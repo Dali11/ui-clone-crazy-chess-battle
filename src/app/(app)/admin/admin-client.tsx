@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Check, X, Coins,
+  LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Check, X, Coins, Smartphone, Shield, Clock,
   TrendingUp, Wallet, AlertCircle, ChevronRight, Cherry, Gamepad2,
-  Shield, Ban, Star, DollarSign, Search, Save, ScrollText, Swords,
+  Ban, Star, DollarSign, Search, Save, ScrollText, Swords,
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
 } from "lucide-react";
 
@@ -62,8 +62,10 @@ interface Deposit {
   charge_id: string | null;
   tx_ref: string | null;
   phone: string | null;
+  operator: string | null;
   reference: string | null;
   created_at: string;
+  profiles?: { username: string; display_name: string; email: string } | null;
 }
 
 interface Tournament {
@@ -250,6 +252,71 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       setWithdrawals((prev) => prev.filter((w) => w.id !== id));
       await fetchStats();
       showToast("Withdrawal rejected");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleVerifyDeposit = async (id: string) => {
+    setActionLoading(`${id}_verify`);
+    try {
+      const res = await fetch(`/api/admin/deposits/${id}/verify`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Verification failed");
+      if (data.status === "success") {
+        showToast(data.message || "Deposit verified and credited");
+        await fetchDeposits();
+        await fetchStats();
+      } else if (data.status === "failed") {
+        showToast(data.message || "Payment not completed");
+        await fetchDeposits();
+      } else {
+        showToast(`Status: ${data.status} - ${data.message || "Still pending"}`);
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCreditDeposit = async (id: string) => {
+    if (!confirm("Manually credit this deposit? This will add funds to the user's wallet.")) return;
+    setActionLoading(`${id}_credit`);
+    try {
+      const res = await fetch(`/api/admin/deposits/${id}/credit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: "Manual credit by admin" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to credit");
+      showToast("Deposit credited to wallet");
+      await fetchDeposits();
+      await fetchStats();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectDeposit = async (id: string) => {
+    const notes = prompt("Reason for rejecting this deposit (optional):") || "Rejected by admin";
+    setActionLoading(`${id}_reject`);
+    try {
+      const res = await fetch(`/api/admin/deposits/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to reject");
+      showToast("Deposit rejected");
+      await fetchDeposits();
+      await fetchStats();
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -752,8 +819,31 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* WITHDRAWALS */}
           {tab === "withdrawals" && (
             <div className="space-y-4">
-              <div className="flex gap-2">
-                {["pending", "completed", "rejected", "all"].map((f) => (
+              {/* Withdrawal stats */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="card text-center">
+                  <p className="text-xs text-ccb-muted">Total Withdrawals</p>
+                  <p className="text-lg font-bold mt-1">
+                    {formatMWK(withdrawals.reduce((s, w) => s + (w.status === "completed" ? w.amount_cents : 0), 0))}
+                  </p>
+                </div>
+                <div className="card text-center">
+                  <p className="text-xs text-ccb-muted">Pending</p>
+                  <p className="text-lg font-bold mt-1 text-ccb-accent">
+                    {withdrawals.filter(w => w.status === "pending").length}
+                  </p>
+                </div>
+                <div className="card text-center">
+                  <p className="text-xs text-ccb-muted">Completed</p>
+                  <p className="text-lg font-bold mt-1 text-ccb-success">
+                    {withdrawals.filter(w => w.status === "completed").length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex gap-2 flex-wrap">
+                {["pending", "completed", "approved", "rejected", "all"].map((f) => (
                   <button
                     key={f}
                     onClick={() => setFilter(f)}
@@ -777,37 +867,59 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                 <div className="space-y-2">
                   {withdrawals.map((w) => (
                     <div key={w.id} className="card">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-medium">
-                            {w.profiles?.display_name || w.profiles?.username || "Unknown"}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold">{formatMWK(w.amount_cents)}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              w.status === "completed" ? "bg-ccb-success/10 text-ccb-success" :
+                              w.status === "pending" ? "bg-ccb-accent/10 text-ccb-accent" :
+                              w.status === "rejected" ? "bg-ccb-danger/10 text-ccb-danger" :
+                              w.status === "approved" ? "bg-ccb-primary/10 text-ccb-primary" :
+                              "bg-ccb-surface text-ccb-muted"
+                            }`}>{w.status}</span>
                           </div>
-                          <div className="text-xs text-ccb-muted">
-                            {w.profiles?.email} · {w.phone} · {w.operator_name}
+                          <div className="text-xs text-ccb-muted mt-1.5 space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <Users className="w-3 h-3" />
+                              {w.profiles?.display_name || w.profiles?.username || "Unknown"}
+                              {w.profiles?.email ? ` · ${w.profiles.email}` : ""}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Smartphone className="w-3 h-3" />
+                              {w.phone} · {w.operator_name}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="w-3 h-3" />
+                              {formatDate(w.created_at)}
+                            </div>
+                            {w.admin_notes && (
+                              <div className="flex items-center gap-1.5 text-ccb-danger">
+                                <AlertCircle className="w-3 h-3" />
+                                {w.admin_notes}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-bold">{formatMWK(w.amount_cents)}</div>
-                          <div className="text-xs text-ccb-muted">{formatDate(w.created_at)}</div>
                         </div>
                       </div>
+
                       {w.status === "pending" && (
                         <div className="flex gap-2 mt-3 pt-3 border-t border-ccb-border">
                           <button
                             onClick={() => handleApprove(w.id)}
                             disabled={actionLoading === w.id}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-success text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-success text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
                           >
-                            {actionLoading === w.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                            Approve
+                            {actionLoading === w.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                            Approve & Send
                           </button>
                           <button
                             onClick={() => handleReject(w.id)}
                             disabled={actionLoading === w.id}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-danger text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-danger text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
                           >
-                            <X className="w-4 h-4" />
-                            Reject
+                            {actionLoading === w.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                            Reject & Refund
                           </button>
                         </div>
                       )}
@@ -818,7 +930,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
             </div>
           )}
 
-          {/* TOURNAMENTS */}
           {tab === "tournaments" && (
             <div className="space-y-3">
               {tournaments.length === 0 ? (
@@ -1287,10 +1398,34 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           )}
 
           {/* DEPOSITS */}
+
           {tab === "deposits" && (
             <div className="space-y-4">
-              <div className="flex gap-2">
-                {["all", "success", "pending", "failed"].map((f) => (
+              {/* Deposit stats */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="card text-center">
+                  <p className="text-xs text-ccb-muted">Total Deposits</p>
+                  <p className="text-lg font-bold mt-1">
+                    {formatMWK(deposits.reduce((s, d) => s + (d.status === "success" ? d.amount_cents : 0), 0))}
+                  </p>
+                </div>
+                <div className="card text-center">
+                  <p className="text-xs text-ccb-muted">Pending</p>
+                  <p className="text-lg font-bold mt-1 text-ccb-accent">
+                    {deposits.filter(d => d.status === "pending").length}
+                  </p>
+                </div>
+                <div className="card text-center">
+                  <p className="text-xs text-ccb-muted">Successful</p>
+                  <p className="text-lg font-bold mt-1 text-ccb-success">
+                    {deposits.filter(d => d.status === "success").length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex gap-2 flex-wrap">
+                {["all", "pending", "processing", "success", "failed"].map((f) => (
                   <button
                     key={f}
                     onClick={() => setFilter(f)}
@@ -1313,20 +1448,69 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
               ) : (
                 <div className="space-y-2">
                   {deposits.map((d) => (
-                    <div key={d.id} className="card flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium">{formatMWK(d.amount_cents)}</div>
-                        <div className="text-xs text-ccb-muted mt-1">
-                          {d.method} · {d.phone || "N/A"} · {formatDate(d.created_at)}
+                    <div key={d.id} className="card">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{formatMWK(d.amount_cents)}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              d.status === "success" ? "bg-ccb-success/10 text-ccb-success" :
+                              d.status === "pending" ? "bg-ccb-accent/10 text-ccb-accent" :
+                              d.status === "processing" ? "bg-ccb-primary/10 text-ccb-primary" :
+                              d.status === "failed" ? "bg-ccb-danger/10 text-ccb-danger" :
+                              "bg-ccb-surface text-ccb-muted"
+                            }`}>{d.status}</span>
+                          </div>
+                          <div className="text-xs text-ccb-muted mt-1.5 space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <Users className="w-3 h-3" />
+                              {d.profiles?.display_name || d.profiles?.username || "Unknown"}
+                              {d.profiles?.email ? ` · ${d.profiles.email}` : ""}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Smartphone className="w-3 h-3" />
+                              {d.method === "mobile_money" ? "Mobile Money" : "Card"}
+                              {d.phone ? ` · ${d.phone}` : ""}
+                              {d.operator ? ` · ${d.operator}` : ""}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="w-3 h-3" />
+                              {formatDate(d.created_at)}
+                              {d.charge_id ? ` · ${d.charge_id.slice(0, 20)}...` : d.tx_ref ? ` · ${d.tx_ref.slice(0, 20)}...` : ""}
+                            </div>
+                          </div>
                         </div>
-                        {d.reference && <div className="text-xs text-ccb-muted">Ref: {d.reference}</div>}
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        d.status === "success" ? "bg-ccb-success/10 text-ccb-success" :
-                        d.status === "pending" ? "bg-ccb-accent/10 text-ccb-accent" :
-                        d.status === "failed" ? "bg-ccb-danger/10 text-ccb-danger" :
-                        "bg-ccb-surface text-ccb-muted"
-                      }`}>{d.status}</span>
+
+                      {/* Action buttons for pending/processing deposits */}
+                      {(d.status === "pending" || d.status === "processing") && (
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-ccb-border">
+                          <button
+                            onClick={() => handleVerifyDeposit(d.id)}
+                            disabled={actionLoading === `${d.id}_verify`}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-primary text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                          >
+                            {actionLoading === `${d.id}_verify` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Shield className="w-3.5 h-3.5" />}
+                            Verify
+                          </button>
+                          <button
+                            onClick={() => handleCreditDeposit(d.id)}
+                            disabled={actionLoading === `${d.id}_credit`}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-success text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                          >
+                            {actionLoading === `${d.id}_credit` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                            Manual Credit
+                          </button>
+                          <button
+                            onClick={() => handleRejectDeposit(d.id)}
+                            disabled={actionLoading === `${d.id}_reject`}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-danger text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                          >
+                            {actionLoading === `${d.id}_reject` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                            Reject
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1334,7 +1518,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
             </div>
           )}
 
-          {/* BATTLES */}
           {tab === "battles" && (
             <div className="space-y-4">
               {battleConfig && (

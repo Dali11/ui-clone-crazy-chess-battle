@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
       .from("deposits")
       .select(`
         id, user_id, amount_cents, status, method, charge_id, tx_ref,
-        paychangu_ref, phone, operator, reference, created_at, updated_at
+        paychangu_ref, phone, operator, reference, created_at, updated_at,
+        profiles!inner(username, display_name, email)
       `)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     return NextResponse.json({ deposits });
-  } catch (e: any) {
+  } catch {
     return NextResponse.json({ error: "Failed to fetch deposits" }, { status: 500 });
   }
 }
