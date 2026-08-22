@@ -24,6 +24,7 @@ export interface GameState {
   initial_minutes: number;
   increment_seconds: number;
   rated: boolean;
+  created_at?: string;
 }
 
 export interface MoveBroadcast {

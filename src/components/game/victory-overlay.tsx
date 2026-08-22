@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Trophy, Handshake, Frown, RefreshCw, Home, Swords, Cherry, ScanSearch } from "lucide-react";
+import { Trophy, Handshake, Frown, RefreshCw, Home, Swords, Cherry, ScanSearch, Clock } from "lucide-react";
 import FireworksCanvas from "./fireworks-canvas";
 
-export type GameOutcome = "win" | "loss" | "draw";
+export type GameOutcome = "win" | "loss" | "draw" | "abort";
 
 interface VictoryOverlayProps {
   visible: boolean;
@@ -55,14 +55,15 @@ export default function VictoryOverlay({
   const isWin = outcome === "win";
   const isDraw = outcome === "draw";
   const isLoss = outcome === "loss";
+  const isAbort = outcome === "abort";
 
   // Color scheme per outcome
-  const accent = isWin ? "#a78bfa" : isDraw ? "#94a3b8" : "#f87171";
-  const accentBg = isWin ? "rgba(167,139,250,0.12)" : isDraw ? "rgba(148,163,184,0.1)" : "rgba(248,113,113,0.1)";
-  const accentBorder = isWin ? "rgba(167,139,250,0.3)" : isDraw ? "rgba(148,163,184,0.2)" : "rgba(248,113,113,0.25)";
+  const accent = isWin ? "#a78bfa" : isDraw ? "#94a3b8" : isAbort ? "#64748b" : "#f87171";
+  const accentBg = isWin ? "rgba(167,139,250,0.12)" : isDraw ? "rgba(148,163,184,0.1)" : isAbort ? "rgba(100,116,139,0.1)" : "rgba(248,113,113,0.1)";
+  const accentBorder = isWin ? "rgba(167,139,250,0.3)" : isDraw ? "rgba(148,163,184,0.2)" : isAbort ? "rgba(100,116,139,0.2)" : "rgba(248,113,113,0.25)";
 
-  const headline = isWin ? "Victory" : isDraw ? "Draw" : "Defeat";
-  const headline2 = isWin ? "You Won" : isDraw ? "Game Drawn" : "You Lost";
+  const headline = isWin ? "Victory" : isDraw ? "Draw" : isAbort ? "Aborted" : "Defeat";
+  const headline2 = isWin ? "You Won" : isDraw ? "Game Drawn" : isAbort ? "Game Aborted" : "You Lost";
 
   return (
     <div
@@ -102,6 +103,7 @@ export default function VictoryOverlay({
         >
           {isWin && <Trophy className="h-7 w-7" style={{ color: accent }} />}
           {isDraw && <Handshake className="h-7 w-7" style={{ color: accent }} />}
+          {isAbort && <Clock className="h-7 w-7" style={{ color: accent }} />}
           {isLoss && <Frown className="h-7 w-7" style={{ color: accent }} />}
         </div>
 
@@ -129,8 +131,8 @@ export default function VictoryOverlay({
             <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold mb-0.5">Result</span>
             <span className="text-sm font-semibold text-white/80">{reasonLabel}</span>
           </div>
-          {/* Rating change */}
-          {ratingChange !== null && ratingChange !== undefined && (
+          {/* Rating change — hidden for aborts (no rating change) */}
+          {ratingChange !== null && ratingChange !== undefined && !isAbort && (
             <div className="flex flex-col items-center">
               <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold mb-0.5">Rating</span>
               <span

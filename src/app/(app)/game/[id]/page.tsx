@@ -53,6 +53,7 @@ export default async function GamePage({
     initial_minutes: game.initial_minutes,
     increment_seconds: game.increment_seconds,
     rated: game.rated,
+    created_at: game.created_at,
   };
 
   return (
