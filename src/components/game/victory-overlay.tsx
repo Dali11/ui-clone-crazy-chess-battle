@@ -16,6 +16,7 @@ interface VictoryOverlayProps {
   subtitle: string;
   berriesAwarded?: number;
   onNewGame?: () => void;
+  onRematch?: () => void;
   onReview?: () => void;
   newGameLabel?: string;
   lobbyHref?: string;
@@ -30,6 +31,7 @@ export default function VictoryOverlay({
   subtitle,
   berriesAwarded,
   onNewGame,
+  onRematch,
   onReview,
   newGameLabel = "New Game",
   lobbyHref = "/play",
@@ -170,6 +172,19 @@ export default function VictoryOverlay({
               }}
             >
               <RefreshCw className="w-4 h-4" /> {newGameLabel}
+            </button>
+          )}
+          {onRematch && (
+            <button
+              onClick={onRematch}
+              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{
+                backgroundColor: accentBg,
+                color: accent,
+                border: `1px solid ${accentBorder}`,
+              }}
+            >
+              <Swords className="w-4 h-4" /> Rematch
             </button>
           )}
           {onReview && (

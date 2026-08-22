@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Chessboard } from "react-chessboard";
 import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
-import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Timer } from "lucide-react";
+import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Timer, Swords } from "lucide-react";
 import Link from "next/link";
 import { getCapturedPieces, getCheckSquare } from "@/lib/game/board-helpers";
 import { playSound, detectMoveSound, setSoundEnabled } from "@/lib/game/sound";
@@ -27,6 +27,8 @@ interface GameClientProps {
   isSpectator?: boolean;
   whiteName?: string;
   blackName?: string;
+  whiteAvatar?: string | null;
+  blackAvatar?: string | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -49,12 +51,13 @@ function formatClock(ms: number | null): string {
   return `0:${seconds.toString().padStart(2, "0")}`;
 }
 
-export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black" }: GameClientProps) {
+export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar }: GameClientProps) {
   const { game, connected, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw } = useRealtimeGame(gameId, initialGame);
   const [fen, setFen] = useState(game.fen);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [viewPly, setViewPly] = useState(0);
+  const [rematchSent, setRematchSent] = useState(false);
   const [reviewFen, setReviewFen] = useState<string | null>(null);
   const [showResignConfirm, setShowResignConfirm] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
@@ -436,18 +439,42 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const toggleSheet = (sheet: SheetType) => setActiveSheet((prev) => (prev === sheet ? null : sheet));
 
   // ============ CHESS.COM-STYLE PLAYER BAR ============
-  const renderPlayerBar = (data: { name: string; rating?: number | string | null; ratingChange?: number | null; captured: string[]; advantage: number; clock: string; isActive: boolean; symbol: string }) => (
+  const handleRematch = async () => {
+    if (rematchSent) return;
+    setRematchSent(true);
+    try {
+      const res = await fetch("/api/game/rematch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId: game.id }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        window.location.href = `/game/${data.gameId}`;
+      } else {
+        setRematchSent(false);
+      }
+    } catch {
+      setRematchSent(false);
+    }
+  };
+
+  const renderPlayerBar = (data: { name: string; avatar?: string | null; rating?: number | string | null; ratingChange?: number | null; captured: string[]; advantage: number; clock: string; isActive: boolean; symbol: string }) => (
     <div className={`flex items-center justify-between max-w-[600px] mx-auto w-full px-2 py-2 rounded-lg transition-colors ${data.isActive ? "bg-ccb-primary/8" : ""}`}>
       <div className="flex items-center gap-2.5 min-w-0">
         {/* Avatar circle — chess.com style */}
         <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors ${data.isActive ? "border-ccb-primary bg-ccb-primary/15" : "border-ccb-border bg-ccb-surface"}`}>
-          <span className="text-lg">{data.symbol}</span>
+          {data.avatar ? (
+            <img src={data.avatar} alt="" className="w-full h-full rounded-full object-cover" />
+          ) : (
+            <span className="text-lg">{data.symbol}</span>
+          )}
         </div>
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-semibold leading-tight truncate">{data.name}</span>
             {data.rating != null && (
-              <span className="text-xs text-ccb-muted shrink-0 flex items-center gap-0.5">
+              <span className="text-sm text-ccb-muted/80 shrink-0 flex items-center gap-0.5 font-medium">
                 ({data.rating}
                 {gameEnded && typeof data.ratingChange === "number" && data.ratingChange !== 0 && (
                   <span className={data.ratingChange > 0 ? "text-emerald-500 font-semibold" : "text-ccb-danger font-semibold"}>
@@ -790,8 +817,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   // ============ SPECTATOR VIEW ============
   if (isSpectator) {
-    const topPlayer = { name: blackName, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" };
-    const bottomPlayer = { name: whiteName, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };
+    const topPlayer = { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" };
+    const bottomPlayer = { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };
 
     return (
       <>
@@ -810,6 +837,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           moveCount={game.move_count}
           subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}`}
           lobbyHref="/play"
+          onRematch={!isSpectator && game.status !== "abort" ? handleRematch : undefined}
         />
       </>
     );
@@ -817,12 +845,12 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   // ============ PLAYER VIEW ============
   const playerData = isWhite
-    ? { name: blackName, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" }
-    : { name: whiteName, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };
+    ? { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" }
+    : { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };
 
   const myData = isWhite
-    ? { name: whiteName, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" }
-    : { name: blackName, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" };
+    ? { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" }
+    : { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" };
 
   return (
     <>
@@ -856,6 +884,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         moveCount={game.move_count}
         subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}`}
         lobbyHref="/play"
+        onRematch={game.status !== "abort" ? handleRematch : undefined}
       />
     </>
   );

@@ -22,6 +22,8 @@ export default function GameClientWrapper(props: {
   isSpectator: boolean;
   whiteName: string;
   blackName: string;
+  whiteAvatar?: string | null;
+  blackAvatar?: string | null;
 }) {
   return <GameClient {...props} />;
 }

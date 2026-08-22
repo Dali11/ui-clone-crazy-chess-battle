@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { User, LogOut, Save, ChevronRight, Trophy, Swords, Wallet } from "lucide-react";
+import { User, LogOut, Save, ChevronRight, Trophy, Swords, Wallet, Camera } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Profile {
@@ -27,12 +27,115 @@ interface Profile {
 export default function SettingsClient({ profile, userId }: { profile: Profile | null; userId: string }) {
   const router = useRouter();
   const supabase = createClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [displayName, setDisplayName] = useState(profile?.display_name || "");
   const [bio, setBio] = useState(profile?.bio || "");
   const [phone, setPhone] = useState(profile?.phone || "");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url || null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 256;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("Failed to get canvas context"));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error("Canvas to Blob conversion failed"));
+              }
+            },
+            "image/jpeg",
+            0.8
+          );
+        };
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAvatarUploading(true);
+    setAvatarError(null);
+
+    try {
+      const blob = await compressImage(file);
+      const path = `${userId}/${Date.now()}.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, blob, { contentType: "image/jpeg" });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(path);
+
+      const publicUrl = urlData.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl })
+        .eq("id", userId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      setAvatarUrl(publicUrl);
+      router.refresh();
+    } catch (err: any) {
+      setAvatarError(err.message || "Failed to upload avatar");
+    } finally {
+      setAvatarUploading(false);
+      if (e.target) {
+        e.target.value = "";
+      }
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -71,6 +174,53 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
           <User className="w-4 h-4 text-ccb-primary" />
           Profile
         </h3>
+
+        {/* Profile Picture Section */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium block">Profile Picture</label>
+          <div className="flex items-center gap-4">
+            <div className="relative w-20 h-20 rounded-full overflow-hidden bg-ccb-surface border border-ccb-border flex items-center justify-center shrink-0">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Avatar"
+                  className="w-20 h-20 rounded-full object-cover"
+                />
+              ) : (
+                <User className="w-10 h-10 text-ccb-muted" />
+              )}
+              {avatarUploading && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-xs text-white font-medium">
+                  Uploading...
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleAvatarChange}
+                accept="image/*"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={avatarUploading}
+                className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-2"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                {avatarUploading ? "Uploading..." : "Change Photo"}
+              </button>
+              {avatarUploading && (
+                <span className="text-xs text-ccb-muted">Uploading image...</span>
+              )}
+              {avatarError && (
+                <span className="text-xs text-ccb-danger">{avatarError}</span>
+              )}
+            </div>
+          </div>
+        </div>
 
         <div>
           <label className="text-sm font-medium block mb-1.5">Display Name</label>

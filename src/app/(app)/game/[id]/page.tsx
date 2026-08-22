@@ -25,8 +25,8 @@ export default async function GamePage({
 
   // Get player profiles for names
   const [whiteProfile, blackProfile] = await Promise.all([
-    supabase.from("profiles").select("username, display_name, rating").eq("id", game.white_player_id).single(),
-    supabase.from("profiles").select("username, display_name, rating").eq("id", game.black_player_id).single(),
+    supabase.from("profiles").select("username, display_name, rating, avatar_url").eq("id", game.white_player_id).single(),
+    supabase.from("profiles").select("username, display_name, rating, avatar_url").eq("id", game.black_player_id).single(),
   ]);
 
   const isPlayer = user && (user.id === game.white_player_id || user.id === game.black_player_id);
@@ -65,6 +65,8 @@ export default async function GamePage({
         isSpectator={isSpectator}
         whiteName={whiteProfile.data?.display_name || whiteProfile.data?.username || "White"}
         blackName={blackProfile.data?.display_name || blackProfile.data?.username || "Black"}
+        whiteAvatar={whiteProfile.data?.avatar_url}
+        blackAvatar={blackProfile.data?.avatar_url}
       />
     </>
   );
