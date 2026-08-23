@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Chessboard } from "react-chessboard";
 import { Chess } from "chess.js";
 import { Clock, Flag, ArrowLeft, Bot, Volume2, VolumeX, List, Palette, X, ChevronLeft, ChevronRight, MoreVertical, MessageCircle, RotateCcw, Send } from "lucide-react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getBestMove, type AIDifficulty } from "@/lib/game/chess-ai";
 import { getCapturedPieces, getCheckSquare } from "@/lib/game/board-helpers";
@@ -66,6 +67,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [whiteClock, setWhiteClock] = useState(initialMinutes * 60 * 1000);
+  const router = useRouter();
   const [blackClock, setBlackClock] = useState(initialMinutes * 60 * 1000);
   const [clockTick, setClockTick] = useState(0);
   const [lastMoveAt, setLastMoveAt] = useState(Date.now());
@@ -387,6 +389,35 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
     setStatus("resign");
     setWinner(aiColor);
     setShowResignConfirm(false);
+  };
+
+  const handlePlayAgain = async () => {
+    const tcId = (() => {
+      const m = initialMinutes;
+      const i = incrementSeconds;
+      if (m === 1 && i === 0) return "bullet";
+      if (m === 3 && i === 2) return "blitz3";
+      if (m === 5 && i === 0) return "blitz";
+      if (m === 10 && i === 0) return "rapid";
+      if (m === 15 && i === 10) return "rapid15";
+      if (m === 30 && i === 0) return "classical";
+      return "blitz";
+    })();
+    try {
+      const res = await fetch("/api/matchmaking/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timeControl: tcId, rated: true }),
+      });
+      const data = await res.json();
+      if (data.status === "matched" && data.gameId) {
+        router.push(`/game/${data.gameId}`);
+      } else {
+        router.push(`/play?tc=${tcId}&rated=1&search=1`);
+      }
+    } catch {
+      router.push(`/play?tc=${tcId}&rated=1&search=1`);
+    }
   };
 
   const handleNewGame = () => {
@@ -905,7 +936,9 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
         reasonLabel={STATUS_LABELS[status] || status}
         moveCount={moveCount}
         subtitle={`${DIFFICULTY_LABELS[difficulty]} · vs Computer`}
+        onPlayAgain={handlePlayAgain}
         onNewGame={handleNewGame}
+        newGameLabel="Rematch Bot"
         onReview={() => setOverlayDismissed(true)}
       />
     </>
