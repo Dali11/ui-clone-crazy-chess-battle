@@ -60,10 +60,10 @@ export async function GET(req: NextRequest) {
       .in("method", ["mobile_money", "card"]);
     const totalDeposits = depositsData?.reduce((sum, d) => sum + (d.amount_cents || 0), 0) || 0;
 
-    // Total withdrawals (completed/approved)
+    // Total withdrawals (only completed — approved is transient during payout)
     const { data: withdrawalsData } = await admin
       .from("withdrawals").select("amount_cents")
-      .in("status", ["approved", "completed"]);
+      .eq("status", "completed");
     const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + (w.amount_cents || 0), 0) || 0;
 
     // Completed + settled battles stats

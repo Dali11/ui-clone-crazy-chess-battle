@@ -23,11 +23,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Fetch withdrawal info before refunding
     const { data: withdrawal } = await admin
       .from("withdrawals")
-      .select("user_id, amount_cents, phone, operator_name")
+      .select("user_id, amount_cents, phone, operator_name, status")
       .eq("id", id)
       .single();
 
     if (!withdrawal) return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 });
+    if (withdrawal.status !== "pending") return NextResponse.json({ error: `Withdrawal is already ${withdrawal.status}` }, { status: 400 });
 
     // Refund wallet and mark rejected
     const { error } = await admin.rpc("refund_withdrawal", {
@@ -37,10 +38,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-    // Add admin notes
+    // Add admin notes + processed_by/at (refund_withdrawal RPC doesn't set these)
     await admin
       .from("withdrawals")
-      .update({ admin_notes: adminNotes })
+      .update({ admin_notes: adminNotes, processed_by: user.id, processed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq("id", id);
 
     // Insert in-app notification directly (no self-HTTP fetch)

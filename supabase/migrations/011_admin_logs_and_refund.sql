@@ -61,6 +61,8 @@ BEGIN
   -- Mark the withdrawal as rejected (refunded)
   UPDATE public.withdrawals
   SET status = 'rejected',
+      processed_by = p_admin_id,
+      processed_at = now(),
       updated_at = now()
   WHERE id = p_withdrawal_id;
 END;

@@ -17,21 +17,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .single();
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    // Get the withdrawal
-    const { data: withdrawal } = await admin
+    // Atomic claim: only update if still pending (prevents double-approve by concurrent admins)
+    const { data: withdrawal, error: claimError } = await admin
       .from("withdrawals")
-      .select("*")
+      .update({ status: "approved", processed_by: user.id, processed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq("id", id)
+      .eq("status", "pending")
+      .select("*")
       .single();
 
-    if (!withdrawal) return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 });
-    if (withdrawal.status !== "pending") return NextResponse.json({ error: "Withdrawal not pending" }, { status: 400 });
-
-    // Mark as approved (funds already debited at request time)
-    await admin
-      .from("withdrawals")
-      .update({ status: "approved", processed_by: user.id, processed_at: new Date().toISOString() })
-      .eq("id", id);
+    if (claimError || !withdrawal) {
+      // Check if it exists at all
+      const { data: existing } = await admin.from("withdrawals").select("status").eq("id", id).single();
+      if (!existing) return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 });
+      return NextResponse.json({ error: `Withdrawal is already ${existing.status}` }, { status: 400 });
+    }
 
     // Initiate Paychangu mobile money payout
     const chargeId = `wd_${withdrawal.id.slice(0, 8)}_${Date.now()}`;
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         // Update with charge_id and mark as completed (Paychangu processes async)
         await admin
           .from("withdrawals")
-          .update({ status: "completed", charge_id: chargeId })
+          .update({ status: "completed", charge_id: chargeId, updated_at: new Date().toISOString() })
           .eq("id", id);
 
         // Insert in-app notification directly (no self-HTTP fetch)

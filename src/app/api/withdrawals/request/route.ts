@@ -18,7 +18,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Phone, operator required" }, { status: 400 });
     }
 
+    // Validate phone format (Malawi: 08x, 09x, +265, 265)
+    const phoneDigits = phone.replace(/\D/g, "");
+    const localPhone = phoneDigits.startsWith("265") ? "0" + phoneDigits.slice(3) : phoneDigits;
+    if (localPhone.length < 9 || !localPhone.match(/^0[89]/)) {
+      return NextResponse.json({ error: "Invalid Malawi mobile money number" }, { status: 400 });
+    }
+
     const admin = createAdminClient();
+
+    // Check for existing pending withdrawal (prevent spam)
+    const { data: existingPending } = await admin
+      .from("withdrawals")
+      .select("id, amount_cents")
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .limit(1);
+
+    if (existingPending && existingPending.length > 0) {
+      return NextResponse.json({ error: "You already have a pending withdrawal. Wait for it to be processed before requesting another." }, { status: 400 });
+    }
 
     // Call the atomic request_withdrawal RPC
     const { data: withdrawalId, error } = await admin.rpc("request_withdrawal", {
