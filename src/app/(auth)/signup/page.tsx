@@ -568,13 +568,17 @@ export default function SignupPage() {
           </div>
         </form>
 
-        <p className="text-center text-sm text-ccb-muted mt-6">
-          Already have an account?{" "}
-          <Link href={loginLink} className="text-ccb-primary hover:underline">
+        <div className="mt-6 text-center">
+          <p className="text-sm text-ccb-muted mb-3">Already have an account?</p>
+          <Link
+            href={loginLink}
+            className="btn-secondary w-full inline-flex items-center justify-center gap-2 px-6 py-3 text-base font-medium"
+          >
             Log in
           </Link>
-        </p>
+        </div>
       </div>
     </div>
   );
 }
+
