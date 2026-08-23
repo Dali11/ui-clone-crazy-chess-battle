@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Swords, Trophy, TrendingUp, User, Wallet, Shield, Coins, Gift } from "lucide-react";
+import { Home, Swords, Trophy, TrendingUp, User, Wallet, Shield, Coins, Gift, Puzzle } from "lucide-react";
 import NotificationBell from "./notification-bell";
 
 interface Profile {
@@ -18,9 +18,9 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
   const isGameRoute = pathname.startsWith("/game/") || pathname.startsWith("/play/computer");
 
   const navItems = [
-    { href: "/dashboard", label: "Home", icon: Home },
     { href: "/play", label: "Play", icon: Swords },
     { href: "/battles", label: "Battles", icon: Coins },
+    { href: "/puzzles", label: "Puzzles", icon: Puzzle },
     { href: "/tournaments", label: "Tournos", icon: Trophy },
     { href: "/wallet", label: "Wallet", icon: Wallet },
   ];
@@ -29,6 +29,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/dashboard", label: "Home", icon: Home },
     { href: "/play", label: "Play", icon: Swords },
     { href: "/battles", label: "Battles", icon: Coins },
+    { href: "/puzzles", label: "Puzzles", icon: Puzzle },
     { href: "/tournaments", label: "Tournos", icon: Trophy },
     { href: "/earn", label: "Earn CCB", icon: Gift },
     { href: "/leaderboard", label: "Ranks", icon: TrendingUp },

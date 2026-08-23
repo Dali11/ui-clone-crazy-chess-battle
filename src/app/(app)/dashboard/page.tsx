@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight, Cherry, Gift } from "lucide-react";
+import WhatsAppBanner from "@/components/layout/whatsapp-banner";
 
 const LEVEL_RATINGS: Record<string, number> = {
   beginner: 400,
@@ -69,6 +70,9 @@ export default async function DashboardPage() {
         </h1>
         <p className="text-sm text-ccb-muted mt-1">Ready for a battle?</p>
       </div>
+
+      {/* WhatsApp group invite — shows once daily until joined */}
+      <WhatsAppBanner />
 
       {/* Stats — compact strip */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
