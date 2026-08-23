@@ -20,6 +20,7 @@ interface VictoryOverlayProps {
   ratingChange?: number | null;
   moveCount: number;
   subtitle: string;
+  playerNames?: { white: string; black: string };
   berriesAwarded?: number;
   moneyEarned?: number;     // in MWK (already divided by 100)
   moneyLabel?: string;       // e.g. "Battle winnings"
@@ -44,6 +45,7 @@ export default function VictoryOverlay({
   berriesAwarded = 0,
   moneyEarned,
   moneyLabel = "Battle winnings",
+  playerNames,
   onNewGame,
   onRematch,
   onReview,
@@ -119,6 +121,19 @@ export default function VictoryOverlay({
           <h2 className="text-2xl font-extrabold tracking-tight leading-none" style={{ color: accent }}>{headline}</h2>
           <p className="text-sm text-white/50 mt-1.5 font-medium">{headline2}</p>
         </div>
+
+        {/* Player names */}
+        {playerNames && (
+          <div className="mt-3 flex items-center justify-center gap-2 text-sm">
+            <span className={`font-semibold ${isWin ? "text-white/90" : "text-white/60"}`}>
+              {playerNames.white}
+            </span>
+            <span className="text-white/30 text-xs font-medium">vs</span>
+            <span className={`font-semibold ${(!isWin && !isDraw && !isAbort) ? "text-white/90" : "text-white/60"}`}>
+              {playerNames.black}
+            </span>
+          </div>
+        )}
 
         {/* Divider */}
         <div className="my-4 h-px" style={{ background: `linear-gradient(90deg, transparent, ${accentBorder}, transparent)` }} />
