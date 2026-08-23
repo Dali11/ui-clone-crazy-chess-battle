@@ -66,7 +66,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
             <span className="font-bold text-sm sm:text-lg truncate">Crazy Chess Battles</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <Link href="/tournaments" className="btn-ghost text-sm hidden sm:inline-flex">Tournaments</Link>
+            <Link href="/league" className="btn-ghost text-sm hidden sm:inline-flex">Tournaments</Link>
             <Link href="/leaderboard" className="btn-ghost text-sm">Leaderboard</Link>
             <Link href="/how-it-works" className="btn-ghost text-sm hidden sm:inline-flex">How it Works</Link>
             <Link href={`/signup${refParam}`} className="btn-primary text-sm px-3 sm:px-4">Sign up</Link>
@@ -330,7 +330,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           </div>
           <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-ccb-muted flex-wrap justify-center">
             <Link href="/leaderboard" className="hover:text-ccb-text transition-colors">Leaderboard</Link>
-            <Link href="/tournaments" className="hover:text-ccb-text transition-colors">Tournaments</Link>
+            <Link href="/league" className="hover:text-ccb-text transition-colors">Tournaments</Link>
             <Link href="/how-it-works" className="hover:text-ccb-text transition-colors">How it Works</Link>
             <Link href="/faq" className="hover:text-ccb-text transition-colors">FAQ</Link>
             <Link href="/about" className="hover:text-ccb-text transition-colors">About</Link>

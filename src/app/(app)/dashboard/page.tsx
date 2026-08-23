@@ -120,15 +120,15 @@ export default async function DashboardPage() {
         {/* Upcoming tournaments */}
         <div className="card p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-base sm:text-lg">Tournaments</h3>
-            <Link href="/tournaments" className="text-xs text-ccb-primary hover:underline">View all</Link>
+            <h3 className="font-bold text-base sm:text-lg">Competitions</h3>
+            <Link href="/league" className="text-xs text-ccb-primary hover:underline">View all</Link>
           </div>
           {activeTournaments && activeTournaments.length > 0 ? (
             <div className="space-y-2">
               {activeTournaments.map((t) => (
                 <Link
                   key={t.id}
-                  href={`/tournaments/${t.id}`}
+                  href={`/league`}
                   className="flex items-center justify-between rounded-lg bg-ccb-surface px-3 py-2.5 sm:px-4 sm:py-3 hover:bg-ccb-card transition-colors"
                 >
                   <div className="min-w-0 flex items-center gap-2">
@@ -146,7 +146,7 @@ export default async function DashboardPage() {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-ccb-muted">No upcoming tournaments. Check back soon!</p>
+            <p className="text-sm text-ccb-muted">No upcoming competitions. Check back soon!</p>
           )}
         </div>
 

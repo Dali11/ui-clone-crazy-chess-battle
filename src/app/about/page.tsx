@@ -16,7 +16,7 @@ export default function AboutPage() {
             <span className="font-bold text-sm sm:text-lg truncate">Crazy Chess Battles</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <Link href="/tournaments" className="btn-ghost text-sm hidden sm:inline-flex">Tournaments</Link>
+            <Link href="/league" className="btn-ghost text-sm hidden sm:inline-flex">Tournaments</Link>
             <Link href="/leaderboard" className="btn-ghost text-sm">Leaderboard</Link>
             <Link href="/signup" className="btn-primary text-sm px-3 sm:px-4">Sign up</Link>
           </div>
@@ -207,7 +207,7 @@ export default function AboutPage() {
             <Link href="/" className="hover:text-ccb-text transition-colors">Home</Link>
             <Link href="/how-it-works" className="hover:text-ccb-text transition-colors">How it Works</Link>
             <Link href="/leaderboard" className="hover:text-ccb-text transition-colors">Leaderboard</Link>
-            <Link href="/tournaments" className="hover:text-ccb-text transition-colors">Tournaments</Link>
+            <Link href="/league" className="hover:text-ccb-text transition-colors">Tournaments</Link>
             <Link href="/faq" className="hover:text-ccb-text transition-colors">FAQ</Link>
             <Link href="/about" className="hover:text-ccb-text transition-colors">About</Link>
             <Link href="/privacy" className="hover:text-ccb-text transition-colors">Privacy</Link>

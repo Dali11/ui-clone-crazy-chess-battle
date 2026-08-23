@@ -512,7 +512,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   };
 
   const handleTournamentShare = async (t: Tournament) => {
-    const url = `${window.location.origin}/tournaments/${t.id}`;
+    const url = `${window.location.origin}/league`;
     try {
       await navigator.clipboard.writeText(url);
       showToast(`Invite link copied: ${url}`);
