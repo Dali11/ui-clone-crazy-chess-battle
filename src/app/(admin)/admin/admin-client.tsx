@@ -141,6 +141,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [battleConfigSaving, setBattleConfigSaving] = useState(false);
   const [berryConfig, setBerryConfig] = useState<any>(null);
   const [berrySaving, setBerrySaving] = useState(false);
+  const [withdrawalConfig, setWithdrawalConfig] = useState<any>(null);
+  const [withdrawalConfigSaving, setWithdrawalConfigSaving] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserInfo | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -201,6 +203,11 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     if (res.ok) setBerryConfig(await res.json());
   }, []);
 
+  const fetchWithdrawalConfig = useCallback(async () => {
+    const res = await fetch("/api/admin/withdrawal-config");
+    if (res.ok) setWithdrawalConfig(await res.json());
+  }, []);
+
   const fetchBattleStats = useCallback(async () => {
     const [statsRes, configRes] = await Promise.all([
       fetch("/api/battles/stats"),
@@ -214,7 +221,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     const load = async () => {
       setLoading(true);
       await fetchStats();
-      if (tab === "withdrawals") await fetchWithdrawals();
+      if (tab === "withdrawals") { await fetchWithdrawals(); await fetchWithdrawalConfig(); }
       if (tab === "users") await fetchUsers();
       if (tab === "deposits") await fetchDeposits();
       if (tab === "tournaments") await fetchTournaments();
@@ -261,6 +268,31 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       alert(err.message);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleToggleAutoApprove = async (enabled: boolean) => {
+    setWithdrawalConfigSaving(true);
+    try {
+      const res = await fetch("/api/admin/withdrawal-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: withdrawalConfig?.id,
+          auto_approve_enabled: enabled,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setWithdrawalConfig(data);
+        showToast(enabled ? "Auto-approval enabled — withdrawals will process automatically" : "Manual approval enabled — withdrawals require admin review");
+      } else {
+        showToast(data.error || "Failed to update setting");
+      }
+    } catch {
+      showToast("Failed to update setting");
+    } finally {
+      setWithdrawalConfigSaving(false);
     }
   };
 
@@ -905,6 +937,31 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* WITHDRAWALS */}
           {tab === "withdrawals" && (
             <div className="space-y-4">
+              {/* Auto-approve toggle */}
+              {withdrawalConfig && (
+                <div className="card flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Auto-Approve Withdrawals</p>
+                    <p className="text-xs text-ccb-muted mt-0.5">
+                      {withdrawalConfig.auto_approve_enabled
+                        ? "Withdrawals are processed automatically via Paychangu. No admin review needed."
+                        : "Withdrawals require manual admin approval before payout is sent."}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleToggleAutoApprove(!withdrawalConfig.auto_approve_enabled)}
+                    disabled={withdrawalConfigSaving}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                      withdrawalConfig.auto_approve_enabled ? "bg-ccb-success" : "bg-ccb-border"
+                    } disabled:opacity-50`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      withdrawalConfig.auto_approve_enabled ? "translate-x-6" : "translate-x-1"
+                    }`} />
+                  </button>
+                </div>
+              )}
+
               {/* Withdrawal stats */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="card text-center">
