@@ -85,6 +85,24 @@ export async function POST(req: NextRequest) {
         .update({ status: "success", updated_at: new Date().toISOString() })
         .eq("id", deposit.id);
 
+      // Trigger referral activation
+      try {
+        await admin.rpc("check_referral_activation", { p_user_id: user.id, p_action: "deposit" });
+      } catch {}
+
+      // Notify user
+      const amountMWK = Math.floor(deposit.amount_cents / 100);
+      try {
+        await admin.from("notifications").insert({
+          user_id: user.id,
+          type: "deposit_success",
+          title: "Deposit confirmed",
+          body: `Your deposit of MWK ${amountMWK.toLocaleString()} has been credited to your wallet.`,
+          data: { amount: amountMWK, method: deposit.method },
+          read: false,
+        });
+      } catch {}
+
       return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount_cents });
     }
 

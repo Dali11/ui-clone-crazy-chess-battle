@@ -46,12 +46,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const remoteStatus = data.data?.status || data.status;
 
     if (remoteStatus === "success" || remoteStatus === "successful") {
-      // Atomically claim the deposit
+      // Atomically claim the deposit — accept both pending AND processing
       const { data: claimed } = await admin
         .from("deposits")
         .update({ status: "processing", updated_at: new Date().toISOString() })
         .eq("id", id)
-        .eq("status", "pending")
+        .in("status", ["pending", "processing"])
         .select("id");
 
       if (claimed && claimed.length > 0) {
@@ -63,6 +63,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         await admin.from("deposits")
           .update({ status: "success", updated_at: new Date().toISOString() })
           .eq("id", id);
+
+        // Trigger referral activation
+        try {
+          await admin.rpc("check_referral_activation", { p_user_id: deposit.user_id, p_action: "deposit" });
+        } catch {}
 
         const amountMWK = Math.floor(deposit.amount_cents / 100);
         try {

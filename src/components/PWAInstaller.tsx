@@ -8,8 +8,8 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-const DISMISS_KEY = "ccb_pwa_install_dismissed_at";
-const DISMISS_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const DISMISS_KEY = "ccb_pwa_dismissed_date";
+const INSTALLED_KEY = "ccb_pwa_installed";
 
 export default function PWAInstaller() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -22,48 +22,85 @@ export default function PWAInstaller() {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
 
-    // Detect standalone / already-installed
-    const isStandalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
-    if (isStandalone) return;
+    // Check if already installed (standalone mode or previously marked)
+    const checkInstalled = () => {
+      const isStandalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.matchMedia("(display-mode: minimal-ui)").matches ||
+        (window.navigator as any).standalone === true;
+      const markedInstalled = localStorage.getItem(INSTALLED_KEY) === "true";
+      return isStandalone || markedInstalled;
+    };
 
-    // Respect recent dismissal
-    const dismissedAt = localStorage.getItem(DISMISS_KEY);
-    if (dismissedAt && Date.now() - parseInt(dismissedAt, 10) < DISMISS_COOLDOWN_MS) {
-      return;
-    }
+    if (checkInstalled()) return; // Already installed — never show
 
+    // Listen for appinstalled event to permanently hide
+    const handleInstalled = () => {
+      localStorage.setItem(INSTALLED_KEY, "true");
+      setShowBanner(false);
+      setDeferredPrompt(null);
+    };
+    window.addEventListener("appinstalled", handleInstalled);
+
+    // Also listen for display-mode changes (covers cases where appinstalled doesn't fire)
+    const mq = window.matchMedia("(display-mode: standalone)");
+    const handleDisplayChange = (e: MediaQueryListEvent) => {
+      if (e.matches) handleInstalled();
+    };
+    mq.addEventListener("change", handleDisplayChange);
+
+    // Check if already shown today
+    const today = new Date().toDateString();
+    const lastShown = localStorage.getItem(DISMISS_KEY);
+    if (lastShown === today) return; // Already shown today
+
+    // Detect iOS (no beforeinstallprompt support)
     const ua = window.navigator.userAgent;
     const iosDetected = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
     setIsIOS(iosDetected);
 
     if (iosDetected) {
-      // iOS doesn't support beforeinstallprompt — show manual instructions banner
+      // iOS doesn't support beforeinstallprompt — show manual instructions
+      // But still respect once-a-day
       setShowBanner(true);
+      localStorage.setItem(DISMISS_KEY, today);
       return;
     }
 
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setShowBanner(true);
+      // Only show if not already shown today
+      const todayDate = new Date().toDateString();
+      const shown = localStorage.getItem(DISMISS_KEY);
+      if (shown !== todayDate) {
+        setShowBanner(true);
+        localStorage.setItem(DISMISS_KEY, todayDate);
+      }
     };
 
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", handleInstalled);
+      mq.removeEventListener("change", handleDisplayChange);
+    };
   }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
     await deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
+    const choice = await deferredPrompt.userChoice;
+    if (choice.outcome === "accepted") {
+      localStorage.setItem(INSTALLED_KEY, "true");
+    }
     setShowBanner(false);
     setDeferredPrompt(null);
   };
 
   const handleDismiss = () => {
-    localStorage.setItem(DISMISS_KEY, Date.now().toString());
+    // Record today's date so it doesn't show again until tomorrow
+    localStorage.setItem(DISMISS_KEY, new Date().toDateString());
     setShowBanner(false);
   };
 

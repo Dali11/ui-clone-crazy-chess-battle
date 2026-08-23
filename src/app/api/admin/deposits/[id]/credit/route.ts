@@ -27,16 +27,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!deposit) return NextResponse.json({ error: "Deposit not found" }, { status: 404 });
     if (deposit.status === "success") return NextResponse.json({ error: "Deposit already credited" }, { status: 400 });
 
-    // Credit wallet
+    // ATOMIC CLAIM: Set status to 'success' first — prevents double-crediting on concurrent requests
+    // Only succeeds if the deposit is still in pending/processing (not already claimed)
+    const { data: claimed } = await admin
+      .from("deposits")
+      .update({ status: "success", updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .in("status", ["pending", "processing"])
+      .select("id");
+
+    if (!claimed || claimed.length === 0) {
+      return NextResponse.json({ error: "Deposit was already claimed by another process" }, { status: 409 });
+    }
+
+    // Now safe to credit wallet — no concurrent request can reach this point
     await admin.rpc("credit_wallet", {
       p_user_id: deposit.user_id,
       p_amount_cents: deposit.amount_cents,
     });
 
-    // Mark as success
-    await admin.from("deposits")
-      .update({ status: "success", updated_at: new Date().toISOString() })
-      .eq("id", id);
+    // Trigger referral activation
+    try {
+      await admin.rpc("check_referral_activation", { p_user_id: deposit.user_id, p_action: "deposit" });
+    } catch {}
 
     // Notify user
     const amountMWK = Math.floor(deposit.amount_cents / 100);

@@ -276,9 +276,11 @@ export default function SignupPage() {
         </div>
 
         {refCode && step === 0 && (
-          <p className="text-xs text-ccb-primary mb-4 font-medium text-center">
-            🍒 Referred by {refCode} — they&apos;ll earn 1,000 CCB when you start playing!
-          </p>
+          <div className="rounded-lg bg-ccb-primary/10 border border-ccb-primary/30 px-4 py-3 mb-4 text-center">
+            <p className="text-sm font-semibold text-ccb-primary">
+              🍒 Referred by {refCode} — you&apos;ll earn 500+ berries and more when you start playing!
+            </p>
+          </div>
         )}
 
         {error && (

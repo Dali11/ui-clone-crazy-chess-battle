@@ -48,6 +48,11 @@ export async function GET(req: NextRequest) {
       .from("withdrawals").select("*", { count: "exact", head: true })
       .eq("status", "pending");
 
+    // Pending deposits
+    const { count: pendingDeposits } = await admin
+      .from("deposits").select("*", { count: "exact", head: true })
+      .in("status", ["pending", "processing"]);
+
     // Total deposits — real money entering the platform (method IN ('mobile_money', 'card'))
     const { data: depositsData } = await admin
       .from("deposits").select("amount_cents")
@@ -112,6 +117,7 @@ export async function GET(req: NextRequest) {
       activeTournaments: activeTournaments ?? 0,
       pendingTournamentApprovals: pendingTournamentApprovals ?? 0,
       pendingWithdrawals: pendingWithdrawals ?? 0,
+      pendingDeposits: pendingDeposits ?? 0,
       totalDeposits,
       totalWithdrawals,
       totalBattleVolume,

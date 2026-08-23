@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MessageCircle, X, Users } from "lucide-react";
+import { X, Users } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 
 const WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/Jn1pLCUVbv09ECOiS8UM1o";
 const JOINED_KEY = "ccb-wa-joined";
@@ -52,8 +53,8 @@ export default function WhatsAppBanner() {
       </button>
 
       <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0">
-          <MessageCircle className="w-6 h-6 text-white" fill="white" />
+        <div className="w-11 h-11 rounded-xl bg-[#25D366] flex items-center justify-center shrink-0">
+          <WhatsAppIcon className="w-6 h-6 text-white" />
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-sm flex items-center gap-1.5">
@@ -69,9 +70,9 @@ export default function WhatsAppBanner() {
       <div className="flex items-center gap-2 mt-3">
         <button
           onClick={handleJoin}
-          className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold px-4 py-2.5 transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-[#25D366] hover:bg-[#1da851] text-white text-sm font-semibold px-4 py-2.5 transition-colors"
         >
-          <MessageCircle className="w-4 h-4" fill="white" />
+          <WhatsAppIcon className="w-4 h-4" />
           <span>Join Group</span>
         </button>
         <button

@@ -27,6 +27,7 @@ interface Stats {
   totalGames?: number;
   activeTournaments: number;
   pendingWithdrawals: number;
+  pendingDeposits: number;
   pendingTournamentApprovals?: number;
   totalDeposits: number;
   totalWithdrawals: number;
@@ -132,7 +133,9 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [filter, setFilter] = useState("pending");
+  const [withdrawalFilter, setWithdrawalFilter] = useState("pending");
+  const [depositFilter, setDepositFilter] = useState("all");
+  const [gamesFilter, setGamesFilter] = useState("all");
   const [battleStats, setBattleStats] = useState<any>(null);
   const [battleConfig, setBattleConfig] = useState<any>(null);
   const [battleConfigSaving, setBattleConfigSaving] = useState(false);
@@ -158,10 +161,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   }, []);
 
   const fetchWithdrawals = useCallback(async () => {
-    const res = await fetch(`/api/admin/withdrawals?status=${filter}`);
+    const res = await fetch(`/api/admin/withdrawals?status=${withdrawalFilter}`);
     const data = await res.json();
     setWithdrawals(data.withdrawals || []);
-  }, [filter]);
+  }, [withdrawalFilter]);
 
   const fetchUsers = useCallback(async () => {
     const res = await fetch("/api/admin/users");
@@ -170,10 +173,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   }, []);
 
   const fetchDeposits = useCallback(async () => {
-    const res = await fetch(`/api/admin/deposits?status=${filter}`);
+    const res = await fetch(`/api/admin/deposits?status=${depositFilter}`);
     const data = await res.json();
     setDeposits(data.deposits || []);
-  }, [filter]);
+  }, [depositFilter]);
 
   const fetchTournaments = useCallback(async () => {
     const res = await fetch("/api/admin/tournaments");
@@ -182,10 +185,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   }, []);
 
   const fetchGames = useCallback(async () => {
-    const res = await fetch(`/api/admin/games?status=${filter}`);
+    const res = await fetch(`/api/admin/games?status=${gamesFilter}`);
     const data = await res.json();
     setGames(data.games || []);
-  }, [filter]);
+  }, [gamesFilter]);
 
   const fetchLogs = useCallback(async () => {
     const res = await fetch("/api/admin/logs");
@@ -222,7 +225,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       setLoading(false);
     };
     load();
-  }, [tab, filter]);
+  }, [tab, withdrawalFilter, depositFilter, gamesFilter]);
 
   const handleApprove = async (id: string) => {
     setActionLoading(id);
@@ -601,7 +604,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     { id: "withdrawals", label: "Withdrawals", icon: ArrowDownUp, badge: stats?.pendingWithdrawals },
     { id: "tournaments", label: "Tournaments", icon: Trophy, badge: stats?.pendingTournamentApprovals || undefined },
     { id: "games", label: "Games", icon: Gamepad2 },
-    { id: "deposits", label: "Deposits", icon: DollarSign },
+    { id: "deposits", label: "Deposits", icon: DollarSign, badge: stats?.pendingDeposits || undefined },
     { id: "battles", label: "Battles", icon: Swords },
     { id: "berry", label: "Berry", icon: Cherry },
     { id: "logs", label: "Logs", icon: ScrollText },
@@ -657,7 +660,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
             return (
               <button
                 key={t.id}
-                onClick={() => { setTab(t.id); setFilter("pending"); setSidebarOpen(false); }}
+                onClick={() => { setTab(t.id); setWithdrawalFilter("pending"); setDepositFilter("all"); setGamesFilter("all"); setSidebarOpen(false); }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive
                     ? "bg-ccb-primary/15 text-ccb-primary shadow-sm"
@@ -929,9 +932,9 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                 {["pending", "completed", "approved", "rejected", "all"].map((f) => (
                   <button
                     key={f}
-                    onClick={() => setFilter(f)}
+                    onClick={() => setWithdrawalFilter(f)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-all ${
-                      filter === f
+                      withdrawalFilter === f
                         ? "bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30"
                         : "text-ccb-muted hover:text-ccb-text border border-transparent"
                     }`}
@@ -1426,9 +1429,9 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                 {["all", "playing", "completed", "aborted", "draw"].map((f) => (
                   <button
                     key={f}
-                    onClick={() => setFilter(f)}
+                    onClick={() => setGamesFilter(f)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-all ${
-                      filter === f
+                      gamesFilter === f
                         ? "bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30"
                         : "text-ccb-muted hover:text-ccb-text border border-transparent"
                     }`}
@@ -1511,9 +1514,9 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                 {["all", "pending", "processing", "success", "failed"].map((f) => (
                   <button
                     key={f}
-                    onClick={() => setFilter(f)}
+                    onClick={() => setDepositFilter(f)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-all ${
-                      filter === f
+                      depositFilter === f
                         ? "bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30"
                         : "text-ccb-muted hover:text-ccb-text border border-transparent"
                     }`}
