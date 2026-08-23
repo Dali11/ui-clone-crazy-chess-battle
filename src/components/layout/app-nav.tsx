@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Swords, Trophy, TrendingUp, User, Wallet, Shield, Coins, Gift, Puzzle } from "lucide-react";
+import { Home, Swords, Trophy, TrendingUp, User, Wallet, Shield, Coins, Gift, Puzzle, Crown } from "lucide-react";
 import NotificationBell from "./notification-bell";
 
 interface Profile {
@@ -22,6 +22,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/battles", label: "Battles", icon: Coins },
     { href: "/puzzles", label: "Puzzles", icon: Puzzle },
     { href: "/tournaments", label: "Tournos", icon: Trophy },
+    { href: "/league", label: "League", icon: Crown },
     { href: "/wallet", label: "Wallet", icon: Wallet },
   ];
 
@@ -31,6 +32,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/battles", label: "Battles", icon: Coins },
     { href: "/puzzles", label: "Puzzles", icon: Puzzle },
     { href: "/tournaments", label: "Tournos", icon: Trophy },
+    { href: "/league", label: "League", icon: Crown },
     { href: "/earn", label: "Earn CCB", icon: Gift },
     { href: "/leaderboard", label: "Ranks", icon: TrendingUp },
     { href: "/history", label: "History", icon: TrendingUp },
