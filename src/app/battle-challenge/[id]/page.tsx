@@ -88,6 +88,23 @@ export default async function BattleChallengePage({
   }
 
   if (challenge.status === "expired" || challenge.status === "cancelled") {
+    // If the challenger is viewing their own expired challenge, show refund info
+    if (challenge.challenger_id === user.id) {
+      return (
+        <div className="flex items-center justify-center min-h-[60vh] px-4">
+          <div className="card max-w-md w-full text-center space-y-3">
+            <h1 className="text-2xl font-bold">Challenge {challenge.status === "expired" ? "Expired" : "Cancelled"}</h1>
+            <p className="text-ccb-muted">
+              {challenge.status === "expired"
+                ? "Your challenge was not accepted in time. Your stake has been refunded to your wallet."
+                : "This challenge was cancelled."}
+            </p>
+            <a href="/wallet" className="btn-primary inline-block mr-2">View Wallet</a>
+            <a href="/battles" className="btn-secondary inline-block">Back to Battles</a>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center justify-center min-h-[60vh] px-4">
         <div className="card max-w-md w-full text-center space-y-3">
@@ -112,7 +129,49 @@ export default async function BattleChallengePage({
     );
   }
 
-  if (new Date(challenge.expires_at) < new Date()) {
+  if (new Date(challenge.expires_at) < new Date() && challenge.status === "pending") {
+    // Challenge has expired — refund the escrowed stake server-side
+    // (atomic claim in the API prevents double-refunds)
+    await admin
+      .from("battle_challenges")
+      .update({ status: "expired" })
+      .eq("id", id)
+      .eq("status", "pending");
+
+    const { error: creditErr } = await admin.rpc("credit_wallet", {
+      p_user_id: challenge.challenger_id,
+      p_amount_cents: challenge.stake_cents,
+    });
+
+    if (!creditErr) {
+      await admin.from("deposits").insert({
+        user_id: challenge.challenger_id,
+        amount_cents: challenge.stake_cents,
+        status: "success",
+        method: "battle_refund",
+        reference: `expired_challenge:${id}`,
+      });
+    }
+
+    // If the current user is the challenger, show refund confirmation
+    if (challenge.challenger_id === user.id) {
+      return (
+        <div className="flex items-center justify-center min-h-[60vh] px-4">
+          <div className="card max-w-md w-full text-center space-y-3">
+            <h1 className="text-2xl font-bold">Challenge Expired</h1>
+            <p className="text-ccb-muted">
+              Your challenge was not accepted in time. Your stake of{" "}
+              <span className="font-semibold text-ccb-text">{formatMKK(challenge.stake_cents)}</span>{" "}
+              has been refunded to your wallet.
+            </p>
+            <a href="/wallet" className="btn-primary inline-block mr-2">View Wallet</a>
+            <a href="/battles" className="btn-secondary inline-block">Back to Battles</a>
+          </div>
+        </div>
+      );
+    }
+
+    // Non-challenger visitor
     return (
       <div className="flex items-center justify-center min-h-[60vh] px-4">
         <div className="card max-w-md w-full text-center space-y-3">

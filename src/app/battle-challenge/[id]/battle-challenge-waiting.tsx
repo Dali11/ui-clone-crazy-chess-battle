@@ -19,6 +19,8 @@ export default function BattleChallengeWaiting({
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [remainingSec, setRemainingSec] = useState<number | null>(null);
+  const [refunded, setRefunded] = useState(false);
+  const refundingRef = useRef(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleCopy = () => {
@@ -31,12 +33,33 @@ export default function BattleChallengeWaiting({
   useEffect(() => {
     if (!expiresAt) return;
     const target = new Date(expiresAt).getTime();
+
+    const triggerRefund = async () => {
+      if (refundingRef.current) return;
+      refundingRef.current = true;
+      try {
+        const res = await fetch("/api/battles/challenge/refund-expired", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ challengeId }),
+        });
+        const data = await res.json();
+        if (res.ok && (data.refunded || data.alreadyRefunded)) {
+          setRefunded(true);
+        } else if (!res.ok && data.error) {
+          setError(data.error);
+        }
+      } catch {
+        // Network error — the server-side expiry handler will still refund
+      }
+    };
+
     const tick = () => {
       const diff = Math.floor((target - Date.now()) / 1000);
       if (diff <= 0) {
         setRemainingSec(0);
         if (pollRef.current) clearInterval(pollRef.current);
-        setError("This challenge has expired.");
+        triggerRefund();
         return;
       }
       setRemainingSec(diff);
@@ -44,7 +67,7 @@ export default function BattleChallengeWaiting({
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [expiresAt]);
+  }, [expiresAt, challengeId]);
 
   useEffect(() => {
     pollRef.current = setInterval(async () => {
@@ -68,7 +91,7 @@ export default function BattleChallengeWaiting({
           }
         } else if (data.status === "expired" || data.status === "cancelled") {
           if (pollRef.current) clearInterval(pollRef.current);
-          setError(`This challenge has ${data.status}.`);
+          setRefunded(true);
         }
       } catch {}
     }, 2500);
@@ -116,9 +139,18 @@ export default function BattleChallengeWaiting({
             </span>
           </div>
         )}
-        <p className="text-xs text-ccb-muted">
-          Your stake is locked. The battle starts automatically once they accept.
-        </p>
+        {refunded && (
+          <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 space-y-1">
+            <p className="text-sm font-semibold text-emerald-400">Stake Refunded</p>
+            <p className="text-xs text-ccb-muted">Your challenge expired and your stake has been returned to your wallet.</p>
+            <a href="/wallet" className="inline-block text-xs font-semibold text-ccb-primary hover:text-ccb-primary/80 mt-1">View Wallet →</a>
+          </div>
+        )}
+        {!refunded && (
+          <p className="text-xs text-ccb-muted">
+            Your stake is locked. The battle starts automatically once they accept.
+          </p>
+        )}
       </div>
     </div>
   );
