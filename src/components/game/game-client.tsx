@@ -66,7 +66,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [viewPly, setViewPly] = useState(0);
   const [rematchState, setRematchState] = useState<RematchState>({ status: "idle" });
+  const [incomingRematch, setIncomingRematch] = useState<{ offerId: string; fromGameId: string } | null>(null);
   const rematchPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const incomingRematchRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [reviewFen, setReviewFen] = useState<string | null>(null);
   const [showResignConfirm, setShowResignConfirm] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
@@ -515,8 +517,84 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   useEffect(() => {
     return () => {
       if (rematchPollRef.current) clearInterval(rematchPollRef.current);
+      if (incomingRematchRef.current) clearInterval(incomingRematchRef.current);
     };
   }, []);
+
+  // Poll for incoming rematch offers when game ends (and we haven't sent one ourselves)
+  useEffect(() => {
+    if (!gameEnded || isSpectator || rematchState.status === "waiting" || rematchState.status === "sending") {
+      if (incomingRematchRef.current) {
+        clearInterval(incomingRematchRef.current);
+        incomingRematchRef.current = null;
+      }
+      return;
+    }
+
+    const checkIncoming = async () => {
+      try {
+        const res = await fetch(`/api/game/rematch/incoming?gameId=${game.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.offer && data.offer.status === "pending") {
+            setIncomingRematch({ offerId: data.offer.id, fromGameId: data.offer.from_game_id });
+          } else if (data.offer && data.offer.status !== "pending") {
+            // Offer was resolved (accepted/declined/expired)
+            setIncomingRematch(null);
+            if (incomingRematchRef.current) {
+              clearInterval(incomingRematchRef.current);
+              incomingRematchRef.current = null;
+            }
+            // If accepted by us elsewhere, redirect
+            if (data.offer.status === "accepted" && data.offer.new_game_id) {
+              window.location.href = `/game/${data.offer.new_game_id}`;
+            }
+          }
+        }
+      } catch {}
+    };
+
+    checkIncoming();
+    incomingRematchRef.current = setInterval(checkIncoming, 3000);
+    return () => {
+      if (incomingRematchRef.current) clearInterval(incomingRematchRef.current);
+      incomingRematchRef.current = null;
+    };
+  }, [gameEnded, isSpectator, game.id, rematchState.status]);
+
+  // Handle accepting an incoming rematch
+  const handleAcceptIncomingRematch = async () => {
+    if (!incomingRematch) return;
+    try {
+      const res = await fetch("/api/game/rematch/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offerId: incomingRematch.offerId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.gameId) {
+          if (incomingRematchRef.current) clearInterval(incomingRematchRef.current);
+          setIncomingRematch(null);
+          window.location.href = `/game/${data.gameId}`;
+        }
+      }
+    } catch {}
+  };
+
+  // Handle declining an incoming rematch
+  const handleDeclineIncomingRematch = async () => {
+    if (!incomingRematch) return;
+    try {
+      await fetch("/api/game/rematch/decline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offerId: incomingRematch.offerId }),
+      });
+    } catch {}
+    if (incomingRematchRef.current) clearInterval(incomingRematchRef.current);
+    setIncomingRematch(null);
+  };
 
   const renderPlayerBar = (data: { name: string; avatar?: string | null; rating?: number | string | null; ratingChange?: number | null; captured: string[]; advantage: number; clock: string; isActive: boolean; symbol: string }) => (
     <div className={`flex items-center justify-between max-w-[600px] mx-auto w-full px-2 py-2 rounded-lg transition-colors ${data.isActive ? "bg-ccb-primary/8" : ""}`}>
@@ -898,9 +976,11 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           moveCount={game.move_count}
           subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
           lobbyHref="/play"
-          onRematch={!isSpectator && game.status !== "abort" ? handleRematch : undefined}
+          onRematch={!isSpectator && game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
           rematchState={rematchState}
           onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
+          onAcceptRematch={incomingRematch && !isSpectator ? handleAcceptIncomingRematch : undefined}
+          onDeclineRematch={incomingRematch && !isSpectator ? handleDeclineIncomingRematch : undefined}
         />
       </>
     );
@@ -949,9 +1029,11 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         moveCount={game.move_count}
         subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
         lobbyHref="/play"
-        onRematch={game.status !== "abort" ? handleRematch : undefined}
+        onRematch={game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
         rematchState={rematchState}
         onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
+        onAcceptRematch={incomingRematch ? handleAcceptIncomingRematch : undefined}
+        onDeclineRematch={incomingRematch ? handleDeclineIncomingRematch : undefined}
       />
     </>
   );
