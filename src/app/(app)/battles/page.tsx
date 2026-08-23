@@ -58,6 +58,7 @@ export default function BattlesPage() {
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [adminNotified, setAdminNotified] = useState(false);
   const [checkingActive, setCheckingActive] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [activeBattle, setActiveBattle] = useState<{
     battleId: string;
     gameId?: string;
@@ -100,6 +101,7 @@ export default function BattlesPage() {
       setBalance(profile.wallet_balance_cents ?? 0);
       setGamesPlayed(profile.games_played ?? 0);
     }
+    setProfileLoaded(true);
   };
 
   useEffect(() => {
@@ -301,6 +303,16 @@ export default function BattlesPage() {
   }
 
   // ===== Battles locked — insufficient games played =====
+  // Wait for profile to load before showing the lock — otherwise players with
+  // enough games see the locked wall during the initial fetch (games_played defaults to 0).
+  if (!profileLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 text-ccb-primary animate-spin mb-3" />
+        <p className="text-sm text-ccb-muted">Loading battles...</p>
+      </div>
+    );
+  }
   if (battlesLocked) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-6 pb-28 sm:py-10 sm:pb-10">
