@@ -77,17 +77,7 @@ export async function POST(req: NextRequest) {
       responded_at: new Date().toISOString(),
     }).eq("id", offerId);
 
-    // Notify the requester that the rematch is accepted
-    const opponentName = opponentProfile.data?.display_name || opponentProfile.data?.username || "Your opponent";
-    await admin.from("notifications").insert({
-      user_id: offer.requester_id,
-      type: "rematch_accepted",
-      title: "Rematch accepted!",
-      body: `${opponentName} accepted your rematch. The game is starting!`,
-      data: { gameId: newGameId, offerId },
-      read: false,
-    });
-
+    // No in-app notification — the requester polls for offer status in real-time
     return NextResponse.json({ gameId: newGameId, offerId });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });

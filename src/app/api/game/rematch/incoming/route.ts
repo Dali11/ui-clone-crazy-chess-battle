@@ -31,7 +31,41 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ offer: null });
     }
 
-    return NextResponse.json({ offer: offers[0] });
+    const offer = offers[0];
+
+    // Auto-expire if the offer is pending but the opponent (current user) has
+    // started playing another game — rematch is no longer relevant.
+    if (offer.status === "pending") {
+      const { data: activeGames } = await admin
+        .from("games")
+        .select("id")
+        .eq("status", "playing")
+        .or(`white_player_id.eq.${user.id},black_player_id.eq.${user.id}`);
+
+      if (activeGames && activeGames.length > 0) {
+        await admin.from("rematch_offers").update({
+          status: "expired",
+          responded_at: new Date().toISOString(),
+        }).eq("id", offer.id);
+        return NextResponse.json({ offer: null });
+      }
+
+      // Also auto-expire if the offer has passed its expiry time
+      const { data: fullOffer } = await admin
+        .from("rematch_offers")
+        .select("expires_at")
+        .eq("id", offer.id)
+        .single();
+      if (fullOffer && new Date(fullOffer.expires_at) < new Date()) {
+        await admin.from("rematch_offers").update({
+          status: "expired",
+          responded_at: new Date().toISOString(),
+        }).eq("id", offer.id);
+        return NextResponse.json({ offer: null });
+      }
+    }
+
+    return NextResponse.json({ offer });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
   }

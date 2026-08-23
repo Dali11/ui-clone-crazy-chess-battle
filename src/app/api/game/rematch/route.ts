@@ -49,14 +49,6 @@ export async function POST(req: NextRequest) {
     }
 
     const opponentId = isWhite ? game.black_player_id : game.white_player_id;
-    const requesterProfile = await admin
-      .from("profiles")
-      .select("display_name, username")
-      .eq("id", user.id)
-      .single();
-
-    const requesterName = requesterProfile.data?.display_name || requesterProfile.data?.username || "Your opponent";
-
     // Create the rematch offer
     const { data: offer, error: offerErr } = await admin
       .from("rematch_offers")
@@ -78,16 +70,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to create rematch offer" }, { status: 500 });
     }
 
-    // Notify the opponent
-    await admin.from("notifications").insert({
-      user_id: opponentId,
-      type: "rematch",
-      title: `Rematch request from ${requesterName}`,
-      body: `${requesterName} wants a rematch. Tap to accept!`,
-      data: { offerId: offer.id, fromGame: gameId },
-      read: false,
-    });
-
+    // No in-app notification — the game client polls for incoming offers in real-time
     return NextResponse.json({ offerId: offer.id, status: "pending" });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });

@@ -27,16 +27,7 @@ export async function POST(req: NextRequest) {
       responded_at: new Date().toISOString(),
     }).eq("id", offerId);
 
-    // Notify the requester
-    await admin.from("notifications").insert({
-      user_id: offer.requester_id,
-      type: "rematch_declined",
-      title: "Rematch declined",
-      body: "Your opponent declined the rematch offer.",
-      data: { offerId },
-      read: false,
-    });
-
+    // No in-app notification — the requester polls for offer status in real-time
     return NextResponse.json({ status: "declined" });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });

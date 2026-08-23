@@ -616,12 +616,32 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     setRematchState({ status: "cancelled" });
   };
 
-  // Cleanup polling on unmount
+  // Cleanup polling on unmount — also cancel/expire any pending rematch offers
+  // so they don't linger for the other player.
   useEffect(() => {
     return () => {
       if (rematchPollRef.current) clearInterval(rematchPollRef.current);
       if (incomingRematchRef.current) clearInterval(incomingRematchRef.current);
+
+      // Cancel any rematch offer WE sent (requester leaving)
+      if (rematchState.status === "waiting" && rematchState.offerId) {
+        fetch("/api/game/rematch/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ offerId: rematchState.offerId }),
+        }).catch(() => {});
+      }
+
+      // Decline any incoming rematch offer (opponent leaving)
+      if (incomingRematch) {
+        fetch("/api/game/rematch/decline", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ offerId: incomingRematch.offerId }),
+        }).catch(() => {});
+      }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Poll for incoming rematch offers when game ends (and we haven't sent one ourselves)
