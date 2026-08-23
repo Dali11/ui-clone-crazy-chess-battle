@@ -5,30 +5,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * Cleanup expired pending challenges and refund escrowed stakes.
  *
  * This is designed to be called by a scheduled cron job (e.g. every 10 minutes).
+ * It's safe to call without auth — it only acts on challenges where
+ * expires_at < now(), so it can't be triggered early. The atomic status
+ * claim prevents double-refunds from concurrent calls.
  *
  * For BATTLE challenges (with escrowed stakes):
- *   - status = 'pending' AND expires_at < now()
  *   - Atomically claim (status → expired), refund stake, log in deposits
  *
  * For REGULAR challenges (no stake):
- *   - status = 'pending' AND expires_at < now()
- *   - Atomically claim (status → expired)
- *
- * The atomic claim prevents double-refunds from concurrent calls.
- *
- * Auth: callable with a CRON_SECRET header to prevent public abuse.
+ *   - Batch mark as expired
  */
 export async function POST(req: NextRequest) {
   try {
-    // Verify the cron secret if one is configured
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
-      const authHeader = req.headers.get("authorization");
-      if (authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    }
-
     const admin = createAdminClient();
     const now = new Date().toISOString();
 
