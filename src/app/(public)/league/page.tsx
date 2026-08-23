@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
+import LeagueNav from '@/components/league/league-nav';
 import {
   Trophy,
   Swords,
@@ -14,7 +16,13 @@ import {
   Search,
   ShieldAlert,
   Award,
-  CheckCircle2
+  CheckCircle2,
+  Table2,
+  LayoutDashboard,
+  ArrowRight,
+  HelpCircle,
+  Target,
+  Crown
 } from 'lucide-react';
 
 export interface PlayerData {
@@ -162,15 +170,16 @@ export default function PremierLeagueHomepage() {
   // Loading Skeleton
   if (loading && !data) {
     return (
-      <div className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-8">
-        <div className="max-w-7xl mx-auto space-y-8 animate-pulse">
-          <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-6 sm:p-8">
-            <div className="h-8 bg-slate-700 rounded w-1/3 mb-4"></div>
-            <div className="h-4 bg-slate-700/60 rounded w-1/4"></div>
+      <div className="min-h-screen bg-ccb-dark text-ccb-text font-sans">
+        <LeagueNav />
+        <div className="max-w-7xl mx-auto p-4 sm:p-8 space-y-8 animate-pulse">
+          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-6 sm:p-8">
+            <div className="h-8 bg-ccb-surface rounded w-1/3 mb-4"></div>
+            <div className="h-4 bg-ccb-surface/60 rounded w-1/4"></div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 bg-slate-800/80 border border-slate-700/50 rounded-2xl p-6 h-96"></div>
-            <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-6 h-96"></div>
+            <div className="lg:col-span-2 bg-ccb-card border border-ccb-border rounded-2xl p-6 h-96"></div>
+            <div className="bg-ccb-card border border-ccb-border rounded-2xl p-6 h-96"></div>
           </div>
         </div>
       </div>
@@ -180,17 +189,20 @@ export default function PremierLeagueHomepage() {
   // Error State
   if (error && !data) {
     return (
-      <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4">
-        <div className="bg-slate-800/90 border border-rose-500/30 rounded-2xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
-          <ShieldAlert className="w-12 h-12 text-rose-400 mx-auto" />
-          <h2 className="text-xl font-bold text-white">League Data Unavailable</h2>
-          <p className="text-slate-400 text-sm">{error}</p>
-          <button
-            onClick={fetchData}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 text-slate-950 font-semibold hover:bg-amber-300 transition-all duration-200 shadow-lg shadow-amber-400/20 cursor-pointer"
-          >
-            <RefreshCw className="w-4 h-4" /> Try Again
-          </button>
+      <div className="min-h-screen bg-ccb-dark text-ccb-text font-sans">
+        <LeagueNav />
+        <div className="flex items-center justify-center p-4 pt-16">
+          <div className="bg-ccb-card border border-ccb-danger/30 rounded-2xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
+            <ShieldAlert className="w-12 h-12 text-ccb-danger mx-auto" />
+            <h2 className="text-xl font-bold text-ccb-text">League Data Unavailable</h2>
+            <p className="text-ccb-muted text-sm">{error}</p>
+            <button
+              onClick={fetchData}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-ccb-accent text-ccb-dark font-semibold hover:bg-ccb-gold transition-all duration-200 shadow-lg shadow-ccb-accent/20 cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" /> Try Again
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -206,68 +218,74 @@ export default function PremierLeagueHomepage() {
   const topPlayers = data?.topPlayers || data?.standings?.slice(0, 5) || [];
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-amber-400 selection:text-slate-950 pb-12">
+    <div className="min-h-screen bg-ccb-dark text-ccb-text font-sans selection:bg-ccb-accent selection:text-ccb-dark pb-12">
+      <LeagueNav />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-8">
 
-        {/* 1. LEAGUE HEADER WITH BRANDING & MATCHDAY INDICATOR */}
-        <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 border border-slate-700/60 shadow-2xl p-6 sm:p-8 lg:p-10">
-          <div className="absolute -right-16 -top-16 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl pointer-events-none"></div>
-          <div className="absolute right-1/3 -bottom-20 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl pointer-events-none"></div>
+        {/* 1. HERO HEADER WITH BRANDING & MATCHDAY INDICATOR */}
+        <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-ccb-dark via-ccb-surface to-ccb-card border border-ccb-border shadow-2xl p-6 sm:p-8 lg:p-10">
+          <div className="absolute -right-16 -top-16 w-64 h-64 bg-ccb-accent/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute right-1/3 -bottom-20 w-80 h-80 bg-ccb-primary/10 rounded-full blur-3xl pointer-events-none"></div>
 
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             
             {/* Title & Branding */}
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-semibold tracking-wider uppercase">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ccb-accent/10 border border-ccb-accent/30 text-ccb-accent text-xs font-semibold tracking-wider uppercase">
                 <Trophy className="w-3.5 h-3.5" /> Official Premier League
               </div>
 
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white uppercase drop-shadow-sm">
-                CRAZYCHESS <span className="text-amber-400">PREMIER LEAGUE</span>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-ccb-text uppercase drop-shadow-sm">
+                CRAZYCHESS <span className="text-ccb-accent">PREMIER LEAGUE</span>
               </h1>
 
-              <p className="text-slate-400 text-sm sm:text-base max-w-2xl">
+              <p className="text-ccb-accent text-sm sm:text-base font-semibold tracking-wide">
+                Play. Compete. Climb. Become Champion.
+              </p>
+
+              <p className="text-ccb-muted text-sm sm:text-base max-w-2xl">
                 {season?.name ? `${season.name} • ` : ''}
                 {league?.name || 'Top competitive chess action with real-time standings and fixtures.'}
               </p>
             </div>
 
             {/* Matchday Indicator Card */}
-            <div className="bg-slate-800/90 border border-amber-400/30 rounded-2xl p-5 sm:p-6 min-w-[280px] sm:min-w-[320px] shadow-xl backdrop-blur-md">
+            <div className="bg-ccb-surface/90 border border-ccb-accent/30 rounded-2xl p-5 sm:p-6 min-w-[280px] sm:min-w-[320px] shadow-xl backdrop-blur-md">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-amber-400" /> Matchday Status
+                <span className="text-xs uppercase font-bold text-ccb-muted tracking-wider flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-ccb-accent" /> Matchday Status
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold">
+                <span className="px-2.5 py-0.5 rounded-full bg-ccb-success/20 text-ccb-success border border-ccb-success/30 text-xs font-semibold">
                   {league?.status?.toUpperCase() || 'ACTIVE'}
                 </span>
               </div>
 
               <div className="flex items-baseline justify-between mb-2">
-                <span className="text-2xl font-black text-amber-400">
+                <span className="text-2xl font-black text-ccb-accent">
                   MATCHDAY {currentMatchday}
                 </span>
-                <span className="text-xs text-slate-400 font-medium">
+                <span className="text-xs text-ccb-muted font-medium">
                   of {totalMatchdays} matchdays
                 </span>
               </div>
 
               {/* Progress Bar */}
-              <div className="w-full bg-slate-700/60 h-2.5 rounded-full overflow-hidden p-0.5">
+              <div className="w-full bg-ccb-surface h-2.5 rounded-full overflow-hidden p-0.5 border border-ccb-border">
                 <div
-                  className="bg-gradient-to-r from-amber-500 to-amber-300 h-full rounded-full transition-all duration-500 shadow-sm"
+                  className="bg-gradient-to-r from-ccb-accent to-ccb-gold h-full rounded-full transition-all duration-500 shadow-sm"
                   style={{ width: `${Math.min(100, Math.max(0, (currentMatchday / (totalMatchdays || 1)) * 100))}%` }}
                 ></div>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs text-slate-400">
+              <div className="mt-4 pt-3 border-t border-ccb-border flex items-center justify-between text-xs text-ccb-muted">
                 <span className="flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5 text-amber-400" /> {data?.standings?.length || 0} Players
+                  <Users className="w-3.5 h-3.5 text-ccb-accent" /> {data?.standings?.length || 0} Players
                 </span>
                 <button
                   onClick={fetchData}
                   disabled={loading}
-                  className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 transition-colors font-medium cursor-pointer"
+                  className="inline-flex items-center gap-1 text-ccb-accent hover:text-ccb-gold transition-colors font-medium cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Sync Data
                 </button>
@@ -277,8 +295,80 @@ export default function PremierLeagueHomepage() {
           </div>
         </header>
 
-        {/* NAVIGATION / TAB SELECTOR FOR MOBILE / QUICK FILTER */}
-        <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto no-scrollbar">
+        {/* 2. QUICK LINKS / DIRECTION SECTION */}
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Link
+            href="/league/table"
+            className="group bg-ccb-card hover:bg-ccb-surface border border-ccb-border hover:border-ccb-primary/60 rounded-2xl p-5 transition-all duration-200 shadow-md flex flex-col justify-between"
+          >
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-ccb-primary/10 border border-ccb-primary/30 text-ccb-primary">
+                  <Table2 className="w-5 h-5" />
+                </div>
+                <ArrowRight className="w-4 h-4 text-ccb-muted group-hover:text-ccb-primary group-hover:translate-x-1 transition-all" />
+              </div>
+              <h3 className="text-base font-bold text-ccb-text group-hover:text-ccb-primary transition-colors">
+                View Full Table
+              </h3>
+              <p className="text-xs text-ccb-muted">
+                Inspect official standings, points, form & position movements
+              </p>
+            </div>
+            <div className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-ccb-primary">
+              View Table <ArrowRight className="w-3.5 h-3.5" />
+            </div>
+          </Link>
+
+          <Link
+            href={`/league/matchday/${currentMatchday}`}
+            className="group bg-ccb-card hover:bg-ccb-surface border border-ccb-border hover:border-ccb-accent/60 rounded-2xl p-5 transition-all duration-200 shadow-md flex flex-col justify-between"
+          >
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 text-ccb-accent">
+                  <Swords className="w-5 h-5" />
+                </div>
+                <ArrowRight className="w-4 h-4 text-ccb-muted group-hover:text-ccb-accent group-hover:translate-x-1 transition-all" />
+              </div>
+              <h3 className="text-base font-bold text-ccb-text group-hover:text-ccb-accent transition-colors">
+                See Fixtures
+              </h3>
+              <p className="text-xs text-ccb-muted">
+                Check upcoming pairings, schedule & matchday results
+              </p>
+            </div>
+            <div className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-ccb-accent">
+              See Fixtures <ArrowRight className="w-3.5 h-3.5" />
+            </div>
+          </Link>
+
+          <Link
+            href="/league/dashboard"
+            className="group bg-ccb-card hover:bg-ccb-surface border border-ccb-border hover:border-ccb-gold/60 rounded-2xl p-5 transition-all duration-200 shadow-md flex flex-col justify-between"
+          >
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-ccb-gold/10 border border-ccb-gold/30 text-ccb-gold">
+                  <LayoutDashboard className="w-5 h-5" />
+                </div>
+                <ArrowRight className="w-4 h-4 text-ccb-muted group-hover:text-ccb-gold group-hover:translate-x-1 transition-all" />
+              </div>
+              <h3 className="text-base font-bold text-ccb-text group-hover:text-ccb-gold transition-colors">
+                My Dashboard
+              </h3>
+              <p className="text-xs text-ccb-muted">
+                Access your personal stats, ELO rating & head-to-head records
+              </p>
+            </div>
+            <div className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-ccb-gold">
+              Go to Dashboard <ArrowRight className="w-3.5 h-3.5" />
+            </div>
+          </Link>
+        </section>
+
+        {/* NAVIGATION / TAB SELECTOR FOR QUICK FILTER */}
+        <div className="flex items-center gap-2 border-b border-ccb-border pb-2 overflow-x-auto no-scrollbar">
           {[
             { id: 'all', label: 'Overview' },
             { id: 'standings', label: 'Standings' },
@@ -291,8 +381,8 @@ export default function PremierLeagueHomepage() {
               onClick={() => setActiveTab(tab.id as any)}
               className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === tab.id
-                  ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
-                  : 'bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  ? 'bg-ccb-accent text-ccb-dark shadow-md shadow-ccb-accent/20 font-bold'
+                  : 'bg-ccb-card/60 text-ccb-muted hover:text-ccb-text hover:bg-ccb-card'
               }`}
             >
               {tab.label}
@@ -306,21 +396,21 @@ export default function PremierLeagueHomepage() {
           {/* LEFT 2 COLUMNS: STANDINGS & TOP PERFORMERS */}
           <div className="lg:col-span-2 space-y-8">
 
-            {/* 2. COMPACT LEAGUE STANDINGS TABLE */}
+            {/* 3. COMPACT LEAGUE STANDINGS TABLE */}
             {(activeTab === 'all' || activeTab === 'standings') && (
-              <section className="bg-slate-800/80 border border-slate-700/60 rounded-3xl shadow-xl overflow-hidden backdrop-blur-sm">
+              <section className="bg-ccb-card border border-ccb-border rounded-3xl shadow-xl overflow-hidden backdrop-blur-sm">
                 
                 {/* Section Header & Search */}
-                <div className="p-5 sm:p-6 border-b border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-800/40">
+                <div className="p-5 sm:p-6 border-b border-ccb-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-ccb-surface/40">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-400">
+                    <div className="p-2.5 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 text-ccb-accent">
                       <Trophy className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-white">
+                      <h2 className="text-xl font-bold text-ccb-text">
                         League Standings
                       </h2>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-ccb-muted">
                         Top {qualifyingSpots} players qualify for playoffs
                       </p>
                     </div>
@@ -328,13 +418,13 @@ export default function PremierLeagueHomepage() {
 
                   {/* Search Box */}
                   <div className="relative min-w-[200px]">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ccb-muted" />
                     <input
                       type="text"
                       placeholder="Search player..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
+                      className="w-full bg-ccb-dark border border-ccb-border rounded-xl pl-9 pr-4 py-2 text-xs text-ccb-text placeholder-ccb-muted focus:outline-none focus:border-ccb-accent transition-colors"
                     />
                   </div>
                 </div>
@@ -343,68 +433,68 @@ export default function PremierLeagueHomepage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-slate-900/60 text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700/50">
-                        <th className="py-3.5 px-4 text-center w-16">Pos</th>
-                        <th className="py-3.5 px-4">Player</th>
-                        <th className="py-3.5 px-3 text-center">P</th>
-                        <th className="py-3.5 px-3 text-center">W</th>
-                        <th className="py-3.5 px-3 text-center">D</th>
-                        <th className="py-3.5 px-3 text-center">L</th>
-                        <th className="py-3.5 px-4 text-center font-black text-amber-400">PTS</th>
-                        <th className="py-3.5 px-4 text-center">Form</th>
+                      <tr className="bg-ccb-surface/60 text-[11px] font-bold uppercase tracking-wider text-ccb-muted border-b border-ccb-border">
+                        <th className="py-3 px-4 text-center w-12">Pos</th>
+                        <th className="py-3 px-4">Player</th>
+                        <th className="py-3 px-3 text-center w-12">P</th>
+                        <th className="py-3 px-3 text-center w-12">W</th>
+                        <th className="py-3 px-3 text-center w-12">D</th>
+                        <th className="py-3 px-3 text-center w-12">L</th>
+                        <th className="py-3 px-4 text-center w-16">Pts</th>
+                        <th className="py-3 px-4 text-center">Form</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-700/40 text-sm">
+                    <tbody className="divide-y divide-ccb-border/60 text-xs sm:text-sm font-medium">
                       {standingsList.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="py-8 text-center text-slate-400 text-sm">
-                            No standings found.
+                          <td colSpan={8} className="py-8 text-center text-ccb-muted">
+                            No players found matching "{searchQuery}"
                           </td>
                         </tr>
                       ) : (
                         standingsList.map((row) => {
-                          const player = row.player;
                           const pos = row.position;
-                          const prevPos = row.previous_position ?? pos;
+                          const prevPos = row.previous_position;
+                          const isQualifying = pos <= qualifyingSpots;
+                          const player = row.player;
 
-                          // Movement logic
-                          let moveIcon = <Minus className="w-3.5 h-3.5 text-slate-500 inline" />;
-                          let moveClass = 'text-slate-500';
+                          // Movement calculations
+                          let moveIcon = <Minus className="w-3 h-3 text-ccb-muted" />;
                           let moveLabel = '';
+                          let moveClass = 'text-ccb-muted';
 
-                          if (prevPos > pos) {
-                            const delta = prevPos - pos;
-                            moveIcon = <ChevronUp className="w-3.5 h-3.5 text-emerald-400 inline stroke-[3]" />;
-                            moveClass = 'text-emerald-400 font-bold';
-                            moveLabel = `${delta}`;
-                          } else if (prevPos < pos) {
-                            const delta = pos - prevPos;
-                            moveIcon = <ChevronDown className="w-3.5 h-3.5 text-rose-400 inline stroke-[3]" />;
-                            moveClass = 'text-rose-400 font-bold';
-                            moveLabel = `${delta}`;
+                          if (prevPos && prevPos > pos) {
+                            const diff = prevPos - pos;
+                            moveIcon = <ChevronUp className="w-3.5 h-3.5 text-ccb-success" />;
+                            moveLabel = diff > 1 ? `${diff}` : '';
+                            moveClass = 'text-ccb-success font-bold';
+                          } else if (prevPos && prevPos < pos) {
+                            const diff = pos - prevPos;
+                            moveIcon = <ChevronDown className="w-3.5 h-3.5 text-ccb-danger" />;
+                            moveLabel = diff > 1 ? `${diff}` : '';
+                            moveClass = 'text-ccb-danger font-bold';
                           }
 
-                          const isQualifying = pos <= qualifyingSpots;
-
-                          // Form array
-                          const formArray: string[] = Array.isArray(row.form)
-                            ? row.form
-                            : typeof row.form === 'string'
-                            ? (row.form as string).split('')
-                            : [];
+                          // Parse form array safely
+                          let formArray: string[] = [];
+                          if (Array.isArray(row.form)) {
+                            formArray = row.form;
+                          } else if (typeof row.form === 'string') {
+                            formArray = (row.form as string).split('');
+                          }
 
                           return (
                             <tr
                               key={row.id || row.player_id || pos}
-                              className={`group hover:bg-slate-700/30 transition-colors ${
-                                isQualifying ? 'border-l-4 border-l-amber-400 bg-amber-400/[0.02]' : ''
+                              className={`group hover:bg-ccb-surface/60 transition-colors ${
+                                isQualifying ? 'bg-ccb-primary/10 border-l-4 border-ccb-primary' : 'border-l-4 border-transparent'
                               }`}
                             >
                               {/* POS & MOVEMENT */}
                               <td className="py-3.5 px-4 text-center">
                                 <div className="flex items-center justify-center gap-1">
                                   <span className={`font-black text-base ${
-                                    pos === 1 ? 'text-amber-400' : pos === 2 ? 'text-slate-300' : pos === 3 ? 'text-amber-600' : 'text-slate-300'
+                                    pos === 1 ? 'text-ccb-gold' : pos === 2 ? 'text-ccb-silver' : pos === 3 ? 'text-ccb-bronze' : 'text-ccb-muted'
                                   }`}>
                                     {pos}
                                   </span>
@@ -422,17 +512,17 @@ export default function PremierLeagueHomepage() {
                                     <img
                                       src={player.avatar_url}
                                       alt={player.display_name}
-                                      className="w-8 h-8 rounded-full object-cover border border-amber-400/40"
+                                      className="w-8 h-8 rounded-full object-cover border border-ccb-accent/40"
                                     />
                                   ) : (
-                                    <div className="w-8 h-8 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-xs font-bold text-amber-400">
+                                    <div className="w-8 h-8 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center text-xs font-bold text-ccb-accent">
                                       {(player?.display_name || player?.username || 'P').slice(0, 2).toUpperCase()}
                                     </div>
                                   )}
 
                                   <div className="flex flex-col">
                                     <div className="flex items-center gap-2">
-                                      <span className="font-semibold text-white group-hover:text-amber-400 transition-colors">
+                                      <span className="font-semibold text-ccb-text group-hover:text-ccb-accent transition-colors">
                                         {player?.display_name || player?.username || 'Unknown Player'}
                                       </span>
                                       <span className="text-xs" title={player?.country || ''}>
@@ -440,7 +530,7 @@ export default function PremierLeagueHomepage() {
                                       </span>
                                     </div>
                                     {player?.rating && (
-                                      <span className="text-[11px] text-slate-400 font-mono">
+                                      <span className="text-[11px] text-ccb-muted font-mono">
                                         ⚡ {player.rating} ELO
                                       </span>
                                     )}
@@ -449,14 +539,14 @@ export default function PremierLeagueHomepage() {
                               </td>
 
                               {/* P, W, D, L */}
-                              <td className="py-3.5 px-3 text-center text-slate-300 font-mono">{row.played}</td>
-                              <td className="py-3.5 px-3 text-center text-emerald-400 font-mono font-medium">{row.wins}</td>
-                              <td className="py-3.5 px-3 text-center text-amber-400 font-mono font-medium">{row.draws}</td>
-                              <td className="py-3.5 px-3 text-center text-rose-400 font-mono font-medium">{row.losses}</td>
+                              <td className="py-3.5 px-3 text-center text-ccb-muted font-mono">{row.played}</td>
+                              <td className="py-3.5 px-3 text-center text-ccb-success font-mono font-medium">{row.wins}</td>
+                              <td className="py-3.5 px-3 text-center text-ccb-accent font-mono font-medium">{row.draws}</td>
+                              <td className="py-3.5 px-3 text-center text-ccb-danger font-mono font-medium">{row.losses}</td>
 
                               {/* PTS */}
                               <td className="py-3.5 px-4 text-center">
-                                <span className="inline-block px-2.5 py-1 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 font-black text-base font-mono shadow-sm">
+                                <span className="inline-block px-2.5 py-1 rounded-lg bg-ccb-accent/10 border border-ccb-accent/30 text-ccb-accent font-black text-base font-mono shadow-sm">
                                   {row.points}
                                 </span>
                               </td>
@@ -465,14 +555,14 @@ export default function PremierLeagueHomepage() {
                               <td className="py-3.5 px-4 text-center">
                                 <div className="flex items-center justify-center gap-1">
                                   {formArray.length === 0 ? (
-                                    <span className="text-slate-600 text-xs">-</span>
+                                    <span className="text-ccb-muted text-xs">-</span>
                                   ) : (
                                     formArray.slice(-5).map((f, idx) => {
                                       const letter = f.toUpperCase();
-                                      let colorClass = 'bg-slate-700/50 text-slate-400 border-slate-600';
-                                      if (letter === 'W') colorClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
-                                      if (letter === 'D') colorClass = 'bg-amber-500/20 text-amber-400 border-amber-500/40';
-                                      if (letter === 'L') colorClass = 'bg-rose-500/20 text-rose-400 border-rose-500/40';
+                                      let colorClass = 'bg-ccb-surface text-ccb-muted border-ccb-border';
+                                      if (letter === 'W') colorClass = 'bg-ccb-success/20 text-ccb-success border-ccb-success/40';
+                                      if (letter === 'D') colorClass = 'bg-ccb-accent/20 text-ccb-accent border-ccb-accent/40';
+                                      if (letter === 'L') colorClass = 'bg-ccb-danger/20 text-ccb-danger border-ccb-danger/40';
 
                                       return (
                                         <span
@@ -495,9 +585,9 @@ export default function PremierLeagueHomepage() {
                 </div>
 
                 {/* Table Footer Legend */}
-                <div className="p-4 bg-slate-900/60 border-t border-slate-700/50 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+                <div className="p-4 bg-ccb-surface/60 border-t border-ccb-border flex flex-col sm:flex-row items-center justify-between text-xs text-ccb-muted gap-2">
                   <span className="flex items-center gap-2">
-                    <span className="w-3 h-3 bg-amber-400/30 border border-amber-400 inline-block rounded-sm"></span>
+                    <span className="w-3 h-3 bg-ccb-primary/30 border border-ccb-primary inline-block rounded-sm"></span>
                     Positions 1–{qualifyingSpots} Playoff qualification zone
                   </span>
                   <span>Scoring: Win = 3pts, Draw = 1pt</span>
@@ -505,14 +595,14 @@ export default function PremierLeagueHomepage() {
               </section>
             )}
 
-            {/* 5. TOP PLAYERS SECTION */}
+            {/* 4. TOP PLAYERS SECTION */}
             {(activeTab === 'all' || activeTab === 'top') && topPlayers.length > 0 && (
               <section className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-amber-400" /> Top League Performers
+                  <h2 className="text-xl font-bold text-ccb-text flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-ccb-accent" /> Top League Performers
                   </h2>
-                  <span className="text-xs text-slate-400">Leading standings & rating leaders</span>
+                  <span className="text-xs text-ccb-muted">Leading standings & rating leaders</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -526,20 +616,20 @@ export default function PremierLeagueHomepage() {
                         key={item.id || item.player_id || idx}
                         className={`relative rounded-2xl p-5 border transition-all duration-300 hover:-translate-y-1 ${
                           isFirst
-                            ? 'bg-gradient-to-b from-slate-800 to-slate-900 border-amber-400/60 shadow-xl shadow-amber-400/10'
+                            ? 'bg-gradient-to-b from-ccb-surface to-ccb-card border-ccb-accent/60 shadow-xl shadow-ccb-accent/10'
                             : rank === 2
-                            ? 'bg-slate-800/80 border-slate-600/60'
-                            : 'bg-slate-800/80 border-slate-700/60'
+                            ? 'bg-ccb-card border-ccb-silver/40'
+                            : 'bg-ccb-card border-ccb-border'
                         }`}
                       >
                         {/* Rank Badge */}
                         <div className="absolute top-4 right-4">
                           {isFirst ? (
-                            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-400/30">
-                              <Trophy className="w-3.5 h-3.5 fill-slate-950" /> #1 LEAD
+                            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-ccb-accent text-ccb-dark font-black text-xs shadow-md shadow-ccb-accent/30">
+                              <Trophy className="w-3.5 h-3.5 fill-ccb-dark" /> #1 LEAD
                             </div>
                           ) : (
-                            <div className="px-2.5 py-1 rounded-full bg-slate-700 text-slate-300 font-bold text-xs border border-slate-600">
+                            <div className="px-2.5 py-1 rounded-full bg-ccb-surface text-ccb-muted font-bold text-xs border border-ccb-border">
                               #{rank}
                             </div>
                           )}
@@ -552,43 +642,41 @@ export default function PremierLeagueHomepage() {
                               src={player.avatar_url}
                               alt={player.display_name}
                               className={`w-12 h-12 rounded-full object-cover border-2 ${
-                                isFirst ? 'border-amber-400' : 'border-slate-600'
+                                isFirst ? 'border-ccb-accent' : 'border-ccb-border'
                               }`}
                             />
                           ) : (
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-base ${
-                              isFirst ? 'bg-amber-400 text-slate-950' : 'bg-slate-700 text-slate-200'
+                              isFirst ? 'bg-ccb-accent text-ccb-dark' : 'bg-ccb-surface text-ccb-text'
                             }`}>
                               {(player?.display_name || 'P').slice(0, 2).toUpperCase()}
                             </div>
                           )}
 
                           <div>
-                            <h3 className="font-bold text-white text-base leading-tight flex items-center gap-1.5">
+                            <h3 className="font-bold text-ccb-text text-base leading-tight flex items-center gap-1.5">
                               {player?.display_name || 'Player'}
                               <span className="text-sm">{getCountryFlag(player?.country)}</span>
                             </h3>
-                            <p className="text-xs text-amber-400 font-mono mt-0.5">
-                              {player?.rating ? `⚡ ${player.rating} ELO` : 'Master League'}
-                            </p>
+                            {player?.rating && (
+                              <p className="text-xs text-ccb-accent font-mono">⚡ {player.rating} ELO</p>
+                            )}
                           </div>
                         </div>
 
-                        {/* Stats Summary */}
-                        <div className="grid grid-cols-3 gap-2 py-3 px-3 rounded-xl bg-slate-900/60 border border-slate-700/50 text-center text-xs">
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-ccb-border/60 text-center">
                           <div>
-                            <div className="text-slate-400 text-[10px] uppercase font-semibold">Points</div>
-                            <div className="font-black text-amber-400 text-base">{item.points}</div>
+                            <div className="text-[10px] text-ccb-muted uppercase font-bold">Played</div>
+                            <div className="font-mono font-bold text-ccb-text">{item.played}</div>
                           </div>
                           <div>
-                            <div className="text-slate-400 text-[10px] uppercase font-semibold">Record</div>
-                            <div className="font-bold text-slate-200 text-sm">{item.wins}-{item.draws}-{item.losses}</div>
+                            <div className="text-[10px] text-ccb-muted uppercase font-bold">Wins</div>
+                            <div className="font-mono font-bold text-ccb-success">{item.wins}</div>
                           </div>
                           <div>
-                            <div className="text-slate-400 text-[10px] uppercase font-semibold">Win Rate</div>
-                            <div className="font-bold text-emerald-400 text-sm">
-                              {item.played ? Math.round((item.wins / item.played) * 100) : 0}%
-                            </div>
+                            <div className="text-[10px] text-ccb-muted uppercase font-bold">Points</div>
+                            <div className="font-mono font-black text-ccb-accent">{item.points}</div>
                           </div>
                         </div>
                       </div>
@@ -603,27 +691,27 @@ export default function PremierLeagueHomepage() {
           {/* RIGHT COLUMN: FIXTURES & RESULTS */}
           <div className="space-y-8">
 
-            {/* 3. UPCOMING MATCHDAY FIXTURES */}
+            {/* 5. UPCOMING MATCHDAY FIXTURES */}
             {(activeTab === 'all' || activeTab === 'fixtures') && (
-              <section className="bg-slate-800/80 border border-slate-700/60 rounded-3xl shadow-xl overflow-hidden backdrop-blur-sm p-5 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-700/60 pb-4">
+              <section className="bg-ccb-card border border-ccb-border rounded-3xl shadow-xl overflow-hidden backdrop-blur-sm p-5 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-ccb-border pb-4">
                   <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-400">
+                    <div className="p-2 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 text-ccb-accent">
                       <Swords className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-white">Upcoming Fixtures</h2>
-                      <p className="text-xs text-slate-400">Matchday {currentMatchday}</p>
+                      <h2 className="text-lg font-bold text-ccb-text">Upcoming Fixtures</h2>
+                      <p className="text-xs text-ccb-muted">Matchday {currentMatchday}</p>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-semibold">
+                  <span className="px-2.5 py-1 rounded-full bg-ccb-accent/10 border border-ccb-accent/30 text-ccb-accent text-xs font-semibold">
                     {upcomingFixtures.length} Matches
                   </span>
                 </div>
 
                 {upcomingFixtures.length === 0 ? (
-                  <div className="py-8 text-center text-slate-400 text-sm space-y-2">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto opacity-80" />
+                  <div className="py-8 text-center text-ccb-muted text-sm space-y-2">
+                    <CheckCircle2 className="w-8 h-8 text-ccb-success mx-auto opacity-80" />
                     <p>All fixtures for Matchday {currentMatchday} are completed!</p>
                   </div>
                 ) : (
@@ -635,7 +723,7 @@ export default function PremierLeagueHomepage() {
                       return (
                         <div
                           key={fixture.id || idx}
-                          className="group relative bg-slate-900/70 border border-slate-700/60 rounded-2xl p-4 hover:border-amber-400/50 transition-all duration-200 shadow-md"
+                          className="group relative bg-ccb-dark/70 border border-ccb-border rounded-2xl p-4 hover:border-ccb-accent/50 transition-all duration-200 shadow-md"
                         >
                           <div className="flex items-center justify-between gap-2">
                             
@@ -644,39 +732,39 @@ export default function PremierLeagueHomepage() {
                               {home?.avatar_url ? (
                                 <img src={home.avatar_url} alt={home.display_name} className="w-7 h-7 rounded-full object-cover shrink-0" />
                               ) : (
-                                <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-amber-400 shrink-0">
+                                <div className="w-7 h-7 rounded-full bg-ccb-surface flex items-center justify-center text-[10px] font-bold text-ccb-accent shrink-0">
                                   {(home?.display_name || 'H').slice(0, 2).toUpperCase()}
                                 </div>
                               )}
                               <div className="min-w-0">
-                                <div className="font-semibold text-xs sm:text-sm text-white truncate">
+                                <div className="font-semibold text-xs sm:text-sm text-ccb-text truncate">
                                   {home?.display_name || 'TBD'}
                                 </div>
-                                <div className="text-[10px] text-amber-400 font-mono">
+                                <div className="text-[10px] text-ccb-accent font-mono">
                                   {home?.rating ? `${home.rating}` : '-'}
                                 </div>
                               </div>
                             </div>
 
                             {/* VS Badge */}
-                            <div className="px-3 py-1 rounded-xl bg-slate-800 border border-amber-400/30 text-amber-400 text-xs font-black shrink-0 shadow-inner">
+                            <div className="px-3 py-1 rounded-xl bg-ccb-surface border border-ccb-accent/30 text-ccb-accent text-xs font-black shrink-0 shadow-inner">
                               VS
                             </div>
 
                             {/* Away Player */}
                             <div className="flex-1 flex items-center justify-end gap-2 text-right min-w-0">
                               <div className="min-w-0">
-                                <div className="font-semibold text-xs sm:text-sm text-white truncate">
+                                <div className="font-semibold text-xs sm:text-sm text-ccb-text truncate">
                                   {away?.display_name || 'TBD'}
                                 </div>
-                                <div className="text-[10px] text-amber-400 font-mono">
+                                <div className="text-[10px] text-ccb-accent font-mono">
                                   {away?.rating ? `${away.rating}` : '-'}
                                 </div>
                               </div>
                               {away?.avatar_url ? (
                                 <img src={away.avatar_url} alt={away.display_name} className="w-7 h-7 rounded-full object-cover shrink-0" />
                               ) : (
-                                <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-amber-400 shrink-0">
+                                <div className="w-7 h-7 rounded-full bg-ccb-surface flex items-center justify-center text-[10px] font-bold text-ccb-accent shrink-0">
                                   {(away?.display_name || 'A').slice(0, 2).toUpperCase()}
                                 </div>
                               )}
@@ -691,30 +779,30 @@ export default function PremierLeagueHomepage() {
               </section>
             )}
 
-            {/* 4. LATEST RESULTS SECTION */}
+            {/* 6. LATEST RESULTS SECTION */}
             {(activeTab === 'all' || activeTab === 'results') && (
-              <section className="bg-slate-800/80 border border-slate-700/60 rounded-3xl shadow-xl overflow-hidden backdrop-blur-sm p-5 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-700/60 pb-4">
+              <section className="bg-ccb-card border border-ccb-border rounded-3xl shadow-xl overflow-hidden backdrop-blur-sm p-5 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-ccb-border pb-4">
                   <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-400">
+                    <div className="p-2 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 text-ccb-accent">
                       <Award className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-white">Latest Results</h2>
-                      <p className="text-xs text-slate-400">
+                      <h2 className="text-lg font-bold text-ccb-text">Latest Results</h2>
+                      <p className="text-xs text-ccb-muted">
                         {data?.latestResults?.matchday
                           ? `Matchday ${data.latestResults.matchday}`
                           : 'Recent Completed Matches'}
                       </p>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full bg-slate-700 text-slate-300 text-xs font-medium">
+                  <span className="px-2.5 py-1 rounded-full bg-ccb-surface text-ccb-muted text-xs font-medium">
                     {latestResults.length} Results
                   </span>
                 </div>
 
                 {latestResults.length === 0 ? (
-                  <div className="py-8 text-center text-slate-400 text-sm">
+                  <div className="py-8 text-center text-ccb-muted text-sm">
                     No completed results recorded yet.
                   </div>
                 ) : (
@@ -731,7 +819,7 @@ export default function PremierLeagueHomepage() {
                       return (
                         <div
                           key={result.id || idx}
-                          className="bg-slate-900/70 border border-slate-700/60 rounded-2xl p-4 space-y-2"
+                          className="bg-ccb-dark/70 border border-ccb-border rounded-2xl p-4 space-y-2"
                         >
                           <div className="flex items-center justify-between text-xs sm:text-sm">
                             
@@ -740,29 +828,29 @@ export default function PremierLeagueHomepage() {
                               {home?.avatar_url ? (
                                 <img src={home.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
                               ) : (
-                                <div className="w-6 h-6 rounded-full bg-slate-700 text-[10px] font-bold text-amber-400 flex items-center justify-center shrink-0">
+                                <div className="w-6 h-6 rounded-full bg-ccb-surface text-[10px] font-bold text-ccb-accent flex items-center justify-center shrink-0">
                                   {(home?.display_name || 'H').slice(0, 1)}
                                 </div>
                               )}
-                              <span className={`truncate font-medium ${isHomeWinner ? 'text-amber-400 font-bold' : 'text-slate-200'}`}>
+                              <span className={`truncate font-medium ${isHomeWinner ? 'text-ccb-accent font-bold' : 'text-ccb-text'}`}>
                                 {home?.display_name || 'Home'}
                               </span>
                             </div>
 
                             {/* Score Display */}
-                            <div className="px-3 py-1 rounded-lg bg-slate-950 border border-slate-700 font-mono font-black text-amber-400 text-xs tracking-wider mx-2">
+                            <div className="px-3 py-1 rounded-lg bg-ccb-dark border border-ccb-border font-mono font-black text-ccb-accent text-xs tracking-wider mx-2">
                               {result.result ? result.result : `${formatScore(homeScore)} - ${formatScore(awayScore)}`}
                             </div>
 
                             {/* Away player */}
                             <div className="flex items-center justify-end gap-2 min-w-0 flex-1 text-right">
-                              <span className={`truncate font-medium ${isAwayWinner ? 'text-amber-400 font-bold' : 'text-slate-200'}`}>
+                              <span className={`truncate font-medium ${isAwayWinner ? 'text-ccb-accent font-bold' : 'text-ccb-text'}`}>
                                 {away?.display_name || 'Away'}
                               </span>
                               {away?.avatar_url ? (
                                 <img src={away.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
                               ) : (
-                                <div className="w-6 h-6 rounded-full bg-slate-700 text-[10px] font-bold text-amber-400 flex items-center justify-center shrink-0">
+                                <div className="w-6 h-6 rounded-full bg-ccb-surface text-[10px] font-bold text-ccb-accent flex items-center justify-center shrink-0">
                                   {(away?.display_name || 'A').slice(0, 1)}
                                 </div>
                               )}
@@ -780,6 +868,72 @@ export default function PremierLeagueHomepage() {
           </div>
 
         </div>
+
+        {/* 7. HOW IT WORKS SECTION */}
+        <section className="bg-ccb-card border border-ccb-border rounded-3xl p-6 sm:p-8 space-y-6">
+          <div className="flex items-center gap-3 border-b border-ccb-border pb-4">
+            <div className="p-2.5 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 text-ccb-accent">
+              <HelpCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-ccb-text">How The League Works</h2>
+              <p className="text-xs text-ccb-muted">The progression roadmap from qualifier to Premier League Champion</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-ccb-surface/80 border border-ccb-border rounded-2xl p-5 space-y-3 relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="w-8 h-8 rounded-xl bg-ccb-primary/20 text-ccb-primary border border-ccb-primary/40 font-black text-sm flex items-center justify-center">
+                  1
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted px-2 py-0.5 rounded bg-ccb-dark border border-ccb-border">
+                  Phase 1
+                </span>
+              </div>
+              <h3 className="font-bold text-ccb-text text-base flex items-center gap-2">
+                <Target className="w-4 h-4 text-ccb-primary" /> Swiss Qualifiers
+              </h3>
+              <p className="text-xs text-ccb-muted leading-relaxed">
+                Players compete in open Swiss-system tournament rounds. Victory earns qualifying spots into the elite Premier League division.
+              </p>
+            </div>
+
+            <div className="bg-ccb-surface/80 border border-ccb-border rounded-2xl p-5 space-y-3 relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="w-8 h-8 rounded-xl bg-ccb-accent/20 text-ccb-accent border border-ccb-accent/40 font-black text-sm flex items-center justify-center">
+                  2
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted px-2 py-0.5 rounded bg-ccb-dark border border-ccb-border">
+                  Phase 2
+                </span>
+              </div>
+              <h3 className="font-bold text-ccb-text text-base flex items-center gap-2">
+                <Swords className="w-4 h-4 text-ccb-accent" /> Premier League
+              </h3>
+              <p className="text-xs text-ccb-muted leading-relaxed">
+                Top qualified players battle across weekly matchdays in head-to-head fixtures with live standings, form tracking, and ELO ratings.
+              </p>
+            </div>
+
+            <div className="bg-ccb-surface/80 border border-ccb-border rounded-2xl p-5 space-y-3 relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="w-8 h-8 rounded-xl bg-ccb-gold/20 text-ccb-gold border border-ccb-gold/40 font-black text-sm flex items-center justify-center">
+                  3
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted px-2 py-0.5 rounded bg-ccb-dark border border-ccb-border">
+                  Phase 3
+                </span>
+              </div>
+              <h3 className="font-bold text-ccb-text text-base flex items-center gap-2">
+                <Crown className="w-4 h-4 text-ccb-gold" /> Crown Champion
+              </h3>
+              <p className="text-xs text-ccb-muted leading-relaxed">
+                The top 4 players from the Premier League standings advance to the Playoff Finals to compete for the ultimate championship title.
+              </p>
+            </div>
+          </div>
+        </section>
 
       </div>
     </div>

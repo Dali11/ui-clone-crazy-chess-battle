@@ -18,6 +18,7 @@ import {
   Clock,
   Sparkles,
 } from 'lucide-react';
+import LeagueNav from '@/components/league/league-nav';
 
 interface NotificationItem {
   type: 'upcoming_match' | 'result' | 'position_change' | 'qualification' | string;
@@ -91,21 +92,21 @@ export default function LeagueNotificationsPage() {
           emoji: '📅',
           icon: Calendar,
           badgeLabel: 'Upcoming Match',
-          badgeStyle: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+          badgeStyle: 'bg-ccb-accent/10 text-ccb-accent border-ccb-accent/30',
         };
       case 'result':
         return {
           emoji: '✅',
           icon: CheckCircle2,
           badgeLabel: 'Result',
-          badgeStyle: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+          badgeStyle: 'bg-ccb-success/10 text-ccb-success border-ccb-success/30',
         };
       case 'position_change':
         return {
           emoji: '📊',
           icon: TrendingUp,
           badgeLabel: 'Standing',
-          badgeStyle: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+          badgeStyle: 'bg-ccb-primary/10 text-ccb-primary border-ccb-primary/30',
         };
       case 'qualification':
         return {
@@ -133,7 +134,7 @@ export default function LeagueNotificationsPage() {
     if (prio === 'medium') {
       return 'border-2 border-blue-500/70 bg-gradient-to-r from-blue-950/20 via-ccb-card to-ccb-card shadow-lg shadow-blue-950/20';
     }
-    return 'border border-ccb-border bg-ccb-card hover:border-slate-600';
+    return 'border border-ccb-border bg-ccb-card hover:border-ccb-border';
   };
 
   // Filtered list
@@ -183,13 +184,14 @@ export default function LeagueNotificationsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-20 sm:pb-8 text-slate-100 max-w-4xl mx-auto">
+    <div className="space-y-6 pb-20 sm:pb-8 text-ccb-text max-w-4xl mx-auto">
+      <LeagueNav />
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-ccb-border pb-4">
         <div className="flex items-center gap-3">
           <Link
             href="/league/dashboard"
-            className="p-2 rounded-xl bg-ccb-card border border-ccb-border hover:bg-ccb-surface text-slate-300 hover:text-white transition-colors"
+            className="p-2 rounded-xl bg-ccb-card border border-ccb-border hover:bg-ccb-surface text-ccb-muted hover:text-white transition-colors"
             title="Back to Dashboard"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -197,7 +199,7 @@ export default function LeagueNotificationsPage() {
           <div>
             <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
               <span>League Notifications</span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-ccb-surface border border-ccb-border text-amber-400 font-mono font-bold">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-ccb-surface border border-ccb-border text-ccb-accent font-mono font-bold">
                 {notifications.length}
               </span>
             </h1>
@@ -208,7 +210,7 @@ export default function LeagueNotificationsPage() {
         <button
           onClick={fetchNotifications}
           disabled={loading}
-          className="self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-200 bg-ccb-card hover:bg-ccb-surface border border-ccb-border rounded-xl transition-colors disabled:opacity-50"
+          className="self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-ccb-text bg-ccb-card hover:bg-ccb-surface border border-ccb-border rounded-xl transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 text-ccb-primary ${loading ? 'animate-spin' : ''}`} />
           <span>Refresh</span>
@@ -261,7 +263,7 @@ export default function LeagueNotificationsPage() {
           onClick={() => setActiveFilter('match')}
           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
             activeFilter === 'match'
-              ? 'bg-slate-700 text-white shadow-md'
+              ? 'bg-ccb-border text-white shadow-md'
               : 'bg-ccb-card border border-ccb-border text-ccb-muted hover:text-white'
           }`}
         >
@@ -291,7 +293,7 @@ export default function LeagueNotificationsPage() {
       {!loading && error && (
         <div className="card text-center py-10 px-4 border border-ccb-border rounded-xl bg-ccb-card">
           <div className="flex justify-center mb-3">
-            <AlertCircle className="w-10 h-10 text-amber-400" />
+            <AlertCircle className="w-10 h-10 text-ccb-accent" />
           </div>
           <h2 className="text-base font-bold text-white mb-1">Failed to load notifications</h2>
           <p className="text-xs text-ccb-muted max-w-sm mx-auto mb-5">{error}</p>
@@ -356,20 +358,20 @@ export default function LeagueNotificationsPage() {
 
                         {/* Timestamp */}
                         <div className="flex items-center gap-1 text-[11px] text-ccb-muted font-mono shrink-0">
-                          <Clock className="w-3 h-3 text-slate-500" />
+                          <Clock className="w-3 h-3 text-ccb-muted" />
                           <span>{timeFormatted}</span>
                         </div>
                       </div>
 
                       {/* Message Body */}
-                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">{n.message}</p>
+                      <p className="text-xs sm:text-sm text-ccb-muted leading-relaxed">{n.message}</p>
 
                       {/* Action Links */}
                       {n.fixtureId && (
                         <div className="pt-2 flex items-center gap-3">
                           <Link
                             href={`/league/match/${n.fixtureId}`}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-ccb-primary hover:text-purple-300 transition-colors"
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-ccb-primary hover:text-ccb-primary transition-colors"
                           >
                             <Swords className="w-3.5 h-3.5" />
                             <span>View Match Fixture</span>
@@ -384,7 +386,7 @@ export default function LeagueNotificationsPage() {
             })
           ) : (
             <div className="card text-center py-12 px-4 border border-ccb-border rounded-xl bg-ccb-card space-y-3">
-              <div className="w-12 h-12 rounded-full bg-ccb-surface border border-ccb-border mx-auto flex items-center justify-center text-slate-400">
+              <div className="w-12 h-12 rounded-full bg-ccb-surface border border-ccb-border mx-auto flex items-center justify-center text-ccb-muted">
                 <Bell className="w-6 h-6 text-ccb-muted" />
               </div>
               <h3 className="text-base font-bold text-white">No notifications found</h3>
