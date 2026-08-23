@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       .select(`
         id, amount_cents, phone, operator_name, status, charge_id, admin_notes,
         processed_at, created_at, updated_at,
-        user_id, profiles!inner(username, display_name, email)
+        user_id, profiles!withdrawals_user_id_profiles_fkey(username, display_name, email)
       `)
       .order("created_at", { ascending: false })
       .limit(50);
