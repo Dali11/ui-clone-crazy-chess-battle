@@ -79,6 +79,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [legalMoveSquares, setLegalMoveSquares] = useState<string[]>([]);
   const [premove, setPremove] = useState<{ from: string; to: string } | null>(null);
+  const [premovePromotion, setPremovePromotion] = useState<{ from: string; to: string } | null>(null);
   const [activeSheet, setActiveSheet] = useState<SheetType>(null);
   const [viewPly, setViewPly] = useState(0);
   const [overlayDismissed, setOverlayDismissed] = useState(false);
@@ -285,16 +286,16 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
         const game = new Chess(fen);
         const move = game.move({ from: premove.from, to: premove.to, promotion: "q" });
         if (move !== null) {
-          if (isPromotionMove(premove.from, premove.to)) {
-            setPendingPromotion({ from: premove.from, to: premove.to });
-          } else {
-            applyMove(premove.from, premove.to, "q");
-          }
+          applyMove(premove.from, premove.to, "q");
         }
       } catch {}
       setPremove(null);
     }
-  }, [isPlayerTurn, premove, fen, gameEnded, applyMove, isPromotionMove]);
+    if (isPlayerTurn && premovePromotion && !gameEnded) {
+      setPendingPromotion({ from: premovePromotion.from, to: premovePromotion.to });
+      setPremovePromotion(null);
+    }
+  }, [isPlayerTurn, premove, premovePromotion, fen, gameEnded, applyMove, isPromotionMove]);
 
   // Handle piece click — show legal moves or capture (Tap-to-move)
   const handlePieceClick = useCallback(({ square, piece }: { square: string | null; piece: { pieceType: string } | null }) => {
@@ -310,6 +311,30 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
       }
       setSelectedSquare(null);
       setLegalMoveSquares([]);
+      return;
+    }
+
+    // Premove via tap-to-move (when it's not our turn)
+    if (!isPlayerTurn) {
+      const game = new Chess(fen);
+      const squarePiece = game.get(square as any);
+      if (!squarePiece) {
+        if (premove) { setPremove(null); setPremovePromotion(null); }
+        return;
+      }
+      const isMyPiece = (isPlayerWhite && squarePiece.color === "w") || (!isPlayerWhite && squarePiece.color === "b");
+      if (!isMyPiece) {
+        if (premove) { setPremove(null); setPremovePromotion(null); }
+        return;
+      }
+      if (premove && premove.from === square) {
+        setPremove(null);
+        setPremovePromotion(null);
+        return;
+      }
+      setSelectedSquare(square);
+      const moves = game.moves({ square: square as any, verbose: true });
+      setLegalMoveSquares(moves.map((m: any) => m.to));
       return;
     }
 
@@ -333,7 +358,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
     setSelectedSquare(square);
     const moves = game.moves({ square: square as any, verbose: true });
     setLegalMoveSquares(moves.map((m: any) => m.to));
-  }, [isPlayerTurn, gameEnded, fen, isPlayerWhite, isLiveView, selectedSquare, legalMoveSquares, isPromotionMove, applyMove]);
+  }, [isPlayerTurn, gameEnded, fen, isPlayerWhite, isLiveView, selectedSquare, legalMoveSquares, isPromotionMove, applyMove, premove]);
 
   // Handle square click — tap to move or delegate to piece click
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
@@ -368,14 +393,23 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
     }
     // Not our turn — set a premove
     if (!targetSquare) return false;
+    if (premove && premove.from === sourceSquare && premove.to === targetSquare) {
+      setPremove(null);
+      setPremovePromotion(null);
+      return false;
+    }
     const game = new Chess(fen);
     const piece = game.get(sourceSquare as any);
     if (!piece) return false;
     const isMyPiece = (isPlayerWhite && piece.color === "w") || (!isPlayerWhite && piece.color === "b");
     if (!isMyPiece) return false;
-    setPremove({ from: sourceSquare, to: targetSquare });
+    if (isPromotionMove(sourceSquare, targetSquare)) {
+      setPremovePromotion({ from: sourceSquare, to: targetSquare });
+    } else {
+      setPremove({ from: sourceSquare, to: targetSquare });
+    }
     return true;
-  }, [isPlayerTurn, gameEnded, isPromotionMove, applyMove, fen, isPlayerWhite, isLiveView]);
+  }, [isPlayerTurn, gameEnded, isPromotionMove, applyMove, fen, isPlayerWhite, isLiveView, premove]);
 
   // Handle promotion selection
   const handlePromotionSelect = useCallback((piece: "q" | "r" | "b" | "n") => {
@@ -434,6 +468,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
     setSelectedSquare(null);
     setLegalMoveSquares([]);
     setPremove(null);
+    setPremovePromotion(null);
     setWhiteClock(initialMinutes * 60 * 1000);
     setBlackClock(initialMinutes * 60 * 1000);
     setLastMoveAt(Date.now());

@@ -76,6 +76,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const [soundOn, setSoundOn] = useState(true);
   const [boardTheme, setBoardTheme] = useState<BoardTheme>(getStoredBoardTheme());
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(null);
+  const [premovePromotion, setPremovePromotion] = useState<{ from: string; to: string } | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [legalMoveSquares, setLegalMoveSquares] = useState<string[]>([]);
   const [premove, setPremove] = useState<{ from: string; to: string } | null>(null);
@@ -245,20 +246,21 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         background: "radial-gradient(circle, rgba(139,92,246,0.4) 70%, transparent 72%)",
       };
     }
-    if (premove) {
-      styles[premove.from] = {
-        ...styles[premove.from],
+    const activePremove = premove || premovePromotion;
+    if (activePremove) {
+      styles[activePremove.from] = {
+        ...styles[activePremove.from],
         background: "radial-gradient(circle, rgba(251,191,36,0.4) 70%, transparent 72%)",
         boxShadow: "inset 0 0 0 3px rgba(251,191,36,0.6)",
       };
-      styles[premove.to] = {
-        ...styles[premove.to],
+      styles[activePremove.to] = {
+        ...styles[activePremove.to],
         background: "radial-gradient(circle, rgba(251,191,36,0.35) 70%, transparent 72%)",
         boxShadow: "inset 0 0 0 3px rgba(251,191,36,0.5)",
       };
     }
     return styles;
-  }, [lastMove, checkSquare, legalMoveSquares, selectedSquare, premove, isLiveView]);
+  }, [lastMove, checkSquare, legalMoveSquares, selectedSquare, premove, premovePromotion, isLiveView]);
 
   const getLiveClock = (player: "white" | "black") => {
     if (!game.last_move_at || !game.white_clock_ms || !game.black_clock_ms) return "—";
@@ -281,7 +283,22 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   const handlePieceClick = useCallback(({ square, piece }: { square: string | null; piece: { pieceType: string } | null }) => {
     if (isSpectator || gameEnded || !isLiveView) return;
-    if (!piece || !square) return;
+
+    // Cancel premove by clicking anywhere (chess.com behavior)
+    if (premove && !square) {
+      setPremove(null);
+      setPremovePromotion(null);
+      return;
+    }
+
+    if (!piece || !square) {
+      // Clicked empty board — cancel premove if set
+      if (premove) {
+        setPremove(null);
+        setPremovePromotion(null);
+      }
+      return;
+    }
 
     // If we have a piece selected and click on a legal move target (capture), make the move
     if (selectedSquare && square !== selectedSquare && legalMoveSquares.includes(square)) {
@@ -309,6 +326,34 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       return;
     }
 
+    // Premove via tap-to-move (when it's not our turn)
+    if (!myTurn) {
+      const game = new Chess(fen);
+      const squarePiece = game.get(square as any);
+      if (!squarePiece) return;
+      const isMyPiece = (isWhite && squarePiece.color === "w") || (isBlack && squarePiece.color === "b");
+      if (!isMyPiece) {
+        // Clicked opponent piece — cancel any existing premove
+        if (premove) {
+          setPremove(null);
+          setPremovePromotion(null);
+        }
+        return;
+      }
+      // If we already have a premove set, and we click one of our pieces, start setting a new premove
+      // If we click the same piece that's part of premove, cancel the premove
+      if (premove && premove.from === square) {
+        setPremove(null);
+        setPremovePromotion(null);
+        return;
+      }
+      // Select piece for premove (tap-to-move)
+      setSelectedSquare(square);
+      const moves = game.moves({ square: square as any, verbose: true });
+      setLegalMoveSquares(moves.map((m: any) => m.to));
+      return;
+    }
+
     // Not a legal move target — select the piece if it's ours
     if (!myTurn) return;
     const game = new Chess(fen);
@@ -330,29 +375,39 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     setSelectedSquare(square);
     const moves = game.moves({ square: square as any, verbose: true });
     setLegalMoveSquares(moves.map((m: any) => m.to));
-  }, [isSpectator, myTurn, gameEnded, fen, isWhite, isBlack, isLiveView, selectedSquare, legalMoveSquares, isPromotionMove, makeMove]);
+  }, [isSpectator, myTurn, gameEnded, fen, isWhite, isBlack, isLiveView, selectedSquare, legalMoveSquares, isPromotionMove, makeMove, premove]);
 
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
     if (selectedSquare && square !== selectedSquare) {
       if (legalMoveSquares.includes(square)) {
-        if (isPromotionMove(selectedSquare, square)) {
-          setPendingPromotion({ from: selectedSquare, to: square });
-        } else {
-          try {
-            const tempGame = new Chess(fen);
-            const move = tempGame.move({ from: selectedSquare, to: square, promotion: "q" });
-            if (move !== null) {
-              setFen(tempGame.fen());
-              setMoveHistory((prev) => [...prev, move.san]);
-              setViewPly((prev) => prev + 1);
-              setLastMove({ from: selectedSquare, to: square });
-              playSound(detectMoveSound(move));
-              if (tempGame.inCheck() && !tempGame.isCheckmate()) {
-                setTimeout(() => playSound("check"), 100);
+        // If it's our turn, make the move; if not, set as premove
+        if (myTurn) {
+          if (isPromotionMove(selectedSquare, square)) {
+            setPendingPromotion({ from: selectedSquare, to: square });
+          } else {
+            try {
+              const tempGame = new Chess(fen);
+              const move = tempGame.move({ from: selectedSquare, to: square, promotion: "q" });
+              if (move !== null) {
+                setFen(tempGame.fen());
+                setMoveHistory((prev) => [...prev, move.san]);
+                setViewPly((prev) => prev + 1);
+                setLastMove({ from: selectedSquare, to: square });
+                playSound(detectMoveSound(move));
+                if (tempGame.inCheck() && !tempGame.isCheckmate()) {
+                  setTimeout(() => playSound("check"), 100);
+                }
+                makeMove(selectedSquare, square);
               }
-              makeMove(selectedSquare, square);
-            }
-          } catch {}
+            } catch {}
+          }
+        } else {
+          // Set premove via tap-to-move
+          if (isPromotionMove(selectedSquare, square)) {
+            setPremovePromotion({ from: selectedSquare, to: square });
+          } else {
+            setPremove({ from: selectedSquare, to: square });
+          }
         }
       }
       setSelectedSquare(null);
@@ -360,7 +415,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     } else {
       handlePieceClick({ square, piece });
     }
-  }, [selectedSquare, legalMoveSquares, isPromotionMove, fen, makeMove, handlePieceClick]);
+  }, [selectedSquare, legalMoveSquares, isPromotionMove, fen, makeMove, handlePieceClick, myTurn]);
 
   const onDrop = useCallback(
     (sourceSquare: string, targetSquare: string): boolean => {
@@ -390,15 +445,25 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         return true;
       }
       if (!targetSquare) return false;
+      // Cancel existing premove if dragging the same piece back to its origin
+      if (premove && premove.from === sourceSquare && premove.to === targetSquare) {
+        setPremove(null);
+        setPremovePromotion(null);
+        return false;
+      }
       const game = new Chess(fen);
       const piece = game.get(sourceSquare as any);
       if (!piece) return false;
       const isMyPiece = (isWhite && piece.color === "w") || (isBlack && piece.color === "b");
       if (!isMyPiece) return false;
-      setPremove({ from: sourceSquare, to: targetSquare });
+      if (isPromotionMove(sourceSquare, targetSquare)) {
+        setPremovePromotion({ from: sourceSquare, to: targetSquare });
+      } else {
+        setPremove({ from: sourceSquare, to: targetSquare });
+      }
       return true;
     },
-    [isSpectator, myTurn, gameEnded, fen, makeMove, isPromotionMove, isWhite, isBlack, isLiveView]
+    [isSpectator, myTurn, gameEnded, fen, makeMove, isPromotionMove, isWhite, isBlack, isLiveView, premove]
   );
 
   const handlePromotionSelect = useCallback((piece: "q" | "r" | "b" | "n") => {
@@ -437,21 +502,25 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         const game = new Chess(fen);
         const move = game.move({ from: premove.from, to: premove.to, promotion: "q" });
         if (move !== null) {
-          if (isPromotionMove(premove.from, premove.to)) {
-            setPendingPromotion({ from: premove.from, to: premove.to });
-          } else {
-            setFen(game.fen());
-            setMoveHistory((prev) => [...prev, move.san]);
-            setViewPly((prev) => prev + 1);
-            setLastMove({ from: premove.from, to: premove.to });
-            playSound(detectMoveSound(move));
-            makeMove(premove.from, premove.to);
+          setFen(game.fen());
+          setMoveHistory((prev) => [...prev, move.san]);
+          setViewPly((prev) => prev + 1);
+          setLastMove({ from: premove.from, to: premove.to });
+          playSound(detectMoveSound(move));
+          if (game.inCheck() && !game.isCheckmate()) {
+            setTimeout(() => playSound("check"), 100);
           }
+          makeMove(premove.from, premove.to);
         }
       } catch {}
       setPremove(null);
     }
-  }, [myTurn, premove, fen, gameEnded, isPromotionMove, makeMove]);
+    if (myTurn && premovePromotion && !gameEnded) {
+      // Premove was a promotion — show the promotion dialog now that it's our turn
+      setPendingPromotion({ from: premovePromotion.from, to: premovePromotion.to });
+      setPremovePromotion(null);
+    }
+  }, [myTurn, premove, premovePromotion, fen, gameEnded, isPromotionMove, makeMove]);
 
   useEffect(() => {
     playSound("gameStart");
