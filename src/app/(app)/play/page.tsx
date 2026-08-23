@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { AIDifficulty } from "@/lib/game/chess-ai";
 import {
@@ -45,6 +45,7 @@ export default function PlayPage() {
   const matchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
 
   const cleanupSearch = () => {
@@ -166,6 +167,22 @@ export default function PlayPage() {
   useEffect(() => {
     return () => cleanupSearch();
   }, []);
+
+  // Auto-start search when arriving with ?tc=...&rated=...&search=1 (Play Again flow)
+  useEffect(() => {
+    const tc = searchParams.get("tc");
+    const ratedParam = searchParams.get("rated");
+    const shouldSearch = searchParams.get("search");
+    if (tc && shouldSearch === "1") {
+      const validTCs = ["bullet", "blitz3", "blitz", "rapid", "rapid15", "classical"];
+      if (validTCs.includes(tc)) setSelectedTC(tc);
+      if (ratedParam === "0") setRated(false);
+      else if (ratedParam === "1") setRated(true);
+      // Small delay to ensure state is set before searching
+      setTimeout(() => handleQuickMatch(), 100);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
 
   const handleCreateChallenge = async () => {

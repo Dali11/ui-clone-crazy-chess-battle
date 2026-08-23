@@ -27,6 +27,7 @@ interface VictoryOverlayProps {
   onNewGame?: () => void;
   onRematch?: () => void;
   onReview?: () => void;
+  onPlayAgain?: () => void;
   onCancelRematch?: () => void;
   onAcceptRematch?: () => void;
   onDeclineRematch?: () => void;
@@ -49,6 +50,7 @@ export default function VictoryOverlay({
   onNewGame,
   onRematch,
   onReview,
+  onPlayAgain,
   onCancelRematch,
   onAcceptRematch,
   onDeclineRematch,
@@ -249,11 +251,21 @@ export default function VictoryOverlay({
             </button>
           )}
 
+          {onPlayAgain && (
+            <button
+              onClick={onPlayAgain}
+              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{ backgroundColor: accent, color: "#0a0a0f", boxShadow: `0 4px 20px ${accentBg}` }}
+            >
+              <Swords className="w-4 h-4" /> Play Again
+            </button>
+          )}
+
           {onNewGame && (
             <button
               onClick={onNewGame}
               className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
-              style={{ backgroundColor: accent, color: "#0a0a0f", boxShadow: `0 4px 20px ${accentBg}` }}
+              style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}
             >
               <RefreshCw className="w-4 h-4" /> {newGameLabel}
             </button>
@@ -274,8 +286,7 @@ export default function VictoryOverlay({
             className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98]"
             style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}
           >
-            {onNewGame ? <Home className="w-4 h-4" /> : <Swords className="w-4 h-4" />}
-            {onNewGame ? "Back to Lobby" : "Play Again"}
+            <Home className="w-4 h-4" /> Back to Lobby
           </Link>
         </div>
       </div>

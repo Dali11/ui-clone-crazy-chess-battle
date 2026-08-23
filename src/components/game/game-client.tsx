@@ -2,6 +2,7 @@
 import { getAbortSeconds } from "@/lib/game/abort-config";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Chessboard } from "react-chessboard";
 import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
@@ -61,6 +62,7 @@ function formatClock(ms: number | null): string {
 
 export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo }: GameClientProps) {
   const { game, connected, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw } = useRealtimeGame(gameId, initialGame, currentUserId);
+  const router = useRouter();
   const [fen, setFen] = useState(game.fen);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
@@ -458,6 +460,38 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const toggleSheet = (sheet: SheetType) => setActiveSheet((prev) => (prev === sheet ? null : sheet));
 
   // ============ REMATCH FLOW ============
+  // Reverse-map initial_minutes + increment to extended time control ID
+  const tcIdFromGame = (() => {
+    const m = game.initial_minutes;
+    const i = game.increment_seconds;
+    if (m === 1 && i === 0) return "bullet";
+    if (m === 3 && i === 2) return "blitz3";
+    if (m === 5 && i === 0) return "blitz";
+    if (m === 10 && i === 0) return "rapid";
+    if (m === 15 && i === 10) return "rapid15";
+    if (m === 30 && i === 0) return "classical";
+    return "blitz"; // fallback
+  })();
+
+  const handlePlayAgain = async () => {
+    try {
+      const res = await fetch("/api/matchmaking/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timeControl: tcIdFromGame, rated: game.rated }),
+      });
+      const data = await res.json();
+      if (data.status === "matched" && data.gameId) {
+        router.push(`/game/${data.gameId}`);
+      } else {
+        // No immediate match — go to play page with auto-search params
+        router.push(`/play?tc=${tcIdFromGame}&rated=${game.rated ? "1" : "0"}&search=1`);
+      }
+    } catch {
+      router.push(`/play?tc=${tcIdFromGame}&rated=${game.rated ? "1" : "0"}&search=1`);
+    }
+  };
+
   const handleRematch = async () => {
     if (rematchState.status === "sending" || rematchState.status === "waiting") return;
     setRematchState({ status: "sending" });
@@ -977,6 +1011,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
           playerNames={{ white: whiteName, black: blackName }}
           lobbyHref="/play"
+          onPlayAgain={!isSpectator ? handlePlayAgain : undefined}
           onRematch={!isSpectator && game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
           rematchState={rematchState}
           onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
