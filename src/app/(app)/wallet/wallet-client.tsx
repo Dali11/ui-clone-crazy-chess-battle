@@ -238,7 +238,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
     try {
       if (method === "mobile_money") {
         if (!phone || phone.length < 9) {
-          setError("Enter a valid phone number (e.g., 0991234567)");
+          setError("Enter a valid Mobile Money number (Airtel or Mpamba, e.g., 0991234567)");
           setLoading(false);
           return;
         }
@@ -293,7 +293,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
 
     try {
       if (!phone || phone.length < 9) {
-        setError("Enter a valid phone number");
+        setError("Enter a valid Mobile Money number");
         setWithdrawLoading(false);
         return;
       }
@@ -566,7 +566,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
           {method === "mobile_money" && (
             <>
               <div>
-                <label className="text-sm font-medium text-ccb-muted mb-2 block">Phone Number</label>
+                <label className="text-sm font-medium text-ccb-muted mb-2 block">Mobile Money Number (Airtel Money or Mpamba)</label>
                 <input
                   type="tel"
                   value={phone}
@@ -625,7 +625,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
           </div>
 
           <div>
-            <label className="text-sm font-medium text-ccb-muted mb-2 block">Phone Number</label>
+            <label className="text-sm font-medium text-ccb-muted mb-2 block">Mobile Money Number (Airtel Money or Mpamba)</label>
             <input
               type="tel"
               value={phone}
