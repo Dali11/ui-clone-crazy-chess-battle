@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Crown, Table2, CalendarDays, LayoutDashboard } from "lucide-react";
+import { Crown, Table2, CalendarDays, LayoutDashboard, Crown as Membership } from "lucide-react";
 
 const leagueNavItems = [
-  { href: "/league", label: "Home", icon: Crown },
+  { href: "/league", label: "Competitions", icon: Crown },
   { href: "/league/table", label: "Table", icon: Table2 },
   { href: "/league/matchday/1", label: "Fixtures", icon: CalendarDays },
   { href: "/league/dashboard", label: "My Stats", icon: LayoutDashboard },
+  { href: "/league/subscribe", label: "Membership", icon: Membership },
 ];
 
 export default function LeagueNav() {
@@ -20,10 +21,14 @@ export default function LeagueNav() {
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar h-12">
           {leagueNavItems.map((item) => {
             const Icon = item.icon;
-            const isActive =
-              item.href === "/league"
-                ? pathname === "/league"
-                : pathname.startsWith(item.href.replace(/\/\d+$/, ""));
+            let isActive;
+            if (item.href === "/league") {
+              isActive = pathname === "/league";
+            } else if (item.href === "/league/subscribe") {
+              isActive = pathname === "/league/subscribe";
+            } else {
+              isActive = pathname.startsWith(item.href.replace(/\/\d+$/, ""));
+            }
             return (
               <Link
                 key={item.href}
