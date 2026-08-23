@@ -41,7 +41,8 @@ export async function updateSession(request: NextRequest) {
   }
   const user = session?.user ?? null;
 
-  // Redirect to login if not authenticated and trying to access protected routes
+  // Redirect to signup if not authenticated and trying to access protected routes
+  // Signup is the default auth flow; login remains available as a secondary option.
   const protectedRoutes = ["/dashboard", "/play", "/wallet", "/history", "/admin", "/challenge", "/battle-challenge", "/game"];
   const isProtected = protectedRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
@@ -49,7 +50,7 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/signup";
     url.searchParams.set("redirect", request.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
