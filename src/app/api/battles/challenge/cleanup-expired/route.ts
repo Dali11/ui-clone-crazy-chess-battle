@@ -1,0 +1,141 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+/**
+ * Cleanup expired pending challenges and refund escrowed stakes.
+ *
+ * This is designed to be called by a scheduled cron job (e.g. every 10 minutes).
+ *
+ * For BATTLE challenges (with escrowed stakes):
+ *   - status = 'pending' AND expires_at < now()
+ *   - Atomically claim (status → expired), refund stake, log in deposits
+ *
+ * For REGULAR challenges (no stake):
+ *   - status = 'pending' AND expires_at < now()
+ *   - Atomically claim (status → expired)
+ *
+ * The atomic claim prevents double-refunds from concurrent calls.
+ *
+ * Auth: callable with a CRON_SECRET header to prevent public abuse.
+ */
+export async function POST(req: NextRequest) {
+  try {
+    // Verify the cron secret if one is configured
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const authHeader = req.headers.get("authorization");
+      if (authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    }
+
+    const admin = createAdminClient();
+    const now = new Date().toISOString();
+
+    // === 1. BATTLE CHALLENGES (with escrow) ===
+    const { data: expiredBattles, error: battleError } = await admin
+      .from("battle_challenges")
+      .select("id, challenger_id, stake_cents")
+      .eq("status", "pending")
+      .lt("expires_at", now);
+
+    if (battleError) {
+      console.error("Battle cleanup query failed:", battleError);
+      return NextResponse.json({ error: "Query failed" }, { status: 500 });
+    }
+
+    let battlesCleaned = 0;
+    let battlesRefunded = 0;
+    let battlesFailed = 0;
+
+    if (expiredBattles && expiredBattles.length > 0) {
+      for (const challenge of expiredBattles) {
+        // Atomic claim — only succeeds if status is still 'pending'
+        const { data: claimed, error: claimError } = await admin
+          .from("battle_challenges")
+          .update({ status: "expired" })
+          .eq("id", challenge.id)
+          .eq("status", "pending")
+          .select("id, challenger_id, stake_cents")
+          .single();
+
+        if (claimError || !claimed) {
+          // Already claimed by another process
+          continue;
+        }
+
+        battlesCleaned++;
+
+        // Refund the stake
+        const { error: creditErr } = await admin.rpc("credit_wallet", {
+          p_user_id: claimed.challenger_id,
+          p_amount_cents: claimed.stake_cents,
+        });
+
+        if (creditErr) {
+          console.error(`Battle refund failed for challenge ${claimed.id}:`, creditErr);
+          // Revert status so it can be retried next run
+          await admin
+            .from("battle_challenges")
+            .update({ status: "pending" })
+            .eq("id", claimed.id);
+          battlesFailed++;
+          continue;
+        }
+
+        // Record the refund in deposits for audit
+        const { error: depErr } = await admin.from("deposits").insert({
+          user_id: claimed.challenger_id,
+          amount_cents: claimed.stake_cents,
+          status: "success",
+          method: "battle_refund",
+          reference: `cleanup_expired:${claimed.id}`,
+        });
+        if (depErr) console.error(`Audit log failed for challenge ${claimed.id}:`, depErr);
+
+        battlesRefunded++;
+      }
+    }
+
+    // === 2. REGULAR CHALLENGES (no escrow, just mark expired) ===
+    const { data: expiredRegular, error: regularError } = await admin
+      .from("challenges")
+      .select("id")
+      .eq("status", "pending")
+      .lt("expires_at", now);
+
+    let regularCleaned = 0;
+
+    if (!regularError && expiredRegular && expiredRegular.length > 0) {
+      const { data: updated, error: updateError } = await admin
+        .from("challenges")
+        .update({ status: "expired" })
+        .eq("status", "pending")
+        .lt("expires_at", now)
+        .select("id");
+
+      regularCleaned = updated?.length || 0;
+    }
+
+    console.log(
+      `[cleanup-expired] Battle challenges: ${expiredBattles?.length || 0} found, ${battlesCleaned} claimed, ${battlesRefunded} refunded, ${battlesFailed} failed. Regular challenges: ${expiredRegular?.length || 0} found, ${regularCleaned} expired.`
+    );
+
+    return NextResponse.json({
+      success: true,
+      battleChallenges: {
+        found: expiredBattles?.length || 0,
+        cleaned: battlesCleaned,
+        refunded: battlesRefunded,
+        failed: battlesFailed,
+      },
+      regularChallenges: {
+        found: expiredRegular?.length || 0,
+        cleaned: regularCleaned,
+      },
+    });
+  } catch (e: any) {
+    console.error("Cleanup error:", e);
+    return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
+  }
+}
