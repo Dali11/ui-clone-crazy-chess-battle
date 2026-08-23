@@ -60,7 +60,7 @@ function formatClock(ms: number | null): string {
 }
 
 export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo }: GameClientProps) {
-  const { game, connected, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw } = useRealtimeGame(gameId, initialGame);
+  const { game, connected, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw } = useRealtimeGame(gameId, initialGame, currentUserId);
   const [fen, setFen] = useState(game.fen);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);

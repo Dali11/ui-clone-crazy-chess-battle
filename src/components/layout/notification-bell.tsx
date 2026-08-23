@@ -129,7 +129,11 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-ccb-border bg-ccb-dark shadow-2xl z-50 max-h-96 overflow-y-auto">
+        <>
+          {/* Backdrop — tap outside to close */}
+          <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setOpen(false)} />
+          {/* Centered panel — anchored to viewport, not the bell button, so it's never cut off */}
+          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-[92vw] max-w-sm rounded-xl border border-ccb-border bg-ccb-dark shadow-2xl max-h-[70vh] overflow-y-auto">
           <div className="sticky top-0 bg-ccb-dark border-b border-ccb-border px-4 py-3 flex items-center justify-between">
             <span className="font-semibold text-sm text-ccb-text">Notifications</span>
             {unreadCount > 0 && (
@@ -201,7 +205,8 @@ export default function NotificationBell() {
               })}
             </div>
           )}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

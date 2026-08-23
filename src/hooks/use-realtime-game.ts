@@ -42,7 +42,7 @@ export interface MoveBroadcast {
   lastMoveAt: string;
 }
 
-export function useRealtimeGame(gameId: string, initialState: GameState) {
+export function useRealtimeGame(gameId: string, initialState: GameState, currentUserId?: string) {
   // ── Stable Supabase client (created once, not on every render) ──────
   // CRITICAL FIX: Previously `createClient()` was called on every render,
   // creating a new Supabase client instance each time. This caused the
@@ -177,10 +177,12 @@ export function useRealtimeGame(gameId: string, initialState: GameState) {
         }
       })
       .on("broadcast", { event: "draw_offer" }, (payload: any) => {
-        // Only show Accept/Decline if the offer came from the opponent
-        // (we ignore our own broadcast echo)
+        // Only show Accept/Decline if the offer came from the OPPONENT.
+        // The server broadcasts this to both players, so the offerer's own
+        // browser also receives it — ignore it there (they already have
+        // the local "pending" state from offerDraw()).
         const from = payload?.payload?.from;
-        if (from && from !== initialState.white_player_id && from !== initialState.black_player_id) return;
+        if (from && currentUserId && from === currentUserId) return;
         setDrawOffer("offer");
       })
       .on("broadcast", { event: "draw_declined" }, () => {
