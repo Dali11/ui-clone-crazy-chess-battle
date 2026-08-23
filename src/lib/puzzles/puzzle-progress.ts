@@ -1,84 +1,164 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export interface PuzzleProgressData {
-  solved: string[];
-  failed: string[];
+  solved: Set<string>;
   attempts: Record<string, number>;
   streak: number;
   bestStreak: number;
   totalSolved: number;
+  highestLevelUnlocked: number;
 }
 
-const STORAGE_KEY = "ccb-puzzle-progress";
+export interface LevelProgress {
+  level: number;
+  solved: number;
+  total: number;
+  isComplete: boolean;
+  isUnlocked: boolean;
+}
 
 const defaultProgress: PuzzleProgressData = {
-  solved: [],
-  failed: [],
+  solved: new Set<string>(),
   attempts: {},
   streak: 0,
   bestStreak: 0,
   totalSolved: 0,
+  highestLevelUnlocked: 1,
 };
 
-function loadProgress(): PuzzleProgressData {
-  if (typeof window === "undefined") return defaultProgress;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultProgress;
-    return { ...defaultProgress, ...JSON.parse(raw) };
-  } catch {
-    return defaultProgress;
-  }
-}
-
-function saveProgress(data: PuzzleProgressData) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
 export function usePuzzleProgress() {
+  const supabase = createClient();
   const [progress, setProgress] = useState<PuzzleProgressData>(defaultProgress);
+  const [loaded, setLoaded] = useState(false);
+  const pendingSaves = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    setProgress(loadProgress());
-  }, []);
+    let mounted = true;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setLoaded(true); return; }
 
-  const markSolved = useCallback((puzzleId: string) => {
-    setProgress((prev) => {
-      const next = { ...prev };
-      if (!next.solved.includes(puzzleId)) {
-        next.solved = [...next.solved, puzzleId];
-        next.totalSolved = next.solved.length;
-      }
-      next.streak = prev.streak + 1;
-      next.bestStreak = Math.max(prev.bestStreak, next.streak);
-      next.attempts = { ...prev.attempts, [puzzleId]: (prev.attempts[puzzleId] || 0) + 1 };
-      saveProgress(next);
-      return next;
-    });
-  }, []);
+        const { data: records, error } = await supabase
+          .from("puzzle_progress")
+          .select("puzzle_id, status, attempts, level")
+          .eq("user_id", user.id);
 
-  const markFailed = useCallback((puzzleId: string) => {
+        if (error || !records) { setLoaded(true); return; }
+
+        const solved = new Set<string>();
+        const attempts: Record<string, number> = {};
+        let highestLevel = 1;
+
+        for (const r of records) {
+          if (r.status === "solved") solved.add(r.puzzle_id);
+          attempts[r.puzzle_id] = r.attempts || 0;
+        }
+
+        // Calculate highest unlocked level from puzzle IDs (lN-...)
+        for (const pid of solved) {
+          const m = pid.match(/^l(\d+)-/);
+          if (m) {
+            const lvl = parseInt(m[1]);
+            if (lvl >= highestLevel) highestLevel = lvl + 1;
+          }
+        }
+        if (highestLevel > 10) highestLevel = 10;
+
+        if (!mounted) return;
+        setProgress({
+          solved,
+          attempts,
+          streak: 0,
+          bestStreak: 0,
+          totalSolved: solved.size,
+          highestLevelUnlocked: highestLevel,
+        });
+      } catch {}
+      setLoaded(true);
+    })();
+    return () => { mounted = false; };
+  }, [supabase]);
+
+  const markSolved = useCallback((puzzleId: string, level: number) => {
+    if (pendingSaves.current.has(puzzleId)) return;
+    pendingSaves.current.add(puzzleId);
+
     setProgress((prev) => {
-      const next = {
+      const solved = new Set(prev.solved);
+      const wasAlreadySolved = solved.has(puzzleId);
+      solved.add(puzzleId);
+      const newStreak = prev.streak + 1;
+      const newHighest = Math.max(prev.highestLevelUnlocked, level + 1 > 10 ? 10 : level + 1);
+      return {
         ...prev,
-        streak: 0,
-        attempts: { ...prev.attempts, [puzzleId]: (prev.attempts[puzzleId] || 0) + 1 },
+        solved,
+        streak: newStreak,
+        bestStreak: Math.max(prev.bestStreak, newStreak),
+        totalSolved: solved.size,
+        highestLevelUnlocked: newHighest,
       };
-      if (!next.failed.includes(puzzleId)) {
-        next.failed = [...next.failed, puzzleId];
-      }
-      saveProgress(next);
-      return next;
     });
-  }, []);
 
-  const resetProgress = useCallback(() => {
-    saveProgress(defaultProgress);
+    // Save to Supabase (upsert)
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const currentAttempts = (progress.attempts[puzzleId] || 0) + 1;
+        await supabase
+          .from("puzzle_progress")
+          .upsert({
+            user_id: user.id,
+            puzzle_id: puzzleId,
+            level,
+            status: "solved",
+            attempts: currentAttempts,
+            solved_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "user_id,puzzle_id" });
+      } catch {} finally {
+        pendingSaves.current.delete(puzzleId);
+      }
+    })();
+  }, [supabase, progress.attempts]);
+
+  const markFailed = useCallback((puzzleId: string, level: number) => {
+    setProgress((prev) => ({
+      ...prev,
+      streak: 0,
+      attempts: { ...prev.attempts, [puzzleId]: (prev.attempts[puzzleId] || 0) + 1 },
+    }));
+
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        await supabase
+          .from("puzzle_progress")
+          .upsert({
+            user_id: user.id,
+            puzzle_id: puzzleId,
+            level,
+            status: "unsolved",
+            attempts: (progress.attempts[puzzleId] || 0) + 1,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "user_id,puzzle_id" });
+      } catch {}
+    })();
+  }, [supabase, progress.attempts]);
+
+  const resetProgress = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from("puzzle_progress").delete().eq("user_id", user.id);
+    } catch {}
     setProgress(defaultProgress);
-  }, []);
+  }, [supabase]);
 
-  return { progress, markSolved, markFailed, resetProgress };
+  return { progress, loaded, markSolved, markFailed, resetProgress };
 }
