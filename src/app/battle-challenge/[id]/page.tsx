@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import BattleChallengeAccept from "./battle-challenge-accept";
+import ChallengeTaken from "@/app/challenge/[id]/challenge-taken";
 import BattleChallengeWaiting from "./battle-challenge-waiting";
 
 function formatMKK(cents: number): string {
@@ -41,15 +42,48 @@ export default async function BattleChallengePage({
     notFound();
   }
 
-  // If already accepted and battle/game exists, send them straight to the game
+  // If already accepted and battle/game exists, check if the game is still in progress
   if (challenge.status === "accepted" && challenge.battle_id) {
     const { data: battle } = await admin
       .from("battles")
-      .select("game_id")
+      .select("id, game_id, white_player_id, black_player_id")
       .eq("id", challenge.battle_id)
       .single();
+
     if (battle?.game_id) {
-      redirect(`/game/${battle.game_id}`);
+      // If the current user is a player in the battle, send them to the game
+      if (battle.white_player_id === user.id || battle.black_player_id === user.id) {
+        redirect(`/game/${battle.game_id}`);
+      }
+
+      // Check if the game is still in progress
+      const { data: game } = await admin
+        .from("games")
+        .select("status, white_player_id, black_player_id")
+        .eq("id", battle.game_id)
+        .single();
+
+      if (game && game.status === "playing") {
+        const { data: whiteProfile } = await admin
+          .from("profiles")
+          .select("username, display_name")
+          .eq("id", game.white_player_id)
+          .single();
+        const { data: blackProfile } = await admin
+          .from("profiles")
+          .select("username, display_name")
+          .eq("id", game.black_player_id)
+          .single();
+
+        return (
+          <ChallengeTaken
+            gameId={battle.game_id}
+            challengerName={whiteProfile?.display_name || whiteProfile?.username || "Player 1"}
+            acceptorName={blackProfile?.display_name || blackProfile?.username || "Player 2"}
+            timeControl="Battle"
+          />
+        );
+      }
     }
   }
 
@@ -73,6 +107,7 @@ export default async function BattleChallengePage({
         challengeId={id}
         url={url}
         stakeLabel={formatMKK(challenge.stake_cents)}
+        expiresAt={challenge.expires_at}
       />
     );
   }

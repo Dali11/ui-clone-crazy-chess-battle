@@ -35,6 +35,7 @@ export default function PlayPage() {
   const [copied, setCopied] = useState(false);
   const [challengeUrl, setChallengeUrl] = useState<string | null>(null);
   const [creatingChallenge, setCreatingChallenge] = useState(false);
+  const [challengeExpiry, setChallengeExpiry] = useState(60); // minutes
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [adminNotified, setAdminNotified] = useState(false);
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>("medium");
@@ -173,7 +174,7 @@ export default function PlayPage() {
       const response = await fetch("/api/challenge/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timeControl: selectedTC, rated }),
+        body: JSON.stringify({ timeControl: selectedTC, rated, expiryMinutes: challengeExpiry }),
       });
       const data = await response.json();
       if (data.challengeId) {
@@ -363,6 +364,24 @@ export default function PlayPage() {
         <div className="relative flex justify-center">
           <span className="bg-ccb-dark px-3 text-xs text-ccb-muted">or</span>
         </div>
+      </div>
+
+      {/* Challenge link expiry picker */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-ccb-muted">Link expires in:</span>
+        {[10, 30, 60, 240].map((mins) => (
+          <button
+            key={mins}
+            onClick={() => setChallengeExpiry(mins)}
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+              challengeExpiry === mins
+                ? "bg-ccb-primary text-ccb-primary-foreground"
+                : "bg-ccb-surface text-ccb-muted border border-ccb-border hover:border-ccb-primary/40"
+            }`}
+          >
+            {mins < 60 ? `${mins}m` : `${mins / 60}h`}
+          </button>
+        ))}
       </div>
 
       {/* Secondary actions — no extra menu step */}

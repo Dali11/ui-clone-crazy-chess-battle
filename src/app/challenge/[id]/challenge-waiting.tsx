@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { Copy, Check, Swords, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-export default function ChallengeWaiting({ url, challengeId }: { url: string; challengeId: string }) {
+export default function ChallengeWaiting({ url, challengeId, expiresAt }: { url: string; challengeId: string; expiresAt?: string }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [expired, setExpired] = useState(false);
+  const [remainingSec, setRemainingSec] = useState<number | null>(null);
   const polledRef = useRef(false);
 
   const handleCopy = () => {
@@ -54,6 +55,24 @@ export default function ChallengeWaiting({ url, challengeId }: { url: string; ch
       clearInterval(interval);
     };
   }, [challengeId, router]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (!expiresAt) return;
+    const target = new Date(expiresAt).getTime();
+    const tick = () => {
+      const diff = Math.floor((target - Date.now()) / 1000);
+      if (diff <= 0) {
+        setRemainingSec(0);
+        setExpired(true);
+        return;
+      }
+      setRemainingSec(diff);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
 
   // Also try Supabase realtime (works if migration is applied)
   useEffect(() => {
@@ -116,6 +135,14 @@ export default function ChallengeWaiting({ url, challengeId }: { url: string; ch
           </button>
         </div>
         {copied && <p className="text-xs text-green-400">Copied to clipboard!</p>}
+        {remainingSec !== null && remainingSec > 0 && (
+          <div className="flex items-center justify-center gap-1.5 text-xs text-ccb-muted">
+            <span>Link expires in </span>
+            <span className="font-bold text-ccb-primary tabular-nums">
+              {Math.floor(remainingSec / 60)}:{String(remainingSec % 60).padStart(2, "0")}
+            </span>
+          </div>
+        )}
         <div className="flex items-center justify-center gap-2 text-xs text-ccb-muted pt-2">
           <Loader2 className="w-3 h-3 animate-spin" />
           <span>Waiting for opponent to accept...</span>

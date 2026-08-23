@@ -8,8 +8,11 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { timeControl, rated } = await req.json();
+    const { timeControl, rated, expiryMinutes } = await req.json();
     const admin = createAdminClient();
+
+    // Clamp expiry to allowed range (5 min – 24 hours)
+    const expiryMins = Math.min(Math.max(expiryMinutes || 60, 5), 1440);
 
     // Get the user's referral code to append to the challenge link
     const { data: profile } = await admin
@@ -43,7 +46,7 @@ export async function POST(req: NextRequest) {
         rated: rated ?? true,
         color: "random",
         status: "pending",
-        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour expiry
+        expires_at: new Date(Date.now() + expiryMins * 60 * 1000).toISOString(),
       })
       .select("id")
       .single();
