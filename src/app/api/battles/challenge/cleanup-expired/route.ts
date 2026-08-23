@@ -4,10 +4,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 /**
  * Cleanup expired pending challenges and refund escrowed stakes.
  *
- * This is designed to be called by a scheduled cron job (e.g. every 10 minutes).
- * It's safe to call without auth — it only acts on challenges where
- * expires_at < now(), so it can't be triggered early. The atomic status
- * claim prevents double-refunds from concurrent calls.
+ * Called by Vercel Cron every 10 minutes (see vercel.json crons config).
+ * Vercel Cron sends a GET request with Authorization: Bearer <CRON_SECRET>.
+ * Also supports POST for manual triggers.
+ *
+ * It's safe to call — it only acts on challenges where expires_at < now(),
+ * so it can't be triggered early. The atomic status claim prevents
+ * double-refunds from concurrent calls.
  *
  * For BATTLE challenges (with escrowed stakes):
  *   - Atomically claim (status → expired), refund stake, log in deposits
@@ -15,7 +18,31 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * For REGULAR challenges (no stake):
  *   - Batch mark as expired
  */
+
+function verifyCronAuth(req: NextRequest): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) return true; // No secret configured — allow
+  const authHeader = req.headers.get("authorization");
+  if (authHeader === `Bearer ${cronSecret}`) return true;
+  // Also allow x-vercel-cron header for Vercel's internal calls
+  if (req.headers.get("x-vercel-cron") === "1") return true;
+  return false;
+}
+
+export async function GET(req: NextRequest) {
+  return handleCleanup(req);
+}
+
 export async function POST(req: NextRequest) {
+  return handleCleanup(req);
+}
+
+async function handleCleanup(req: NextRequest) {
+  // Verify cron auth if CRON_SECRET is set
+  if (!verifyCronAuth(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const admin = createAdminClient();
     const now = new Date().toISOString();
