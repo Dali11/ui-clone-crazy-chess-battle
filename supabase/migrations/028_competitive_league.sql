@@ -113,7 +113,7 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO public.competitive_divisions (name, code, country, eligibility_config)
 VALUES
-  ('Men's Division', 'MW-MEN', 'MW', '{"gender": "male", "minRating": 0}'),
-  ('Women's Division', 'MW-WOMEN', 'MW', '{"gender": "female", "minRating": 0}'),
+  ('Men''s Division', 'MW-MEN', 'MW', '{"gender": "male", "minRating": 0}'),
+  ('Women''s Division', 'MW-WOMEN', 'MW', '{"gender": "female", "minRating": 0}'),
   ('Open Division', 'MW-OPEN', 'MW', '{"minRating": 0}')
 ON CONFLICT (code) DO NOTHING;
