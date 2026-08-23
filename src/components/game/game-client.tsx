@@ -14,11 +14,18 @@ import { useBoardSize } from "@/hooks/use-board-size";
 import { useLockBodyScroll } from "@/hooks/use-lock-body-scroll";
 import MoveScroller from "./move-scroller";
 import CapturedPieces from "./captured-pieces";
-import VictoryOverlay, { type GameOutcome } from "./victory-overlay";
+import VictoryOverlay, { type GameOutcome, type RematchState } from "./victory-overlay";
 import PromotionDialog from "./promotion-dialog";
 import BoardThemePicker from "./board-theme-picker";
 import OpeningBadge from "./opening-badge";
 import GameChat from "./game-chat";
+
+interface BattleInfo {
+  isBattle: boolean;
+  stakeCents: number;
+  winnerPayoutCents: number;
+  winnerId: string | null;
+}
 
 interface GameClientProps {
   gameId: string;
@@ -29,6 +36,7 @@ interface GameClientProps {
   blackName?: string;
   whiteAvatar?: string | null;
   blackAvatar?: string | null;
+  battleInfo?: BattleInfo | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -51,13 +59,14 @@ function formatClock(ms: number | null): string {
   return `0:${seconds.toString().padStart(2, "0")}`;
 }
 
-export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar }: GameClientProps) {
+export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo }: GameClientProps) {
   const { game, connected, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw } = useRealtimeGame(gameId, initialGame);
   const [fen, setFen] = useState(game.fen);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [viewPly, setViewPly] = useState(0);
-  const [rematchSent, setRematchSent] = useState(false);
+  const [rematchState, setRematchState] = useState<RematchState>({ status: "idle" });
+  const rematchPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [reviewFen, setReviewFen] = useState<string | null>(null);
   const [showResignConfirm, setShowResignConfirm] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
@@ -122,6 +131,14 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   }, [gameEnded, isSpectator, checkTimeout]);
 
   const myRatingChange = isWhite ? game.white_rating_change : game.black_rating_change;
+
+  // Calculate earnings for victory overlay
+  const didIWin = game.winner === (isWhite ? "white" : "black");
+  const isBattleGame = battleInfo?.isBattle === true;
+  const moneyEarned = isBattleGame && didIWin ? (battleInfo?.winnerPayoutCents ?? 0) / 100 : undefined;
+  // For battles, berries are not awarded (they have their own reward system)
+  // For non-battle games, berries are awarded as before
+  const berriesEarned = !isBattleGame && didIWin ? (game.rated ? 10 : 15) : 0;
 
   const captured = useMemo(() => getCapturedPieces(displayFen), [displayFen]);
   const checkSquare = useMemo(() => getCheckSquare(displayFen), [displayFen]);
@@ -438,10 +455,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   const toggleSheet = (sheet: SheetType) => setActiveSheet((prev) => (prev === sheet ? null : sheet));
 
-  // ============ CHESS.COM-STYLE PLAYER BAR ============
+  // ============ REMATCH FLOW ============
   const handleRematch = async () => {
-    if (rematchSent) return;
-    setRematchSent(true);
+    if (rematchState.status === "sending" || rematchState.status === "waiting") return;
+    setRematchState({ status: "sending" });
     try {
       const res = await fetch("/api/game/rematch", {
         method: "POST",
@@ -450,14 +467,56 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       });
       if (res.ok) {
         const data = await res.json();
-        window.location.href = `/game/${data.gameId}`;
+        if (data.offerId) {
+          setRematchState({ status: "waiting", offerId: data.offerId });
+          // Poll for offer status
+          rematchPollRef.current = setInterval(async () => {
+            try {
+              const pollRes = await fetch(`/api/game/rematch?offerId=${data.offerId}`);
+              if (pollRes.ok) {
+                const pollData = await pollRes.json();
+                if (pollData.status === "accepted" && pollData.new_game_id) {
+                  if (rematchPollRef.current) clearInterval(rematchPollRef.current);
+                  setRematchState({ status: "accepted", offerId: data.offerId, gameId: pollData.new_game_id });
+                  setTimeout(() => { window.location.href = `/game/${pollData.new_game_id}`; }, 1500);
+                } else if (pollData.status === "declined") {
+                  if (rematchPollRef.current) clearInterval(rematchPollRef.current);
+                  setRematchState({ status: "declined", offerId: data.offerId });
+                } else if (pollData.status === "cancelled" || pollData.status === "expired") {
+                  if (rematchPollRef.current) clearInterval(rematchPollRef.current);
+                  setRematchState({ status: pollData.status === "expired" ? "expired" : "cancelled", offerId: data.offerId });
+                }
+              }
+            } catch {}
+          }, 2000);
+        }
       } else {
-        setRematchSent(false);
+        setRematchState({ status: "idle" });
       }
     } catch {
-      setRematchSent(false);
+      setRematchState({ status: "idle" });
     }
   };
+
+  const handleCancelRematch = async () => {
+    if (!rematchState.offerId) return;
+    try {
+      await fetch("/api/game/rematch/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offerId: rematchState.offerId }),
+      });
+    } catch {}
+    if (rematchPollRef.current) clearInterval(rematchPollRef.current);
+    setRematchState({ status: "cancelled" });
+  };
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (rematchPollRef.current) clearInterval(rematchPollRef.current);
+    };
+  }, []);
 
   const renderPlayerBar = (data: { name: string; avatar?: string | null; rating?: number | string | null; ratingChange?: number | null; captured: string[]; advantage: number; clock: string; isActive: boolean; symbol: string }) => (
     <div className={`flex items-center justify-between max-w-[600px] mx-auto w-full px-2 py-2 rounded-lg transition-colors ${data.isActive ? "bg-ccb-primary/8" : ""}`}>
@@ -833,11 +892,15 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           outcome={(game.status === "abort" ? "abort" : game.winner === null ? "draw" : game.winner === (isWhite ? "white" : "black") ? "win" : "loss") as GameOutcome}
           reasonLabel={STATUS_LABELS[game.status] || game.status}
           ratingChange={myRatingChange}
-          berriesAwarded={game.winner && game.winner === (isWhite ? "white" : "black") ? (game.rated ? 10 : 15) : 0}
+          berriesAwarded={berriesEarned}
+          moneyEarned={moneyEarned}
+          moneyLabel={isBattleGame ? "Battle winnings" : undefined}
           moveCount={game.move_count}
-          subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}`}
+          subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
           lobbyHref="/play"
           onRematch={!isSpectator && game.status !== "abort" ? handleRematch : undefined}
+          rematchState={rematchState}
+          onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
         />
       </>
     );
@@ -880,11 +943,15 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         outcome={(game.status === "abort" ? "abort" : game.winner === null ? "draw" : game.winner === (isWhite ? "white" : "black") ? "win" : "loss") as GameOutcome}
         reasonLabel={STATUS_LABELS[game.status] || game.status}
         ratingChange={myRatingChange}
-        berriesAwarded={game.winner && game.winner === (isWhite ? "white" : "black") ? (game.rated ? 10 : 15) : 0}
+        berriesAwarded={berriesEarned}
+        moneyEarned={moneyEarned}
+        moneyLabel={isBattleGame ? "Battle winnings" : undefined}
         moveCount={game.move_count}
-        subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}`}
+        subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
         lobbyHref="/play"
         onRematch={game.status !== "abort" ? handleRematch : undefined}
+        rematchState={rematchState}
+        onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
       />
     </>
   );

@@ -7,7 +7,8 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { notificationId } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const notificationId = body.notificationId || body.id;
 
     if (notificationId) {
       // Mark single notification

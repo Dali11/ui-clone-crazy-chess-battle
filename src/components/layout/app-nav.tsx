@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Swords, Trophy, TrendingUp, User, Wallet, Shield, Coins, Gift } from "lucide-react";
+import NotificationBell from "./notification-bell";
 
 interface Profile {
   username: string | null;
@@ -85,6 +86,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <Link href="/earn" className="flex items-center gap-1.5 text-sm">
               <Gift className="w-4 h-4 text-orange-500" />
               <span className="font-bold">Earn CCB</span>
@@ -117,6 +119,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
             <span className="font-bold text-sm">CCB</span>
           </Link>
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <Link href="/earn" className="flex items-center gap-1">
               <Gift className="w-4 h-4 text-orange-500" />
               <span className="text-xs font-bold">Earn</span>

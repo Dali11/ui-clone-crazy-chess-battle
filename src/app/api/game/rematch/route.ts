@@ -2,101 +2,126 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+/**
+ * POST /api/game/rematch
+ * Creates a rematch offer (pending) and notifies the opponent.
+ * The game is NOT created yet — only when the opponent accepts.
+ * Body: { gameId: string }
+ */
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { gameId } = await req.json();
-
-    if (!gameId) {
-      return NextResponse.json({ error: "Game ID required" }, { status: 400 });
-    }
+    if (!gameId) return NextResponse.json({ error: "Game ID required" }, { status: 400 });
 
     const admin = createAdminClient();
 
     // Fetch the original game
-    const { data: originalGame, error: fetchError } = await admin
+    const { data: game, error: fetchError } = await admin
       .from("games")
-      .select("id, status, time_control, initial_minutes, increment_seconds, rated, white_player_id, black_player_id, white_rating, black_rating")
+      .select("id, status, time_control, initial_minutes, increment_seconds, rated, white_player_id, black_player_id")
       .eq("id", gameId)
       .single();
 
-    if (fetchError || !originalGame) {
-      return NextResponse.json({ error: "Game not found" }, { status: 404 });
+    if (fetchError || !game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
+
+    // Verify user was a player
+    const isWhite = game.white_player_id === user.id;
+    const isBlack = game.black_player_id === user.id;
+    if (!isWhite && !isBlack) return NextResponse.json({ error: "Not a player in this game" }, { status: 403 });
+
+    // Game must be over
+    if (game.status === "playing") return NextResponse.json({ error: "Game still in progress" }, { status: 400 });
+
+    // Check for existing pending rematch offer from this game
+    const { data: existing } = await admin
+      .from("rematch_offers")
+      .select("id, status")
+      .eq("from_game_id", gameId)
+      .eq("status", "pending")
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      return NextResponse.json({ error: "A rematch offer is already pending for this game", offerId: existing[0].id }, { status: 409 });
     }
 
-    // Verify user was a player in that game
-    const isWhite = originalGame.white_player_id === user.id;
-    const isBlack = originalGame.black_player_id === user.id;
-
-    if (!isWhite && !isBlack) {
-      return NextResponse.json({ error: "Not a player in this game" }, { status: 403 });
-    }
-
-    // Verify game status is not 'playing'
-    if (originalGame.status === "playing") {
-      return NextResponse.json({ error: "Game is still in progress" }, { status: 400 });
-    }
-
-    // Fetch player profiles for ratings and display names
-    const { data: whiteProfile } = await admin
+    const opponentId = isWhite ? game.black_player_id : game.white_player_id;
+    const requesterProfile = await admin
       .from("profiles")
-      .select("rating, display_name, username")
-      .eq("id", originalGame.white_player_id)
+      .select("display_name, username")
+      .eq("id", user.id)
       .single();
 
-    const { data: blackProfile } = await admin
-      .from("profiles")
-      .select("rating, display_name, username")
-      .eq("id", originalGame.black_player_id)
+    const requesterName = requesterProfile.data?.display_name || requesterProfile.data?.username || "Your opponent";
+
+    // Create the rematch offer
+    const { data: offer, error: offerErr } = await admin
+      .from("rematch_offers")
+      .insert({
+        from_game_id: gameId,
+        requester_id: user.id,
+        opponent_id: opponentId,
+        status: "pending",
+        time_control: game.time_control,
+        initial_minutes: game.initial_minutes,
+        increment_seconds: game.increment_seconds,
+        rated: game.rated,
+      })
+      .select("id")
       .single();
 
-    // Swap colors: white becomes black and black becomes white
-    const newWhiteId = originalGame.black_player_id;
-    const newBlackId = originalGame.white_player_id;
-    const newWhiteRating = blackProfile?.rating ?? originalGame.black_rating ?? 1500;
-    const newBlackRating = whiteProfile?.rating ?? originalGame.white_rating ?? 1500;
-
-    // Create new game via admin RPC create_game
-    const { data: newGameId, error: rpcError } = await admin.rpc("create_game", {
-      p_white_id: newWhiteId,
-      p_black_id: newBlackId,
-      p_white_rating: newWhiteRating,
-      p_black_rating: newBlackRating,
-      p_time_control: originalGame.time_control || "blitz",
-      p_initial_minutes: originalGame.initial_minutes ?? 3,
-      p_increment_seconds: originalGame.increment_seconds ?? 2,
-      p_rated: originalGame.rated ?? true,
-    });
-
-    if (rpcError || !newGameId) {
-      console.error("Rematch create_game error:", rpcError);
-      return NextResponse.json({ error: "Failed to create rematch game" }, { status: 500 });
+    if (offerErr || !offer) {
+      console.error("Rematch offer insert error:", offerErr);
+      return NextResponse.json({ error: "Failed to create rematch offer" }, { status: 500 });
     }
 
-    // Determine requester name and opponent ID for notification
-    const requesterProfile = isWhite ? whiteProfile : blackProfile;
-    const requesterName = requesterProfile?.display_name || requesterProfile?.username || "Your opponent";
-    const opponentId = isWhite ? originalGame.black_player_id : originalGame.white_player_id;
-
-    // Insert notification for opponent
+    // Notify the opponent
     await admin.from("notifications").insert({
       user_id: opponentId,
       type: "rematch",
       title: `Rematch request from ${requesterName}`,
-      body: `${requesterName} challenged you to a rematch. Tap to play!`,
-      data: { gameId: newGameId, fromGame: originalGame.id },
+      body: `${requesterName} wants a rematch. Tap to accept!`,
+      data: { offerId: offer.id, fromGame: gameId },
       read: false,
     });
 
-    return NextResponse.json({ gameId: newGameId });
+    return NextResponse.json({ offerId: offer.id, status: "pending" });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
+  }
+}
+
+/**
+ * GET /api/game/rematch?offerId=...
+ * Check the status of a rematch offer (polled by the requester while waiting).
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const offerId = req.nextUrl.searchParams.get("offerId");
+    if (!offerId) return NextResponse.json({ error: "offerId required" }, { status: 400 });
+
+    const admin = createAdminClient();
+    const { data: offer } = await admin
+      .from("rematch_offers")
+      .select("id, status, new_game_id, from_game_id, requester_id, opponent_id")
+      .eq("id", offerId)
+      .single();
+
+    if (!offer) return NextResponse.json({ error: "Offer not found" }, { status: 404 });
+
+    // Only participants can check
+    if (offer.requester_id !== user.id && offer.opponent_id !== user.id) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    }
+
+    return NextResponse.json(offer);
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
   }

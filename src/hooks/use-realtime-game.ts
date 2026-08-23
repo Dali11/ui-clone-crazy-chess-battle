@@ -143,6 +143,10 @@ export function useRealtimeGame(gameId: string, initialState: GameState) {
           if (typeof updated.move_count === "number") {
             lastAppliedMoveCount.current = updated.move_count;
           }
+          // Clear draw offer when game ends
+          if (updated.status && updated.status !== "playing") {
+            setDrawOffer(null);
+          }
           setGame((prev) => ({ ...prev, ...updated } as GameState));
         }
       )
@@ -181,6 +185,10 @@ export function useRealtimeGame(gameId: string, initialState: GameState) {
       })
       .on("broadcast", { event: "draw_declined" }, () => {
         setDrawOffer(null);
+      })
+      .on("broadcast", { event: "draw_accepted" }, () => {
+        setDrawOffer(null);
+        setGame((prev) => ({ ...prev, status: "draw", winner: null }));
       })
       .on("broadcast", { event: "resign" }, (payload: any) => {
         const data = payload?.payload;

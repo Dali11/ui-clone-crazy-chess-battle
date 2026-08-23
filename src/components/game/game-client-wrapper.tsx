@@ -15,6 +15,13 @@ const GameClient = dynamic(
   }
 );
 
+export interface BattleInfo {
+  isBattle: boolean;
+  stakeCents: number;
+  winnerPayoutCents: number;
+  winnerId: string | null;
+}
+
 export default function GameClientWrapper(props: {
   gameId: string;
   initialGame: GameState;
@@ -24,6 +31,7 @@ export default function GameClientWrapper(props: {
   blackName: string;
   whiteAvatar?: string | null;
   blackAvatar?: string | null;
+  battleInfo?: BattleInfo | null;
 }) {
   return <GameClient {...props} />;
 }

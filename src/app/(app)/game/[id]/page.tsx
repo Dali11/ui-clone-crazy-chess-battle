@@ -32,6 +32,14 @@ export default async function GamePage({
   const isPlayer = user && (user.id === game.white_player_id || user.id === game.black_player_id);
   const isSpectator = !isPlayer;
 
+  // Check if this game is linked to a battle
+  const { data: battle } = await supabase
+    .from("battles")
+    .select("id, stake_cents, winner_payout_cents, status, winner_id, white_player_id, black_player_id")
+    .or(`game_id.eq.${id},armageddon_game_id.eq.${id}`)
+    .limit(1)
+    .single();
+
   const gameState: GameState = {
     id: game.id,
     fen: game.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
@@ -56,6 +64,15 @@ export default async function GamePage({
     created_at: game.created_at,
   };
 
+  // Battle info for earnings display
+  const battleInfo = battle ? {
+    isBattle: true,
+    stakeCents: battle.stake_cents,
+    winnerPayoutCents: battle.winner_payout_cents,
+    winnerId: battle.winner_id,
+    isArmageddon: false, // will be determined in client
+  } : null;
+
   return (
     <>
       <GameClientWrapper
@@ -67,6 +84,7 @@ export default async function GamePage({
         blackName={blackProfile.data?.display_name || blackProfile.data?.username || "Black"}
         whiteAvatar={whiteProfile.data?.avatar_url}
         blackAvatar={blackProfile.data?.avatar_url}
+        battleInfo={battleInfo}
       />
     </>
   );

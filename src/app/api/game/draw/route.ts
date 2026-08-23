@@ -43,7 +43,6 @@ export async function POST(req: NextRequest) {
 
     if (action === "offer") {
       // Broadcast draw offer to opponent via realtime
-      // The frontend listens for this broadcast event
       const channel = admin.channel(`game:${gameId}`);
       await channel.send({
         type: "broadcast",
@@ -100,6 +99,14 @@ export async function POST(req: NextRequest) {
         }).eq("id", game.black_player_id);
       }
 
+      // Broadcast draw_accepted so the opponent's UI clears the "waiting" state
+      const channel = admin.channel(`game:${gameId}`);
+      await channel.send({
+        type: "broadcast",
+        event: "draw_accepted",
+        payload: { from: user.id },
+      });
+
       // Check if this is a Battle game — draw triggers armageddon
       const { data: battle } = await admin
         .from("battles")
@@ -117,7 +124,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "decline") {
-      // Just broadcast the decline
+      // Broadcast the decline
       const channel = admin.channel(`game:${gameId}`);
       await channel.send({
         type: "broadcast",
