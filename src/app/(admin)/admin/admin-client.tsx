@@ -5,6 +5,7 @@ import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Check, X, Coins, Smartphone, Shield, Clock,
   TrendingUp, Wallet, AlertCircle, ChevronRight, Cherry, Gamepad2,
   Ban, Star, DollarSign, Search, Save, ScrollText, Swords,
+  Menu, LogOut,
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
 } from "lucide-react";
 
@@ -130,6 +131,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filter, setFilter] = useState("pending");
   const [battleStats, setBattleStats] = useState<any>(null);
   const [battleConfig, setBattleConfig] = useState<any>(null);
@@ -606,47 +608,128 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   ];
 
   return (
-    <div className="space-y-6 pb-20 sm:pb-0">
+    <div className="flex min-h-screen">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-ccb-success text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2">
+        <div className="fixed top-4 right-4 z-[60] bg-ccb-success text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2">
           <Check className="w-4 h-4" /> {toast}
         </div>
       )}
 
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-          <Shield className="w-6 h-6 text-ccb-primary" /> Admin Dashboard
-        </h1>
-        <p className="text-sm text-ccb-muted mt-1">Welcome back, {adminName}</p>
-      </div>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 sm:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      {/* Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {tabs.map((t) => {
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.id}
-              onClick={() => { setTab(t.id); setFilter("pending"); }}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all whitespace-nowrap ${
-                tab === t.id
-                  ? "border-ccb-primary bg-ccb-primary/10 text-ccb-primary"
-                  : "border-ccb-surface text-ccb-muted hover:border-ccb-border"
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {t.label}
-              {t.badge ? (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-ccb-accent/20 text-ccb-accent text-xs font-bold">
-                  {t.badge}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
+      {/* Sidebar */}
+      <aside
+        className={`fixed sm:sticky top-0 left-0 z-40 h-screen w-64 bg-ccb-dark border-r border-ccb-border flex flex-col transition-transform duration-200 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full sm:translate-x-0"
+        }`}
+      >
+        {/* Sidebar header */}
+        <div className="px-4 py-4 border-b border-ccb-border flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-ccb-primary to-ccb-primary/70 flex items-center justify-center shadow-lg">
+              <Shield className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold leading-tight">Admin Console</p>
+              <p className="text-[10px] text-ccb-muted">Crazy Chess Battles</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="sm:hidden p-1.5 rounded-lg text-ccb-muted hover:bg-ccb-surface"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
+        {/* Nav items */}
+        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
+          {tabs.map((t) => {
+            const Icon = t.icon;
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => { setTab(t.id); setFilter("pending"); setSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  isActive
+                    ? "bg-ccb-primary/15 text-ccb-primary shadow-sm"
+                    : "text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="flex-1 text-left">{t.label}</span>
+                {t.badge ? (
+                  <span className="px-1.5 py-0.5 rounded-full bg-ccb-accent/20 text-ccb-accent text-[10px] font-bold">
+                    {t.badge}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Sidebar footer */}
+        <div className="px-3 py-3 border-t border-ccb-border space-y-1">
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-ccb-surface/50">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-ccb-primary/30 to-ccb-primary/10 flex items-center justify-center">
+              <Shield className="w-4 h-4 text-ccb-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium truncate">{adminName}</p>
+              <p className="text-[10px] text-ccb-muted">Administrator</p>
+            </div>
+          </div>
+          <a
+            href="/dashboard"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Exit to app
+          </a>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Mobile header */}
+        <div className="sm:hidden flex items-center justify-between px-4 py-3 border-b border-ccb-border bg-ccb-dark sticky top-0 z-20">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="flex items-center gap-2 text-ccb-text"
+          >
+            <Menu className="w-5 h-5" />
+            <span className="text-sm font-bold">Admin</span>
+          </button>
+          <div className="flex items-center gap-1.5">
+            <Shield className="w-4 h-4 text-ccb-primary" />
+            <span className="text-xs text-ccb-muted">{tabs.find(t => t.id === tab)?.label}</span>
+          </div>
+        </div>
+
+        {/* Desktop header */}
+        <div className="hidden sm:flex items-center justify-between px-6 py-4 border-b border-ccb-border">
+          <div>
+            <h1 className="text-lg font-bold flex items-center gap-2">
+              {(() => {
+                const Icon = tabs.find(t => t.id === tab)?.icon || Shield;
+                return <Icon className="w-5 h-5 text-ccb-primary" />;
+              })()}
+              {tabs.find(t => t.id === tab)?.label || "Overview"}
+            </h1>
+            <p className="text-xs text-ccb-muted mt-0.5">Welcome back, {adminName}</p>
+          </div>
+        </div>
+
+        {/* Content area */}
+        <div className="flex-1 p-4 sm:p-6 space-y-4 overflow-y-auto">
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin text-ccb-muted" />
@@ -1804,6 +1887,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           )}
         </>
       )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+// Real payment methods only — excludes internal audit entries like
+// battle_escrow, battle_payout, battle_refund, tournament_entry,
+// tournament_payout, tournament_refund, tournament_creator_profit, platform_cut.
+// Those are ledger entries, not money entering the platform.
+const PAYMENT_METHODS = ["mobile_money", "card", "bank_transfer"];
+
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -22,8 +28,9 @@ export async function GET(req: NextRequest) {
       .select(`
         id, user_id, amount_cents, status, method, charge_id, tx_ref,
         paychangu_ref, phone, operator, reference, created_at, updated_at,
-        profiles!inner(username, display_name, email)
+        profiles!deposits_user_id_profiles_fkey(username, display_name, email)
       `)
+      .in("method", PAYMENT_METHODS)
       .order("created_at", { ascending: false })
       .limit(100);
 
