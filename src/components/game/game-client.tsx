@@ -67,8 +67,14 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [viewPly, setViewPly] = useState(0);
+  const [victoryDismissed, setVictoryDismissed] = useState(false);
   const [rematchState, setRematchState] = useState<RematchState>({ status: "idle" });
   const [incomingRematch, setIncomingRematch] = useState<{ offerId: string; fromGameId: string } | null>(null);
+  // If the player dismissed the overlay to review the board but an incoming rematch offer
+  // arrives, bring the overlay back so they can see Accept/Decline.
+  useEffect(() => {
+    if (incomingRematch) setVictoryDismissed(false);
+  }, [incomingRematch]);
   const rematchPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const incomingRematchRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [reviewFen, setReviewFen] = useState<string | null>(null);
@@ -1089,7 +1095,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
         <PromotionDialog visible={!!pendingPromotion} color={isWhite ? "white" : "black"} onSelect={handlePromotionSelect} onCancel={() => setPendingPromotion(null)} />
         <VictoryOverlay
-          visible={gameEnded}
+          visible={gameEnded && !victoryDismissed}
           outcome={(game.status === "abort" ? "abort" : game.winner === null ? "draw" : game.winner === (isWhite ? "white" : "black") ? "win" : "loss") as GameOutcome}
           reasonLabel={STATUS_LABELS[game.status] || game.status}
           ratingChange={myRatingChange}
@@ -1107,6 +1113,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
           onAcceptRematch={incomingRematch && !isSpectator ? handleAcceptIncomingRematch : undefined}
           onDeclineRematch={incomingRematch && !isSpectator ? handleDeclineIncomingRematch : undefined}
+          onReview={() => setVictoryDismissed(true)}
+          onDismiss={() => setVictoryDismissed(true)}
         />
       </>
     );
@@ -1145,7 +1153,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
       <PromotionDialog visible={!!pendingPromotion} color={isWhite ? "white" : "black"} onSelect={handlePromotionSelect} onCancel={() => setPendingPromotion(null)} />
       <VictoryOverlay
-        visible={gameEnded}
+        visible={gameEnded && !victoryDismissed}
         outcome={(game.status === "abort" ? "abort" : game.winner === null ? "draw" : game.winner === (isWhite ? "white" : "black") ? "win" : "loss") as GameOutcome}
         reasonLabel={STATUS_LABELS[game.status] || game.status}
         ratingChange={myRatingChange}
@@ -1162,6 +1170,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
         onAcceptRematch={incomingRematch ? handleAcceptIncomingRematch : undefined}
         onDeclineRematch={incomingRematch ? handleDeclineIncomingRematch : undefined}
+        onReview={() => setVictoryDismissed(true)}
+        onDismiss={() => setVictoryDismissed(true)}
       />
     </>
   );

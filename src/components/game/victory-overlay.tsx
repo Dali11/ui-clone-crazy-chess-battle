@@ -32,6 +32,7 @@ interface VictoryOverlayProps {
   onCancelRematch?: () => void;
   onAcceptRematch?: () => void;
   onDeclineRematch?: () => void;
+  onDismiss?: () => void;
   rematchState?: RematchState;
   newGameLabel?: string;
   lobbyHref?: string;
@@ -56,6 +57,7 @@ export default function VictoryOverlay({
   onCancelRematch,
   onAcceptRematch,
   onDeclineRematch,
+  onDismiss,
   rematchState = { status: "idle" },
   newGameLabel = "New Game",
   lobbyHref = "/play",
@@ -109,6 +111,17 @@ export default function VictoryOverlay({
           boxShadow: `0 20px 60px -10px ${accentBg}, 0 0 0 1px ${accentBorder}`,
         }}
       >
+        {/* Dismiss button — lets players close the overlay to review the board/moves underneath */}
+        {onDismiss && (
+          <button
+            onClick={onDismiss}
+            aria-label="Close"
+            className="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors z-10"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+
         {/* Accent ring */}
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full flex items-center justify-center transition-transform duration-500"
