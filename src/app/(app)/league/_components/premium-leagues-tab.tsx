@@ -414,7 +414,7 @@ export default function PremiumLeaguesTab() {
                                 <span className="text-xs font-medium flex-1 truncate">
                                   {s.player?.display_name || s.player?.username || 'Unknown'}
                                 </span>
-                                <span className="text-[10px] text-ccb-muted hidden sm:block">{s.player?.rating || '\u2014'}</span>
+                                <span className="text-[10px] text-ccb-muted hidden sm:block">{s.player?.rating || '—'}</span>
                                 <span className="text-xs font-bold">{s.points}pts</span>
                                 <span className="text-[10px] text-ccb-muted hidden sm:block">{s.played}P</span>
                               </div>
@@ -462,7 +462,7 @@ export default function PremiumLeaguesTab() {
               </div>
               <div>
                 <h4 className="font-bold text-sm">CrazyChess Champions League</h4>
-                <p className="text-[10px] text-ccb-muted">Top 10 from each league \u00b7 50 qualifiers</p>
+                <p className="text-[10px] text-ccb-muted">Top 10 from each league · 50 qualifiers</p>
               </div>
             </div>
             <div className="flex items-center gap-1.5 mt-3">
@@ -481,7 +481,7 @@ export default function PremiumLeaguesTab() {
               </div>
               <div>
                 <h4 className="font-bold text-sm">Airtel CrazyChess Shield</h4>
-                <p className="text-[10px] text-ccb-muted">Premium-only \u00b7 Sponsored competition</p>
+                <p className="text-[10px] text-ccb-muted">Premium-only · Sponsored competition</p>
               </div>
             </div>
             <div className="flex items-center gap-2 mt-3">
@@ -500,7 +500,7 @@ export default function PremiumLeaguesTab() {
       {/* ADMIN NOTE */}
       {isAdmin && (
         <div className="bg-ccb-primary/10 border border-ccb-primary/30 rounded-xl p-3 text-xs text-ccb-primary font-semibold flex items-center gap-2">
-          <Crown className="w-4 h-4" /> Admin \u2014 League capacity, prize pools, promotion/relegation and payout config are editable from the admin dashboard.
+          <Crown className="w-4 h-4" /> Admin — League capacity, prize pools, promotion/relegation and payout config are editable from the admin dashboard.
         </div>
       )}
     </div>
