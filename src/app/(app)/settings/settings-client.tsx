@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { User, LogOut, Save, ChevronRight, Trophy, Swords, Wallet, Camera } from "lucide-react";
+import { User, LogOut, Save, ChevronRight, Trophy, Swords, Wallet, Camera, Circle, AlertCircle, CheckCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Profile {
@@ -13,6 +13,8 @@ interface Profile {
   bio: string | null;
   avatar_url: string | null;
   phone: string | null;
+  gender: string | null;
+  identity_verified: boolean | null;
   rating: number | null;
   games_played: number | null;
   wins: number | null;
@@ -24,6 +26,13 @@ interface Profile {
   is_admin: boolean | null;
 }
 
+const GENDER_OPTIONS = [
+  { value: "male", label: "Male", icon: User, color: "text-blue-400" },
+  { value: "female", label: "Female", icon: User, color: "text-pink-400" },
+  { value: "other", label: "Other", icon: Circle, color: "text-purple-400" },
+  { value: "prefer_not_to_say", label: "Prefer not to say", icon: Circle, color: "text-ccb-muted" },
+];
+
 export default function SettingsClient({ profile, userId }: { profile: Profile | null; userId: string }) {
   const router = useRouter();
   const supabase = createClient();
@@ -32,6 +41,9 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
   const [displayName, setDisplayName] = useState(profile?.display_name || "");
   const [bio, setBio] = useState(profile?.bio || "");
   const [phone, setPhone] = useState(profile?.phone || "");
+  const [gender, setGender] = useState(profile?.gender || "");
+  const [identityVerified, setIdentityVerified] = useState(profile?.identity_verified || false);
+  const [genderChanged, setGenderChanged] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url || null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -140,15 +152,22 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
   const handleSave = async () => {
     setSaving(true);
     setError(null);
+    const updates: Record<string, any> = { display_name: displayName, bio, phone };
+    const genderChangedFlag = gender !== (profile?.gender || "");
+    if (gender) updates.gender = gender;
     const { error } = await supabase
       .from("profiles")
-      .update({ display_name: displayName, bio, phone })
+      .update(updates)
       .eq("id", userId);
     if (error) {
       setError(error.message);
     } else {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+      if (genderChangedFlag && identityVerified) {
+        setIdentityVerified(false);
+        setGenderChanged(true);
+      }
       router.refresh();
     }
     setSaving(false);
@@ -234,6 +253,63 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
           />
         </div>
 
+        {/* Gender Identity */}
+        <div>
+          <label className="text-sm font-medium block mb-2">Gender Identity</label>
+          <p className="text-xs text-ccb-muted mb-2.5">
+            Determines which league divisions you're eligible for. Women's and Men's leagues run in parallel with the same prize pools.
+          </p>
+
+          {/* Verification status badge */}
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl mb-2.5 text-xs font-medium ${
+            identityVerified
+              ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30"
+              : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+          }`}>
+            {identityVerified ? (
+              <>
+                <CheckCircle className="w-3.5 h-3.5" />
+                Identity verified — your gender is confirmed for league eligibility
+              </>
+            ) : (
+              <>
+                <AlertCircle className="w-3.5 h-3.5" />
+                Identity not verified — gender-restricted leagues will be locked until an admin verifies your identity
+              </>
+            )}
+          </div>
+
+          {/* Warning if gender change will reset verification */}
+          {genderChanged && !identityVerified && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl mb-2.5 text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+              <AlertCircle className="w-3.5 h-3.5" />
+              Changing your gender requires re-verification by an admin before you can join gender-restricted leagues.
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            {GENDER_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              const isSelected = gender === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setGender(opt.value)}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                    isSelected
+                      ? "border-ccb-primary bg-ccb-primary/10 text-ccb-primary"
+                      : "border-ccb-border bg-ccb-surface hover:border-ccb-primary/30"
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${isSelected ? opt.color : "text-ccb-muted"}`} />
+                  <span className={isSelected ? "" : "text-ccb-text"}>{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div>
           <label className="text-sm font-medium block mb-1.5">Bio</label>
           <textarea
@@ -294,14 +370,16 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
         </div>
       </div>
 
-      {/* Logout */}
-      <button
-        onClick={handleLogout}
-        className="w-full flex items-center justify-center gap-2 rounded-xl bg-ccb-danger/10 border border-ccb-danger/30 text-ccb-danger px-4 py-3 text-sm font-medium hover:bg-ccb-danger/20 transition-colors"
-      >
-        <LogOut className="w-4 h-4" />
-        Log out
-      </button>
+      {/* Sign out */}
+      <div className="card p-4">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 text-sm text-ccb-danger hover:opacity-80"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign Out
+        </button>
+      </div>
     </div>
   );
 }

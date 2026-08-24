@@ -6,6 +6,7 @@ import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Check, X, Coins, Smartphone, Shield, Clock,
   TrendingUp, Wallet, AlertCircle, ChevronRight, Cherry, Gamepad2,
   Ban, Star, DollarSign, Search, Save, ScrollText, Swords,
+  ShieldCheck, UserRound, XCircle,
   Menu, LogOut, Crown, Play,
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
 } from "lucide-react";
@@ -120,7 +121,7 @@ interface AdminLog {
   profiles: { username: string; display_name: string } | null;
 }
 
-type Tab = "overview" | "users" | "withdrawals" | "tournaments" | "games" | "deposits" | "battles" | "berry" | "logs" | "leagues" | "seasons" | "membership";
+type Tab = "overview" | "users" | "withdrawals" | "tournaments" | "games" | "deposits" | "battles" | "berry" | "logs" | "leagues" | "seasons" | "membership" | "verification";
 
 export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [tab, setTab] = useState<Tab>("overview");
@@ -164,6 +165,9 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [managingTournament, setManagingTournament] = useState<Tournament | null>(null);
   const [tournamentDetail, setTournamentDetail] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [verificationPlayers, setVerificationPlayers] = useState<any[]>([]);
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [verificationFilter, setVerificationFilter] = useState<"pending" | "verified" | "all">("pending");
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -230,6 +234,32 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     if (statsRes.ok) setBattleStats(await statsRes.json());
     if (configRes.ok) setBattleConfig(await configRes.json());
   }, []);
+
+  const fetchVerificationPlayers = useCallback(async () => {
+    setVerificationLoading(true);
+    try {
+      const res = await fetch(`/api/admin/identity-verification?filter=${verificationFilter}`);
+      const json = await res.json();
+      setVerificationPlayers(json.players || []);
+    } catch { setVerificationPlayers([]); }
+    finally { setVerificationLoading(false); }
+  }, [verificationFilter]);
+
+  const verifyIdentity = async (playerId: string, action: "verify" | "reject", genderOverride?: string) => {
+    setActionLoading(`${playerId}_verify`);
+    try {
+      const res = await fetch("/api/admin/identity-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId, action, genderOverride }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed");
+      showToast(json.message || "Done");
+      await fetchVerificationPlayers();
+    } catch (err: any) { showToast(err.message); }
+    finally { setActionLoading(null); }
+  };
 
   const fetchAdminLeagues = useCallback(async () => {
     const res = await fetch("/api/admin/leagues");
@@ -322,6 +352,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     } catch {} finally { setActionLoading(null); }
   };
   useEffect(() => {
+    if (tab === "verification") fetchVerificationPlayers();
+  }, [verificationFilter]);
+
+  useEffect(() => {
     const load = async () => {
       setLoading(true);
       await fetchStats();
@@ -336,6 +370,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       if (tab === "leagues") await fetchAdminLeagues();
       if (tab === "seasons") await fetchAdminSeasons();
       if (tab === "membership") await fetchMarketConfigs();
+      if (tab === "verification") await fetchVerificationPlayers();
       setLoading(false);
     };
     load();
@@ -841,6 +876,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     { id: "leagues", label: "Leagues", icon: Crown },
     { id: "seasons", label: "Seasons", icon: Calendar },
     { id: "membership", label: "Membership", icon: Crown },
+    { id: "verification", label: "Verification", icon: ShieldCheck },
   ];
 
   return (
@@ -2595,6 +2631,107 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           )}
         </>
       )}
+
+          {/* VERIFICATION */}
+          {tab === "verification" && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                {(["pending", "verified", "all"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setVerificationFilter(f)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      verificationFilter === f
+                        ? "bg-ccb-primary text-white"
+                        : "bg-ccb-surface text-ccb-muted hover:text-ccb-text"
+                    }`}
+                  >
+                    {f === "pending" ? "Pending" : f === "verified" ? "Verified" : "All"}
+                  </button>
+                ))}
+              </div>
+
+              {verificationLoading ? (
+                <div className="card p-8 text-center">
+                  <Loader2 className="w-6 h-6 mx-auto mb-2 text-ccb-muted animate-spin" />
+                </div>
+              ) : verificationPlayers.length === 0 ? (
+                <div className="card p-8 text-center">
+                  <Shield className="w-8 h-8 mx-auto mb-2 text-ccb-muted opacity-50" />
+                  <p className="text-sm text-ccb-muted">
+                    {verificationFilter === "pending" ? "No players pending verification" : "No players found"}
+                  </p>
+                </div>
+              ) : (
+                verificationPlayers.map((p: any) => (
+                  <div key={p.id} className="card p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-ccb-surface border border-ccb-border overflow-hidden flex items-center justify-center shrink-0">
+                          {p.avatar_url ? (
+                            <img src={p.avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <UserRound className="w-5 h-5 text-ccb-muted" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-bold text-sm">{p.display_name || p.username || "Unknown"}</div>
+                          <div className="text-xs text-ccb-muted">{p.email}</div>
+                          {p.phone && <div className="text-xs text-ccb-muted">{p.phone}</div>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          p.gender === "female" ? "bg-pink-500/10 text-pink-400" :
+                          p.gender === "male" ? "bg-blue-500/10 text-blue-400" :
+                          "bg-ccb-surface text-ccb-muted"
+                        }`}>
+                          {p.gender || "Not set"}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          p.identity_verified ? "bg-ccb-success/10 text-ccb-success" : "bg-amber-500/10 text-amber-500"
+                        }`}>
+                          {p.identity_verified ? "Verified" : "Unverified"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <select
+                        defaultValue={p.gender || ""}
+                        id={`gender-override-${p.id}`}
+                        className="px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-xs font-medium"
+                      >
+                        <option value="">Confirm gender...</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </select>
+                      <ActionButton
+                        onClick={() => {
+                          const select = document.getElementById(`gender-override-${p.id}`) as HTMLSelectElement;
+                          verifyIdentity(p.id, "verify", select.value || undefined);
+                        }}
+                        loading={actionLoading === `${p.id}_verify`}
+                        variant="success"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" /> Verify
+                      </ActionButton>
+                      {p.identity_verified && (
+                        <ActionButton
+                          onClick={() => verifyIdentity(p.id, "reject")}
+                          loading={actionLoading === `${p.id}_verify`}
+                          variant="danger"
+                        >
+                          <XCircle className="w-3.5 h-3.5" /> Revoke
+                        </ActionButton>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
         </div>
       </div>
     </div>

@@ -112,9 +112,16 @@ export async function GET(req: Request) {
               {
                 id: 'gender_requirement',
                 label: `Gender: ${league.gender_restriction || 'open'} division`,
-                done: !league.gender_restriction || league.gender_restriction === 'open' || profile?.gender === league.gender_restriction,
+                done: !league.gender_restriction || league.gender_restriction === 'open' || (profile?.gender === league.gender_restriction && !!profile?.identity_verified),
                 required: league.gender_restriction && league.gender_restriction !== 'open',
                 action: '/settings', actionLabel: 'Update Gender',
+              },
+              {
+                id: 'gender_verified',
+                label: 'Identity verified (confirms your gender)',
+                done: !league.gender_restriction || league.gender_restriction === 'open' || !!profile?.identity_verified,
+                required: league.gender_restriction && league.gender_restriction !== 'open',
+                action: null, actionLabel: null,
               },
               { id: 'phone_verified', label: 'Verify phone number', done: league.requires_phone_verification ? !!profile?.phone_verified : true, required: !!league.requires_phone_verification, action: '/settings', actionLabel: 'Verify Phone' },
               { id: 'identity_verified', label: 'Identity verification', done: league.requires_identity_verification ? !!profile?.identity_verified : true, required: !!league.requires_identity_verification, action: '/settings', actionLabel: 'Verify Identity' },
@@ -158,6 +165,7 @@ export async function GET(req: Request) {
       isAdmin,
       hasMembership,
       userId: user?.id || null,
+      userGender: profile?.gender || null,
       market: {
         currencyCode: market.currencyCode,
         currencySymbol: market.currencySymbol,

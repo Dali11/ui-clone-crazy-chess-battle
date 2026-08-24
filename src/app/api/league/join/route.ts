@@ -85,6 +85,29 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `Maximum rating of ${league.max_rating} required` }, { status: 403 });
       }
 
+      // Check gender restriction + identity verification
+      if (league.gender_restriction && league.gender_restriction !== 'open') {
+        const { data: profileData } = await admin
+          .from('profiles')
+          .select('gender, identity_verified')
+          .eq('id', user.id)
+          .single();
+
+        if (!profileData?.identity_verified) {
+          return NextResponse.json({
+            error: 'Identity verification required to join gender-restricted leagues. An admin must verify your identity before you can register.',
+            code: 'identity_verification_required',
+          }, { status: 403 });
+        }
+
+        if (profileData.gender !== league.gender_restriction) {
+          return NextResponse.json({
+            error: `This league is for ${league.gender_restriction === 'female' ? 'women' : 'men'} only. Your verified gender does not match this division.`,
+            code: 'gender_mismatch',
+          }, { status: 403 });
+        }
+      }
+
       // Check max players
       if (league.league_size) {
         const { count } = await admin

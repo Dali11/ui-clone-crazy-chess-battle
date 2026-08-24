@@ -47,6 +47,7 @@ interface League {
   name: string;
   status: string;
   tier: number;
+  gender_restriction: string;
   league_size: number;
   prize_pool_cents: number;
   prize_currency: string;
@@ -71,6 +72,7 @@ interface ApiResponse {
   isAdmin: boolean;
   hasMembership: boolean;
   userId: string | null;
+  userGender: string | null;
   market: {
     currencyCode: string;
     currencySymbol: string;
@@ -136,6 +138,7 @@ export default function PremiumLeaguesTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedLeague, setExpandedLeague] = useState<number | null>(null);
+  const [genderView, setGenderView] = useState<'male' | 'female' | null>(null);
   const [registering, setRegistering] = useState<string | null>(null);
   const [registerMsg, setRegisterMsg] = useState<{ leagueId: string; type: 'success' | 'error'; msg: string } | null>(null);
   const [competitions, setCompetitions] = useState<PremiumCompetition[]>([]);
@@ -148,6 +151,8 @@ export default function PremiumLeaguesTab() {
       const res = await fetch('/api/league/premium-leagues');
       const json = await res.json();
       setData(json);
+      if (json.userGender === 'female') setGenderView('female');
+      else setGenderView('male');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -191,7 +196,8 @@ export default function PremiumLeaguesTab() {
   };
 
   const symbol = data?.market?.currencySymbol || 'MK';
-  const leagues = data?.leagues || [];
+  const allLeagues = data?.leagues || [];
+  const leagues = allLeagues.filter(l => l.gender_restriction === genderView);
   const hasMembership = data?.hasMembership || false;
   const isAdmin = data?.isAdmin || false;
 
@@ -241,6 +247,32 @@ export default function PremiumLeaguesTab() {
         </div>
       </div>
 
+      {/* GENDER TOGGLE */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setGenderView('male')}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
+            genderView === 'male'
+              ? 'bg-blue-500/10 border border-blue-500/30 text-blue-400'
+              : 'bg-ccb-surface border border-ccb-border text-ccb-muted'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Men's Leagues
+        </button>
+        <button
+          onClick={() => setGenderView('female')}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
+            genderView === 'female'
+              ? 'bg-pink-500/10 border border-pink-500/30 text-pink-400'
+              : 'bg-ccb-surface border border-ccb-border text-ccb-muted'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Women's Leagues
+        </button>
+      </div>
+
       {/* LEAGUE CARDS */}
       {loading ? (
         <div className="space-y-4 animate-pulse">
@@ -287,6 +319,12 @@ export default function PremiumLeaguesTab() {
                       <div className="flex items-center gap-2">
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${meta.bgColor} ${meta.color}`}>L{league.tier}</span>
                         <h3 className="font-bold text-sm truncate">{league.name}</h3>
+                        {league.gender_restriction === 'female' && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-pink-500/10 text-pink-400 shrink-0">Women's</span>
+                        )}
+                        {league.gender_restriction === 'male' && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 shrink-0">Men's</span>
+                        )}
                         {league.status === 'registration' && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-ccb-success/10 text-ccb-success border border-ccb-success/30">OPEN</span>
                         )}
