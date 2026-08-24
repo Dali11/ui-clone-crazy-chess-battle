@@ -250,24 +250,6 @@ export default function PremiumLeaguesTab() {
         </div>
       </div>
 
-      {/* GENDER BADGE — locked to player's verified gender */}
-      <div className="flex items-center gap-2">
-        <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold ${
-          genderView === 'female'
-            ? 'bg-pink-500/10 border border-pink-500/30 text-pink-400'
-            : 'bg-blue-500/10 border border-blue-500/30 text-blue-400'
-        }`}>
-          <Users className="w-4 h-4" />
-          {genderView === 'female' ? "Women's Leagues" : "Men's Leagues"}
-        </div>
-        {!data?.userIdentityVerified && (
-          <span className="text-[10px] text-ccb-muted flex items-center gap-1">
-            <AlertCircle className="w-3 h-3" />
-            Identity not verified — gender locked until verified
-          </span>
-        )}
-      </div>
-
       {/* LEAGUE CARDS */}
       {loading ? (
         <div className="space-y-4 animate-pulse">
