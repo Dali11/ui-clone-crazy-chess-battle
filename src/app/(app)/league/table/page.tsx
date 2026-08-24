@@ -13,7 +13,6 @@ import {
   Info,
   ChevronLeft,
 } from 'lucide-react';
-import LeagueNav from '@/components/league/league-nav';
 import LeagueSubNav from '@/components/league/league-sub-nav';
 
 interface Player {
@@ -110,7 +109,6 @@ export default function StandingsTablePage() {
 
   return (
     <div className="space-y-6 pb-20 sm:pb-8">
-      <LeagueNav />
       <div className="flex items-center justify-between gap-4">
         <Link href="/league" className="inline-flex items-center gap-1.5 text-sm text-ccb-muted hover:text-ccb-accent transition-colors">
           <ChevronLeft className="w-4 h-4" /> Back to Leagues

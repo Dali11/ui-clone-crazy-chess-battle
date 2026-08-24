@@ -20,7 +20,6 @@ import {
   User,
   ChevronLeft,
 } from 'lucide-react';
-import LeagueNav from '@/components/league/league-nav';
 
 interface PlayerProfile {
   id: string;
@@ -278,7 +277,6 @@ export default function LeagueDashboardPage() {
 
   return (
     <div className="space-y-6 pb-20 sm:pb-8 text-ccb-text">
-      <LeagueNav />
       <div>
         <Link href="/league" className="inline-flex items-center gap-1.5 text-sm text-ccb-muted hover:text-ccb-accent transition-colors">
           <ChevronLeft className="w-4 h-4" /> Back to League Home

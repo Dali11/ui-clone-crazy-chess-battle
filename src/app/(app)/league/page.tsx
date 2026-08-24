@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import LeagueNav from '@/components/league/league-nav';
 import TournamentsTab from './_components/tournaments-tab';
 import PremiumLeaguesTab from './_components/premium-leagues-tab';
 import { Swords, Crown } from 'lucide-react';
@@ -14,7 +13,6 @@ export default function CompetePage() {
 
   return (
     <div className="space-y-6 pb-20 sm:pb-8">
-      <LeagueNav />
 
       {/* HEADER */}
       <div className="px-4 sm:px-6 lg:px-8">

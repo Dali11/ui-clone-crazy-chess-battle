@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import LeagueNav from '@/components/league/league-nav';
 import {
   Trophy, Crown, Swords, Calendar, Users, RefreshCw, ShieldAlert,
   CheckCircle2, Lock, Sparkles, Star, Zap, Clock, DollarSign,
@@ -105,7 +104,6 @@ export default function TournamentsPage() {
 
   return (
     <div className="space-y-6 pb-20 sm:pb-8">
-      <LeagueNav />
 
       <div>
         <h1 className="text-xl sm:text-2xl font-bold">Tournaments</h1>

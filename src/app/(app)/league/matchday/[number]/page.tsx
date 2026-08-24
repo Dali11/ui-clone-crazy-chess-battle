@@ -4,7 +4,6 @@ import React, { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Swords, Trophy, ArrowLeft, RefreshCw } from 'lucide-react';
-import LeagueNav from '@/components/league/league-nav';
 import LeagueSubNav from '@/components/league/league-sub-nav';
 
 interface Player {
@@ -133,7 +132,6 @@ export default function MatchdayPage({ params }: { params?: Promise<{ number: st
 
   return (
     <div className="space-y-6 pb-20 sm:pb-8">
-      <LeagueNav />
       <div className="flex items-center justify-between gap-4">
         <Link
           href="/league"

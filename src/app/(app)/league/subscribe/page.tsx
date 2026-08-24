@@ -7,7 +7,6 @@ import {
   Sparkles, Calendar, RefreshCw, AlertCircle, ArrowRight, X, Users,
   Smartphone, Phone,
 } from 'lucide-react';
-import LeagueNav from '@/components/league/league-nav';
 
 interface MembershipConfig {
   country: string;
@@ -202,7 +201,6 @@ export default function SubscriptionPage() {
 
   return (
     <div className="space-y-6 pb-20 sm:pb-8">
-      <LeagueNav />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-8">
 
@@ -305,8 +303,8 @@ export default function SubscriptionPage() {
 
             {/* Subscribe CTA */}
             <div className="mt-6 text-center">
-              <button onClick={() => { resetPayment(); setShowPaymentModal(true); }} className="px-8 py-4 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-base hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20">
-                <Crown className="w-5 h-5 inline mr-2" /> Subscribe
+              <button onClick={() => { resetPayment(); setShowPaymentModal(true); }} className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20">
+                Subscribe
               </button>
               <p className="text-xs text-ccb-muted mt-3">Pay via TNM Mpamba or Airtel Money</p>
             </div>
@@ -442,7 +440,7 @@ export default function SubscriptionPage() {
                 {paymentError && <div className="p-3 rounded-xl border border-ccb-danger/30 bg-ccb-danger/10 text-ccb-danger text-sm flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {paymentError}</div>}
 
                 <button onClick={handleSubscribe} className="w-full py-3 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20 flex items-center justify-center gap-2">
-                  <Zap className="w-4 h-4" /> Pay &amp; Subscribe
+                  Subscribe
                 </button>
                 <p className="text-[10px] text-ccb-muted text-center">You will receive a mobile money prompt on your phone to authorize the payment.</p>
               </>
