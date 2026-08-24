@@ -92,10 +92,12 @@ export async function POST(req: NextRequest) {
     });
 
     // Insert with time_control if the column exists
+    // All challenges expire after 10 minutes
     const insertData: any = {
       challenger_id: user.id,
       stake_cents: stakeCents,
       status: "pending",
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     };
     if (timeControl) {
       insertData.time_control = timeControl;

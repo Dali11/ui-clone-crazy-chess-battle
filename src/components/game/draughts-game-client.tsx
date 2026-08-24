@@ -1,0 +1,327 @@
+"use client";
+
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import DraughtsBoard from "./draughts-board";
+import {
+  stringToBoard,
+  getLegalMoves,
+  getMovesForPiece,
+  initialBoard,
+  type Board,
+  type Position,
+  type DraughtsMove,
+  type Color,
+} from "@/lib/game/draughts-engine";
+import { Flag, Timer, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
+
+interface DraughtsGameClientProps {
+  game: any;
+  myId: string;
+}
+
+export default function DraughtsGameClient({ game: initialGame, myId }: DraughtsGameClientProps) {
+  const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+
+  const [game, setGame] = useState(initialGame);
+  const [board, setBoard] = useState<Board>(() => stringToBoard(initialGame.board_state));
+  const [selected, setSelected] = useState<Position | null>(null);
+  const [legalMoves, setLegalMoves] = useState<DraughtsMove[]>([]);
+  const [lastMove, setLastMove] = useState<{ from: Position; to: Position } | null>(null);
+  const [clockTick, setClockTick] = useState(0);
+  const [showResignConfirm, setShowResignConfirm] = useState(false);
+  const [viewIndex, setViewIndex] = useState<number | null>(null); // null = live
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const isWhite = game.white_player_id === myId;
+  const isBlack = game.black_player_id === myId;
+  const isSpectator = !isWhite && !isBlack;
+  const myColor: Color | null = isWhite ? "white" : isBlack ? "black" : null;
+  const perspective = myColor === "black" ? "black" : "white";
+  const currentTurn = game.turn as Color;
+  const myTurn = myColor === currentTurn && game.status === "playing";
+  const gameEnded = game.status !== "playing";
+  const mustContinueJump = game.must_continue_jump as Position | null;
+
+  // Live clock calculation
+  const whiteClockMs = (() => {
+    if (gameEnded) return game.white_clock_ms;
+    void clockTick;
+    const elapsed = Date.now() - new Date(game.last_move_at || game.created_at).getTime();
+    return currentTurn === "white" ? Math.max(0, game.white_clock_ms - elapsed) : game.white_clock_ms;
+  })();
+
+  const blackClockMs = (() => {
+    if (gameEnded) return game.black_clock_ms;
+    void clockTick;
+    const elapsed = Date.now() - new Date(game.last_move_at || game.created_at).getTime();
+    return currentTurn === "black" ? Math.max(0, game.black_clock_ms - elapsed) : game.black_clock_ms;
+  })();
+
+  // Clock tick
+  useEffect(() => {
+    if (gameEnded) return;
+    const interval = setInterval(() => setClockTick(t => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [gameEnded]);
+
+  // Realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel(`draughts_game:${game.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "draughts_games", filter: `id=eq.${game.id}` },
+        (payload: any) => {
+          setGame(payload.new);
+          setBoard(stringToBoard(payload.new.board_state));
+          setSelected(null);
+          setLegalMoves([]);
+          setError(null);
+        }
+      )
+      .subscribe();
+    channelRef.current = channel;
+
+    // Polling fallback
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/draughts/state?gameId=${game.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.move_count !== game.move_count || data.status !== game.status) {
+            setGame(data);
+            setBoard(stringToBoard(data.board_state));
+            setSelected(null);
+            setLegalMoves([]);
+            setError(null);
+          }
+        }
+      } catch {}
+    }, 3000);
+
+    return () => {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.id]);
+
+  // Handle square click
+  const handleSquareClick = useCallback((pos: Position) => {
+    if (!myTurn || submitting) return;
+    setError(null);
+
+    // If we must continue jumping, only allow the locked piece
+    if (mustContinueJump) {
+      if (pos.row !== mustContinueJump.row || pos.col !== mustContinueJump.col) {
+        setError("You must continue jumping with the selected piece");
+        return;
+      }
+    }
+
+    const piece = board[pos.row][pos.col];
+
+    // If clicking on own piece, select it
+    if (piece && myColor) {
+      const isMyPiece = (piece === "w" || piece === "W") && myColor === "white" ||
+                        (piece === "b" || piece === "B") && myColor === "black";
+      if (isMyPiece) {
+        setSelected(pos);
+        const moves = getMovesForPiece(board, pos);
+        // Filter by mandatory captures
+        const allMoves = getLegalMoves(board, myColor);
+        const hasCaptures = allMoves.some(m => m.captures && m.captures.length > 0);
+        const pieceMoves = hasCaptures
+          ? moves.filter(m => m.captures && m.captures.length > 0)
+          : moves;
+        setLegalMoves(pieceMoves);
+        return;
+      }
+    }
+
+    // If clicking on a target square, make the move
+    if (selected) {
+      const move = legalMoves.find(m => m.to.row === pos.row && m.to.col === pos.col);
+      if (move) {
+        submitMove(selected, pos);
+        return;
+      }
+    }
+
+    // Deselect
+    setSelected(null);
+    setLegalMoves([]);
+  }, [myTurn, submitting, mustContinueJump, board, myColor, selected, legalMoves]);
+
+  // Submit a move
+  const submitMove = async (from: Position, to: Position) => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/draughts/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameId: game.id,
+          move: { from, to },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Invalid move");
+      } else {
+        setLastMove({ from, to });
+        setSelected(null);
+        setLegalMoves([]);
+      }
+    } catch {
+      setError("Move failed — check your connection");
+    }
+    setSubmitting(false);
+  };
+
+  // Resign
+  const handleResign = async () => {
+    try {
+      await fetch("/api/draughts/resign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId: game.id }),
+      });
+      setShowResignConfirm(false);
+    } catch {}
+  };
+
+  const formatTime = (ms: number) => {
+    const totalSec = Math.ceil(ms / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return `${min}:${String(sec).padStart(2, "0")}`;
+  };
+
+  const opponentName = isWhite ? game.black_player_id : game.white_player_id;
+  const myName = isWhite ? game.white_player_id : game.black_player_id;
+
+  // Determine winner label
+  const winnerLabel = game.winner === "white" ? "White wins!" : game.winner === "black" ? "Black wins!" : "Draw";
+
+  return (
+    <div className="flex flex-col items-center gap-4 max-w-[600px] mx-auto">
+      {/* Error banner */}
+      {error && (
+        <div className="w-full px-4 py-2 rounded-lg bg-red-500/15 text-red-400 text-sm text-center">
+          {error}
+        </div>
+      )}
+
+      {/* Opponent info (top) */}
+      <div className="w-full flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
+        <div className="flex items-center gap-2">
+          <div className={`w-3 h-3 rounded-full ${perspective === "white" ? "bg-stone-900" : "bg-stone-100"}`} />
+          <span className="text-sm font-medium text-ccb-text">
+            {isWhite ? "Black" : "White"}
+          </span>
+          <span className="text-xs text-ccb-muted">
+            ({isWhite ? game.black_rating || "—" : game.white_rating || "—"})
+          </span>
+        </div>
+        <div className={`flex items-center gap-1.5 text-sm font-bold tabular-nums ${
+          currentTurn === (isWhite ? "black" : "white") && !gameEnded ? "text-ccb-primary" : "text-ccb-muted"
+        }`}>
+          <Timer className="w-4 h-4" />
+          {formatTime(isWhite ? blackClockMs : whiteClockMs)}
+        </div>
+      </div>
+
+      {/* Board */}
+      <DraughtsBoard
+        board={board}
+        perspective={perspective}
+        selected={selected}
+        legalMoves={legalMoves}
+        mustContinueJump={mustContinueJump}
+        onSquareClick={handleSquareClick}
+        lastMove={lastMove}
+        interactive={myTurn && !submitting}
+      />
+
+      {/* My info (bottom) */}
+      <div className="w-full flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
+        <div className="flex items-center gap-2">
+          <div className={`w-3 h-3 rounded-full ${perspective === "white" ? "bg-stone-100" : "bg-stone-900"}`} />
+          <span className="text-sm font-medium text-ccb-text">
+            {isWhite ? "White (You)" : "Black (You)"}
+          </span>
+          <span className="text-xs text-ccb-muted">
+            ({isWhite ? game.white_rating || "—" : game.black_rating || "—"})
+          </span>
+        </div>
+        <div className={`flex items-center gap-1.5 text-sm font-bold tabular-nums ${
+          currentTurn === myColor && !gameEnded ? "text-ccb-primary" : "text-ccb-muted"
+        }`}>
+          <Timer className="w-4 h-4" />
+          {formatTime(isWhite ? whiteClockMs : blackClockMs)}
+        </div>
+      </div>
+
+      {/* Turn indicator / game over */}
+      {!gameEnded && (
+        <div className={`px-4 py-2 rounded-lg text-sm font-medium ${
+          myTurn ? "bg-ccb-primary/10 text-ccb-primary" : "bg-ccb-surface text-ccb-muted"
+        }`}>
+          {mustContinueJump
+            ? "Continue jumping!"
+            : myTurn
+            ? "Your turn"
+            : "Opponent's turn..."}
+        </div>
+      )}
+
+      {/* Controls */}
+      {gameEnded ? (
+        <div className="w-full flex flex-col items-center gap-3 py-4">
+          <div className="text-xl font-bold text-ccb-text">{winnerLabel}</div>
+          <div className="text-sm text-ccb-muted capitalize">{game.status}</div>
+          {game.white_rating_change != null && (
+            <div className="text-xs text-ccb-muted">
+              Rating: {isWhite ? game.white_rating_change : game.black_rating_change > 0 ? "+" : ""}
+              {isWhite ? game.white_rating_change : game.black_rating_change}
+            </div>
+          )}
+          <button
+            onClick={() => router.push("/draughts")}
+            className="btn-secondary px-6"
+          >
+            Back to Lobby
+          </button>
+        </div>
+      ) : (
+        !isSpectator && (
+          <div className="flex gap-3">
+            {showResignConfirm ? (
+              <>
+                <span className="text-sm text-ccb-muted py-2">Resign?</span>
+                <button onClick={handleResign} className="btn bg-ccb-danger text-white px-4 py-2 text-sm">
+                  Yes, resign
+                </button>
+                <button onClick={() => setShowResignConfirm(false)} className="btn-secondary text-sm px-4 py-2">
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button onClick={() => setShowResignConfirm(true)} className="btn-secondary text-sm">
+                <Flag className="w-4 h-4 mr-1.5" /> Resign
+              </button>
+            )}
+          </div>
+        )
+      )}
+    </div>
+  );
+}

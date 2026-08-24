@@ -11,8 +11,8 @@ export async function POST(req: NextRequest) {
     const { timeControl, rated, expiryMinutes } = await req.json();
     const admin = createAdminClient();
 
-    // Clamp expiry to allowed range (5 min – 24 hours)
-    const expiryMins = Math.min(Math.max(expiryMinutes || 60, 5), 1440);
+    // Default 10 minutes, clamp to (10 min – 24 hours)
+    const expiryMins = Math.min(Math.max(expiryMinutes || 10, 10), 1440);
 
     // Get the user's referral code to append to the challenge link
     const { data: profile } = await admin

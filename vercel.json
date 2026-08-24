@@ -8,7 +8,7 @@
   "crons": [
     {
       "path": "/api/battles/challenge/cleanup-expired",
-      "schedule": "0 0 * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/league/membership-cleanup",

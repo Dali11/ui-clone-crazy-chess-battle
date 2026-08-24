@@ -35,7 +35,7 @@ export default function PlayPage() {
   const [copied, setCopied] = useState(false);
   const [challengeUrl, setChallengeUrl] = useState<string | null>(null);
   const [creatingChallenge, setCreatingChallenge] = useState(false);
-  const [challengeExpiry, setChallengeExpiry] = useState(60); // minutes
+  const [challengeExpiry, setChallengeExpiry] = useState(10); // minutes
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [adminNotified, setAdminNotified] = useState(false);
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>("medium");
@@ -386,7 +386,7 @@ export default function PlayPage() {
       {/* Challenge link expiry picker */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-ccb-muted">Link expires in:</span>
-        {[10, 30, 60, 240].map((mins) => (
+        {[10, 30, 60].map((mins) => (
           <button
             key={mins}
             onClick={() => setChallengeExpiry(mins)}
