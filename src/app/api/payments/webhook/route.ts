@@ -46,14 +46,14 @@ export async function POST(req: NextRequest) {
     // Fetch the deposit (charge_id for mobile money, tx_ref for card/standard checkout)
     let { data: deposit } = await admin
       .from("deposits")
-      .select("id, user_id, amount_cents, status")
+      .select("id, user_id, amount_cents, status, reference")
       .eq("charge_id", chargeId)
       .single();
 
     if (!deposit) {
       const { data: txDeposit } = await admin
         .from("deposits")
-        .select("id, user_id, amount_cents, status")
+        .select("id, user_id, amount_cents, status, reference")
         .eq("tx_ref", chargeId)
         .single();
       deposit = txDeposit;
@@ -83,8 +83,21 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true, message: "Already processing" });
       }
 
-      // We won the race — credit wallet
-      await admin.rpc("credit_wallet", {
+      // We won the race — check if this is a membership payment
+      const isMembership = deposit.reference?.startsWith('membership:');
+
+      if (isMembership) {
+        // Membership payments don't credit the wallet — the verify endpoint will activate the membership
+        // Just mark the deposit as success
+        await admin
+          .from('deposits')
+          .update({ status: 'success', updated_at: new Date().toISOString() })
+          .eq('id', deposit.id);
+        return NextResponse.json({ received: true, message: 'Membership payment confirmed' });
+      }
+
+      // Normal deposit — credit wallet
+      await admin.rpc('credit_wallet', {
         p_user_id: deposit.user_id,
         p_amount_cents: deposit.amount_cents,
       });

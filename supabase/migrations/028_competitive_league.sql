@@ -102,18 +102,4 @@ CREATE POLICY "Admins can manage leagues" ON public.premier_leagues FOR ALL TO a
 CREATE POLICY "Admins can manage fixtures" ON public.league_fixtures FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Admins can manage standings" ON public.league_standings FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
--- ============================================================
--- Seed: Malawi Season 1 + Premier League
--- ============================================================
-
-INSERT INTO public.competitive_seasons (name, country, start_date, end_date, status, config)
-VALUES ('CrazyChess Malawi Season 1', 'MW', '2026-09-01', '2026-12-31', 'upcoming',
-  '{"swissQualifiers": true, "premierLeagueEnabled": true, "cupEnabled": true}')
-ON CONFLICT DO NOTHING;
-
-INSERT INTO public.competitive_divisions (name, code, country, eligibility_config)
-VALUES
-  ('Men''s Division', 'MW-MEN', 'MW', '{"gender": "male", "minRating": 0}'),
-  ('Women''s Division', 'MW-WOMEN', 'MW', '{"gender": "female", "minRating": 0}'),
-  ('Open Division', 'MW-OPEN', 'MW', '{"minRating": 0}')
-ON CONFLICT (code) DO NOTHING;
+-- (Seed data removed — seasons and divisions are created via admin dashboard)

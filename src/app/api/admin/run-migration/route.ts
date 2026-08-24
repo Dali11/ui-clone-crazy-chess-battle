@@ -179,6 +179,59 @@ export async function POST(req: NextRequest) {
       results.push({ ok: false, error: e.message, sql: 'Create triggers' });
     }
 
+    // Create market_config table — configurable per-country currency & membership pricing
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS market_config (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          country_code TEXT NOT NULL UNIQUE,
+          country_name TEXT NOT NULL,
+          currency_code TEXT NOT NULL,
+          currency_symbol TEXT NOT NULL DEFAULT '',
+          membership_active BOOLEAN NOT NULL DEFAULT true,
+          membership_price_cents INT NOT NULL DEFAULT 0,
+          membership_currency TEXT NOT NULL,
+          is_default BOOLEAN NOT NULL DEFAULT false,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_market_config_country ON market_config(country_code)`);
+      results.push({ ok: true, sql: 'Create market_config table' });
+    } catch (e: any) {
+      results.push({ ok: false, error: e.message, sql: 'Create market_config table' });
+    }
+
+    // Seed default market: Malawi / MWK (config, not competitive-entity seed data)
+    try {
+      await client.query(`
+        INSERT INTO market_config (country_code, country_name, currency_code, currency_symbol, membership_active, membership_price_cents, membership_currency, is_default)
+        VALUES ('MW', 'Malawi', 'MWK', 'MK', true, 500000, 'MWK', true)
+        ON CONFLICT (country_code) DO NOTHING
+      `);
+      results.push({ ok: true, sql: 'Seed MW market_config' });
+    } catch (e: any) {
+      results.push({ ok: false, error: e.message, sql: 'Seed MW market_config' });
+    }
+
+    // market_config RLS
+    try {
+      await client.query(`ALTER TABLE market_config ENABLE ROW LEVEL SECURITY`);
+      await client.query(`DROP POLICY IF EXISTS "Market config is public" ON market_config`);
+      await client.query(`CREATE POLICY "Market config is public" ON market_config FOR SELECT USING (true)`);
+      await client.query(`DROP POLICY IF EXISTS "Admins can manage market config" ON market_config`);
+      await client.query(`
+        CREATE POLICY "Admins can manage market config" ON market_config FOR ALL TO authenticated USING (
+          EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+        ) WITH CHECK (
+          EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+        )
+      `);
+      results.push({ ok: true, sql: 'market_config RLS policies' });
+    } catch (e: any) {
+      results.push({ ok: false, error: e.message, sql: 'market_config RLS policies' });
+    }
+
     await client.end();
 
     const allOk = results.every((r: any) => r.ok);

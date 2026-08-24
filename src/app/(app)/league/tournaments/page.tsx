@@ -20,6 +20,8 @@ interface Competition {
   startsAt?: string;
   timeControl?: string;
   entryFee?: number;
+  currency?: string;
+  currencySymbol?: string;
   isRegistered?: boolean;
   qualification: { canJoin: boolean; reason: string | null };
 }
@@ -41,7 +43,12 @@ function getStatusLabel(status: string): { label: string; color: string } {
   }
 }
 
-function formatCurrency(cents: number): string { return (cents / 100).toLocaleString(); }
+function formatCurrency(cents: number, currencySymbol?: string, currencyCode?: string): string {
+  const amount = (cents / 100).toLocaleString();
+  if (currencySymbol) return `${currencySymbol}${amount}`;
+  if (currencyCode) return `${amount} ${currencyCode}`;
+  return amount;
+}
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'TBD';
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -102,7 +109,7 @@ export default function TournamentsPage() {
 
       <div>
         <h1 className="text-xl sm:text-2xl font-bold">Tournaments</h1>
-        <p className="text-sm text-ccb-muted mt-1">Swiss tournaments — open entry, no player cap</p>
+        <p className="text-sm text-ccb-muted mt-1">Swiss tournaments — open to all players. Each tournament sets its own player cap and entry fee (free or paid).</p>
       </div>
 
       {joinMessage && (
@@ -202,7 +209,7 @@ function TournamentCard({ competition, onJoin, joining }: { competition: Competi
         {competition.rounds && <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" /> {competition.rounds} rounds</span>}
         {competition.timeControl && <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {competition.timeControl}</span>}
         {competition.startsAt && <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {formatDate(competition.startsAt)}</span>}
-        {isPaid && competition.entryFee != null && <span className="flex items-center gap-1 text-ccb-accent"><DollarSign className="w-3.5 h-3.5" /> {formatCurrency(competition.entryFee)}</span>}
+        {isPaid && competition.entryFee != null && <span className="flex items-center gap-1 text-ccb-accent"><DollarSign className="w-3.5 h-3.5" /> {formatCurrency(competition.entryFee, competition.currencySymbol, competition.currency)}</span>}
       </div>
 
       <div className="pt-3 border-t border-ccb-border">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getMarketConfig } from '@/lib/league/market-config';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,6 +22,8 @@ export async function GET(request: NextRequest) {
       profile = profileData;
       isAdmin = !!profile?.is_admin;
     }
+
+    const market = await getMarketConfig(profile?.country);
 
     // Get membership status
     let membership: any = null;
@@ -160,7 +163,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================================
-    // TOURNAMENTS (Swiss — open, no fixed player cap)
+    // TOURNAMENTS (Swiss — open to all players; each tournament sets its own optional player cap and free/paid entry fee)
     // ============================================================
 
     const { data: tournaments, error: tournamentError } = await admin
@@ -207,6 +210,8 @@ export async function GET(request: NextRequest) {
         status: tournament.status === 'pending_approval' ? 'pending' : tournament.status,
         entryType: tournament.entry_fee_cents > 0 ? 'paid' : 'free',
         entryFee: tournament.entry_fee_cents,
+        currency: market.currencyCode,
+        currencySymbol: market.currencySymbol,
         playerCount: participantCount || 0,
         maxPlayers: tournament.max_players || null, // null = no cap
         rounds: tournament.rounds,
