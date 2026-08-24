@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Crown, Trophy, ArrowUp, ArrowDown, Users, Calendar, RefreshCw,
   AlertCircle, Lock, Star, Award, Shield, ChevronRight, Sparkles,
-  TrendingUp, Medal, Swords, Target,
+  TrendingUp, Medal, Swords, Target, CheckCircle, XCircle, Loader2,
 } from 'lucide-react';
 
 interface LeagueStanding {
@@ -23,6 +23,23 @@ interface LeagueStanding {
     avatar_url: string | null;
     rating: number;
   } | null;
+}
+
+interface ChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+  required: boolean;
+  action: string | null;
+  actionLabel: string | null;
+}
+
+interface Qualification {
+  canJoin: boolean;
+  reason: string | null;
+  isRegistered: boolean;
+  checklist: ChecklistItem[] | null;
+  regStatus: string | null;
 }
 
 interface League {
@@ -46,12 +63,14 @@ interface League {
   payout_config: Record<string, number> | null;
   sponsor_name: string | null;
   description: string | null;
+  qualification: Qualification;
 }
 
 interface ApiResponse {
   success: boolean;
   isAdmin: boolean;
   hasMembership: boolean;
+  userId: string | null;
   market: {
     currencyCode: string;
     currencySymbol: string;
@@ -84,11 +103,24 @@ function getPayout(cents: number, position: number, config: Record<string, numbe
   return Math.round(cents * pct);
 }
 
+const REASON_LABELS: Record<string, string> = {
+  not_authenticated: 'Sign in to register',
+  already_joined: 'You are a player in this league',
+  already_registered: 'Registration pending approval',
+  completed: 'League season completed',
+  not_registration_phase: 'Registration not open yet',
+  registration_closed: 'Registration deadline passed',
+  requirements_not_met: 'Requirements not met',
+  full: 'League is full',
+};
+
 export default function PremiumLeaguesTab() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedLeague, setExpandedLeague] = useState<number | null>(null);
+  const [registering, setRegistering] = useState<string | null>(null);
+  const [registerMsg, setRegisterMsg] = useState<{ leagueId: string; type: 'success' | 'error'; msg: string } | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -105,6 +137,26 @@ export default function PremiumLeaguesTab() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  const handleRegister = async (leagueId: string) => {
+    setRegistering(leagueId);
+    setRegisterMsg(null);
+    try {
+      const res = await fetch('/api/league/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leagueId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to register');
+      setRegisterMsg({ leagueId, type: 'success', msg: 'Registration submitted! Pending approval.' });
+      await fetchData();
+    } catch (err: any) {
+      setRegisterMsg({ leagueId, type: 'error', msg: err.message });
+    } finally {
+      setRegistering(null);
+    }
+  };
 
   const symbol = data?.market?.currencySymbol || 'MK';
   const leagues = data?.leagues || [];
@@ -179,7 +231,9 @@ export default function PremiumLeaguesTab() {
             const prizeFormatted = formatMoney(league.prize_pool_cents, league.prize_currency || symbol);
             const standings = league.standings || [];
             const capacity = league.league_size || 0;
-            const isFull = capacity > 0 && league.playerCount >= capacity;
+            const qual = league.qualification;
+            const showRegisterBtn = qual?.canJoin === true;
+            const isRegistered = qual?.isRegistered;
 
             return (
               <div
@@ -201,10 +255,16 @@ export default function PremiumLeaguesTab() {
                       <div className="flex items-center gap-2">
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${meta.bgColor} ${meta.color}`}>L{league.tier}</span>
                         <h3 className="font-bold text-sm truncate">{league.name}</h3>
+                        {league.status === 'registration' && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-ccb-success/10 text-ccb-success border border-ccb-success/30">OPEN</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-xs text-ccb-muted">
                         <span className="flex items-center gap-1"><Trophy className="w-3 h-3" /> {prizeFormatted}</span>
                         <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {league.playerCount}{capacity > 0 ? `/${capacity}` : ''}</span>
+                        {league.status === 'registration' && league.registrationCount > 0 && (
+                          <span className="flex items-center gap-1 text-ccb-accent"><Sparkles className="w-3 h-3" /> {league.registrationCount} registered</span>
+                        )}
                         {league.status === 'active' && (
                           <span className="flex items-center gap-1 text-ccb-success"><Calendar className="w-3 h-3" /> MD {league.current_matchday}/{league.total_matchdays || '?'}</span>
                         )}
@@ -260,6 +320,73 @@ export default function PremiumLeaguesTab() {
                       </div>
                     </div>
 
+                    {/* QUALIFICATION CHECKLIST */}
+                    {qual?.checklist && (
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-2">Registration Requirements</h4>
+                        <div className="space-y-1">
+                          {qual.checklist.filter((c) => c.required).map((item) => (
+                            <div key={item.id} className="flex items-center gap-2 text-xs">
+                              {item.done ? (
+                                <CheckCircle className="w-4 h-4 text-ccb-success shrink-0" />
+                              ) : (
+                                <XCircle className="w-4 h-4 text-ccb-danger shrink-0" />
+                              )}
+                              <span className={item.done ? 'text-ccb-muted' : 'text-ccb-text font-medium'}>{item.label}</span>
+                              {!item.done && item.action && (
+                                <Link href={item.action} className="ml-auto text-[10px] font-bold text-ccb-primary hover:underline">
+                                  {item.actionLabel}
+                                </Link>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* REGISTRATION STATUS / BUTTON */}
+                    {league.status === 'registration' && (
+                      <div>
+                        {isRegistered ? (
+                          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border ${
+                            qual.regStatus === 'player' ? 'bg-ccb-success/10 border-ccb-success/30 text-ccb-success' :
+                            qual.regStatus === 'approved' ? 'bg-ccb-success/10 border-ccb-success/30 text-ccb-success' :
+                            'bg-ccb-accent/10 border-ccb-accent/30 text-ccb-accent'
+                          }`}>
+                            <CheckCircle className="w-4 h-4" />
+                            <span className="text-xs font-bold">
+                              {qual.regStatus === 'player' ? 'You are in this league!' :
+                               qual.regStatus === 'approved' ? 'Registration approved!' :
+                               'Registration pending approval'}
+                            </span>
+                          </div>
+                        ) : showRegisterBtn ? (
+                          <button
+                            onClick={() => handleRegister(league.id)}
+                            disabled={registering === league.id}
+                            className="w-full py-3 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            {registering === league.id ? (
+                              <><Loader2 className="w-4 h-4 animate-spin" /> Registering...</>
+                            ) : (
+                              <><Swords className="w-4 h-4" /> Register for {league.name}</>
+                            )}
+                          </button>
+                        ) : (
+                          <div className="px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-center">
+                            <p className="text-xs text-ccb-muted">{REASON_LABELS[qual?.reason || ''] || 'Registration not available'}</p>
+                          </div>
+                        )}
+                        {registerMsg?.leagueId === league.id && (
+                          <div className={`mt-2 px-3 py-2 rounded-lg text-xs ${
+                            registerMsg.type === 'success' ? 'bg-ccb-success/10 text-ccb-success' : 'bg-ccb-danger/10 text-ccb-danger'
+                          }`}>
+                            {registerMsg.msg}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* STANDINGS */}
                     {standings.length > 0 ? (
                       <div>
@@ -287,7 +414,7 @@ export default function PremiumLeaguesTab() {
                                 <span className="text-xs font-medium flex-1 truncate">
                                   {s.player?.display_name || s.player?.username || 'Unknown'}
                                 </span>
-                                <span className="text-[10px] text-ccb-muted hidden sm:block">{s.player?.rating || '—'}</span>
+                                <span className="text-[10px] text-ccb-muted hidden sm:block">{s.player?.rating || '\u2014'}</span>
                                 <span className="text-xs font-bold">{s.points}pts</span>
                                 <span className="text-[10px] text-ccb-muted hidden sm:block">{s.played}P</span>
                               </div>
@@ -299,10 +426,10 @@ export default function PremiumLeaguesTab() {
                       <div className="text-center py-6">
                         <Trophy className="w-8 h-8 text-ccb-muted mx-auto mb-2" />
                         <p className="text-xs text-ccb-muted">
-                          {league.status === 'upcoming' ? 'League not started yet' : 'No standings available'}
+                          {league.status === 'upcoming' ? 'League not started yet' : league.status === 'registration' ? 'No players registered yet' : 'No standings available'}
                         </p>
-                        {league.status === 'upcoming' && (
-                          <p className="text-[10px] text-ccb-muted mt-1">{league.registrationCount} registered</p>
+                        {league.status === 'registration' && league.registrationCount > 0 && (
+                          <p className="text-[10px] text-ccb-muted mt-1">{league.registrationCount} players registered</p>
                         )}
                       </div>
                     )}
@@ -328,7 +455,6 @@ export default function PremiumLeaguesTab() {
           <Swords className="w-4 h-4" /> Exclusive Premium Competitions
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Champions League */}
           <div className="bg-gradient-to-br from-ccb-primary/10 to-ccb-accent/10 border border-ccb-primary/30 rounded-2xl p-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl bg-ccb-primary/20 border border-ccb-primary/30 flex items-center justify-center">
@@ -336,7 +462,7 @@ export default function PremiumLeaguesTab() {
               </div>
               <div>
                 <h4 className="font-bold text-sm">CrazyChess Champions League</h4>
-                <p className="text-[10px] text-ccb-muted">Top 10 from each league · 50 qualifiers</p>
+                <p className="text-[10px] text-ccb-muted">Top 10 from each league \u00b7 50 qualifiers</p>
               </div>
             </div>
             <div className="flex items-center gap-1.5 mt-3">
@@ -348,8 +474,6 @@ export default function PremiumLeaguesTab() {
               ))}
             </div>
           </div>
-
-          {/* Sponsored Shield */}
           <div className="bg-gradient-to-br from-ccb-accent/10 to-ccb-primary/10 border border-ccb-accent/30 rounded-2xl p-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl bg-ccb-accent/20 border border-ccb-accent/30 flex items-center justify-center">
@@ -357,7 +481,7 @@ export default function PremiumLeaguesTab() {
               </div>
               <div>
                 <h4 className="font-bold text-sm">Airtel CrazyChess Shield</h4>
-                <p className="text-[10px] text-ccb-muted">Premium-only · Sponsored competition</p>
+                <p className="text-[10px] text-ccb-muted">Premium-only \u00b7 Sponsored competition</p>
               </div>
             </div>
             <div className="flex items-center gap-2 mt-3">
@@ -376,7 +500,7 @@ export default function PremiumLeaguesTab() {
       {/* ADMIN NOTE */}
       {isAdmin && (
         <div className="bg-ccb-primary/10 border border-ccb-primary/30 rounded-xl p-3 text-xs text-ccb-primary font-semibold flex items-center gap-2">
-          <Crown className="w-4 h-4" /> Admin — League capacity, prize pools, promotion/relegation and payout config are editable from the admin dashboard.
+          <Crown className="w-4 h-4" /> Admin \u2014 League capacity, prize pools, promotion/relegation and payout config are editable from the admin dashboard.
         </div>
       )}
     </div>
