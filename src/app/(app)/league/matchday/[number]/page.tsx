@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Swords, Trophy, ArrowLeft, RefreshCw } from 'lucide-react';
 import LeagueNav from '@/components/league/league-nav';
+import LeagueSubNav from '@/components/league/league-sub-nav';
 
 interface Player {
   display_name?: string;
@@ -131,20 +132,22 @@ export default function MatchdayPage({ params }: { params?: Promise<{ number: st
   const nextMatchday = matchdayNumber < totalMatchdays ? matchdayNumber + 1 : null;
 
   return (
-    <>
+    <div className="space-y-6 pb-20 sm:pb-8">
       <LeagueNav />
-      <div className="space-y-6 pb-20 sm:pb-8">
-        <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <Link
+          href="/league"
+          className="inline-flex items-center gap-1.5 text-sm text-ccb-muted hover:text-ccb-accent transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Leagues
+        </Link>
+        <LeagueSubNav />
+      </div>
+      <div className="space-y-6">
           {/* Back Link & Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-ccb-border pb-4">
             <div>
-              <Link
-                href="/league"
-                className="inline-flex items-center gap-1.5 text-xs text-ccb-muted hover:text-ccb-accent transition-colors mb-2"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back to League Home</span>
-              </Link>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ccb-text flex items-center gap-2">
                   <Trophy className="w-7 h-7 text-ccb-accent shrink-0" />
@@ -290,6 +293,5 @@ export default function MatchdayPage({ params }: { params?: Promise<{ number: st
           )}
         </div>
       </div>
-    </>
   );
 }

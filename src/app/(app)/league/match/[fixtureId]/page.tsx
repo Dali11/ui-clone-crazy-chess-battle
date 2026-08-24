@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, ExternalLink, RefreshCw, Swords, Shield, Calendar } from 'lucide-react';
 import LeagueNav from '@/components/league/league-nav';
+import LeagueSubNav from '@/components/league/league-sub-nav';
 
 interface Player {
   display_name?: string;
@@ -140,29 +141,19 @@ export default function MatchDetailPage({ params }: { params?: Promise<{ fixture
   const watchUrl = data?.watchUrl || 'https://www.chess.com/live';
 
   return (
-    <>
+    <div className="space-y-6 pb-20 sm:pb-8">
       <LeagueNav />
-      <div className="space-y-6 pb-20 sm:pb-8">
-        <div className="space-y-6">
-          {/* Navigation Top Bar */}
-          <div className="flex items-center justify-between border-b border-ccb-border pb-4">
-            <Link
-              href={fixture?.matchday ? `/league/matchday/${fixture.matchday}` : '/league/table'}
-              className="inline-flex items-center gap-1.5 text-xs text-ccb-muted hover:text-ccb-accent transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>
-                {fixture?.matchday ? `Back to Matchday ${fixture.matchday}` : 'Back to Matchday'}
-              </span>
-            </Link>
-
-            {fixture?.matchday && (
-              <span className="text-xs font-semibold px-2.5 py-1 rounded bg-ccb-surface border border-ccb-border text-ccb-accent">
-                Matchday {fixture.matchday}
-              </span>
-            )}
-          </div>
-
+      <div className="flex items-center justify-between gap-4">
+        <Link
+          href={fixture?.matchday ? `/league/matchday/${fixture.matchday}` : '/league/table'}
+          className="inline-flex items-center gap-1.5 text-sm text-ccb-muted hover:text-ccb-accent transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Leagues
+        </Link>
+        <LeagueSubNav />
+      </div>
+      <div className="space-y-6">
           {/* Loading State */}
           {loading && (
             <div className="flex flex-col items-center justify-center py-20 space-y-3">
@@ -393,6 +384,5 @@ export default function MatchDetailPage({ params }: { params?: Promise<{ fixture
           )}
         </div>
       </div>
-    </>
   );
 }

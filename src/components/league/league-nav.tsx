@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Swords, Crown, Table2, CalendarDays, LayoutDashboard, Crown as Membership } from "lucide-react";
+import { Swords, Crown, LayoutDashboard, Crown as Membership } from "lucide-react";
 
 const leagueNavItems = [
   { href: "/league/tournaments", label: "Tournaments", icon: Swords },
   { href: "/league", label: "Leagues", icon: Crown },
-  { href: "/league/table", label: "Table", icon: Table2 },
-  { href: "/league/matchday/1", label: "Fixtures", icon: CalendarDays },
   { href: "/league/dashboard", label: "My Stats", icon: LayoutDashboard },
   { href: "/league/subscribe", label: "Membership", icon: Membership },
 ];
@@ -27,7 +25,7 @@ export default function LeagueNav() {
           } else if (item.href === "/league/subscribe") {
             isActive = pathname === "/league/subscribe";
           } else {
-            isActive = pathname.startsWith(item.href.replace(/\/\d+$/, ""));
+            isActive = pathname.startsWith(item.href);
           }
           return (
             <Link
