@@ -111,7 +111,7 @@ export default function SubscriptionPage() {
   const daysLeft = membership ? Math.ceil((new Date(membership.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
 
   return (
-    <div className="min-h-screen bg-ccb-dark text-ccb-text font-sans pb-12">
+    <div className="space-y-6 pb-20 sm:pb-8">
       <LeagueNav />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-8">

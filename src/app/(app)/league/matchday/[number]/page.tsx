@@ -133,8 +133,8 @@ export default function MatchdayPage({ params }: { params?: Promise<{ number: st
   return (
     <>
       <LeagueNav />
-      <div className="min-h-screen bg-ccb-dark text-ccb-text p-4 sm:p-6 md:p-8">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className="space-y-6 pb-20 sm:pb-8">
+        <div className="space-y-6">
           {/* Back Link & Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-ccb-border pb-4">
             <div>

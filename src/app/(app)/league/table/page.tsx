@@ -108,7 +108,7 @@ export default function StandingsTablePage() {
   };
 
   return (
-    <div className="w-full bg-ccb-dark text-ccb-text min-h-screen p-3 sm:p-6 lg:p-8 rounded-2xl shadow-xl border border-ccb-surface">
+    <div className="space-y-6 pb-20 sm:pb-8">
       <LeagueNav />
       <div className="mb-4">
         <Link href="/league" className="inline-flex items-center gap-1.5 text-sm text-ccb-muted hover:text-ccb-accent transition-colors">
