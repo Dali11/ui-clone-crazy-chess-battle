@@ -8,13 +8,17 @@ import {
   stringToBoard,
   getLegalMoves,
   getMovesForPiece,
-  initialBoard,
   type Board,
   type Position,
   type DraughtsMove,
   type Color,
 } from "@/lib/game/draughts-engine";
-import { Flag, Timer, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Flag, Timer } from "lucide-react";
+
+// Map DB turn ('white'/'black') to engine Color ('w'/'b')
+function dbToEngine(s: string): Color {
+  return s === "white" ? "w" : "b";
+}
 
 interface DraughtsGameClientProps {
   game: any;
@@ -32,7 +36,6 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
   const [lastMove, setLastMove] = useState<{ from: Position; to: Position } | null>(null);
   const [clockTick, setClockTick] = useState(0);
   const [showResignConfirm, setShowResignConfirm] = useState(false);
-  const [viewIndex, setViewIndex] = useState<number | null>(null); // null = live
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -41,26 +44,34 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
   const isWhite = game.white_player_id === myId;
   const isBlack = game.black_player_id === myId;
   const isSpectator = !isWhite && !isBlack;
-  const myColor: Color | null = isWhite ? "white" : isBlack ? "black" : null;
-  const perspective = myColor === "black" ? "black" : "white";
-  const currentTurn = game.turn as Color;
-  const myTurn = myColor === currentTurn && game.status === "playing";
+
+  // DB-format colors for display
+  const myDbColor: string | null = isWhite ? "white" : isBlack ? "black" : null;
+  const currentDbTurn: string = game.turn; // 'white' | 'black' from DB
   const gameEnded = game.status !== "playing";
   const mustContinueJump = game.must_continue_jump as Position | null;
+
+  // Engine-format colors for engine calls
+  const myEngineColor: Color | null = myDbColor ? dbToEngine(myDbColor) : null;
+  const currentEngineTurn: Color = dbToEngine(currentDbTurn);
+  const myTurn = myEngineColor === currentEngineTurn && game.status === "playing";
+
+  // Display perspective
+  const perspective = myDbColor === "black" ? "black" : "white";
 
   // Live clock calculation
   const whiteClockMs = (() => {
     if (gameEnded) return game.white_clock_ms;
     void clockTick;
     const elapsed = Date.now() - new Date(game.last_move_at || game.created_at).getTime();
-    return currentTurn === "white" ? Math.max(0, game.white_clock_ms - elapsed) : game.white_clock_ms;
+    return currentDbTurn === "white" ? Math.max(0, game.white_clock_ms - elapsed) : game.white_clock_ms;
   })();
 
   const blackClockMs = (() => {
     if (gameEnded) return game.black_clock_ms;
     void clockTick;
     const elapsed = Date.now() - new Date(game.last_move_at || game.created_at).getTime();
-    return currentTurn === "black" ? Math.max(0, game.black_clock_ms - elapsed) : game.black_clock_ms;
+    return currentDbTurn === "black" ? Math.max(0, game.black_clock_ms - elapsed) : game.black_clock_ms;
   })();
 
   // Clock tick
@@ -128,19 +139,12 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
     const piece = board[pos.row][pos.col];
 
     // If clicking on own piece, select it
-    if (piece && myColor) {
-      const isMyPiece = (piece === "w" || piece === "W") && myColor === "white" ||
-                        (piece === "b" || piece === "B") && myColor === "black";
-      if (isMyPiece) {
+    if (piece && myEngineColor) {
+      const pieceColor = (piece === "w" || piece === "W") ? "w" : "b";
+      if (pieceColor === myEngineColor) {
         setSelected(pos);
         const moves = getMovesForPiece(board, pos);
-        // Filter by mandatory captures
-        const allMoves = getLegalMoves(board, myColor);
-        const hasCaptures = allMoves.some(m => m.captures && m.captures.length > 0);
-        const pieceMoves = hasCaptures
-          ? moves.filter(m => m.captures && m.captures.length > 0)
-          : moves;
-        setLegalMoves(pieceMoves);
+        setLegalMoves(moves);
         return;
       }
     }
@@ -149,7 +153,7 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
     if (selected) {
       const move = legalMoves.find(m => m.to.row === pos.row && m.to.col === pos.col);
       if (move) {
-        submitMove(selected, pos);
+        submitMove(selected, pos, move);
         return;
       }
     }
@@ -157,10 +161,10 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
     // Deselect
     setSelected(null);
     setLegalMoves([]);
-  }, [myTurn, submitting, mustContinueJump, board, myColor, selected, legalMoves]);
+  }, [myTurn, submitting, mustContinueJump, board, myEngineColor, selected, legalMoves]);
 
   // Submit a move
-  const submitMove = async (from: Position, to: Position) => {
+  const submitMove = async (from: Position, to: Position, move: DraughtsMove) => {
     setSubmitting(true);
     setError(null);
     try {
@@ -169,7 +173,13 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           gameId: game.id,
-          move: { from, to },
+          move: {
+            from,
+            to,
+            path: move.path,
+            captures: move.captures,
+            isCapture: move.isCapture,
+          },
         }),
       });
       const data = await res.json();
@@ -205,9 +215,6 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
     return `${min}:${String(sec).padStart(2, "0")}`;
   };
 
-  const opponentName = isWhite ? game.black_player_id : game.white_player_id;
-  const myName = isWhite ? game.white_player_id : game.black_player_id;
-
   // Determine winner label
   const winnerLabel = game.winner === "white" ? "White wins!" : game.winner === "black" ? "Black wins!" : "Draw";
 
@@ -232,7 +239,7 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
           </span>
         </div>
         <div className={`flex items-center gap-1.5 text-sm font-bold tabular-nums ${
-          currentTurn === (isWhite ? "black" : "white") && !gameEnded ? "text-ccb-primary" : "text-ccb-muted"
+          currentDbTurn === (isWhite ? "black" : "white") && !gameEnded ? "text-ccb-primary" : "text-ccb-muted"
         }`}>
           <Timer className="w-4 h-4" />
           {formatTime(isWhite ? blackClockMs : whiteClockMs)}
@@ -263,7 +270,7 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
           </span>
         </div>
         <div className={`flex items-center gap-1.5 text-sm font-bold tabular-nums ${
-          currentTurn === myColor && !gameEnded ? "text-ccb-primary" : "text-ccb-muted"
+          currentDbTurn === myDbColor && !gameEnded ? "text-ccb-primary" : "text-ccb-muted"
         }`}>
           <Timer className="w-4 h-4" />
           {formatTime(isWhite ? whiteClockMs : blackClockMs)}

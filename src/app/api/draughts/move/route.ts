@@ -5,11 +5,20 @@ import {
   stringToBoard,
   boardToString,
   applyMove,
-  getLegalMoves,
-  checkGameOver,
   type DraughtsMove,
   type Position,
+  type Color,
 } from "@/lib/game/draughts-engine";
+
+// Map DB turn ('white'/'black') to engine Color ('w'/'b')
+function dbToEngineColor(s: string): Color {
+  return s === "white" ? "w" : "b";
+}
+
+// Map engine Color to DB turn string
+function engineToDbColor(c: Color): string {
+  return c === "w" ? "white" : "black";
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,22 +58,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not a player in this game" }, { status: 403 });
     }
 
-    const currentTurn = game.turn as "white" | "black";
-    if ((isWhite && currentTurn !== "white") || (isBlack && currentTurn !== "black")) {
+    const dbTurn = game.turn as string; // 'white' | 'black' in DB
+    if ((isWhite && dbTurn !== "white") || (isBlack && dbTurn !== "black")) {
       return NextResponse.json({ error: "Not your turn" }, { status: 400 });
     }
+
+    const engineTurn = dbToEngineColor(dbTurn);
 
     // Check clock
     const now = Date.now();
     const lastMoveTime = new Date(game.last_move_at || game.created_at).getTime();
     const elapsedMs = now - lastMoveTime;
-    const currentClockMs = currentTurn === "white" ? game.white_clock_ms : game.black_clock_ms;
+    const currentClockMs = dbTurn === "white" ? game.white_clock_ms : game.black_clock_ms;
     const remainingMs = (currentClockMs ?? 0) - elapsedMs;
 
     if (remainingMs <= 0) {
       // Player's clock expired — they lose on time
       const admin = createAdminClient();
-      const winner = currentTurn === "white" ? "black" : "white";
+      const winner = dbTurn === "white" ? "black" : "white";
       await admin.from("draughts_games").update({
         status: "timeout",
         winner,
@@ -95,13 +106,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Validate and apply the move
+    // Construct a DraughtsMove — need required fields for the engine
     const draughtsMove: DraughtsMove = {
       from: { row: move.from.row, col: move.from.col },
       to: { row: move.to.row, col: move.to.col },
+      path: move.path || [{ row: move.from.row, col: move.from.col }, { row: move.to.row, col: move.to.col }],
+      captures: move.captures || [],
+      isCapture: !!(move.captures && move.captures.length > 0),
     };
 
-    const result = applyMove(board, draughtsMove, currentTurn, game.move_count);
+    const result = applyMove(board, draughtsMove, engineTurn, game.move_count, game.moves_since_capture || 0);
 
     if (!result.valid) {
       return NextResponse.json({ error: result.error || "Invalid move" }, { status: 400 });
@@ -110,32 +124,30 @@ export async function POST(req: NextRequest) {
     // Calculate new clock
     let newWhiteClock = game.white_clock_ms;
     let newBlackClock = game.black_clock_ms;
-    if (currentTurn === "white") {
+    if (dbTurn === "white") {
       newWhiteClock = Math.max(0, Math.floor(remainingMs + (game.increment_seconds || 0) * 1000));
     } else {
       newBlackClock = Math.max(0, Math.floor(remainingMs + (game.increment_seconds || 0) * 1000));
     }
 
     // Check for timeout after move
-    let gameEnded = result.status !== "playing";
-    let winner = result.winner;
+    let gameEnded = result.isGameOver;
+    let winner: string | null = result.winner ? (result.winner === 'draw' ? null : engineToDbColor(result.winner)) : null;
 
     if (newWhiteClock <= 0) {
       gameEnded = true;
       winner = "black";
-      result.status = "timeout";
     } else if (newBlackClock <= 0) {
       gameEnded = true;
       winner = "white";
-      result.status = "timeout";
     }
 
     // Build move history entry
     const moveEntry = {
       from: move.from,
       to: move.to,
-      player: currentTurn,
-      captured: !!(move as any).captures?.length,
+      player: dbTurn,
+      captured: !!(result.capturedPositions && result.capturedPositions.length > 0),
       moveNum: game.move_count + 1,
     };
 
@@ -144,37 +156,49 @@ export async function POST(req: NextRequest) {
     moveHistory.push(moveEntry);
 
     // Prepare update
+    const capturedCount = result.capturedPositions?.length || 0;
     const updateData: Record<string, unknown> = {
-      board_state: boardToString(result.board!),
+      board_state: boardToString(result.board),
       move_history: moveHistory,
       move_count: game.move_count + 1,
       white_clock_ms: newWhiteClock,
       black_clock_ms: newBlackClock,
       last_move_at: new Date().toISOString(),
-      moves_since_capture: result.capturedCount && result.capturedCount > 0
+      moves_since_capture: capturedCount > 0
         ? 0
         : (game.moves_since_capture || 0) + 1,
     };
 
-    if (result.mustContinueJump) {
+    let nextDbTurn: string;
+
+    if (result.mustContinueJump && result.mustContinueFrom) {
       // Same player must continue jumping
-      updateData.must_continue_jump = result.mustContinueJump;
-      updateData.turn = currentTurn; // keep same turn
+      updateData.must_continue_jump = result.mustContinueFrom;
+      updateData.turn = dbTurn; // keep same turn
+      nextDbTurn = dbTurn;
     } else {
       // Switch turn
       updateData.must_continue_jump = null;
-      updateData.turn = currentTurn === "white" ? "black" : "white";
+      nextDbTurn = dbTurn === "white" ? "black" : "white";
+      updateData.turn = nextDbTurn;
     }
 
-    // Check draw (40 moves without capture)
-    if (!gameEnded && (game.moves_since_capture || 0) + 1 >= 80) {
+    // Check draw (80 half-moves without capture = 40 full moves)
+    if (!gameEnded && result.halfMoveClock >= 80) {
       gameEnded = true;
       winner = null;
-      result.status = "draw";
     }
 
+    let endStatus = "playing";
     if (gameEnded) {
-      updateData.status = result.status;
+      if (newWhiteClock <= 0 || newBlackClock <= 0) {
+        endStatus = "timeout";
+      } else if (winner === null) {
+        endStatus = "draw";
+      } else {
+        endStatus = "win";
+      }
+      updateData.status = endStatus;
       updateData.winner = winner;
       updateData.ended_at = new Date().toISOString();
     }
@@ -192,17 +216,17 @@ export async function POST(req: NextRequest) {
 
     // Update ratings if game ended
     if (gameEnded) {
-      await updateDraughtsRatings(admin, game, winner, result.status || "win");
+      await updateDraughtsRatings(admin, game, winner, endStatus);
     }
 
     return NextResponse.json({
       valid: true,
       board: result.board,
-      status: result.status || "playing",
+      status: endStatus,
       winner,
-      turn: updateData.turn,
+      turn: nextDbTurn,
       moveCount: game.move_count + 1,
-      mustContinueJump: result.mustContinueJump || null,
+      mustContinueJump: result.mustContinueJump ? result.mustContinueFrom : null,
       whiteClockMs: newWhiteClock,
       blackClockMs: newBlackClock,
     });
