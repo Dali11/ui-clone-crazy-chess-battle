@@ -7,7 +7,8 @@ import {
   Trophy, Crown, Swords, Calendar, Users, RefreshCw, ShieldAlert,
   CheckCircle2, Lock, Sparkles, TrendingUp, Star, Zap, Medal,
   ChevronRight, Info, LogIn, X, ArrowRight, ArrowUp, ArrowDown,
-  UserCheck, Phone, CreditCard, Gamepad2 as ChessIcon,
+  UserCheck, Phone, CreditCard, Gamepad2 as ChessIcon, Clock,
+  DollarSign, Pencil,
 } from 'lucide-react';
 
 // ============================================================
@@ -19,24 +20,24 @@ interface ChecklistItem {
   label: string;
   done: boolean;
   required: boolean;
-  action?: string;
-  actionLabel?: string;
+  action?: string | null;
+  actionLabel?: string | null;
   description?: string;
 }
 
 interface Competition {
-  type: 'league' | 'swiss';
+  type: 'league' | 'tournament';
   id: string;
   name: string;
   country?: string;
   status: string;
-  tier: number;
-  genderRestriction: string;
-  entryType: string;
+  tier?: number;
+  genderRestriction?: string;
+  entryType?: string;
   description?: string;
   playerCount: number;
   registrationCount?: number;
-  maxPlayers?: number;
+  maxPlayers?: number | null;
   currentMatchday?: number;
   totalMatchdays?: number;
   registrationDeadline?: string;
@@ -55,16 +56,19 @@ interface Competition {
     status?: string;
     checklist?: ChecklistItem[];
   };
-  // Swiss
+  // Tournament fields
   rounds?: number;
   startsAt?: string;
+  timeControl?: string;
+  entryFee?: number;
   isRegistered?: boolean;
 }
 
-interface TieredResponse {
+interface ApiResponse {
   success: boolean;
+  isAdmin: boolean;
   tiered: Record<number, { men: Competition[]; women: Competition[]; open: Competition[] }>;
-  swissQualifiers: Competition[];
+  tournaments: Competition[];
   user: { id: string } | null;
 }
 
@@ -104,8 +108,18 @@ function getStatusLabel(status: string): { label: string; color: string } {
     case 'registration': return { label: 'OPEN', color: 'text-ccb-accent bg-ccb-accent/10 border-ccb-accent/30' };
     case 'upcoming': return { label: 'SOON', color: 'text-blue-400 bg-blue-400/10 border-blue-400/30' };
     case 'completed': return { label: 'DONE', color: 'text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30' };
+    case 'pending': return { label: 'PENDING', color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30' };
     default: return { label: status.toUpperCase(), color: 'text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30' };
   }
+}
+
+function formatCurrency(cents: number): string {
+  return (cents / 100).toLocaleString();
+}
+
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return 'TBD';
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 // ============================================================
@@ -113,9 +127,10 @@ function getStatusLabel(status: string): { label: string; color: string } {
 // ============================================================
 
 export default function LeagueHomepage() {
-  const [data, setData] = useState<TieredResponse | null>(null);
+  const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'tournaments' | 'leagues'>('tournaments');
   const [joining, setJoining] = useState<string | null>(null);
   const [joinMessage, setJoinMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [checklistCompetition, setChecklistCompetition] = useState<Competition | null>(null);
@@ -138,7 +153,6 @@ export default function LeagueHomepage() {
   useEffect(() => { fetchCompetitions(); }, [fetchCompetitions]);
 
   const handleJoin = async (competition: Competition) => {
-    // If there's a checklist and not all requirements are met, show the checklist
     if (competition.qualification.checklist) {
       const requiredItems = competition.qualification.checklist.filter(c => c.required);
       const unmetItems = requiredItems.filter(c => !c.done);
@@ -148,7 +162,6 @@ export default function LeagueHomepage() {
       }
     }
 
-    // All requirements met — proceed with joining
     setJoining(competition.id);
     setJoinMessage(null);
     try {
@@ -176,23 +189,22 @@ export default function LeagueHomepage() {
   };
 
   const isGuest = !data?.user;
+  const isAdmin = data?.isAdmin || false;
   const tiered = data?.tiered || {};
-  const swissQualifiers = data?.swissQualifiers || [];
+  const tournaments = data?.tournaments || [];
   const tiers = Object.keys(tiered).map(Number).sort((a, b) => a - b);
 
-  const totalActive = [...tiers.flatMap(t => [...tiered[t].men, ...tiered[t].women, ...tiered[t].open])]
-    .filter(c => c.status === 'active' || c.status === 'registration').length;
-  const totalPlayers = [...tiers.flatMap(t => [...tiered[t].men, ...tiered[t].women, ...tiered[t].open])]
-    .reduce((sum, c) => sum + (c.playerCount || 0), 0);
+  const totalTournaments = tournaments.filter(t => t.status === 'upcoming' || t.status === 'active').length;
+  const totalTournamentPlayers = tournaments.reduce((sum, t) => sum + (t.playerCount || 0), 0);
 
   return (
     <div className="min-h-screen bg-ccb-dark text-ccb-text font-sans pb-12">
       <LeagueNav />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
 
         {/* HERO */}
-        <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-ccb-dark via-ccb-surface to-ccb-card border border-ccb-border shadow-2xl p-6 sm:p-8 lg:p-10">
+        <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-ccb-dark via-ccb-surface to-ccb-card border border-ccb-border shadow-2xl p-6 sm:p-8">
           <div className="absolute -right-16 -top-16 w-64 h-64 bg-ccb-accent/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute right-1/3 -bottom-20 w-80 h-80 bg-ccb-primary/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -207,8 +219,8 @@ export default function LeagueHomepage() {
               <p className="text-xl sm:text-2xl font-bold text-ccb-primary tracking-wide">Become Champion.</p>
               <p className="text-ccb-muted text-sm sm:text-base max-w-2xl">
                 {isGuest
-                  ? 'Start at the bottom. Win your way up. Every season, the top 2 promote and the bottom 2 relegate. Qualify through Swiss tournaments and climb the pyramid to become champion.'
-                  : 'Browse your division below. Complete your qualification checklist to join competitions. Win to promote, avoid relegation.'
+                  ? 'Enter Swiss tournaments, earn ranking points, and climb the competitive ladder. Premium Leagues are coming soon — get ready.'
+                  : 'Join tournaments below to earn ranking points. Premium Leagues are coming soon.'
                 }
               </p>
               {isGuest && (
@@ -227,31 +239,31 @@ export default function LeagueHomepage() {
             <div className="grid grid-cols-2 gap-3 min-w-[260px]">
               <div className="bg-ccb-surface/90 border border-ccb-border rounded-2xl p-4 shadow-lg">
                 <div className="flex items-center gap-2 text-ccb-muted text-xs uppercase tracking-wider font-semibold mb-1">
-                  <Trophy className="w-3.5 h-3.5 text-ccb-accent" /> Active
+                  <Swords className="w-3.5 h-3.5 text-ccb-accent" /> Tournaments
                 </div>
-                <div className="text-2xl font-black">{totalActive}</div>
-                <div className="text-xs text-ccb-muted">competitions</div>
+                <div className="text-2xl font-black">{totalTournaments}</div>
+                <div className="text-xs text-ccb-muted">live & upcoming</div>
               </div>
               <div className="bg-ccb-surface/90 border border-ccb-border rounded-2xl p-4 shadow-lg">
                 <div className="flex items-center gap-2 text-ccb-muted text-xs uppercase tracking-wider font-semibold mb-1">
                   <Users className="w-3.5 h-3.5 text-ccb-accent" /> Players
                 </div>
-                <div className="text-2xl font-black">{totalPlayers}</div>
+                <div className="text-2xl font-black">{totalTournamentPlayers}</div>
                 <div className="text-xs text-ccb-muted">competing</div>
               </div>
               <div className="bg-ccb-surface/90 border border-ccb-border rounded-2xl p-4 shadow-lg">
                 <div className="flex items-center gap-2 text-ccb-muted text-xs uppercase tracking-wider font-semibold mb-1">
-                  <Medal className="w-3.5 h-3.5 text-ccb-accent" /> Tiers
+                  <Crown className="w-3.5 h-3.5 text-ccb-primary" /> Leagues
                 </div>
-                <div className="text-2xl font-black">{tiers.length || '—'}</div>
-                <div className="text-xs text-ccb-muted">divisions</div>
+                <div className="text-2xl font-black text-ccb-primary">Soon</div>
+                <div className="text-xs text-ccb-muted">premium coming</div>
               </div>
               <div className="bg-ccb-surface/90 border border-ccb-border rounded-2xl p-4 shadow-lg">
                 <div className="flex items-center gap-2 text-ccb-muted text-xs uppercase tracking-wider font-semibold mb-1">
-                  <Swords className="w-3.5 h-3.5 text-ccb-accent" /> Qualifiers
+                  <Medal className="w-3.5 h-3.5 text-ccb-accent" /> Qualify
                 </div>
-                <div className="text-2xl font-black">{swissQualifiers.length}</div>
-                <div className="text-xs text-ccb-muted">Swiss events</div>
+                <div className="text-2xl font-black">Free</div>
+                <div className="text-xs text-ccb-muted">open entry</div>
               </div>
             </div>
           </div>
@@ -268,209 +280,402 @@ export default function LeagueHomepage() {
           )}
         </header>
 
-        {/* PYRAMID EXPLANATION */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 flex items-center justify-center">
-                <ArrowUp className="w-5 h-5 text-ccb-success" />
+        {/* TABS */}
+        <div className="flex items-center gap-2 border-b border-ccb-border">
+          <button
+            onClick={() => setActiveTab('tournaments')}
+            className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all -mb-px ${
+              activeTab === 'tournaments'
+                ? 'border-ccb-accent text-ccb-accent'
+                : 'border-transparent text-ccb-muted hover:text-ccb-text'
+            }`}
+          >
+            <Swords className="w-4 h-4" /> Tournaments
+            {tournaments.length > 0 && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-ccb-accent/10 text-ccb-accent">{tournaments.length}</span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('leagues')}
+            className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all -mb-px ${
+              activeTab === 'leagues'
+                ? 'border-ccb-primary text-ccb-primary'
+                : 'border-transparent text-ccb-muted hover:text-ccb-text'
+            }`}
+          >
+            <Crown className="w-4 h-4" /> Premium Leagues
+            {!isAdmin && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-ccb-muted/10 text-ccb-muted">Soon</span>
+            )}
+            {isAdmin && tiers.length > 0 && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-ccb-primary/10 text-ccb-primary">{tiers.length}</span>
+            )}
+          </button>
+        </div>
+
+        {/* ============================================================ */}
+        {/* TOURNAMENTS TAB */}
+        {/* ============================================================ */}
+
+        {activeTab === 'tournaments' && (
+          <div className="space-y-6">
+            {loading ? (
+              <div className="space-y-4 animate-pulse">
+                {[1, 2, 3].map(i => <div key={i} className="bg-ccb-card border border-ccb-border rounded-2xl p-6 h-40" />)}
               </div>
-              <span className="text-xs font-bold text-ccb-muted uppercase tracking-wider">Promotion</span>
-            </div>
-            <h3 className="text-lg font-bold mb-1">Top 2 Go Up</h3>
-            <p className="text-sm text-ccb-muted">Finish in the top 2 of your division to earn promotion to the tier above.</p>
-          </div>
-          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-ccb-primary/10 border border-ccb-primary/30 flex items-center justify-center">
-                <Crown className="w-5 h-5 text-ccb-primary" />
+            ) : tournaments.length === 0 ? (
+              <div className="bg-ccb-card border border-ccb-border rounded-2xl p-12 text-center">
+                <Trophy className="w-12 h-12 text-ccb-muted mx-auto mb-4" />
+                <h3 className="text-lg font-bold mb-2">No tournaments yet</h3>
+                <p className="text-ccb-muted text-sm">New tournaments are coming soon. Check back or follow us for updates.</p>
               </div>
-              <span className="text-xs font-bold text-ccb-muted uppercase tracking-wider">The Pyramid</span>
-            </div>
-            <h3 className="text-lg font-bold mb-1">Start At The Bottom</h3>
-            <p className="text-sm text-ccb-muted">New players enter at the lowest tier. Win your way up to the Premier League.</p>
-          </div>
-          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-ccb-danger/10 border border-ccb-danger/30 flex items-center justify-center">
-                <ArrowDown className="w-5 h-5 text-ccb-danger" />
-              </div>
-              <span className="text-xs font-bold text-ccb-muted uppercase tracking-wider">Relegation</span>
-            </div>
-            <h3 className="text-lg font-bold mb-1">Bottom 2 Go Down</h3>
-            <p className="text-sm text-ccb-muted">Finish in the bottom 2 and you'll be relegated to the tier below. Fight to stay up!</p>
-          </div>
-        </section>
-
-        {/* LOADING */}
-        {loading && !data && (
-          <div className="space-y-4 animate-pulse">
-            {[1, 2, 3].map(i => <div key={i} className="bg-ccb-card border border-ccb-border rounded-2xl p-6 h-40" />)}
-          </div>
-        )}
-
-        {/* ERROR */}
-        {error && !data && (
-          <div className="bg-ccb-card border border-ccb-danger/30 rounded-2xl p-8 text-center">
-            <ShieldAlert className="w-10 h-10 text-ccb-danger mx-auto mb-3" />
-            <p className="text-ccb-muted">{error}</p>
-            <button onClick={fetchCompetitions} className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-ccb-accent text-ccb-dark font-semibold hover:bg-ccb-gold">
-              <RefreshCw className="w-4 h-4" /> Try Again
-            </button>
-          </div>
-        )}
-
-        {/* SWISS QUALIFIERS */}
-        {!loading && swissQualifiers.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <Swords className="w-5 h-5 text-ccb-accent" /> Swiss Qualifiers
-              </h2>
-              <span className="text-xs text-ccb-muted">{swissQualifiers.length} upcoming</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {swissQualifiers.map(comp => (
-                <CompetitionCard key={comp.id} competition={comp} onJoin={handleJoin} joining={joining === comp.id} onShowChecklist={setChecklistCompetition} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* TIERED LEAGUES */}
-        {!loading && tiers.length > 0 && (
-          <div className="space-y-8">
-            {tiers.map(tier => {
-              const tierData = tiered[tier];
-              const allComps = [...(tierData.men || []), ...(tierData.women || []), ...(tierData.open || [])];
-              if (allComps.length === 0) return null;
-
-              return (
-                <section key={tier}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full border ${getTierColor(tier)}`}>
-                        TIER {tier}
-                      </span>
-                      <h2 className="text-xl font-bold">{getTierName(tier)}</h2>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-ccb-muted">
-                      <span className="flex items-center gap-1 text-ccb-success">
-                        <ArrowUp className="w-3.5 h-3.5" /> 2 promote
-                      </span>
-                      <span className="flex items-center gap-1 text-ccb-danger">
-                        <ArrowDown className="w-3.5 h-3.5" /> 2 relegate
-                      </span>
+            ) : (
+              <>
+                {/* Active/Upcoming */}
+                {tournaments.filter(t => t.status === 'upcoming' || t.status === 'active').length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
+                      <Zap className="w-5 h-5 text-ccb-accent" /> Active & Upcoming
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {tournaments.filter(t => t.status === 'upcoming' || t.status === 'active').map(comp => (
+                        <TournamentCard key={comp.id} competition={comp} onJoin={handleJoin} joining={joining === comp.id} onShowChecklist={setChecklistCompetition} />
+                      ))}
                     </div>
                   </div>
+                )}
 
-                  {/* Men's Division */}
-                  {tierData.men?.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xs font-bold px-2 py-1 rounded-full border text-blue-400 bg-blue-400/10 border-blue-400/30">
-                          MEN'S
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {tierData.men.map(comp => (
-                          <CompetitionCard key={comp.id} competition={comp} onJoin={handleJoin} joining={joining === comp.id} onShowChecklist={setChecklistCompetition} />
-                        ))}
-                      </div>
+                {/* Completed */}
+                {tournaments.filter(t => t.status === 'completed').length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-ccb-muted">
+                      <Trophy className="w-5 h-5" /> Past Tournaments
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {tournaments.filter(t => t.status === 'completed').map(comp => (
+                        <TournamentCard key={comp.id} competition={comp} onJoin={handleJoin} joining={joining === comp.id} onShowChecklist={setChecklistCompetition} />
+                      ))}
                     </div>
-                  )}
+                  </div>
+                )}
+              </>
+            )}
 
-                  {/* Women's Division */}
-                  {tierData.women?.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xs font-bold px-2 py-1 rounded-full border text-pink-400 bg-pink-400/10 border-pink-400/30">
-                          WOMEN'S
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {tierData.women.map(comp => (
-                          <CompetitionCard key={comp.id} competition={comp} onJoin={handleJoin} joining={joining === comp.id} onShowChecklist={setChecklistCompetition} />
-                        ))}
-                      </div>
-                    </div>
-                  )}
+            {/* Info */}
+            <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+              <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
+                <Info className="w-4 h-4 text-ccb-accent" /> How Tournaments Work
+              </h3>
+              <p className="text-xs text-ccb-muted leading-relaxed">
+                Swiss tournaments are open to all players — no fixed player limit. Compete in multiple rounds, earn ranking points, and improve your standing. Top performers may qualify for Premium Leagues when they launch.
+              </p>
+            </div>
+          </div>
+        )}
 
-                  {/* Open Division */}
-                  {tierData.open?.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xs font-bold px-2 py-1 rounded-full border text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30">
-                          OPEN
-                        </span>
+        {/* ============================================================ */}
+        {/* PREMIUM LEAGUES TAB */}
+        {/* ============================================================ */}
+
+        {activeTab === 'leagues' && (
+          <div className="space-y-6">
+            {/* ADMIN VIEW: Full tiered league system */}
+            {isAdmin && (
+              <>
+                {/* Promotion/Relegation explainer */}
+                <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 flex items-center justify-center">
+                        <ArrowUp className="w-5 h-5 text-ccb-success" />
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {tierData.open.map(comp => (
-                          <CompetitionCard key={comp.id} competition={comp} onJoin={handleJoin} joining={joining === comp.id} onShowChecklist={setChecklistCompetition} />
-                        ))}
-                      </div>
+                      <span className="text-xs font-bold text-ccb-muted uppercase tracking-wider">Promotion</span>
                     </div>
-                  )}
+                    <h3 className="text-lg font-bold mb-1">Top 2 Go Up</h3>
+                    <p className="text-sm text-ccb-muted">Finish in the top 2 of your division to earn promotion to the tier above.</p>
+                  </div>
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-ccb-primary/10 border border-ccb-primary/30 flex items-center justify-center">
+                        <Crown className="w-5 h-5 text-ccb-primary" />
+                      </div>
+                      <span className="text-xs font-bold text-ccb-muted uppercase tracking-wider">The Pyramid</span>
+                    </div>
+                    <h3 className="text-lg font-bold mb-1">Start At The Bottom</h3>
+                    <p className="text-sm text-ccb-muted">New players enter at the lowest tier. Win your way up to the Premier League.</p>
+                  </div>
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-ccb-danger/10 border border-ccb-danger/30 flex items-center justify-center">
+                        <ArrowDown className="w-5 h-5 text-ccb-danger" />
+                      </div>
+                      <span className="text-xs font-bold text-ccb-muted uppercase tracking-wider">Relegation</span>
+                    </div>
+                    <h3 className="text-lg font-bold mb-1">Bottom 2 Go Down</h3>
+                    <p className="text-sm text-ccb-muted">Finish in the bottom 2 and you relegate down. Fight to stay up!</p>
+                  </div>
                 </section>
-              );
-            })}
+
+                {/* Admin badge */}
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-ccb-primary/10 border border-ccb-primary/30 text-ccb-primary text-sm font-semibold">
+                  <Crown className="w-4 h-4" /> Admin View — Users see "Coming Soon" for Premium Leagues
+                </div>
+
+                {loading ? (
+                  <div className="space-y-4 animate-pulse">
+                    {[1, 2].map(i => <div key={i} className="bg-ccb-card border border-ccb-border rounded-2xl p-6 h-40" />)}
+                  </div>
+                ) : tiers.length === 0 ? (
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-12 text-center">
+                    <Crown className="w-12 h-12 text-ccb-muted mx-auto mb-4" />
+                    <h3 className="text-lg font-bold mb-2">No leagues created yet</h3>
+                    <p className="text-ccb-muted text-sm">Create leagues from the admin dashboard to configure tiers, gender divisions, and qualification requirements.</p>
+                    <Link href="/admin" className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-ccb-primary text-white font-semibold text-sm">
+                      <Pencil className="w-4 h-4" /> Go to Admin
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {tiers.map(tier => {
+                      const tierData = tiered[tier];
+                      const allComps = [...(tierData.men || []), ...(tierData.women || []), ...(tierData.open || [])];
+                      if (allComps.length === 0) return null;
+
+                      return (
+                        <section key={tier}>
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <span className={`text-xs font-bold px-3 py-1 rounded-full border ${getTierColor(tier)}`}>
+                                TIER {tier}
+                              </span>
+                              <h2 className="text-xl font-bold">{getTierName(tier)}</h2>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-ccb-muted">
+                              <span className="flex items-center gap-1 text-ccb-success">
+                                <ArrowUp className="w-3.5 h-3.5" /> 2 promote
+                              </span>
+                              <span className="flex items-center gap-1 text-ccb-danger">
+                                <ArrowDown className="w-3.5 h-3.5" /> 2 relegate
+                              </span>
+                            </div>
+                          </div>
+
+                          {tierData.men?.length > 0 && (
+                            <div className="mb-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-xs font-bold px-2 py-1 rounded-full border text-blue-400 bg-blue-400/10 border-blue-400/30">MEN'S</span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {tierData.men.map(comp => (
+                                  <LeagueCard key={comp.id} competition={comp} onJoin={handleJoin} joining={joining === comp.id} onShowChecklist={setChecklistCompetition} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {tierData.women?.length > 0 && (
+                            <div className="mb-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-xs font-bold px-2 py-1 rounded-full border text-pink-400 bg-pink-400/10 border-pink-400/30">WOMEN'S</span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {tierData.women.map(comp => (
+                                  <LeagueCard key={comp.id} competition={comp} onJoin={handleJoin} joining={joining === comp.id} onShowChecklist={setChecklistCompetition} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {tierData.open?.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-xs font-bold px-2 py-1 rounded-full border text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30">OPEN</span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {tierData.open.map(comp => (
+                                  <LeagueCard key={comp.id} competition={comp} onJoin={handleJoin} joining={joining === comp.id} onShowChecklist={setChecklistCompetition} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </section>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+                    <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
+                      <Info className="w-4 h-4 text-ccb-accent" /> How Promotion Works
+                    </h3>
+                    <p className="text-xs text-ccb-muted leading-relaxed">
+                      At the end of each season, the top 2 players in each division are promoted to the tier above. The bottom 2 are relegated down. New players start at the lowest tier.
+                    </p>
+                  </div>
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+                    <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-ccb-accent" /> Qualification Checklist
+                    </h3>
+                    <p className="text-xs text-ccb-muted leading-relaxed">
+                      Before joining any league, players must complete a qualification checklist: profile, gender, phone verification, identity verification, Chess.com linkage, and membership.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* USER VIEW: Coming Soon */}
+            {!isAdmin && (
+              <div className="space-y-6">
+                {/* Coming Soon hero */}
+                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-ccb-primary/10 via-ccb-card to-ccb-surface border border-ccb-primary/30 p-8 sm:p-12 text-center">
+                  <div className="absolute -right-20 -top-20 w-72 h-72 bg-ccb-primary/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -left-20 -bottom-20 w-72 h-72 bg-ccb-accent/10 rounded-full blur-3xl pointer-events-none" />
+
+                  <div className="relative z-10 space-y-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ccb-primary/10 border border-ccb-primary/30 text-ccb-primary text-xs font-semibold tracking-wider uppercase">
+                      <Clock className="w-3.5 h-3.5" /> Coming Soon
+                    </div>
+                    <div className="flex justify-center">
+                      <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-ccb-primary to-ccb-accent flex items-center justify-center shadow-xl shadow-ccb-primary/20">
+                        <Crown className="w-10 h-10 text-white" />
+                      </div>
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight">Premium Leagues</h2>
+                    <p className="text-ccb-muted text-sm sm:text-base max-w-xl mx-auto">
+                      The CrazyChess Premier League is a tiered competitive system with promotion and relegation. Players start at the bottom and climb the pyramid to become champion. Separate Men&apos;s and Women&apos;s divisions.
+                    </p>
+                  </div>
+                </div>
+
+                {/* What to expect */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+                    <div className="w-10 h-10 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 flex items-center justify-center mb-3">
+                      <ArrowUp className="w-5 h-5 text-ccb-success" />
+                    </div>
+                    <h3 className="font-bold text-sm mb-1">Promotion System</h3>
+                    <p className="text-xs text-ccb-muted">Top 2 players from each division promote up each season. Climb from Division 3 to the Premier League.</p>
+                  </div>
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+                    <div className="w-10 h-10 rounded-xl bg-pink-400/10 border border-pink-400/30 flex items-center justify-center mb-3">
+                      <Users className="w-5 h-5 text-pink-400" />
+                    </div>
+                    <h3 className="font-bold text-sm mb-1">Men&apos;s & Women&apos;s</h3>
+                    <p className="text-xs text-ccb-muted">Separate divisions for men and women at every tier. Compete in your category for fair and exciting competition.</p>
+                  </div>
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+                    <div className="w-10 h-10 rounded-xl bg-ccb-primary/10 border border-ccb-primary/30 flex items-center justify-center mb-3">
+                      <ShieldAlert className="w-5 h-5 text-ccb-primary" />
+                    </div>
+                    <h3 className="font-bold text-sm mb-1">Verified Competition</h3>
+                    <p className="text-xs text-ccb-muted">Identity verification, phone verification, and Chess.com linkage required. Fair play is our priority.</p>
+                  </div>
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+                    <div className="w-10 h-10 rounded-xl bg-ccb-success/10 border border-ccb-success/30 flex items-center justify-center mb-3">
+                      <Trophy className="w-5 h-5 text-ccb-success" />
+                    </div>
+                    <h3 className="font-bold text-sm mb-1">Season Champions</h3>
+                    <p className="text-xs text-ccb-muted">Each season culminates in a champion for every tier and gender division. Earn your place in CrazyChess history.</p>
+                  </div>
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+                    <div className="w-10 h-10 rounded-xl bg-ccb-danger/10 border border-ccb-danger/30 flex items-center justify-center mb-3">
+                      <ArrowDown className="w-5 h-5 text-ccb-danger" />
+                    </div>
+                    <h3 className="font-bold text-sm mb-1">Relegation Battle</h3>
+                    <p className="text-xs text-ccb-muted">Bottom 2 players relegate down each season. Every match matters — fight to stay in your division.</p>
+                  </div>
+                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+                    <div className="w-10 h-10 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 flex items-center justify-center mb-3">
+                      <Crown className="w-5 h-5 text-ccb-accent" />
+                    </div>
+                    <h3 className="font-bold text-sm mb-1">Membership Required</h3>
+                    <p className="text-xs text-ccb-muted">Premium Leagues require an active CrazyChess Club membership (MK5,000/month). Tournament entry stays free.</p>
+                  </div>
+                </div>
+
+                {/* Qualification teaser */}
+                <div className="bg-ccb-card border border-ccb-border rounded-2xl p-6">
+                  <h3 className="text-base font-bold mb-3 flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-ccb-accent" /> Qualification Checklist
+                  </h3>
+                  <p className="text-sm text-ccb-muted mb-4">
+                    Before joining a Premium League, you&apos;ll need to complete this checklist. Get a head start now:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { icon: UserCheck, label: 'Complete your profile', desc: 'Full name, display name, country', action: '/settings' },
+                      { icon: Users, label: 'Select your gender', desc: 'Required for men\'s/women\'s divisions', action: '/settings' },
+                      { icon: Phone, label: 'Verify your phone', desc: 'SMS verification for identity', action: '/settings' },
+                      { icon: CreditCard, label: 'Identity verification', desc: 'Government ID or document', action: '/settings' },
+                      { icon: ChessIcon, label: 'Link Chess.com', desc: 'Import verified rating', action: '/settings' },
+                      { icon: Crown, label: 'Get membership', desc: 'MK5,000/month for premium access', action: '/league/subscribe' },
+                    ].map((item, i) => {
+                      const Icon = item.icon;
+                      return (
+                        <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-ccb-border bg-ccb-surface/50">
+                          <div className="w-9 h-9 rounded-lg bg-ccb-accent/10 text-ccb-accent flex items-center justify-center shrink-0">
+                            <Icon className="w-4.5 h-4.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-semibold block">{item.label}</span>
+                            <span className="text-xs text-ccb-muted block">{item.desc}</span>
+                          </div>
+                          {!isGuest && item.action && (
+                            <Link href={item.action} className="text-xs font-semibold text-ccb-accent hover:underline shrink-0 mt-1">
+                              Start →
+                            </Link>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* CTA */}
+                {isGuest ? (
+                  <div className="text-center">
+                    <Link href="/signup" className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-ccb-accent text-ccb-dark font-bold hover:bg-ccb-gold transition-all shadow-lg shadow-ccb-accent/20">
+                      <Sparkles className="w-5 h-5" /> Get Started Free
+                    </Link>
+                    <p className="text-xs text-ccb-muted mt-3">Start playing tournaments now. Premium Leagues launch soon.</p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Link href="/league/subscribe" className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-ccb-primary text-white font-bold hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20">
+                      <Crown className="w-5 h-5" /> Get Membership
+                    </Link>
+                    <p className="text-xs text-ccb-muted mt-3">Secure your spot for Premium Leagues today.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* EMPTY */}
-        {!loading && !error && tiers.length === 0 && swissQualifiers.length === 0 && (
-          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-12 text-center">
-            <Trophy className="w-12 h-12 text-ccb-muted mx-auto mb-4" />
-            <h3 className="text-lg font-bold mb-2">No competitions yet</h3>
-            <p className="text-ccb-muted text-sm">New competitions are coming soon. Check back or follow us for updates.</p>
-          </div>
+        {/* QUALIFICATION CHECKLIST MODAL */}
+        {checklistCompetition && (
+          <QualificationModal
+            competition={checklistCompetition}
+            onClose={() => setChecklistCompetition(null)}
+            onJoin={() => {
+              setChecklistCompetition(null);
+              handleJoin({ ...checklistCompetition, qualification: { ...checklistCompetition.qualification, checklist: checklistCompetition.qualification.checklist?.map(c => ({ ...c, done: true })) } });
+            }}
+          />
         )}
-
-        {/* INFO */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-            <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
-              <Info className="w-4 h-4 text-ccb-accent" /> How Promotion Works
-            </h3>
-            <p className="text-xs text-ccb-muted leading-relaxed">
-              At the end of each season, the top 2 players in each division are promoted to the tier above. The bottom 2 are relegated down. New players start at the lowest tier and must win their way up to the Premier League.
-            </p>
-          </div>
-          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-            <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-ccb-accent" /> Qualification Checklist
-            </h3>
-            <p className="text-xs text-ccb-muted leading-relaxed">
-              Before joining any competition, you must complete a qualification checklist. This includes profile completion, gender selection, phone verification, and identity verification. Some competitions also require Chess.com linkage and an active membership.
-            </p>
-          </div>
-        </section>
       </div>
-
-      {/* QUALIFICATION CHECKLIST MODAL */}
-      {checklistCompetition && (
-        <QualificationModal
-          competition={checklistCompetition}
-          onClose={() => setChecklistCompetition(null)}
-          onJoin={() => {
-            setChecklistCompetition(null);
-            handleJoin({ ...checklistCompetition, qualification: { ...checklistCompetition.qualification, checklist: checklistCompetition.qualification.checklist?.map(c => ({ ...c, done: true })) } });
-          }}
-        />
-      )}
     </div>
   );
 }
 
 // ============================================================
-// Competition Card
+// Tournament Card
 // ============================================================
 
-function CompetitionCard({
-  competition,
-  onJoin,
-  joining,
-  onShowChecklist,
+function TournamentCard({
+  competition, onJoin, joining, onShowChecklist,
 }: {
   competition: Competition;
   onJoin: (c: Competition) => void;
@@ -478,30 +683,130 @@ function CompetitionCard({
   onShowChecklist: (c: Competition) => void;
 }) {
   const statusInfo = getStatusLabel(competition.status);
-  const genderInfo = getGenderLabel(competition.genderRestriction);
-  const isLeague = competition.type === 'league';
+  const isPaid = competition.entryType === 'paid';
+  const canJoin = competition.qualification.canJoin;
+  const isParticipating = competition.isRegistered;
+
+  return (
+    <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5 hover:border-ccb-accent/30 transition-all group">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 flex items-center justify-center">
+            <Swords className="w-5 h-5 text-ccb-accent" />
+          </div>
+          <div>
+            <h3 className="font-bold text-sm">{competition.name}</h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-ccb-muted">Swiss Tournament</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusInfo.color}`}>
+                {statusInfo.label}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div>
+          {isPaid ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30">PAID</span>
+          ) : (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-success/10 text-ccb-success border border-ccb-success/30">FREE</span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4 mb-3 text-xs text-ccb-muted flex-wrap">
+        <span className="flex items-center gap-1">
+          <Users className="w-3.5 h-3.5" /> {competition.playerCount}
+          {competition.maxPlayers ? `/${competition.maxPlayers}` : ' players'}
+        </span>
+        {competition.rounds && (
+          <span className="flex items-center gap-1">
+            <Trophy className="w-3.5 h-3.5" /> {competition.rounds} rounds
+          </span>
+        )}
+        {competition.timeControl && (
+          <span className="flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5" /> {competition.timeControl}
+          </span>
+        )}
+        {competition.startsAt && (
+          <span className="flex items-center gap-1">
+            <Calendar className="w-3.5 h-3.5" /> {formatDate(competition.startsAt)}
+          </span>
+        )}
+        {isPaid && competition.entryFee != null && (
+          <span className="flex items-center gap-1 text-ccb-accent">
+            <DollarSign className="w-3.5 h-3.5" /> {formatCurrency(competition.entryFee)}
+          </span>
+        )}
+      </div>
+
+      <div className="pt-3 border-t border-ccb-border">
+        {isParticipating ? (
+          <div className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-ccb-success/10 text-ccb-success border border-ccb-success/30 font-semibold text-sm">
+            <CheckCircle2 className="w-4 h-4" /> Participating
+          </div>
+        ) : canJoin ? (
+          <button
+            onClick={() => onJoin(competition)}
+            disabled={joining}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-ccb-accent text-ccb-dark font-bold text-sm hover:bg-ccb-gold transition-all shadow-lg shadow-ccb-accent/20 disabled:opacity-50"
+          >
+            {joining ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            Join Tournament
+          </button>
+        ) : competition.qualification.reason === 'not_authenticated' ? (
+          <Link href="/login" className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-ccb-border bg-ccb-surface text-ccb-text font-medium text-sm hover:bg-ccb-card">
+            <LogIn className="w-4 h-4" /> Sign In to Join
+          </Link>
+        ) : (
+          <div className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-ccb-border bg-ccb-surface/50 text-ccb-muted font-medium text-sm">
+            <Lock className="w-4 h-4" />
+            {competition.qualification.reason === 'already_started' ? 'In Progress' :
+             competition.qualification.reason === 'completed' ? 'Tournament Ended' :
+             competition.qualification.reason === 'pending_approval' ? 'Pending Approval' :
+             competition.qualification.reason === 'full' ? 'Tournament Full' :
+             'Not Available'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// League Card (admin view)
+// ============================================================
+
+function LeagueCard({
+  competition, onJoin, joining, onShowChecklist,
+}: {
+  competition: Competition;
+  onJoin: (c: Competition) => void;
+  joining: boolean;
+  onShowChecklist: (c: Competition) => void;
+}) {
+  const statusInfo = getStatusLabel(competition.status);
+  const genderInfo = getGenderLabel(competition.genderRestriction || 'open');
   const isMembership = competition.entryType === 'membership';
   const canJoin = competition.qualification.canJoin;
-  const isParticipating = competition.qualification.status === 'participating' || competition.isRegistered;
+  const isParticipating = competition.qualification.status === 'participating';
   const checklist = competition.qualification.checklist;
   const requiredItems = checklist?.filter(c => c.required) || [];
   const completedItems = requiredItems.filter(c => c.done);
   const progress = requiredItems.length > 0 ? Math.round((completedItems.length / requiredItems.length) * 100) : 100;
 
   return (
-    <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5 hover:border-ccb-accent/30 transition-all group">
+    <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5 hover:border-ccb-primary/30 transition-all group">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-            isLeague ? 'bg-ccb-primary/10 border border-ccb-primary/30' : 'bg-ccb-accent/10 border border-ccb-accent/30'
-          }`}>
-            {isLeague ? <Crown className="w-5 h-5 text-ccb-primary" /> : <Swords className="w-5 h-5 text-ccb-accent" />}
+          <div className="w-10 h-10 rounded-xl bg-ccb-primary/10 border border-ccb-primary/30 flex items-center justify-center">
+            <Crown className="w-5 h-5 text-ccb-primary" />
           </div>
           <div>
             <h3 className="font-bold text-sm">{competition.name}</h3>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs text-ccb-muted">
-                {isLeague ? `Tier ${competition.tier} · ${genderInfo.label}` : 'Swiss Qualifier'}
+                Tier {competition.tier} · {genderInfo.label}
               </span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusInfo.color}`}>
                 {statusInfo.label}
@@ -509,7 +814,7 @@ function CompetitionCard({
             </div>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div>
           {isMembership ? (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30">MEMBERSHIP</span>
           ) : (
@@ -518,49 +823,39 @@ function CompetitionCard({
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="flex items-center gap-4 mb-3 text-xs text-ccb-muted">
+      <div className="flex items-center gap-4 mb-3 text-xs text-ccb-muted flex-wrap">
         <span className="flex items-center gap-1">
           <Users className="w-3.5 h-3.5" /> {competition.playerCount}
           {competition.maxPlayers ? `/${competition.maxPlayers}` : ''}
         </span>
-        {isLeague && competition.currentMatchday != null && (
+        {competition.currentMatchday != null && (
           <span className="flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5" /> MD {competition.currentMatchday}/{competition.totalMatchdays || '?'}
           </span>
         )}
-        {!isLeague && competition.rounds && (
-          <span className="flex items-center gap-1">
-            <Trophy className="w-3.5 h-3.5" /> {competition.rounds} rounds
-          </span>
-        )}
-        {isLeague && competition.promotesCount && (
+        {competition.promotesCount && (
           <span className="flex items-center gap-1 text-ccb-success">
             <ArrowUp className="w-3.5 h-3.5" /> {competition.promotesCount} promote
           </span>
         )}
-        {isLeague && competition.relegatesCount && (
+        {competition.relegatesCount && (
           <span className="flex items-center gap-1 text-ccb-danger">
             <ArrowDown className="w-3.5 h-3.5" /> {competition.relegatesCount} relegate
           </span>
         )}
       </div>
 
-      {/* Rating requirements */}
       {(competition.minRating || 0) > 0 && (
         <div className="flex items-center gap-2 mb-3 text-xs text-ccb-muted">
           <Star className="w-3.5 h-3.5 text-ccb-accent" />
-          {competition.maxRating
-            ? `Rating: ${competition.minRating}–${competition.maxRating}`
-            : `Min rating: ${competition.minRating}`}
+          {competition.maxRating ? `Rating: ${competition.minRating}–${competition.maxRating}` : `Min rating: ${competition.minRating}`}
         </div>
       )}
 
-      {/* Qualification progress bar (if not eligible and has checklist) */}
       {checklist && !canJoin && competition.qualification.reason === 'requirements_not_met' && requiredItems.length > 0 && (
         <div className="mb-3">
           <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-ccb-muted">Qualification: {completedItems.length}/{requiredItems.length} done</span>
+            <span className="text-ccb-muted">Qualification: {completedItems.length}/{requiredItems.length}</span>
             <span className="text-ccb-accent font-semibold">{progress}%</span>
           </div>
           <div className="w-full bg-ccb-surface h-2 rounded-full overflow-hidden">
@@ -572,13 +867,9 @@ function CompetitionCard({
         </div>
       )}
 
-      {/* CTA */}
       <div className="pt-3 border-t border-ccb-border">
         {isParticipating ? (
-          <Link
-            href={isLeague ? '/league/table' : '/league'}
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-ccb-success/10 text-ccb-success border border-ccb-success/30 font-semibold text-sm hover:bg-ccb-success/20 transition-all"
-          >
+          <Link href="/league/table" className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-ccb-success/10 text-ccb-success border border-ccb-success/30 font-semibold text-sm hover:bg-ccb-success/20 transition-all">
             <CheckCircle2 className="w-4 h-4" /> Participating — View
             <ChevronRight className="w-4 h-4" />
           </Link>
@@ -586,10 +877,10 @@ function CompetitionCard({
           <button
             onClick={() => onJoin(competition)}
             disabled={joining}
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-ccb-accent text-ccb-dark font-bold text-sm hover:bg-ccb-gold transition-all shadow-lg shadow-ccb-accent/20 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-ccb-primary text-white font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50"
           >
             {joining ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-            Join Now
+            Join League
           </button>
         ) : competition.qualification.reason === 'requirements_not_met' ? (
           <button
@@ -607,8 +898,8 @@ function CompetitionCard({
             <Lock className="w-4 h-4" />
             {competition.qualification.reason === 'already_started' ? 'In Progress' :
              competition.qualification.reason === 'registration_closed' ? 'Registration Closed' :
-             competition.qualification.reason === 'completed' ? 'Competition Ended' :
-             competition.qualification.reason === 'full' ? 'Competition Full' :
+             competition.qualification.reason === 'completed' ? 'Season Ended' :
+             competition.qualification.reason === 'not_registration_phase' ? 'Not in Registration' :
              'Not Available'}
           </div>
         )}
@@ -622,9 +913,7 @@ function CompetitionCard({
 // ============================================================
 
 function QualificationModal({
-  competition,
-  onClose,
-  onJoin,
+  competition, onClose, onJoin,
 }: {
   competition: Competition;
   onClose: () => void;
@@ -634,12 +923,11 @@ function QualificationModal({
   const requiredItems = checklist.filter(c => c.required);
   const completedItems = requiredItems.filter(c => c.done);
   const allMet = requiredItems.every(c => c.done);
-  const genderInfo = getGenderLabel(competition.genderRestriction);
 
   const checklistIcons: Record<string, React.ReactNode> = {
     profile_complete: <UserCheck className="w-5 h-5" />,
     gender_selected: <UserCheck className="w-5 h-5" />,
-    gender_requirement: <UserCheck className="w-5 h-5" />,
+    gender_requirement: <Users className="w-5 h-5" />,
     phone_verified: <Phone className="w-5 h-5" />,
     identity_verified: <CreditCard className="w-5 h-5" />,
     chesscom_linked: <ChessIcon className="w-5 h-5" />,
@@ -652,7 +940,6 @@ function QualificationModal({
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       <div className="bg-ccb-card border border-ccb-border rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
         <div className="sticky top-0 bg-ccb-card border-b border-ccb-border p-5 flex items-center justify-between rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-ccb-primary/10 border border-ccb-primary/30 flex items-center justify-center">
@@ -660,9 +947,7 @@ function QualificationModal({
             </div>
             <div>
               <h3 className="font-bold text-base">Qualification Checklist</h3>
-              <p className="text-xs text-ccb-muted">
-                {competition.name} · {getTierName(competition.tier)} · {genderInfo.label}
-              </p>
+              <p className="text-xs text-ccb-muted">{competition.name}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-ccb-surface transition-colors">
@@ -670,7 +955,6 @@ function QualificationModal({
           </button>
         </div>
 
-        {/* Progress */}
         <div className="p-5 border-b border-ccb-border">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-semibold">Progress: {completedItems.length}/{requiredItems.length}</span>
@@ -686,7 +970,6 @@ function QualificationModal({
           </div>
         </div>
 
-        {/* Checklist items */}
         <div className="p-5 space-y-3">
           {checklist.filter(c => c.required).map((item) => (
             <div key={item.id} className={`flex items-start gap-3 p-3 rounded-xl border ${
@@ -704,14 +987,8 @@ function QualificationModal({
                   </span>
                   {item.done && <CheckCircle2 className="w-4 h-4 text-ccb-success shrink-0" />}
                 </div>
-                {item.description && (
-                  <p className="text-xs text-ccb-muted mt-0.5">{item.description}</p>
-                )}
                 {!item.done && item.action && (
-                  <Link
-                    href={item.action}
-                    className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-ccb-accent hover:underline"
-                  >
+                  <Link href={item.action} className="inline-flex items-center gap-1 mt-1.5 text-xs font-semibold text-ccb-accent hover:underline">
                     {item.actionLabel} <ArrowRight className="w-3 h-3" />
                   </Link>
                 )}
@@ -723,12 +1000,11 @@ function QualificationModal({
           ))}
         </div>
 
-        {/* Footer */}
         <div className="sticky bottom-0 bg-ccb-card border-t border-ccb-border p-5 rounded-b-2xl">
           {allMet ? (
             <button
               onClick={onJoin}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-ccb-accent text-ccb-dark font-bold text-sm hover:bg-ccb-gold transition-all shadow-lg shadow-ccb-accent/20"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-ccb-primary text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20"
             >
               <Zap className="w-4 h-4" /> Join Competition
             </button>
