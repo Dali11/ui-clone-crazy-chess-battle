@@ -11,18 +11,20 @@ interface Profile {
   rating: number | null;
   avatar_url: string | null;
   is_admin: boolean | null;
+  wallet_balance_cents: number | null;
 }
 
 export default function AppNav({ profile }: { profile: Profile | null }) {
   const pathname = usePathname();
   const isGameRoute = pathname.startsWith("/game/") || pathname.startsWith("/play/computer") || pathname.startsWith("/draughts/game/");
 
+  // Mobile bottom nav — Wallet replaced by Draughts (Wallet moves to header)
   const navItems = [
     { href: "/play", label: "Play", icon: Swords },
     { href: "/battles", label: "Battles", icon: Coins },
     { href: "/league", label: "Compete", icon: Crown },
     { href: "/draughts", label: "Draughts", icon: Disc3 },
-    { href: "/wallet", label: "Wallet", icon: Wallet },
+    { href: "/settings", label: "Profile", icon: User },
   ];
 
   const desktopItems = [
@@ -34,23 +36,14 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/earn", label: "Earn CCB", icon: Gift },
     { href: "/leaderboard", label: "Ranks", icon: TrendingUp },
     { href: "/history", label: "History", icon: TrendingUp },
-    { href: "/wallet", label: "Wallet", icon: Wallet },
     ...(profile?.is_admin ? [{ href: "/admin", label: "Admin", icon: Shield }] : []),
   ];
 
-  const getRatingTier = (rating: number | null) => {
-    if (!rating) return { label: "Unrated", color: "text-ccb-muted" };
-    if (rating >= 2400) return { label: "GM", color: "text-purple-400" };
-    if (rating >= 2200) return { label: "Master", color: "text-fuchsia-400" };
-    if (rating >= 1900) return { label: "Diamond", color: "text-cyan-400" };
-    if (rating >= 1600) return { label: "Platinum", color: "text-emerald-400" };
-    if (rating >= 1300) return { label: "Gold", color: "text-ccb-accent" };
-    if (rating >= 1000) return { label: "Silver", color: "text-ccb-silver" };
-    if (rating >= 700) return { label: "Bronze", color: "text-ccb-bronze" };
-    return { label: "Rookie", color: "text-ccb-muted" };
+  const formatBalance = (cents: number | null | undefined) => {
+    const value = cents ?? 0;
+    const kwacha = Math.floor(value / 100);
+    return `MK ${kwacha.toLocaleString()}`;
   };
-
-  const tier = getRatingTier(profile?.rating ?? null);
 
   return (
     <>
@@ -92,10 +85,14 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
               <Gift className="w-4 h-4 text-orange-500" />
               <span className="font-bold">Earn CCB</span>
             </Link>
-            <div className="flex items-center gap-2">
-              <span className={`text-sm font-medium ${tier.color}`}>{tier.label}</span>
-              <span className="text-sm font-bold">{profile?.rating ?? "—"}</span>
-            </div>
+            {/* Wallet balance — replaces rating display */}
+            <Link
+              href="/wallet"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-sm hover:bg-ccb-accent/10 transition-colors"
+            >
+              <Wallet className="w-4 h-4 text-ccb-accent" />
+              <span className="font-bold text-ccb-text">{formatBalance(profile?.wallet_balance_cents)}</span>
+            </Link>
             <Link
               href="/settings"
               className="flex items-center gap-2 text-sm text-ccb-muted hover:text-ccb-text"
@@ -125,10 +122,14 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
               <Gift className="w-4 h-4 text-orange-500" />
               <span className="text-xs font-bold">Earn</span>
             </Link>
-            <div className="flex items-center gap-1.5">
-              <span className={`text-xs font-medium ${tier.color}`}>{tier.label}</span>
-              <span className="text-xs font-bold">{profile?.rating ?? "—"}</span>
-            </div>
+            {/* Wallet balance — replaces rating display */}
+            <Link
+              href="/wallet"
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-ccb-surface border border-ccb-border"
+            >
+              <Wallet className="w-3.5 h-3.5 text-ccb-accent" />
+              <span className="text-xs font-bold text-ccb-text">{formatBalance(profile?.wallet_balance_cents)}</span>
+            </Link>
             <Link href="/settings" className="flex items-center gap-2 text-ccb-muted">
               <div className="w-7 h-7 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center">
                 <User className="w-3.5 h-3.5" />
