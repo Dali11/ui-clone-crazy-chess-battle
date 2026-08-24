@@ -73,6 +73,7 @@ interface ApiResponse {
   hasMembership: boolean;
   userId: string | null;
   userGender: string | null;
+  userIdentityVerified: boolean | null;
   market: {
     currencyCode: string;
     currencySymbol: string;
@@ -151,8 +152,10 @@ export default function PremiumLeaguesTab() {
       const res = await fetch('/api/league/premium-leagues');
       const json = await res.json();
       setData(json);
+      // Lock to player's own gender — no browsing the other gender's leagues
       if (json.userGender === 'female') setGenderView('female');
-      else setGenderView('male');
+      else if (json.userGender === 'male') setGenderView('male');
+      else setGenderView('male'); // default for unverified/unset
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -247,30 +250,22 @@ export default function PremiumLeaguesTab() {
         </div>
       </div>
 
-      {/* GENDER TOGGLE */}
+      {/* GENDER BADGE — locked to player's verified gender */}
       <div className="flex items-center gap-2">
-        <button
-          onClick={() => setGenderView('male')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
-            genderView === 'male'
-              ? 'bg-blue-500/10 border border-blue-500/30 text-blue-400'
-              : 'bg-ccb-surface border border-ccb-border text-ccb-muted'
-          }`}
-        >
+        <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold ${
+          genderView === 'female'
+            ? 'bg-pink-500/10 border border-pink-500/30 text-pink-400'
+            : 'bg-blue-500/10 border border-blue-500/30 text-blue-400'
+        }`}>
           <Users className="w-4 h-4" />
-          Men's Leagues
-        </button>
-        <button
-          onClick={() => setGenderView('female')}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
-            genderView === 'female'
-              ? 'bg-pink-500/10 border border-pink-500/30 text-pink-400'
-              : 'bg-ccb-surface border border-ccb-border text-ccb-muted'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          Women's Leagues
-        </button>
+          {genderView === 'female' ? "Women's Leagues" : "Men's Leagues"}
+        </div>
+        {!data?.userIdentityVerified && (
+          <span className="text-[10px] text-ccb-muted flex items-center gap-1">
+            <AlertCircle className="w-3 h-3" />
+            Identity not verified — gender locked until verified
+          </span>
+        )}
       </div>
 
       {/* LEAGUE CARDS */}

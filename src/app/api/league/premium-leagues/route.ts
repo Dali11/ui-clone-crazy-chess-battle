@@ -166,6 +166,7 @@ export async function GET(req: Request) {
       hasMembership,
       userId: user?.id || null,
       userGender: profile?.gender || null,
+      userIdentityVerified: profile?.identity_verified || false,
       market: {
         currencyCode: market.currencyCode,
         currencySymbol: market.currencySymbol,
