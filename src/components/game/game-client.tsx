@@ -126,6 +126,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     return Math.max(0, abortSeconds * 1000 - elapsed);
   })();
   const abortRemainingSec = Math.ceil(abortRemainingMs / 1000);
+  const abortRemainingDisplay = abortRemainingSec >= 60
+    ? `${Math.floor(abortRemainingSec / 60)}:${String(abortRemainingSec % 60).padStart(2, '0')}`
+    : `${abortRemainingSec}s`;
 
   useEffect(() => {
     if (gameEnded) return;
@@ -1134,14 +1137,14 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       {/* First-move abort countdown banner */}
       {isFirstMovePending && (
         <div className={`flex items-center justify-center gap-2 px-4 py-2 mb-1 rounded-lg text-sm font-medium transition-colors ${
-          abortRemainingSec <= 5
+          abortRemainingSec <= 10
             ? "bg-red-500/15 text-red-400 border border-red-500/30"
             : "bg-ccb-surface text-ccb-muted border border-ccb-border"
         }`}>
           <Timer className="w-4 h-4" />
           {myTurn
-            ? <span>Make your first move! <span className="tabular-nums font-bold">{abortRemainingSec}s</span></span>
-            : <span>Waiting for opponent... <span className="tabular-nums">{abortRemainingSec}s</span></span>
+            ? <span>Make your first move! <span className="tabular-nums font-bold">{abortRemainingDisplay}</span></span>
+            : <span>Waiting for opponent... <span className="tabular-nums">{abortRemainingDisplay}</span></span>
           }
         </div>
       )}

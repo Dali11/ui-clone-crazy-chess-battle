@@ -2,15 +2,19 @@
 // If no move is made within this window, the game is aborted (no rating
 // change, no winner). Tournament and battle games are never aborted —
 // they always resolve decisively.
+//
+// Bullet (1+0) is the shortest format — 30s is enough to tell if someone
+// is actually there. Blitz and Rapid get 2 minutes since the games are
+// longer and players may need a moment to settle in.
 export const FIRST_MOVE_ABORT_SECONDS: Record<string, number> = {
-  bullet: 10,
-  blitz: 15,
-  rapid: 20,
-  classical: 30,
+  bullet: 30,
+  blitz: 120,
+  rapid: 120,
+  classical: 120,
 };
 
 // Default fallback if time_control is unrecognized
-export const DEFAULT_ABORT_SECONDS = 15;
+export const DEFAULT_ABORT_SECONDS = 120;
 
 /**
  * Returns the abort threshold in seconds for a given time control.
