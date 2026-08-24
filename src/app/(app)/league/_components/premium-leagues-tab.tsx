@@ -534,8 +534,9 @@ export default function PremiumLeaguesTab() {
         ) : competitions.length === 0 ? (
           <div className="bg-ccb-card border border-ccb-border rounded-2xl p-6 text-center">
             <Swords className="w-8 h-8 text-ccb-muted mx-auto mb-2" />
+            <p className="text-sm font-bold text-ccb-text mb-1">Nothing on the board yet</p>
             <p className="text-xs text-ccb-muted">
-              No premium competitions scheduled yet. Admin can create Champions League, Cup or sponsored competitions from the admin dashboard.
+              Champions League, Cups and sponsored showdowns land here first.
             </p>
           </div>
         ) : (
@@ -585,9 +586,6 @@ export default function PremiumLeaguesTab() {
             })}
           </div>
         )}
-        <p className="text-[10px] text-ccb-muted text-center mt-3">
-          Premium competitions appear when leagues are active. Admin can configure format, qualification, prize pools and eligibility.
-        </p>
       </div>
 
       {/* ADMIN NOTE */}
