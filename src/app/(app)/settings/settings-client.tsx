@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { User, LogOut, Save, ChevronRight, Trophy, Swords, Wallet, Camera, Circle, AlertCircle, CheckCircle } from "lucide-react";
+import { User, LogOut, Save, ChevronRight, Trophy, Swords, Wallet, Camera, Circle, AlertCircle, CheckCircle, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Profile {
@@ -153,8 +153,9 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
     setSaving(true);
     setError(null);
     const updates: Record<string, any> = { display_name: displayName, bio, phone };
+    // Gender is locked once set — only allow setting if not yet set
     const genderChangedFlag = gender !== (profile?.gender || "");
-    if (gender) updates.gender = gender;
+    if (gender && !profile?.gender) updates.gender = gender;
     const { error } = await supabase
       .from("profiles")
       .update(updates)
@@ -279,11 +280,11 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
             )}
           </div>
 
-          {/* Warning if gender change will reset verification */}
-          {genderChanged && !identityVerified && (
+          {/* First-time selection notice */}
+          {!profile?.gender && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl mb-2.5 text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
               <AlertCircle className="w-3.5 h-3.5" />
-              Changing your gender requires re-verification by an admin before you can join gender-restricted leagues.
+              Choose carefully — gender is locked once set and can only be changed by an admin.
             </div>
           )}
 
@@ -291,12 +292,16 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
             {GENDER_OPTIONS.map((opt) => {
               const Icon = opt.icon;
               const isSelected = gender === opt.value;
+              const isLocked = !!profile?.gender;
               return (
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => setGender(opt.value)}
+                  disabled={isLocked}
+                  onClick={() => !isLocked && setGender(opt.value)}
                   className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                    isLocked ? "opacity-50 cursor-not-allowed" : ""
+                  } ${
                     isSelected
                       ? "border-ccb-primary bg-ccb-primary/10 text-ccb-primary"
                       : "border-ccb-border bg-ccb-surface hover:border-ccb-primary/30"
@@ -308,6 +313,14 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
               );
             })}
           </div>
+
+          {/* Locked notice */}
+          {profile?.gender && (
+            <p className="text-xs text-ccb-muted mt-2 flex items-center gap-1.5">
+              <Lock className="w-3 h-3" />
+              Gender is locked once set. Contact an admin if you need it changed.
+            </p>
+          )}
         </div>
 
         <div>
