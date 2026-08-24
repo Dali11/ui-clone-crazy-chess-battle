@@ -80,6 +80,23 @@ interface ApiResponse {
   leagues: League[];
 }
 
+interface PremiumCompetition {
+  id: string;
+  name: string;
+  type: 'champions_league' | 'shield' | 'cup' | 'custom';
+  description: string | null;
+  sponsor_name: string | null;
+  sponsor_logo_url: string | null;
+  format: { stages?: string[]; groupStage?: boolean; knockoutRounds?: boolean };
+  prize_pool_cents: number;
+  prize_currency: string;
+  status: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  requires_membership: boolean;
+  participantCount: number;
+}
+
 const LEAGUE_META: Record<number, { color: string; bgColor: string; borderColor: string; icon: typeof Crown }> = {
   1: { color: 'text-ccb-primary', bgColor: 'bg-ccb-primary/10', borderColor: 'border-ccb-primary/30', icon: Crown },
   2: { color: 'text-ccb-accent', bgColor: 'bg-ccb-accent/10', borderColor: 'border-ccb-accent/30', icon: Trophy },
@@ -121,6 +138,8 @@ export default function PremiumLeaguesTab() {
   const [expandedLeague, setExpandedLeague] = useState<number | null>(null);
   const [registering, setRegistering] = useState<string | null>(null);
   const [registerMsg, setRegisterMsg] = useState<{ leagueId: string; type: 'success' | 'error'; msg: string } | null>(null);
+  const [competitions, setCompetitions] = useState<PremiumCompetition[]>([]);
+  const [competitionsLoading, setCompetitionsLoading] = useState(true);
 
   const fetchData = async () => {
     setLoading(true);
@@ -136,7 +155,20 @@ export default function PremiumLeaguesTab() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const fetchCompetitions = async () => {
+    setCompetitionsLoading(true);
+    try {
+      const res = await fetch('/api/league/premium-competitions');
+      const json = await res.json();
+      setCompetitions(json.competitions || []);
+    } catch {
+      setCompetitions([]);
+    } finally {
+      setCompetitionsLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); fetchCompetitions(); }, []);
 
   const handleRegister = async (leagueId: string) => {
     setRegistering(leagueId);
@@ -454,44 +486,64 @@ export default function PremiumLeaguesTab() {
         <h3 className="text-sm font-bold uppercase tracking-wider text-ccb-muted mb-3 flex items-center gap-1.5">
           <Swords className="w-4 h-4" /> Exclusive Premium Competitions
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="bg-gradient-to-br from-ccb-primary/10 to-ccb-accent/10 border border-ccb-primary/30 rounded-2xl p-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-ccb-primary/20 border border-ccb-primary/30 flex items-center justify-center">
-                <Crown className="w-5 h-5 text-ccb-primary" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm">CrazyChess Champions League</h4>
-                <p className="text-[10px] text-ccb-muted">Top 10 from each league · 50 qualifiers</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 mt-3">
-              {['Groups', 'Knockouts', 'Semis', 'Final'].map((stage, i, arr) => (
-                <div key={stage} className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">{stage}</span>
-                  {i < arr.length - 1 && <ChevronRight className="w-3 h-3 text-ccb-muted" />}
+        {competitionsLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-pulse">
+            {[1, 2].map(i => <div key={i} className="bg-ccb-card border border-ccb-border rounded-2xl h-28" />)}
+          </div>
+        ) : competitions.length === 0 ? (
+          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-6 text-center">
+            <Swords className="w-8 h-8 text-ccb-muted mx-auto mb-2" />
+            <p className="text-xs text-ccb-muted">
+              No premium competitions scheduled yet. Admin can create Champions League, Cup or sponsored competitions from the admin dashboard.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {competitions.map(comp => {
+              const Icon = comp.type === 'shield' || comp.type === 'cup' ? Shield : Crown;
+              const stages = comp.format?.stages && comp.format.stages.length > 0
+                ? comp.format.stages
+                : [
+                    ...(comp.format?.groupStage ? ['Groups'] : []),
+                    ...(comp.format?.knockoutRounds ? ['Knockouts', 'Semis', 'Final'] : []),
+                  ];
+              return (
+                <div key={comp.id} className="bg-gradient-to-br from-ccb-primary/10 to-ccb-accent/10 border border-ccb-primary/30 rounded-2xl p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-ccb-primary/20 border border-ccb-primary/30 flex items-center justify-center shrink-0">
+                      <Icon className="w-5 h-5 text-ccb-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-sm truncate">{comp.name}</h4>
+                      <p className="text-[10px] text-ccb-muted truncate">
+                        {comp.sponsor_name ? `Sponsored by ${comp.sponsor_name}` : comp.description || 'Premium competition'}
+                        {comp.participantCount > 0 ? ` · ${comp.participantCount} players` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  {stages.length > 0 ? (
+                    <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                      {stages.map((stage, i, arr) => (
+                        <div key={stage} className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">{stage}</span>
+                          {i < arr.length - 1 && <ChevronRight className="w-3 h-3 text-ccb-muted" />}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted capitalize">{comp.status.replace('_', ' ')}</span>
+                    {comp.prize_pool_cents > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">
+                        {formatMoney(comp.prize_pool_cents, comp.prize_currency === 'MWK' ? 'MK' : comp.prize_currency)} prize
+                      </span>
+                    )}
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
-          <div className="bg-gradient-to-br from-ccb-accent/10 to-ccb-primary/10 border border-ccb-accent/30 rounded-2xl p-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-ccb-accent/20 border border-ccb-accent/30 flex items-center justify-center">
-                <Shield className="w-5 h-5 text-ccb-accent" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm">Airtel CrazyChess Shield</h4>
-                <p className="text-[10px] text-ccb-muted">Premium-only · Sponsored competition</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 mt-3">
-              <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">Configurable</span>
-              <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">Groups</span>
-              <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">Knockouts</span>
-              <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">Prizes</span>
-            </div>
-          </div>
-        </div>
+        )}
         <p className="text-[10px] text-ccb-muted text-center mt-3">
           Premium competitions appear when leagues are active. Admin can configure format, qualification, prize pools and eligibility.
         </p>
