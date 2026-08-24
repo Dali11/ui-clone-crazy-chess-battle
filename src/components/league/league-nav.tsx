@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Crown, Table2, CalendarDays, LayoutDashboard, Crown as Membership } from "lucide-react";
+import { Swords, Crown, Table2, CalendarDays, LayoutDashboard, Crown as Membership } from "lucide-react";
 
 const leagueNavItems = [
-  { href: "/league", label: "Compete", icon: Crown },
+  { href: "/league/tournaments", label: "Tournaments", icon: Swords },
+  { href: "/league", label: "Leagues", icon: Crown },
   { href: "/league/table", label: "Table", icon: Table2 },
   { href: "/league/matchday/1", label: "Fixtures", icon: CalendarDays },
   { href: "/league/dashboard", label: "My Stats", icon: LayoutDashboard },
@@ -17,34 +18,32 @@ export default function LeagueNav() {
 
   return (
     <div className="border-b border-ccb-border bg-ccb-surface/50 backdrop-blur-sm sticky top-16 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar h-12">
-          {leagueNavItems.map((item) => {
-            const Icon = item.icon;
-            let isActive;
-            if (item.href === "/league") {
-              isActive = pathname === "/league";
-            } else if (item.href === "/league/subscribe") {
-              isActive = pathname === "/league/subscribe";
-            } else {
-              isActive = pathname.startsWith(item.href.replace(/\/\d+$/, ""));
-            }
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                  isActive
-                    ? "text-ccb-primary bg-ccb-primary/10"
-                    : "text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
+      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar h-12">
+        {leagueNavItems.map((item) => {
+          const Icon = item.icon;
+          let isActive;
+          if (item.href === "/league") {
+            isActive = pathname === "/league";
+          } else if (item.href === "/league/subscribe") {
+            isActive = pathname === "/league/subscribe";
+          } else {
+            isActive = pathname.startsWith(item.href.replace(/\/\d+$/, ""));
+          }
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                isActive
+                  ? "text-ccb-primary bg-ccb-primary/10"
+                  : "text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
