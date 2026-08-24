@@ -202,7 +202,6 @@ export default function PremiumLeaguesTab() {
   const allLeagues = data?.leagues || [];
   const leagues = allLeagues.filter(l => l.gender_restriction === genderView);
   const hasMembership = data?.hasMembership || false;
-  const isAdmin = data?.isAdmin || false;
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 space-y-6">
@@ -565,12 +564,6 @@ export default function PremiumLeaguesTab() {
         )}
       </div>
 
-      {/* ADMIN NOTE */}
-      {isAdmin && (
-        <div className="bg-ccb-primary/10 border border-ccb-primary/30 rounded-xl p-3 text-xs text-ccb-primary font-semibold flex items-center gap-2">
-          <Crown className="w-4 h-4" /> Admin — League capacity, prize pools, promotion/relegation and payout config are editable from the admin dashboard.
-        </div>
-      )}
     </div>
   );
 }
