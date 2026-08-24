@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Check, X, Coins, Smartphone, Shield, Clock,
   TrendingUp, Wallet, AlertCircle, ChevronRight, Cherry, Gamepad2,
   Ban, Star, DollarSign, Search, Save, ScrollText, Swords,
-  Menu, LogOut, Crown,
+  Menu, LogOut, Crown, Play,
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
 } from "lucide-react";
 
@@ -156,6 +157,13 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [editForm, setEditForm] = useState<Record<string, any>>({});
   const [prizeEditTournament, setPrizeEditTournament] = useState<Tournament | null>(null);
   const [prizeForm, setPrizeForm] = useState<any>(null);
+  const [creatingTournament, setCreatingTournament] = useState(false);
+  const [createForm, setCreateForm] = useState<Record<string, any>>({});
+  const [tournamentFilter, setTournamentFilter] = useState<string>("all");
+  const [tournamentSearch, setTournamentSearch] = useState("");
+  const [managingTournament, setManagingTournament] = useState<Tournament | null>(null);
+  const [tournamentDetail, setTournamentDetail] = useState<any>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -650,6 +658,97 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const handleCreateTournament = async () => {
+    setActionLoading("create_tournament");
+    try {
+      const res = await fetch("/api/tournaments/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: createForm.name,
+          description: createForm.description || "",
+          type: createForm.type || "swiss",
+          timeControl: createForm.time_control || "blitz",
+          initialMinutes: Number(createForm.initial_minutes) || 5,
+          incrementSeconds: Number(createForm.increment_seconds) || 0,
+          maxPlayers: createForm.max_players ? Number(createForm.max_players) : null,
+          minPlayers: Number(createForm.min_players) || 2,
+          rounds: createForm.rounds ? Number(createForm.rounds) : null,
+          durationMinutes: createForm.duration_minutes ? Number(createForm.duration_minutes) : null,
+          startsAt: createForm.starts_at,
+          endsAt: createForm.ends_at || null,
+          entryFeeCents: Number(createForm.entry_fee_cents) || 0,
+          creatorProfitPercent: Number(createForm.creator_profit_percent) || 0,
+          minRating: Number(createForm.min_rating) || 0,
+          maxRating: createForm.max_rating ? Number(createForm.max_rating) : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create tournament");
+      setCreatingTournament(false);
+      setCreateForm({});
+      await fetchTournaments();
+      showToast(`Tournament "${data.tournament?.name || "New tournament"}" created`);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const fetchTournamentDetail = async (t: Tournament) => {
+    setManagingTournament(t);
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/admin/tournaments/${t.id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load");
+      setTournamentDetail(data);
+    } catch (err: any) {
+      setTournamentDetail({ error: err.message });
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleAdminTournamentAction = async (action: string) => {
+    if (!managingTournament) return;
+    if (!confirm(`Are you sure you want to ${action.replace(/_/g, " ")} this tournament?`)) return;
+    setActionLoading(`admin_${action}`);
+    try {
+      const res = await fetch(`/api/admin/tournaments/${managingTournament.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      showToast(`Tournament ${action.replace(/_/g, " ")} successful`);
+      await fetchTournaments();
+      await fetchTournamentDetail(managingTournament);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const filteredTournaments = tournaments.filter((t) => {
+    const matchFilter = tournamentFilter === "all" || t.status === tournamentFilter;
+    const q = tournamentSearch.toLowerCase();
+    const matchSearch = !q || t.name.toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q);
+    return matchFilter && matchSearch;
+  });
+
+  const tournamentStats = {
+    total: tournaments.length,
+    upcoming: tournaments.filter((t) => t.status === "upcoming").length,
+    active: tournaments.filter((t) => t.status === "active").length,
+    finished: tournaments.filter((t) => t.status === "finished" || t.status === "completed").length,
+    pending: tournaments.filter((t) => t.status === "pending_approval").length,
+    cancelled: tournaments.filter((t) => t.status === "cancelled").length,
   };
 
   const updatePrizePayout = (index: number, field: string, value: any) => {
@@ -1176,46 +1275,135 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           )}
 
           {tab === "tournaments" && (
-            <div className="space-y-3">
-              {tournaments.length === 0 ? (
+            <div className="space-y-4">
+              {/* STATS CARDS */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                <div className="card p-3 text-center">
+                  <div className="text-xl font-bold">{tournamentStats.total}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-ccb-muted">Total</div>
+                </div>
+                <div className="card p-3 text-center">
+                  <div className="text-xl font-bold text-blue-400">{tournamentStats.upcoming}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-ccb-muted">Upcoming</div>
+                </div>
+                <div className="card p-3 text-center">
+                  <div className="text-xl font-bold text-ccb-success">{tournamentStats.active}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-ccb-muted">Active</div>
+                </div>
+                <div className="card p-3 text-center">
+                  <div className="text-xl font-bold text-ccb-muted">{tournamentStats.finished}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-ccb-muted">Done</div>
+                </div>
+                <div className="card p-3 text-center">
+                  <div className="text-xl font-bold text-amber-500">{tournamentStats.pending}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-ccb-muted">Pending</div>
+                </div>
+                <div className="card p-3 text-center">
+                  <div className="text-xl font-bold text-ccb-danger">{tournamentStats.cancelled}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-ccb-muted">Cancelled</div>
+                </div>
+              </div>
+
+              {/* TOOLBAR */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="text"
+                  placeholder="Search tournaments..."
+                  value={tournamentSearch}
+                  onChange={(e) => setTournamentSearch(e.target.value)}
+                  className="input-field flex-1 min-w-[150px]"
+                />
+                <select
+                  value={tournamentFilter}
+                  onChange={(e) => setTournamentFilter(e.target.value)}
+                  className="input-field w-auto"
+                >
+                  <option value="all">All Status</option>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="active">Active</option>
+                  <option value="pending_approval">Pending</option>
+                  <option value="finished">Finished</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+                <button
+                  onClick={() => {
+                    setCreatingTournament(true);
+                    setCreateForm({
+                      name: "",
+                      description: "",
+                      type: "swiss",
+                      time_control: "blitz",
+                      initial_minutes: 5,
+                      increment_seconds: 0,
+                      max_players: "",
+                      min_players: 2,
+                      rounds: "",
+                      duration_minutes: "",
+                      starts_at: "",
+                      ends_at: "",
+                      entry_fee_cents: 0,
+                      creator_profit_percent: 0,
+                      min_rating: 0,
+                      max_rating: "",
+                    });
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ccb-primary text-white text-sm font-bold hover:opacity-90 shrink-0"
+                >
+                  <Trophy className="w-4 h-4" /> Create
+                </button>
+              </div>
+
+              {/* TOURNAMENT LIST */}
+              {filteredTournaments.length === 0 ? (
                 <div className="text-center py-12 text-ccb-muted text-sm">
                   <Trophy className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  No tournaments found
+                  {tournaments.length === 0 ? "No tournaments yet. Create one!" : "No tournaments match your filter."}
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {tournaments.map((t) => (
+                  {filteredTournaments.map((t) => (
                     <div key={t.id} className="card">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium flex items-center gap-2">
+                          <div className="text-sm font-medium flex items-center gap-2 flex-wrap">
                             {t.name}
-                            <span className={`text-xs px-2 py-0.5 rounded ${
-                              t.status === "active" ? "bg-ccb-success/10 text-ccb-success" :
-                              t.status === "upcoming" ? "bg-ccb-accent/10 text-ccb-accent" :
-                              t.status === "finished" ? "bg-ccb-muted/10 text-ccb-muted" :
-                              t.status === "cancelled" ? "bg-ccb-danger/10 text-ccb-danger" :
-                              t.status === "pending_approval" ? "bg-amber-500/10 text-amber-500" :
-                              t.status === "rejected" ? "bg-red-500/10 text-red-500" :
-                              "bg-ccb-surface text-ccb-muted"
-                            }`}>{t.status}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                              t.status === "active" ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30" :
+                              t.status === "upcoming" ? "bg-blue-400/10 text-blue-400 border border-blue-400/30" :
+                              t.status === "finished" || t.status === "completed" ? "bg-ccb-muted/10 text-ccb-muted border border-ccb-muted/30" :
+                              t.status === "cancelled" ? "bg-ccb-danger/10 text-ccb-danger border border-ccb-danger/30" :
+                              t.status === "pending_approval" ? "bg-amber-500/10 text-amber-500 border border-amber-500/30" :
+                              t.status === "rejected" ? "bg-red-500/10 text-red-500 border border-red-500/30" :
+                              "bg-ccb-surface text-ccb-muted border border-ccb-border"
+                            }`}>{t.status.replace(/_/g, " ")}</span>
+                            <span className="text-[10px] uppercase text-ccb-muted border border-ccb-border rounded px-1.5 py-0.5">{t.type}</span>
                           </div>
-                          <div className="text-xs text-ccb-muted mt-1">
-                            {t.type} · {t.time_control} · {t.participant_count}/{t.max_players ?? '∞'} players · Round {t.current_round}/{t.rounds ?? '-'}
-                          </div>
-                          <div className="text-xs text-ccb-muted">
-                            Entry: {formatMWK(t.entry_fee_cents)} · Prize: {formatMWK(t.prize_pool_cents)}
+                          <div className="text-xs text-ccb-muted mt-1.5 flex items-center gap-2 flex-wrap">
+                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{t.time_control} · {t.initial_minutes}+{t.increment_seconds}</span>
+                            <span className="flex items-center gap-1"><Users className="w-3 h-3" />{t.participant_count}/{t.max_players ?? "\u221e"}</span>
+                            {t.rounds && <span className="flex items-center gap-1"><Trophy className="w-3 h-3" />R{t.current_round}/{t.rounds}</span>}
+                            <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{formatMWK(t.entry_fee_cents)}</span>
+                            <span className="flex items-center gap-1"><Gift className="w-3 h-3" />{formatMWK(t.prize_pool_cents)}</span>
                           </div>
                           {t.description && (
                             <div className="text-xs text-ccb-muted mt-1 line-clamp-1">{t.description}</div>
                           )}
-                        </div>
-                        <div className="text-xs text-ccb-muted text-right shrink-0 ml-3">
-                          {formatDate(t.starts_at)}
+                          <div className="text-[10px] text-ccb-muted mt-1">{formatDate(t.starts_at)}</div>
                         </div>
                       </div>
 
+                      {/* ACTION BUTTONS */}
                       <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-ccb-border">
+                        {/* Manage — always available */}
+                        <button
+                          onClick={() => fetchTournamentDetail(t)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-primary text-sm font-medium hover:bg-ccb-primary/10 disabled:opacity-50"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" /> Manage
+                        </button>
+
                         {/* Approve — pending_approval only */}
                         {t.status === "pending_approval" && (
                           <>
@@ -1281,8 +1469,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           onClick={() => handleTournamentShare(t)}
                           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted text-sm font-medium hover:bg-ccb-muted/10"
                         >
-                          <Share2 className="w-3.5 h-3.5" />
-                          Share
+                          <Share2 className="w-3.5 h-3.5" /> Share
                         </button>
 
                         {/* Cancel & Refund — upcoming or active */}
@@ -1293,7 +1480,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                             className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-danger/90 text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
                           >
                             {actionLoading === `${t.id}_cancel` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-                            Cancel & Refund
+                            Cancel
                           </button>
                         )}
 
@@ -1326,43 +1513,31 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                 </div>
               )}
 
-              {/* Edit Tournament Modal */}
-              {editingTournament && (
+              {/* CREATE TOURNAMENT MODAL */}
+              {creatingTournament && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                   <div className="bg-ccb-card rounded-xl border border-ccb-border max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-bold">Edit Tournament</h3>
-                      <button onClick={() => setEditingTournament(null)} className="text-ccb-muted hover:text-ccb-fg">
+                      <h3 className="text-lg font-bold flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-ccb-accent" /> Create Tournament
+                      </h3>
+                      <button onClick={() => setCreatingTournament(false)} className="text-ccb-muted hover:text-ccb-fg">
                         <X className="w-5 h-5" />
                       </button>
                     </div>
-
                     <div className="space-y-3">
                       <div>
-                        <label className="text-xs font-medium text-ccb-muted">Name</label>
-                        <input
-                          value={editForm.name || ""}
-                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          className="input-field mt-1 w-full"
-                        />
+                        <label className="text-xs font-medium text-ccb-muted">Tournament Name *</label>
+                        <input type="text" value={createForm.name || ""} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} className="input-field mt-1 w-full" placeholder="e.g. Malawi Swiss Qualifier #1" />
                       </div>
                       <div>
                         <label className="text-xs font-medium text-ccb-muted">Description</label>
-                        <textarea
-                          value={editForm.description || ""}
-                          onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                          className="input-field mt-1 w-full"
-                          rows={2}
-                        />
+                        <textarea value={createForm.description || ""} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} className="input-field mt-1 w-full" rows={2} placeholder="Optional description" />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Type</label>
-                          <select
-                            value={editForm.type || "swiss"}
-                            onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
-                            className="input-field mt-1 w-full"
-                          >
+                          <select value={createForm.type || "swiss"} onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })} className="input-field mt-1 w-full">
                             <option value="swiss">Swiss</option>
                             <option value="arena">Arena</option>
                             <option value="knockout">Knockout</option>
@@ -1370,11 +1545,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         </div>
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Time Control</label>
-                          <select
-                            value={editForm.time_control || "blitz"}
-                            onChange={(e) => setEditForm({ ...editForm, time_control: e.target.value })}
-                            className="input-field mt-1 w-full"
-                          >
+                          <select value={createForm.time_control || "blitz"} onChange={(e) => setCreateForm({ ...createForm, time_control: e.target.value })} className="input-field mt-1 w-full">
                             <option value="bullet">Bullet</option>
                             <option value="blitz">Blitz</option>
                             <option value="rapid">Rapid</option>
@@ -1385,116 +1556,72 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Initial Minutes</label>
-                          <input
-                            type="number"
-                            value={editForm.initial_minutes ?? ""}
-                            onChange={(e) => setEditForm({ ...editForm, initial_minutes: e.target.value })}
-                            className="input-field mt-1 w-full"
-                          />
+                          <input type="number" value={createForm.initial_minutes ?? 5} onChange={(e) => setCreateForm({ ...createForm, initial_minutes: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Increment (sec)</label>
-                          <input
-                            type="number"
-                            value={editForm.increment_seconds ?? ""}
-                            onChange={(e) => setEditForm({ ...editForm, increment_seconds: e.target.value })}
-                            className="input-field mt-1 w-full"
-                          />
+                          <input type="number" value={createForm.increment_seconds ?? 0} onChange={(e) => setCreateForm({ ...createForm, increment_seconds: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs font-medium text-ccb-muted">Max Players (blank = ∞)</label>
-                          <input
-                            type="number"
-                            value={editForm.max_players ?? ""}
-                            onChange={(e) => setEditForm({ ...editForm, max_players: e.target.value })}
-                            className="input-field mt-1 w-full"
-                          />
+                          <label className="text-xs font-medium text-ccb-muted">Min Players</label>
+                          <input type="number" value={createForm.min_players ?? 2} onChange={(e) => setCreateForm({ ...createForm, min_players: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-ccb-muted">Rounds</label>
-                          <input
-                            type="number"
-                            value={editForm.rounds ?? ""}
-                            onChange={(e) => setEditForm({ ...editForm, rounds: e.target.value })}
-                            className="input-field mt-1 w-full"
-                          />
+                          <label className="text-xs font-medium text-ccb-muted">Max Players (blank = \u221e)</label>
+                          <input type="number" value={createForm.max_players ?? ""} onChange={(e) => setCreateForm({ ...createForm, max_players: e.target.value })} className="input-field mt-1 w-full" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Rounds (blank = arena)</label>
+                          <input type="number" value={createForm.rounds ?? ""} onChange={(e) => setCreateForm({ ...createForm, rounds: e.target.value })} className="input-field mt-1 w-full" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Duration (min)</label>
+                          <input type="number" value={createForm.duration_minutes ?? ""} onChange={(e) => setCreateForm({ ...createForm, duration_minutes: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Min Rating</label>
-                          <input
-                            type="number"
-                            value={editForm.min_rating ?? 0}
-                            onChange={(e) => setEditForm({ ...editForm, min_rating: e.target.value })}
-                            className="input-field mt-1 w-full"
-                          />
+                          <input type="number" value={createForm.min_rating ?? 0} onChange={(e) => setCreateForm({ ...createForm, min_rating: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Max Rating (blank = none)</label>
-                          <input
-                            type="number"
-                            value={editForm.max_rating ?? ""}
-                            onChange={(e) => setEditForm({ ...editForm, max_rating: e.target.value })}
-                            className="input-field mt-1 w-full"
-                          />
+                          <input type="number" value={createForm.max_rating ?? ""} onChange={(e) => setCreateForm({ ...createForm, max_rating: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-ccb-muted">Start Time</label>
-                        <input
-                          type="datetime-local"
-                          value={editForm.starts_at || ""}
-                          onChange={(e) => setEditForm({ ...editForm, starts_at: e.target.value })}
-                          className="input-field mt-1 w-full"
-                        />
+                        <label className="text-xs font-medium text-ccb-muted">Start Time *</label>
+                        <input type="datetime-local" value={createForm.starts_at || ""} onChange={(e) => setCreateForm({ ...createForm, starts_at: e.target.value })} className="input-field mt-1 w-full" />
                       </div>
                       <div>
                         <label className="text-xs font-medium text-ccb-muted">End Time (optional)</label>
-                        <input
-                          type="datetime-local"
-                          value={editForm.ends_at || ""}
-                          onChange={(e) => setEditForm({ ...editForm, ends_at: e.target.value })}
-                          className="input-field mt-1 w-full"
-                        />
+                        <input type="datetime-local" value={createForm.ends_at || ""} onChange={(e) => setCreateForm({ ...createForm, ends_at: e.target.value })} className="input-field mt-1 w-full" />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Entry Fee (MK cents)</label>
-                          <input
-                            type="number"
-                            value={editForm.entry_fee_cents ?? 0}
-                            onChange={(e) => setEditForm({ ...editForm, entry_fee_cents: e.target.value })}
-                            className="input-field mt-1 w-full"
-                          />
+                          <input type="number" value={createForm.entry_fee_cents ?? 0} onChange={(e) => setCreateForm({ ...createForm, entry_fee_cents: e.target.value })} className="input-field mt-1 w-full" placeholder="0 = free" />
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-ccb-muted">Prize Pool (MK cents)</label>
-                          <input
-                            type="number"
-                            value={editForm.prize_pool_cents ?? 0}
-                            onChange={(e) => setEditForm({ ...editForm, prize_pool_cents: e.target.value })}
-                            className="input-field mt-1 w-full"
-                          />
+                          <label className="text-xs font-medium text-ccb-muted">Creator Profit %</label>
+                          <input type="number" value={createForm.creator_profit_percent ?? 0} onChange={(e) => setCreateForm({ ...createForm, creator_profit_percent: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                       </div>
                     </div>
-
                     <div className="flex gap-2 pt-2">
                       <button
-                        onClick={saveTournamentEdit}
-                        disabled={actionLoading === `${editingTournament.id}_edit`}
+                        onClick={handleCreateTournament}
+                        disabled={actionLoading === "create_tournament" || !createForm.name || !createForm.starts_at}
                         className="flex items-center gap-1 px-4 py-2 rounded-lg bg-ccb-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
                       >
-                        {actionLoading === `${editingTournament.id}_edit` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                        Save Changes
+                        {actionLoading === "create_tournament" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trophy className="w-4 h-4" />}
+                        Create Tournament
                       </button>
-                      <button
-                        onClick={() => setEditingTournament(null)}
-                        className="px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted text-sm font-medium hover:bg-ccb-muted/10"
-                      >
+                      <button onClick={() => setCreatingTournament(false)} className="px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted text-sm font-medium hover:bg-ccb-muted/10">
                         Cancel
                       </button>
                     </div>
@@ -1502,7 +1629,284 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                 </div>
               )}
 
-              {/* Edit Prize Distribution Modal */}
+              {/* MANAGE TOURNAMENT MODAL */}
+              {managingTournament && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-ccb-card rounded-xl border border-ccb-border max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-bold">{managingTournament.name}</h3>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                          managingTournament.status === "active" ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30" :
+                          managingTournament.status === "upcoming" ? "bg-blue-400/10 text-blue-400 border border-blue-400/30" :
+                          managingTournament.status === "finished" || managingTournament.status === "completed" ? "bg-ccb-muted/10 text-ccb-muted border border-ccb-muted/30" :
+                          "bg-ccb-surface text-ccb-muted border border-ccb-border"
+                        }`}>{managingTournament.status.replace(/_/g, " ")}</span>
+                      </div>
+                      <button onClick={() => { setManagingTournament(null); setTournamentDetail(null); }} className="text-ccb-muted hover:text-ccb-fg">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Tournament Info Summary */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                      <div className="bg-ccb-surface rounded-lg p-2.5">
+                        <div className="text-[10px] uppercase text-ccb-muted">Type</div>
+                        <div className="font-bold capitalize">{managingTournament.type}</div>
+                      </div>
+                      <div className="bg-ccb-surface rounded-lg p-2.5">
+                        <div className="text-[10px] uppercase text-ccb-muted">Time</div>
+                        <div className="font-bold">{managingTournament.initial_minutes}+{managingTournament.increment_seconds}</div>
+                      </div>
+                      <div className="bg-ccb-surface rounded-lg p-2.5">
+                        <div className="text-[10px] uppercase text-ccb-muted">Players</div>
+                        <div className="font-bold">{managingTournament.participant_count}/{managingTournament.max_players ?? "\u221e"}</div>
+                      </div>
+                      <div className="bg-ccb-surface rounded-lg p-2.5">
+                        <div className="text-[10px] uppercase text-ccb-muted">Entry</div>
+                        <div className="font-bold">{formatMWK(managingTournament.entry_fee_cents)}</div>
+                      </div>
+                    </div>
+
+                    {/* Admin Action Buttons */}
+                    <div className="flex flex-wrap gap-2 pb-2 border-b border-ccb-border">
+                      {managingTournament.status === "upcoming" && managingTournament.participant_count >= 2 && (
+                        <button
+                          onClick={() => handleAdminTournamentAction("start")}
+                          disabled={actionLoading === "admin_start"}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-success text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                        >
+                          {actionLoading === "admin_start" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                          Start Now
+                        </button>
+                      )}
+                      {managingTournament.status === "active" && (
+                        <button
+                          onClick={() => handleAdminTournamentAction("advance_round")}
+                          disabled={actionLoading === "admin_advance_round"}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                        >
+                          {actionLoading === "admin_advance_round" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                          Advance Round
+                        </button>
+                      )}
+                      {managingTournament.status === "active" && (
+                        <button
+                          onClick={() => handleAdminTournamentAction("force_finish")}
+                          disabled={actionLoading === "admin_force_finish"}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-accent/90 text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                        >
+                          {actionLoading === "admin_force_finish" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                          Force Finish
+                        </button>
+                      )}
+                      {(managingTournament.status === "upcoming" || managingTournament.status === "active") && (
+                        <button
+                          onClick={() => handleAdminTournamentAction("cancel")}
+                          disabled={actionLoading === "admin_cancel"}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-danger/90 text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                        >
+                          {actionLoading === "admin_cancel" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                          Cancel & Refund
+                        </button>
+                      )}
+                      <Link href={`/tournament/${managingTournament.id}`} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-primary text-sm font-medium hover:bg-ccb-primary/10">
+                        <Swords className="w-3.5 h-3.5" /> View Page
+                      </Link>
+                    </div>
+
+                    {/* Detail Content */}
+                    {detailLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-ccb-muted" />
+                      </div>
+                    ) : tournamentDetail?.error ? (
+                      <div className="text-center py-8 text-sm text-ccb-danger">
+                        <AlertCircle className="w-8 h-8 mx-auto mb-2" />
+                        {tournamentDetail.error}
+                      </div>
+                    ) : tournamentDetail ? (
+                      <>
+                        {/* Participants */}
+                        <div>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-2 flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5" /> Participants ({tournamentDetail.participants?.length || 0})
+                          </h4>
+                          {tournamentDetail.participants?.length === 0 ? (
+                            <p className="text-xs text-ccb-muted">No participants registered yet.</p>
+                          ) : (
+                            <div className="space-y-1 max-h-48 overflow-y-auto">
+                              {tournamentDetail.participants?.map((p: any, i: number) => (
+                                <div key={p.player_id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-ccb-surface text-sm">
+                                  <span className="text-xs font-bold text-ccb-muted w-6 text-center">#{p.seed || i + 1}</span>
+                                  {p.profile?.avatar_url ? (
+                                    <img src={p.profile.avatar_url} alt="" className="w-6 h-6 rounded-full shrink-0" />
+                                  ) : (
+                                    <div className="w-6 h-6 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center text-[10px] font-bold text-ccb-muted shrink-0">
+                                      {(p.profile?.display_name || p.profile?.username || "?").charAt(0)}
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium truncate">{p.profile?.display_name || p.profile?.username || "Unknown"}</div>
+                                  </div>
+                                  <div className="text-xs text-ccb-muted">Rating: {p.profile?.rating || "\u2014"}</div>
+                                  <div className="text-xs font-bold">{p.score?.toFixed(1) || "0.0"}</div>
+                                  <div className="text-[10px] text-ccb-muted">{p.wins}W/{p.losses}L/{p.draws}D</div>
+                                  {p.paid_entry_fee && <span className="text-[10px] text-ccb-success font-bold">PAID</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Rounds */}
+                        {tournamentDetail.rounds?.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-2 flex items-center gap-1.5">
+                              <Swords className="w-3.5 h-3.5" /> Rounds ({tournamentDetail.rounds.length})
+                            </h4>
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                              {tournamentDetail.rounds.map((round: any) => (
+                                <div key={round.id} className="rounded-lg border border-ccb-border overflow-hidden">
+                                  <div className="flex items-center justify-between px-3 py-2 bg-ccb-surface text-xs">
+                                    <span className="font-bold">Round {round.round_number}</span>
+                                    <span className={round.is_complete ? "text-ccb-success font-bold" : "text-ccb-accent font-bold"}>
+                                      {round.is_complete ? "COMPLETE" : "IN PROGRESS"}
+                                    </span>
+                                  </div>
+                                  <div className="divide-y divide-ccb-border/50">
+                                    {round.pairings?.map((pair: any, idx: number) => (
+                                      <div key={idx} className="px-3 py-2 flex items-center gap-2 text-xs">
+                                        {pair.bye ? (
+                                          <span className="text-ccb-muted flex-1">{pair.whiteName || "TBD"} <span className="text-ccb-success font-bold">BYE</span></span>
+                                        ) : (
+                                          <>
+                                            <span className={`flex-1 truncate ${pair.result === "white" ? "font-bold text-ccb-success" : ""}`}>
+                                              {pair.whiteName || "TBD"} ({pair.whiteRating || "\u2014"})
+                                            </span>
+                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-surface">
+                                              {pair.result === "white" ? "1-0" : pair.result === "black" ? "0-1" : pair.result === "draw" ? "\u00bd-\u00bd" : "vs"}
+                                            </span>
+                                            <span className={`flex-1 truncate text-right ${pair.result === "black" ? "font-bold text-ccb-success" : ""}`}>
+                                              ({pair.blackRating || "\u2014"}) {pair.blackName || "TBD"}
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+
+              {/* EDIT TOURNAMENT MODAL */}
+              {editingTournament && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-ccb-card rounded-xl border border-ccb-border max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold">Edit Tournament</h3>
+                      <button onClick={() => setEditingTournament(null)} className="text-ccb-muted hover:text-ccb-fg">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-medium text-ccb-muted">Name</label>
+                        <input type="text" value={editForm.name || ""} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="input-field mt-1 w-full" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-ccb-muted">Description</label>
+                        <textarea value={editForm.description || ""} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="input-field mt-1 w-full" rows={2} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Type</label>
+                          <select value={editForm.type || "swiss"} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })} className="input-field mt-1 w-full">
+                            <option value="swiss">Swiss</option>
+                            <option value="arena">Arena</option>
+                            <option value="knockout">Knockout</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Time Control</label>
+                          <select value={editForm.time_control || "blitz"} onChange={(e) => setEditForm({ ...editForm, time_control: e.target.value })} className="input-field mt-1 w-full">
+                            <option value="bullet">Bullet</option>
+                            <option value="blitz">Blitz</option>
+                            <option value="rapid">Rapid</option>
+                            <option value="classical">Classical</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Initial Minutes</label>
+                          <input type="number" value={editForm.initial_minutes ?? ""} onChange={(e) => setEditForm({ ...editForm, initial_minutes: e.target.value })} className="input-field mt-1 w-full" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Increment (sec)</label>
+                          <input type="number" value={editForm.increment_seconds ?? ""} onChange={(e) => setEditForm({ ...editForm, increment_seconds: e.target.value })} className="input-field mt-1 w-full" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Max Players (blank = \u221e)</label>
+                          <input type="number" value={editForm.max_players ?? ""} onChange={(e) => setEditForm({ ...editForm, max_players: e.target.value })} className="input-field mt-1 w-full" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Rounds</label>
+                          <input type="number" value={editForm.rounds ?? ""} onChange={(e) => setEditForm({ ...editForm, rounds: e.target.value })} className="input-field mt-1 w-full" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Min Rating</label>
+                          <input type="number" value={editForm.min_rating ?? 0} onChange={(e) => setEditForm({ ...editForm, min_rating: e.target.value })} className="input-field mt-1 w-full" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Max Rating (blank = none)</label>
+                          <input type="number" value={editForm.max_rating ?? ""} onChange={(e) => setEditForm({ ...editForm, max_rating: e.target.value })} className="input-field mt-1 w-full" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-ccb-muted">Start Time</label>
+                        <input type="datetime-local" value={editForm.starts_at || ""} onChange={(e) => setEditForm({ ...editForm, starts_at: e.target.value })} className="input-field mt-1 w-full" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-ccb-muted">End Time (optional)</label>
+                        <input type="datetime-local" value={editForm.ends_at || ""} onChange={(e) => setEditForm({ ...editForm, ends_at: e.target.value })} className="input-field mt-1 w-full" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Entry Fee (MK cents)</label>
+                          <input type="number" value={editForm.entry_fee_cents ?? 0} onChange={(e) => setEditForm({ ...editForm, entry_fee_cents: e.target.value })} className="input-field mt-1 w-full" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Prize Pool (MK cents)</label>
+                          <input type="number" value={editForm.prize_pool_cents ?? 0} onChange={(e) => setEditForm({ ...editForm, prize_pool_cents: e.target.value })} className="input-field mt-1 w-full" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <button onClick={saveTournamentEdit} disabled={actionLoading === `${editingTournament.id}_edit`} className="flex items-center gap-1 px-4 py-2 rounded-lg bg-ccb-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
+                        {actionLoading === `${editingTournament.id}_edit` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        Save Changes
+                      </button>
+                      <button onClick={() => setEditingTournament(null)} className="px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted text-sm font-medium hover:bg-ccb-muted/10">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* EDIT PRIZE DISTRIBUTION MODAL */}
               {prizeEditTournament && prizeForm && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                   <div className="bg-ccb-card rounded-xl border border-ccb-border max-w-md w-full max-h-[85vh] overflow-y-auto p-6 space-y-4">
@@ -1513,65 +1917,33 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       </button>
                     </div>
                     <p className="text-xs text-ccb-muted">Prize pool: {formatMWK(prizeEditTournament.prize_pool_cents)}</p>
-
                     <div>
                       <label className="text-xs font-medium text-ccb-muted">Distribution Type</label>
-                      <select
-                        value={prizeForm.type || "percentage"}
-                        onChange={(e) => setPrizeForm({ ...prizeForm, type: e.target.value })}
-                        className="input-field mt-1 w-full"
-                      >
+                      <select value={prizeForm.type || "percentage"} onChange={(e) => setPrizeForm({ ...prizeForm, type: e.target.value })} className="input-field mt-1 w-full">
                         <option value="percentage">Percentage of pool</option>
                         <option value="flat">Fixed amount per rank</option>
                       </select>
                     </div>
-
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-ccb-muted">Payouts</label>
                       {prizeForm.payouts?.map((payout: any, i: number) => (
                         <div key={i} className="flex items-center gap-2">
                           <span className="text-xs text-ccb-muted w-8">#{payout.rank}</span>
-                          <input
-                            type="number"
-                            value={prizeForm.type === "flat" ? payout.amount_cents ?? 0 : payout.percentage ?? 0}
-                            onChange={(e) => updatePrizePayout(i, prizeForm.type === "flat" ? "amount_cents" : "percentage", Number(e.target.value))}
-                            className="input-field flex-1"
-                            placeholder={prizeForm.type === "flat" ? "Amount (cents)" : "Percentage (%)"}
-                          />
-                          {prizeForm.type === "percentage" && (
-                            <span className="text-xs text-ccb-muted w-20 text-right">
-                              = {formatMWK(Math.floor((prizeEditTournament.prize_pool_cents * (payout.percentage || 0)) / 100))}
-                            </span>
-                          )}
-                          <button
-                            onClick={() => removePrizePayout(i)}
-                            className="text-ccb-danger hover:bg-ccb-danger/10 p-1 rounded"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <input type="number" value={prizeForm.type === "flat" ? payout.amount_cents ?? 0 : payout.percentage ?? 0} onChange={(e) => updatePrizePayout(i, prizeForm.type === "flat" ? "amount_cents" : "percentage", Number(e.target.value))} className="input-field flex-1" placeholder={prizeForm.type === "flat" ? "Amount (cents)" : "Percentage (%)"} />
+                          {prizeForm.type === "percentage" && <span className="text-xs text-ccb-muted w-20 text-right">= {formatMWK(Math.floor((prizeEditTournament.prize_pool_cents * (payout.percentage || 0)) / 100))}</span>}
+                          <button onClick={() => removePrizePayout(i)} className="text-ccb-danger hover:bg-ccb-danger/10 p-1 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       ))}
-                      <button
-                        onClick={addPrizePayout}
-                        className="text-xs text-ccb-primary hover:underline flex items-center gap-1"
-                      >
-                        + Add payout tier
+                      <button onClick={addPrizePayout} className="flex items-center gap-1 text-xs text-ccb-primary hover:underline">
+                        <ChevronRight className="w-3.5 h-3.5" /> Add payout
                       </button>
                     </div>
-
                     <div className="flex gap-2 pt-2">
-                      <button
-                        onClick={savePrizeEdit}
-                        disabled={actionLoading === `${prizeEditTournament.id}_edit_prizes`}
-                        className="flex items-center gap-1 px-4 py-2 rounded-lg bg-ccb-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
-                      >
+                      <button onClick={savePrizeEdit} disabled={actionLoading === `${prizeEditTournament.id}_edit_prizes`} className="flex items-center gap-1 px-4 py-2 rounded-lg bg-ccb-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
                         {actionLoading === `${prizeEditTournament.id}_edit_prizes` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                         Save Prizes
                       </button>
-                      <button
-                        onClick={() => setPrizeEditTournament(null)}
-                        className="px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted text-sm font-medium hover:bg-ccb-muted/10"
-                      >
+                      <button onClick={() => setPrizeEditTournament(null)} className="px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted text-sm font-medium hover:bg-ccb-muted/10">
                         Cancel
                       </button>
                     </div>
@@ -1580,6 +1952,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
               )}
             </div>
           )}
+
 
           {/* GAMES */}
           {tab === "games" && (
