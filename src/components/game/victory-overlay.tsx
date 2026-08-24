@@ -21,6 +21,7 @@ interface VictoryOverlayProps {
   moveCount: number;
   subtitle: string;
   playerNames?: { white: string; black: string };
+  winnerSide?: "white" | "black" | null;
   berriesAwarded?: number;
   moneyEarned?: number;     // in MWK (already divided by 100)
   moneyLabel?: string;       // e.g. "Battle winnings"
@@ -47,6 +48,7 @@ export default function VictoryOverlay({
   moneyEarned,
   moneyLabel = "Battle winnings",
   playerNames,
+  winnerSide,
   onNewGame,
   onRematch,
   onReview,
@@ -124,18 +126,25 @@ export default function VictoryOverlay({
           <p className="text-sm text-white/50 mt-1.5 font-medium">{headline2}</p>
         </div>
 
-        {/* Player names */}
-        {playerNames && (
-          <div className="mt-3 flex items-center justify-center gap-2 text-sm">
-            <span className={`font-semibold ${isWin ? "text-white/90" : "text-white/60"}`}>
-              {playerNames.white}
-            </span>
-            <span className="text-white/30 text-xs font-medium">vs</span>
-            <span className={`font-semibold ${(!isWin && !isDraw && !isAbort) ? "text-white/90" : "text-white/60"}`}>
-              {playerNames.black}
-            </span>
-          </div>
-        )}
+        {/* Player names — the actual winning side is celebrated, regardless of viewer's own color */}
+        {playerNames && (() => {
+          // Fall back to viewer-perspective if winnerSide wasn't passed (e.g. draw/abort, or legacy callers)
+          const whiteIsWinner = winnerSide ? winnerSide === "white" : isWin;
+          const blackIsWinner = winnerSide ? winnerSide === "black" : (!isWin && !isDraw && !isAbort);
+          return (
+            <div className="mt-3 flex items-center justify-center gap-1.5 text-sm">
+              <span className={`inline-flex items-center gap-1 font-semibold ${whiteIsWinner ? "text-white" : "text-white/50"}`}>
+                {whiteIsWinner && <Trophy className="h-3.5 w-3.5" style={{ color: accent }} />}
+                {playerNames.white}
+              </span>
+              <span className="text-white/30 text-xs font-medium">vs</span>
+              <span className={`inline-flex items-center gap-1 font-semibold ${blackIsWinner ? "text-white" : "text-white/50"}`}>
+                {blackIsWinner && <Trophy className="h-3.5 w-3.5" style={{ color: accent }} />}
+                {playerNames.black}
+              </span>
+            </div>
+          );
+        })()}
 
         {/* Divider */}
         <div className="my-4 h-px" style={{ background: `linear-gradient(90deg, transparent, ${accentBorder}, transparent)` }} />

@@ -1099,6 +1099,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           moveCount={game.move_count}
           subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
           playerNames={{ white: whiteName, black: blackName }}
+          winnerSide={game.winner as "white" | "black" | null}
           lobbyHref="/play"
           onPlayAgain={!isSpectator ? handlePlayAgain : undefined}
           onRematch={!isSpectator && game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
@@ -1154,6 +1155,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         moveCount={game.move_count}
         subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
         playerNames={{ white: whiteName, black: blackName }}
+        winnerSide={game.winner as "white" | "black" | null}
         lobbyHref="/play"
         onRematch={game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
         rematchState={rematchState}
