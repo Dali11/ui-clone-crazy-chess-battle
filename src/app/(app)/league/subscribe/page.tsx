@@ -368,7 +368,7 @@ export default function SubscriptionPage() {
               { q: 'Can I still play for free without a membership?', a: 'Absolutely. Free competitions, casual games, and free Swiss qualifiers are available to all players. Membership unlocks premium divisions and exclusive events.' },
               { q: 'How do I pay for my membership?', a: 'Payment is via TNM Mpamba or Airtel Money — the same mobile money options used for tournament entries and wallet deposits.' },
               { q: 'Can I cancel my membership?', a: 'Yes. Your membership stays active until the end of your billing period. After that, it will not auto-renew unless you choose to extend.' },
-              { q: 'What happens to my season points if my membership expires?', a: 'Your season points and rankings are preserved. However, you will only accumulate new points in premium competitions while your membership is active.' },
+              { q: 'What happens if my membership expires?', a: 'You get a 10-day grace period to renew. After that, you lose your spot in any premium leagues and remaining fixtures are forfeited. Your season points and rankings are preserved.' },
             ].map((faq, i) => (
               <div key={i} className="bg-ccb-card border border-ccb-border rounded-xl p-4">
                 <h3 className="font-semibold text-sm mb-1">{faq.q}</h3>

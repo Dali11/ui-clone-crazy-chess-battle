@@ -1,0 +1,194 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+/**
+ * Membership Cleanup — called daily by Vercel cron.
+ *
+ * Two phases:
+ * 1. MARK EXPIRED: Memberships where end_date < NOW() and status='active'
+ *    -> set status='expired'. Player keeps league spot during grace period.
+ *
+ * 2. ENFORCE 10-DAY RULE: Memberships expired >10 days ago (status='expired')
+ *    -> Remove player from all premier_leagues (player_ids)
+ *    -> Delete their league_standings rows
+ *    -> Forfeit all unplayed league_fixtures (opponent gets the win)
+ *    -> Set membership status='cancelled'
+ */
+
+const GRACE_PERIOD_DAYS = 10;
+
+export async function POST(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get("authorization");
+    const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+    const admin = createAdminClient();
+    const now = new Date();
+    const tenDaysAgo = new Date(now.getTime() - GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+
+    const results = {
+      markedExpired: 0,
+      removedFromLeagues: 0,
+      fixturesForfeited: 0,
+      standingsDeleted: 0,
+      details: [] as any[],
+    };
+
+    // PHASE 1: Mark memberships as expired (end_date passed, still active)
+    const { data: justExpired, error: expiredErr } = await admin
+      .from("memberships")
+      .select("id, player_id, end_date")
+      .eq("status", "active")
+      .lt("end_date", now.toISOString());
+
+    if (expiredErr) throw expiredErr;
+
+    if (justExpired && justExpired.length > 0) {
+      const expiredIds = justExpired.map((m) => m.id);
+      const { error: updateErr } = await admin
+        .from("memberships")
+        .update({ status: "expired", updated_at: now.toISOString() })
+        .in("id", expiredIds);
+
+      if (!updateErr) {
+        results.markedExpired = expiredIds.length;
+      }
+    }
+
+    // PHASE 2: Enforce 10-day grace period — remove from leagues
+    const { data: overdue, error: overdueErr } = await admin
+      .from("memberships")
+      .select("id, player_id, end_date")
+      .eq("status", "expired")
+      .lt("end_date", tenDaysAgo.toISOString());
+
+    if (overdueErr) throw overdueErr;
+
+    if (overdue && overdue.length > 0) {
+      for (const membership of overdue) {
+        const playerId = membership.player_id;
+
+        // Find all leagues this player is in
+        const { data: leagues } = await admin
+          .from("premier_leagues")
+          .select("id, name, player_ids, status")
+          .contains("player_ids", [playerId]);
+
+        if (!leagues || leagues.length === 0) {
+          await admin
+            .from("memberships")
+            .update({ status: "cancelled", updated_at: now.toISOString() })
+            .eq("id", membership.id);
+          continue;
+        }
+
+        for (const league of leagues) {
+          // Remove player from player_ids
+          const updatedPlayerIds = (league.player_ids || []).filter(
+            (id: string) => id !== playerId
+          );
+
+          await admin
+            .from("premier_leagues")
+            .update({
+              player_ids: updatedPlayerIds,
+              updated_at: now.toISOString(),
+            })
+            .eq("id", league.id);
+
+          results.removedFromLeagues++;
+
+          // Forfeit unplayed fixtures — opponent gets the win
+          const { data: unplayedFixtures } = await admin
+            .from("league_fixtures")
+            .select("id, home_player_id, away_player_id")
+            .eq("league_id", league.id)
+            .eq("played", false)
+            .or(`home_player_id.eq.${playerId},away_player_id.eq.${playerId}`);
+
+          if (unplayedFixtures && unplayedFixtures.length > 0) {
+            for (const fixture of unplayedFixtures) {
+              const isHome = fixture.home_player_id === playerId;
+              const result = isHome ? "away_win" : "home_win";
+
+              await admin
+                .from("league_fixtures")
+                .update({
+                  played: true,
+                  result,
+                  updated_at: now.toISOString(),
+                })
+                .eq("id", fixture.id);
+
+              results.fixturesForfeited++;
+
+              // Update opponent's standings (add a win)
+              const opponentId = isHome
+                ? fixture.away_player_id
+                : fixture.home_player_id;
+
+              if (opponentId) {
+                const { data: standing } = await admin
+                  .from("league_standings")
+                  .select("id, played, wins, points, form")
+                  .eq("league_id", league.id)
+                  .eq("player_id", opponentId)
+                  .single();
+
+                if (standing) {
+                  await admin
+                    .from("league_standings")
+                    .update({
+                      played: (standing.played || 0) + 1,
+                      wins: (standing.wins || 0) + 1,
+                      points: (standing.points || 0) + 3,
+                      form: [...(standing.form || []), "W"].slice(-5),
+                      updated_at: now.toISOString(),
+                    })
+                    .eq("id", standing.id);
+                }
+              }
+            }
+          }
+
+          // Delete the expired player's standings row
+          const { error: deleteErr } = await admin
+            .from("league_standings")
+            .delete()
+            .eq("league_id", league.id)
+            .eq("player_id", playerId);
+
+          if (!deleteErr) results.standingsDeleted++;
+
+          results.details.push({
+            playerId,
+            leagueId: league.id,
+            leagueName: league.name,
+            fixturesForfeited: unplayedFixtures?.length || 0,
+          });
+        }
+
+        // Mark membership as cancelled (fully processed)
+        await admin
+          .from("memberships")
+          .update({ status: "cancelled", updated_at: now.toISOString() })
+          .eq("id", membership.id);
+      }
+    }
+
+    if (isCron || results.removedFromLeagues > 0) {
+      console.log(
+        `[membership-cleanup] ${now.toISOString()}: ` +
+        `${results.markedExpired} marked expired, ` +
+        `${results.removedFromLeagues} removed from leagues, ` +
+        `${results.fixturesForfeited} fixtures forfeited, ` +
+        `${results.standingsDeleted} standings deleted`
+      );
+    }
+
+    return NextResponse.json({ success: true, ...results });
+  } catch (error: any) {
+    console.error("Membership cleanup error:", error);
+    return NextResponse.json({ error: error.message || "Cleanup failed" }, { status: 500 });
+  }
+}
