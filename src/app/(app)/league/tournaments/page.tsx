@@ -322,7 +322,7 @@ function TournamentCard({ competition, onJoin, joining }: { competition: Competi
       </div>
 
       {/* VIEW DETAILS LINK */}
-      <Link href={`/league/tournaments/${competition.id}`} className="mt-2 text-center text-xs text-ccb-muted hover:text-ccb-accent transition-colors">
+      <Link href={`/tournament/${competition.id}`} className="mt-2 text-center text-xs text-ccb-muted hover:text-ccb-accent transition-colors">
         View details &rarr;
       </Link>
     </div>

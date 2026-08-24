@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Trophy, Swords, Calendar, Users, RefreshCw, ShieldAlert,
-  CheckCircle2, Lock, Zap, Clock, DollarSign, Gift, TrendingUp,
+  CheckCircle2, Lock, Zap, Clock, DollarSign,
 } from 'lucide-react';
 
 interface Competition {
@@ -182,7 +182,7 @@ export default function TournamentsTab() {
             const isParticipating = comp.isRegistered;
 
             return (
-              <div key={comp.id} className={`bg-ccb-card border rounded-2xl flex flex-col ${isLive ? 'border-ccb-success/30' : 'border-ccb-border'}`}>
+              <div key={comp.id} className={`bg-ccb-card border rounded-2xl p-4 flex flex-col ${isLive ? 'border-ccb-success/30' : 'border-ccb-border'}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isLive ? 'bg-ccb-success/10 border border-ccb-success/30' : 'bg-ccb-accent/10 border border-ccb-accent/30'}`}>
@@ -247,7 +247,7 @@ export default function TournamentsTab() {
                   )}
                 </div>
 
-                <Link href={`/league/tournaments/${comp.id}`} className="mt-2 text-center text-xs text-ccb-muted hover:text-ccb-accent transition-colors">
+                <Link href={`/tournament/${comp.id}`} className="mt-2 text-center text-xs text-ccb-muted hover:text-ccb-accent transition-colors">
                   Details &rarr;
                 </Link>
               </div>
@@ -255,24 +255,6 @@ export default function TournamentsTab() {
           })}
         </div>
       )}
-
-      {/* SWISS BATTLES BANNER */}
-      <div className="bg-gradient-to-br from-ccb-primary/10 to-ccb-accent/10 border border-ccb-primary/30 rounded-2xl p-5">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-ccb-primary/20 border border-ccb-primary/30 flex items-center justify-center shrink-0">
-            <Zap className="w-6 h-6 text-ccb-primary" />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-bold text-sm mb-1">Swiss Battles</h3>
-            <p className="text-xs text-ccb-muted leading-relaxed">
-              Open Swiss-format tournaments for all players. No cap, free or paid entry, daily/weekly/monthly. Qualify for premium leagues through performance.
-            </p>
-            <Link href="/league/tournaments" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-ccb-primary hover:gap-2 transition-all">
-              View All Swiss <TrendingUp className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
