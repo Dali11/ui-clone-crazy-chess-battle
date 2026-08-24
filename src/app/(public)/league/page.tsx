@@ -5,7 +5,7 @@ import Link from 'next/link';
 import LeagueNav from '@/components/league/league-nav';
 import {
   Trophy, Crown, Swords, Calendar, Users, RefreshCw, ShieldAlert,
-  CheckCircle2, Lock, Sparkles, TrendingUp, Star, Zap, Medal,
+  CheckCircle2, Lock, Sparkles, Star, Zap,
   ChevronRight, Info, LogIn, X, ArrowRight, ArrowUp, ArrowDown,
   UserCheck, Phone, CreditCard, Gamepad2 as ChessIcon, Clock,
   DollarSign, Pencil,
@@ -22,7 +22,6 @@ interface ChecklistItem {
   required: boolean;
   action?: string | null;
   actionLabel?: string | null;
-  description?: string;
 }
 
 interface Competition {
@@ -36,7 +35,6 @@ interface Competition {
   entryType?: string;
   description?: string;
   playerCount: number;
-  registrationCount?: number;
   maxPlayers?: number | null;
   currentMatchday?: number;
   totalMatchdays?: number;
@@ -56,7 +54,6 @@ interface Competition {
     status?: string;
     checklist?: ChecklistItem[];
   };
-  // Tournament fields
   rounds?: number;
   startsAt?: string;
   timeControl?: string;
@@ -194,99 +191,30 @@ export default function LeagueHomepage() {
   const tournaments = data?.tournaments || [];
   const tiers = Object.keys(tiered).map(Number).sort((a, b) => a - b);
 
-  const totalTournaments = tournaments.filter(t => t.status === 'upcoming' || t.status === 'active').length;
-  const totalTournamentPlayers = tournaments.reduce((sum, t) => sum + (t.playerCount || 0), 0);
-
   return (
     <div className="min-h-screen bg-ccb-dark text-ccb-text font-sans pb-12">
       <LeagueNav />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
 
-        {/* HERO */}
-        <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-ccb-dark via-ccb-surface to-ccb-card border border-ccb-border shadow-2xl p-6 sm:p-8">
-          <div className="absolute -right-16 -top-16 w-64 h-64 bg-ccb-accent/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute right-1/3 -bottom-20 w-80 h-80 bg-ccb-primary/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ccb-accent/10 border border-ccb-accent/30 text-ccb-accent text-xs font-semibold tracking-wider uppercase">
-                <Crown className="w-3.5 h-3.5" /> CrazyChess Competitive
-              </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase">
-                PLAY. COMPETE. <span className="text-ccb-accent">CLIMB.</span>
-              </h1>
-              <p className="text-xl sm:text-2xl font-bold text-ccb-primary tracking-wide">Become Champion.</p>
-              <p className="text-ccb-muted text-sm sm:text-base max-w-2xl">
-                {isGuest
-                  ? 'Enter Swiss tournaments, earn ranking points, and climb the competitive ladder. Premium Leagues are coming soon — get ready.'
-                  : 'Join tournaments below to earn ranking points. Premium Leagues are coming soon.'
-                }
-              </p>
-              {isGuest && (
-                <div className="flex flex-wrap gap-3 pt-2">
-                  <Link href="/signup" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-ccb-accent text-ccb-dark font-semibold hover:bg-ccb-gold transition-all shadow-lg shadow-ccb-accent/20">
-                    <Sparkles className="w-4 h-4" /> Get Started
-                  </Link>
-                  <Link href="/login" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-ccb-border bg-ccb-surface text-ccb-text font-semibold hover:bg-ccb-card transition-all">
-                    <LogIn className="w-4 h-4" /> Sign In
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-3 min-w-[260px]">
-              <div className="bg-ccb-surface/90 border border-ccb-border rounded-2xl p-4 shadow-lg">
-                <div className="flex items-center gap-2 text-ccb-muted text-xs uppercase tracking-wider font-semibold mb-1">
-                  <Swords className="w-3.5 h-3.5 text-ccb-accent" /> Tournaments
-                </div>
-                <div className="text-2xl font-black">{totalTournaments}</div>
-                <div className="text-xs text-ccb-muted">live & upcoming</div>
-              </div>
-              <div className="bg-ccb-surface/90 border border-ccb-border rounded-2xl p-4 shadow-lg">
-                <div className="flex items-center gap-2 text-ccb-muted text-xs uppercase tracking-wider font-semibold mb-1">
-                  <Users className="w-3.5 h-3.5 text-ccb-accent" /> Players
-                </div>
-                <div className="text-2xl font-black">{totalTournamentPlayers}</div>
-                <div className="text-xs text-ccb-muted">competing</div>
-              </div>
-              <div className="bg-ccb-surface/90 border border-ccb-border rounded-2xl p-4 shadow-lg">
-                <div className="flex items-center gap-2 text-ccb-muted text-xs uppercase tracking-wider font-semibold mb-1">
-                  <Crown className="w-3.5 h-3.5 text-ccb-primary" /> Leagues
-                </div>
-                <div className="text-2xl font-black text-ccb-primary">Soon</div>
-                <div className="text-xs text-ccb-muted">premium coming</div>
-              </div>
-              <div className="bg-ccb-surface/90 border border-ccb-border rounded-2xl p-4 shadow-lg">
-                <div className="flex items-center gap-2 text-ccb-muted text-xs uppercase tracking-wider font-semibold mb-1">
-                  <Medal className="w-3.5 h-3.5 text-ccb-accent" /> Qualify
-                </div>
-                <div className="text-2xl font-black">Free</div>
-                <div className="text-xs text-ccb-muted">open entry</div>
-              </div>
-            </div>
+        {joinMessage && (
+          <div className={`mb-4 p-3 rounded-xl border text-sm font-medium ${
+            joinMessage.type === 'success'
+              ? 'bg-ccb-success/10 border-ccb-success/30 text-ccb-success'
+              : 'bg-ccb-danger/10 border-ccb-danger/30 text-ccb-danger'
+          }`}>
+            {joinMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 inline mr-2" /> : <ShieldAlert className="w-4 h-4 inline mr-2" />}
+            {joinMessage.text}
           </div>
+        )}
 
-          {joinMessage && (
-            <div className={`relative z-10 mt-4 p-3 rounded-xl border text-sm font-medium ${
-              joinMessage.type === 'success'
-                ? 'bg-ccb-success/10 border-ccb-success/30 text-ccb-success'
-                : 'bg-ccb-danger/10 border-ccb-danger/30 text-ccb-danger'
-            }`}>
-              {joinMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 inline mr-2" /> : <ShieldAlert className="w-4 h-4 inline mr-2" />}
-              {joinMessage.text}
-            </div>
-          )}
-        </header>
-
-        {/* TABS */}
-        <div className="flex items-center gap-2 border-b border-ccb-border">
+        {/* TABS — first thing on the page */}
+        <div className="flex items-center gap-1 border-b border-ccb-border mb-6">
           <button
             onClick={() => setActiveTab('tournaments')}
-            className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all -mb-px ${
+            className={`flex items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-all -mb-px rounded-t-lg ${
               activeTab === 'tournaments'
-                ? 'border-ccb-accent text-ccb-accent'
+                ? 'border-ccb-accent text-ccb-accent bg-ccb-accent/5'
                 : 'border-transparent text-ccb-muted hover:text-ccb-text'
             }`}
           >
@@ -297,9 +225,9 @@ export default function LeagueHomepage() {
           </button>
           <button
             onClick={() => setActiveTab('leagues')}
-            className={`flex items-center gap-2 px-5 py-3 font-semibold text-sm border-b-2 transition-all -mb-px ${
+            className={`flex items-center gap-2 px-5 py-3 font-bold text-sm border-b-2 transition-all -mb-px rounded-t-lg ${
               activeTab === 'leagues'
-                ? 'border-ccb-primary text-ccb-primary'
+                ? 'border-ccb-primary text-ccb-primary bg-ccb-primary/5'
                 : 'border-transparent text-ccb-muted hover:text-ccb-text'
             }`}
           >
@@ -323,15 +251,27 @@ export default function LeagueHomepage() {
               <div className="space-y-4 animate-pulse">
                 {[1, 2, 3].map(i => <div key={i} className="bg-ccb-card border border-ccb-border rounded-2xl p-6 h-40" />)}
               </div>
+            ) : error ? (
+              <div className="bg-ccb-card border border-ccb-danger/30 rounded-2xl p-8 text-center">
+                <ShieldAlert className="w-10 h-10 text-ccb-danger mx-auto mb-3" />
+                <p className="text-ccb-muted">{error}</p>
+                <button onClick={fetchCompetitions} className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-ccb-accent text-ccb-dark font-semibold hover:bg-ccb-gold">
+                  <RefreshCw className="w-4 h-4" /> Try Again
+                </button>
+              </div>
             ) : tournaments.length === 0 ? (
               <div className="bg-ccb-card border border-ccb-border rounded-2xl p-12 text-center">
                 <Trophy className="w-12 h-12 text-ccb-muted mx-auto mb-4" />
                 <h3 className="text-lg font-bold mb-2">No tournaments yet</h3>
                 <p className="text-ccb-muted text-sm">New tournaments are coming soon. Check back or follow us for updates.</p>
+                {isGuest && (
+                  <Link href="/signup" className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-ccb-accent text-ccb-dark font-semibold text-sm">
+                    <Sparkles className="w-4 h-4" /> Get Started Free
+                  </Link>
+                )}
               </div>
             ) : (
               <>
-                {/* Active/Upcoming */}
                 {tournaments.filter(t => t.status === 'upcoming' || t.status === 'active').length > 0 && (
                   <div>
                     <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
@@ -345,7 +285,6 @@ export default function LeagueHomepage() {
                   </div>
                 )}
 
-                {/* Completed */}
                 {tournaments.filter(t => t.status === 'completed').length > 0 && (
                   <div>
                     <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-ccb-muted">
@@ -360,16 +299,6 @@ export default function LeagueHomepage() {
                 )}
               </>
             )}
-
-            {/* Info */}
-            <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-              <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
-                <Info className="w-4 h-4 text-ccb-accent" /> How Tournaments Work
-              </h3>
-              <p className="text-xs text-ccb-muted leading-relaxed">
-                Swiss tournaments are open to all players — no fixed player limit. Compete in multiple rounds, earn ranking points, and improve your standing. Top performers may qualify for Premium Leagues when they launch.
-              </p>
-            </div>
           </div>
         )}
 
@@ -379,14 +308,48 @@ export default function LeagueHomepage() {
 
         {activeTab === 'leagues' && (
           <div className="space-y-6">
+            {/* USER VIEW: Simple Coming Soon */}
+            {!isAdmin && (
+              <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-ccb-primary/20 to-ccb-accent/20 border border-ccb-primary/30 flex items-center justify-center shadow-xl mb-6">
+                  <Crown className="w-10 h-10 text-ccb-primary" />
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight mb-2">Coming Soon</h2>
+                <p className="text-ccb-muted text-sm sm:text-base max-w-md mb-6">
+                  Premium Leagues are on the way. Tiered divisions with promotion and relegation, separate men&apos;s and women&apos;s competitions, and a path to becoming champion.
+                </p>
+                <div className="flex flex-wrap gap-3 justify-center">
+                  {isGuest ? (
+                    <>
+                      <Link href="/signup" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-ccb-accent text-ccb-dark font-semibold text-sm hover:bg-ccb-gold transition-all shadow-lg shadow-ccb-accent/20">
+                        <Sparkles className="w-4 h-4" /> Get Started Free
+                      </Link>
+                      <Link href="/league/subscribe" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-ccb-border bg-ccb-surface text-ccb-text font-semibold text-sm hover:bg-ccb-card">
+                        <Crown className="w-4 h-4" /> Get Membership
+                      </Link>
+                    </>
+                  ) : (
+                    <Link href="/league/subscribe" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-ccb-primary text-white font-semibold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20">
+                      <Crown className="w-4 h-4" /> Get Membership
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* ADMIN VIEW: Full tiered league system */}
             {isAdmin && (
               <>
+                {/* Admin badge */}
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-ccb-primary/10 border border-ccb-primary/30 text-ccb-primary text-sm font-semibold">
+                  <Crown className="w-4 h-4" /> Admin View — Users see &quot;Coming Soon&quot;
+                </div>
+
                 {/* Promotion/Relegation explainer */}
                 <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-ccb-success/10 border border-ccb-success/30 flex items-center justify-center">
                         <ArrowUp className="w-5 h-5 text-ccb-success" />
                       </div>
                       <span className="text-xs font-bold text-ccb-muted uppercase tracking-wider">Promotion</span>
@@ -415,11 +378,6 @@ export default function LeagueHomepage() {
                     <p className="text-sm text-ccb-muted">Finish in the bottom 2 and you relegate down. Fight to stay up!</p>
                   </div>
                 </section>
-
-                {/* Admin badge */}
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-ccb-primary/10 border border-ccb-primary/30 text-ccb-primary text-sm font-semibold">
-                  <Crown className="w-4 h-4" /> Admin View — Users see "Coming Soon" for Premium Leagues
-                </div>
 
                 {loading ? (
                   <div className="space-y-4 animate-pulse">
@@ -463,7 +421,7 @@ export default function LeagueHomepage() {
                           {tierData.men?.length > 0 && (
                             <div className="mb-4">
                               <div className="flex items-center gap-2 mb-3">
-                                <span className="text-xs font-bold px-2 py-1 rounded-full border text-blue-400 bg-blue-400/10 border-blue-400/30">MEN'S</span>
+                                <span className="text-xs font-bold px-2 py-1 rounded-full border text-blue-400 bg-blue-400/10 border-blue-400/30">MEN&apos;S</span>
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {tierData.men.map(comp => (
@@ -476,7 +434,7 @@ export default function LeagueHomepage() {
                           {tierData.women?.length > 0 && (
                             <div className="mb-4">
                               <div className="flex items-center gap-2 mb-3">
-                                <span className="text-xs font-bold px-2 py-1 rounded-full border text-pink-400 bg-pink-400/10 border-pink-400/30">WOMEN'S</span>
+                                <span className="text-xs font-bold px-2 py-1 rounded-full border text-pink-400 bg-pink-400/10 border-pink-400/30">WOMEN&apos;S</span>
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {tierData.women.map(comp => (
@@ -510,7 +468,7 @@ export default function LeagueHomepage() {
                       <Info className="w-4 h-4 text-ccb-accent" /> How Promotion Works
                     </h3>
                     <p className="text-xs text-ccb-muted leading-relaxed">
-                      At the end of each season, the top 2 players in each division are promoted to the tier above. The bottom 2 are relegated down. New players start at the lowest tier.
+                      At the end of each season, the top 2 players promote up. Bottom 2 relegate down. New players start at the lowest tier.
                     </p>
                   </div>
                   <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
@@ -518,138 +476,11 @@ export default function LeagueHomepage() {
                       <UserCheck className="w-4 h-4 text-ccb-accent" /> Qualification Checklist
                     </h3>
                     <p className="text-xs text-ccb-muted leading-relaxed">
-                      Before joining any league, players must complete a qualification checklist: profile, gender, phone verification, identity verification, Chess.com linkage, and membership.
+                      Players must complete: profile, gender, phone verification, identity verification, Chess.com linkage, and membership before joining.
                     </p>
                   </div>
                 </div>
               </>
-            )}
-
-            {/* USER VIEW: Coming Soon */}
-            {!isAdmin && (
-              <div className="space-y-6">
-                {/* Coming Soon hero */}
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-ccb-primary/10 via-ccb-card to-ccb-surface border border-ccb-primary/30 p-8 sm:p-12 text-center">
-                  <div className="absolute -right-20 -top-20 w-72 h-72 bg-ccb-primary/10 rounded-full blur-3xl pointer-events-none" />
-                  <div className="absolute -left-20 -bottom-20 w-72 h-72 bg-ccb-accent/10 rounded-full blur-3xl pointer-events-none" />
-
-                  <div className="relative z-10 space-y-4">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ccb-primary/10 border border-ccb-primary/30 text-ccb-primary text-xs font-semibold tracking-wider uppercase">
-                      <Clock className="w-3.5 h-3.5" /> Coming Soon
-                    </div>
-                    <div className="flex justify-center">
-                      <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-ccb-primary to-ccb-accent flex items-center justify-center shadow-xl shadow-ccb-primary/20">
-                        <Crown className="w-10 h-10 text-white" />
-                      </div>
-                    </div>
-                    <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight">Premium Leagues</h2>
-                    <p className="text-ccb-muted text-sm sm:text-base max-w-xl mx-auto">
-                      The CrazyChess Premier League is a tiered competitive system with promotion and relegation. Players start at the bottom and climb the pyramid to become champion. Separate Men&apos;s and Women&apos;s divisions.
-                    </p>
-                  </div>
-                </div>
-
-                {/* What to expect */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-                    <div className="w-10 h-10 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 flex items-center justify-center mb-3">
-                      <ArrowUp className="w-5 h-5 text-ccb-success" />
-                    </div>
-                    <h3 className="font-bold text-sm mb-1">Promotion System</h3>
-                    <p className="text-xs text-ccb-muted">Top 2 players from each division promote up each season. Climb from Division 3 to the Premier League.</p>
-                  </div>
-                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-                    <div className="w-10 h-10 rounded-xl bg-pink-400/10 border border-pink-400/30 flex items-center justify-center mb-3">
-                      <Users className="w-5 h-5 text-pink-400" />
-                    </div>
-                    <h3 className="font-bold text-sm mb-1">Men&apos;s & Women&apos;s</h3>
-                    <p className="text-xs text-ccb-muted">Separate divisions for men and women at every tier. Compete in your category for fair and exciting competition.</p>
-                  </div>
-                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-                    <div className="w-10 h-10 rounded-xl bg-ccb-primary/10 border border-ccb-primary/30 flex items-center justify-center mb-3">
-                      <ShieldAlert className="w-5 h-5 text-ccb-primary" />
-                    </div>
-                    <h3 className="font-bold text-sm mb-1">Verified Competition</h3>
-                    <p className="text-xs text-ccb-muted">Identity verification, phone verification, and Chess.com linkage required. Fair play is our priority.</p>
-                  </div>
-                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-                    <div className="w-10 h-10 rounded-xl bg-ccb-success/10 border border-ccb-success/30 flex items-center justify-center mb-3">
-                      <Trophy className="w-5 h-5 text-ccb-success" />
-                    </div>
-                    <h3 className="font-bold text-sm mb-1">Season Champions</h3>
-                    <p className="text-xs text-ccb-muted">Each season culminates in a champion for every tier and gender division. Earn your place in CrazyChess history.</p>
-                  </div>
-                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-                    <div className="w-10 h-10 rounded-xl bg-ccb-danger/10 border border-ccb-danger/30 flex items-center justify-center mb-3">
-                      <ArrowDown className="w-5 h-5 text-ccb-danger" />
-                    </div>
-                    <h3 className="font-bold text-sm mb-1">Relegation Battle</h3>
-                    <p className="text-xs text-ccb-muted">Bottom 2 players relegate down each season. Every match matters — fight to stay in your division.</p>
-                  </div>
-                  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-                    <div className="w-10 h-10 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30 flex items-center justify-center mb-3">
-                      <Crown className="w-5 h-5 text-ccb-accent" />
-                    </div>
-                    <h3 className="font-bold text-sm mb-1">Membership Required</h3>
-                    <p className="text-xs text-ccb-muted">Premium Leagues require an active CrazyChess Club membership (MK5,000/month). Tournament entry stays free.</p>
-                  </div>
-                </div>
-
-                {/* Qualification teaser */}
-                <div className="bg-ccb-card border border-ccb-border rounded-2xl p-6">
-                  <h3 className="text-base font-bold mb-3 flex items-center gap-2">
-                    <UserCheck className="w-5 h-5 text-ccb-accent" /> Qualification Checklist
-                  </h3>
-                  <p className="text-sm text-ccb-muted mb-4">
-                    Before joining a Premium League, you&apos;ll need to complete this checklist. Get a head start now:
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
-                      { icon: UserCheck, label: 'Complete your profile', desc: 'Full name, display name, country', action: '/settings' },
-                      { icon: Users, label: 'Select your gender', desc: 'Required for men\'s/women\'s divisions', action: '/settings' },
-                      { icon: Phone, label: 'Verify your phone', desc: 'SMS verification for identity', action: '/settings' },
-                      { icon: CreditCard, label: 'Identity verification', desc: 'Government ID or document', action: '/settings' },
-                      { icon: ChessIcon, label: 'Link Chess.com', desc: 'Import verified rating', action: '/settings' },
-                      { icon: Crown, label: 'Get membership', desc: 'MK5,000/month for premium access', action: '/league/subscribe' },
-                    ].map((item, i) => {
-                      const Icon = item.icon;
-                      return (
-                        <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-ccb-border bg-ccb-surface/50">
-                          <div className="w-9 h-9 rounded-lg bg-ccb-accent/10 text-ccb-accent flex items-center justify-center shrink-0">
-                            <Icon className="w-4.5 h-4.5" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm font-semibold block">{item.label}</span>
-                            <span className="text-xs text-ccb-muted block">{item.desc}</span>
-                          </div>
-                          {!isGuest && item.action && (
-                            <Link href={item.action} className="text-xs font-semibold text-ccb-accent hover:underline shrink-0 mt-1">
-                              Start →
-                            </Link>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* CTA */}
-                {isGuest ? (
-                  <div className="text-center">
-                    <Link href="/signup" className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-ccb-accent text-ccb-dark font-bold hover:bg-ccb-gold transition-all shadow-lg shadow-ccb-accent/20">
-                      <Sparkles className="w-5 h-5" /> Get Started Free
-                    </Link>
-                    <p className="text-xs text-ccb-muted mt-3">Start playing tournaments now. Premium Leagues launch soon.</p>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <Link href="/league/subscribe" className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-ccb-primary text-white font-bold hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20">
-                      <Crown className="w-5 h-5" /> Get Membership
-                    </Link>
-                    <p className="text-xs text-ccb-muted mt-3">Secure your spot for Premium Leagues today.</p>
-                  </div>
-                )}
-              </div>
             )}
           </div>
         )}
