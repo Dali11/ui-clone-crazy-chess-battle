@@ -77,10 +77,10 @@ export default function TournamentsTab() {
     setJoining(comp.id);
     setJoinMsg(null);
     try {
-      const res = await fetch('/api/league/join', {
+      const res = await fetch(`/api/tournaments/${comp.id}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tournamentId: comp.id, competitionType: 'swiss' }),
+        body: JSON.stringify({}),
       });
       const json = await res.json();
       if (json.success) {

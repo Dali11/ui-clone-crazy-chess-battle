@@ -178,6 +178,51 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Enforce entry fee — debit wallet if fee > 0
+      const entryFee = tournament.entry_fee_cents || 0;
+      let paidEntryFee = false;
+
+      if (entryFee > 0) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('wallet_balance_cents')
+          .eq('id', user.id)
+          .single();
+        const currentBalance = profile?.wallet_balance_cents ?? 0;
+        if (currentBalance < entryFee) {
+          const feeMwk = Math.floor(entryFee / 100);
+          return NextResponse.json({
+            error: `Insufficient wallet balance. Entry fee is MK ${feeMwk.toLocaleString()}. You have MK ${Math.floor(currentBalance / 100).toLocaleString()}. Please deposit funds first.`,
+          }, { status: 402 });
+        }
+
+        const { error: debitErr } = await admin.rpc('debit_wallet', {
+          p_user_id: user.id,
+          p_amount_cents: entryFee,
+        });
+        if (debitErr) {
+          if (debitErr.message?.includes('Insufficient balance')) {
+            return NextResponse.json({ error: 'Insufficient wallet balance. Please deposit funds first.' }, { status: 402 });
+          }
+          return NextResponse.json({ error: 'Failed to process entry fee.' }, { status: 500 });
+        }
+        paidEntryFee = true;
+
+        // Add entry fee to prize pool
+        await admin.from('tournaments')
+          .update({ prize_pool_cents: (tournament.prize_pool_cents || 0) + entryFee })
+          .eq('id', tournamentId);
+
+        // Audit log
+        await admin.from('deposits').insert({
+          user_id: user.id,
+          amount_cents: -entryFee,
+          status: 'success',
+          method: 'tournament_entry',
+          reference: `tournament:${tournamentId}:entry`,
+        });
+      }
+
       // Register
       const { error: partError } = await admin
         .from('tournament_participants')
@@ -187,9 +232,16 @@ export async function POST(request: NextRequest) {
           score: 0,
           wins: 0,
           games_played: 0,
+          paid_entry_fee: paidEntryFee,
         });
 
-      if (partError) throw partError;
+      if (partError) {
+        // Refund if debited
+        if (paidEntryFee) {
+          await admin.rpc('credit_wallet', { p_user_id: user.id, p_amount_cents: entryFee });
+        }
+        throw partError;
+      }
 
       return NextResponse.json({ success: true, message: 'Successfully registered for the tournament!' });
     }
