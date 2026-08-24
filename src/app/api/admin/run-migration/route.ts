@@ -206,7 +206,7 @@ export async function POST(req: NextRequest) {
     try {
       await client.query(`
         INSERT INTO market_config (country_code, country_name, currency_code, currency_symbol, membership_active, membership_price_cents, membership_currency, is_default)
-        VALUES ('MW', 'Malawi', 'MWK', 'MK', true, 500000, 'MWK', true)
+        VALUES ('MW', 'Malawi', 'MWK', 'MK', true, 1000000, 'MWK', true)
         ON CONFLICT (country_code) DO NOTHING
       `);
       results.push({ ok: true, sql: 'Seed MW market_config' });

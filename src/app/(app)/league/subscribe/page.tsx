@@ -189,7 +189,7 @@ export default function SubscriptionPage() {
   const hasActive = data?.hasActiveMembership;
   const history = data?.history || [];
 
-  const monthlyPrice = config?.price || 5000;
+  const monthlyPrice = config?.price || 10000;
   const yearlyPrice = monthlyPrice * 10;
   const currencyLabel = config?.currency || 'MWK';
 
