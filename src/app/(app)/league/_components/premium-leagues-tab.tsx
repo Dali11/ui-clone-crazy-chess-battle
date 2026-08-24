@@ -314,13 +314,16 @@ export default function PremiumLeaguesTab() {
                       <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-2 flex items-center gap-1.5">
                         <Award className="w-3.5 h-3.5" /> Prize Pool — {prizeFormatted}
                       </h4>
-                      <div className="grid grid-cols-5 gap-2">
+                      <div className="space-y-1.5">
                         {[1, 2, 3, 4, 5].map(pos => {
                           const payout = getPayout(league.prize_pool_cents, pos, league.payout_config);
                           return (
-                            <div key={pos} className="text-center bg-ccb-surface rounded-lg p-2">
-                              <div className={`text-[10px] font-bold ${meta.color}`}>#{pos}</div>
-                              <div className="text-xs font-bold mt-0.5">{formatMoney(payout, league.prize_currency || symbol)}</div>
+                            <div key={pos} className="flex items-center justify-between bg-ccb-surface rounded-lg px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-6 h-6 rounded-full bg-ccb-card border border-ccb-border flex items-center justify-center text-[11px] font-bold ${meta.color}`}>{pos}</span>
+                                <span className="text-xs text-ccb-muted">Place</span>
+                              </div>
+                              <span className="text-sm font-bold">{formatMoney(payout, league.prize_currency || symbol)}</span>
                             </div>
                           );
                         })}
