@@ -107,6 +107,8 @@ export default function BattlesPage() {
   useEffect(() => {
     checkActiveBattle();
     loadProfile();
+    // Trigger expired challenge cleanup on page load (since cron is daily on Hobby plan)
+    fetch("/api/battles/challenge/cleanup-expired", { method: "POST" }).catch(() => {});
     fetch("/api/battles/config")
       .then(async (r) => {
         const d = await r.json();
@@ -116,6 +118,7 @@ export default function BattlesPage() {
       })
       .catch(() => {});
   }, [checkActiveBattle]);
+
 
   // Re-fetch the profile (games_played, rating, balance) whenever this tab
   // regains focus or becomes visible again. A long-lived tab can otherwise
