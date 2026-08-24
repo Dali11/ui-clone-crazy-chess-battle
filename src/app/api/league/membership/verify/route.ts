@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { activateMembership } from '@/lib/league/membership';
 
 // POST — Verify membership payment status and activate membership on success
 export async function POST(request: NextRequest) {
@@ -32,22 +33,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Already processed
+    // Already marked success (e.g. the webhook won the race) — auto-activate
+    // the membership here too if it hasn't been created yet.
     if (deposit.status === 'success') {
-      // Check if membership was already activated
-      const { data: existingMembership } = await admin
-        .from('memberships')
-        .select('*')
-        .eq('player_id', user.id)
-        .eq('payment_reference', chargeId)
-        .single();
-
-      return NextResponse.json({
-        status: 'success',
-        depositId: deposit.id,
-        membership: existingMembership || null,
-        message: existingMembership ? 'Membership activated' : 'Payment confirmed, activating membership...',
-      });
+      try {
+        const membership = await activateMembership(admin, user.id, chargeId, deposit.reference);
+        return NextResponse.json({
+          status: 'success',
+          depositId: deposit.id,
+          membership,
+          message: `Welcome to the CrazyChess Club! Your membership is active.`,
+        });
+      } catch (err: any) {
+        return NextResponse.json({ error: err.message }, { status: 500 });
+      }
     }
 
     if (deposit.status === 'failed' || deposit.status === 'cancelled') {
@@ -76,44 +75,27 @@ export async function POST(request: NextRequest) {
         .select('id');
 
       if (!claimed || claimed.length === 0) {
-        // Another request is already processing
-        return NextResponse.json({ status: 'success', depositId: deposit.id, message: 'Payment confirmed, activating...' });
+        // Another request (webhook or a concurrent verify call) is already
+        // processing or has finished — try to activate here too in case that
+        // other request hasn't created the membership row yet.
+        try {
+          const membership = await activateMembership(admin, user.id, chargeId, deposit.reference);
+          return NextResponse.json({
+            status: 'success',
+            depositId: deposit.id,
+            membership,
+            message: `Welcome to the CrazyChess Club! Your membership is active.`,
+          });
+        } catch {
+          return NextResponse.json({ status: 'success', depositId: deposit.id, message: 'Payment confirmed, activating...' });
+        }
       }
 
-      // Parse billing cycle from reference: "membership:monthly" or "membership:yearly"
-      const billingCycle = deposit.reference?.includes('yearly') ? 'yearly' : 'monthly';
-      const price = billingCycle === 'yearly' ? 50000 : 5000;
-
-      const now = new Date();
-      const endDate = new Date(now);
-      if (billingCycle === 'yearly') {
-        endDate.setFullYear(endDate.getFullYear() + 1);
-      } else {
-        endDate.setMonth(endDate.getMonth() + 1);
-      }
-
-      // Create the active membership
-      const { data: membership, error: membershipError } = await admin
-        .from('memberships')
-        .insert({
-          player_id: user.id,
-          status: 'active',
-          billing_cycle: billingCycle,
-          price,
-          currency: 'MWK',
-          country: 'MW',
-          start_date: now.toISOString(),
-          end_date: endDate.toISOString(),
-          auto_renew: false,
-          payment_method: 'mobile_money',
-          payment_reference: chargeId,
-        })
-        .select()
-        .single();
-
-      if (membershipError) {
-        console.error('Failed to create membership:', membershipError);
-        return NextResponse.json({ error: 'Payment confirmed but membership activation failed. Contact support.' }, { status: 500 });
+      let membership;
+      try {
+        membership = await activateMembership(admin, user.id, chargeId, deposit.reference);
+      } catch (err: any) {
+        return NextResponse.json({ error: err.message }, { status: 500 });
       }
 
       // Mark deposit as success (skip wallet credit — this is a membership payment, not a deposit)
@@ -121,25 +103,11 @@ export async function POST(request: NextRequest) {
         .update({ status: 'success', updated_at: new Date().toISOString() })
         .eq('id', deposit.id);
 
-      // Notify user
-      try {
-        await admin.from('notifications').insert({
-          user_id: user.id,
-          type: 'membership_active',
-          title: 'CrazyChess Club Membership Active',
-          body: billingCycle === 'yearly'
-            ? `Welcome to the CrazyChess Club! Your membership is active for 1 year (until ${endDate.toLocaleDateString()}).`
-            : `Welcome to the CrazyChess Club! Your membership is active for 1 month (until ${endDate.toLocaleDateString()}).`,
-          data: { billingCycle, membershipId: membership.id },
-          read: false,
-        });
-      } catch {}
-
       return NextResponse.json({
         status: 'success',
         depositId: deposit.id,
         membership,
-        message: billingCycle === 'yearly'
+        message: membership.billing_cycle === 'yearly'
           ? `Welcome to the CrazyChess Club! Your membership is active for 1 year.`
           : `Welcome to the CrazyChess Club! Your membership is active for 1 month.`,
       });

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { detectOperator } from '@/lib/operator';
 import {
   Crown, Check, Zap, Shield, Star, Trophy, Swords, TrendingUp,
   Sparkles, Calendar, RefreshCw, AlertCircle, ArrowRight, X, Users,
@@ -39,12 +40,6 @@ interface MembershipResponse {
   error?: string;
 }
 
-interface Operator {
-  id: string;
-  name: string;
-  reference: string;
-}
-
 type PaymentState = 'idle' | 'initiating' | 'pending' | 'verifying' | 'success' | 'failed';
 
 export default function SubscriptionPage() {
@@ -55,8 +50,6 @@ export default function SubscriptionPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Payment form state
-  const [operators, setOperators] = useState<Operator[]>([]);
-  const [selectedOperator, setSelectedOperator] = useState<string>('');
   const [phone, setPhone] = useState('');
   const [paymentState, setPaymentState] = useState<PaymentState>('idle');
   const [chargeId, setChargeId] = useState<string | null>(null);
@@ -76,25 +69,8 @@ export default function SubscriptionPage() {
     }
   };
 
-  const fetchOperators = async () => {
-    try {
-      const res = await fetch('/api/payments/operators');
-      const json = await res.json();
-      if (json.data) {
-        const ops = json.data.map((op: any) => ({
-          id: op.reference || op.id,
-          name: op.name,
-          reference: op.reference,
-        }));
-        setOperators(ops);
-        if (ops.length > 0) setSelectedOperator(ops[0].reference);
-      }
-    } catch {}
-  };
-
   useEffect(() => {
     fetchMembership();
-    fetchOperators();
   }, []);
 
   // Clean up polling on unmount
@@ -105,8 +81,9 @@ export default function SubscriptionPage() {
   }, []);
 
   const handleSubscribe = async () => {
-    if (!phone || !selectedOperator) {
-      setPaymentError('Please enter your phone number and select a payment operator');
+    const digits = phone.replace(/\D/g, '');
+    if (!digits || digits.length < 9) {
+      setPaymentError('Please enter a valid Mobile Money number (Airtel Money or Mpamba)');
       return;
     }
 
@@ -120,7 +97,7 @@ export default function SubscriptionPage() {
         body: JSON.stringify({
           billingCycle,
           phone,
-          operatorRefId: selectedOperator,
+          operatorRefId: detectOperator(phone),
         }),
       });
       const json = await res.json();
@@ -409,31 +386,14 @@ export default function SubscriptionPage() {
               <>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-semibold text-ccb-muted uppercase tracking-wider mb-2 block">Mobile Money Operator</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {operators.length > 0 ? operators.map((op) => (
-                        <button key={op.reference} onClick={() => setSelectedOperator(op.reference)} className={`p-3 rounded-xl border transition-all text-sm font-medium flex flex-col items-center gap-1 ${selectedOperator === op.reference ? 'border-ccb-primary bg-ccb-primary/10 text-ccb-primary' : 'border-ccb-border bg-ccb-surface hover:border-ccb-primary/30'}`}>
-                          <Smartphone className="w-5 h-5" />
-                          <span>{op.name}</span>
-                        </button>
-                      )) : (
-                        <>
-                          <button onClick={() => setSelectedOperator('TNM')} className={`p-3 rounded-xl border transition-all text-sm font-medium flex flex-col items-center gap-1 ${selectedOperator === 'TNM' ? 'border-ccb-primary bg-ccb-primary/10 text-ccb-primary' : 'border-ccb-border bg-ccb-surface hover:border-ccb-primary/30'}`}>
-                            <Smartphone className="w-5 h-5" /><span>TNM Mpamba</span>
-                          </button>
-                          <button onClick={() => setSelectedOperator('AIRTEL')} className={`p-3 rounded-xl border transition-all text-sm font-medium flex flex-col items-center gap-1 ${selectedOperator === 'AIRTEL' ? 'border-ccb-primary bg-ccb-primary/10 text-ccb-primary' : 'border-ccb-border bg-ccb-surface hover:border-ccb-primary/30'}`}>
-                            <Smartphone className="w-5 h-5" /><span>Airtel Money</span>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-ccb-muted uppercase tracking-wider mb-2 block">Phone Number</label>
+                    <label className="text-xs font-semibold text-ccb-muted uppercase tracking-wider mb-2 block">Mobile Money Number</label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ccb-muted" />
                       <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0991 234 567" className="w-full pl-10 pr-4 py-3 rounded-xl border border-ccb-border bg-ccb-surface text-sm focus:border-ccb-primary focus:outline-none" />
                     </div>
+                    <p className="text-[11px] text-ccb-muted mt-1.5 flex items-center gap-1">
+                      <Smartphone className="w-3 h-3" /> Airtel Money (09xx) or TNM Mpamba (08xx) — detected automatically
+                    </p>
                   </div>
                 </div>
 
