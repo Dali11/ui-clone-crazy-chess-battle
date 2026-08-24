@@ -46,7 +46,7 @@ export default function BattlesPage() {
   const MIN_GAMES_FOR_BATTLES = 5;
   const battlesLocked = gamesPlayed < MIN_GAMES_FOR_BATTLES;
   const [selectedStake, setSelectedStake] = useState<number | null>(null);
-  const [selectedTC, setSelectedTC] = useState("blitz");
+  const [selectedTC, setSelectedTC] = useState("rapid15");
   const [state, setState] = useState<BattleState>("select");
   const [battleId, setBattleId] = useState<string | null>(null);
   const [opponent, setOpponent] = useState<{ username: string; display_name: string; rating: number } | null>(null);

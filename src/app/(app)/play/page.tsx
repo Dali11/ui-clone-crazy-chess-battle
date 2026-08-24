@@ -29,7 +29,7 @@ type SearchState = "idle" | "searching" | "noPlayers";
 
 export default function PlayPage() {
   const [view, setView] = useState<View>("main");
-  const [selectedTC, setSelectedTC] = useState("blitz");
+  const [selectedTC, setSelectedTC] = useState("rapid15");
   const [rated, setRated] = useState(true);
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [copied, setCopied] = useState(false);
