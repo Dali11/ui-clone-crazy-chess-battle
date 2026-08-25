@@ -1,5 +1,7 @@
 "use client";
 
+import BoardThemePicker from "@/components/game/board-theme-picker";
+import { getStoredBoardTheme, storeBoardTheme, BOARD_THEMES, type BoardTheme } from "@/lib/game/board-themes";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -186,7 +188,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [identityVerified, setIdentityVerified] = useState(profile?.identity_verified || false);
   const [defaultTimeControl, setDefaultTimeControl] = useState("15+10");
-  const [boardTheme, setBoardTheme] = useState("default");
+  const [boardTheme, setBoardTheme] = useState<BoardTheme>(BOARD_THEMES[1]);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [moveAnimations, setMoveAnimations] = useState(true);
   const [autoQueen, setAutoQueen] = useState(false);
@@ -221,7 +223,9 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
       try {
         const p = JSON.parse(prefs);
         if (p.defaultTimeControl) setDefaultTimeControl(p.defaultTimeControl);
-        if (p.boardTheme) setBoardTheme(p.boardTheme);
+        // Board theme is stored separately in ccb-board-theme
+        const stored = getStoredBoardTheme();
+        setBoardTheme(stored);
         if (p.soundEnabled !== undefined) setSoundEnabled(p.soundEnabled);
         if (p.moveAnimations !== undefined) setMoveAnimations(p.moveAnimations);
         if (p.autoQueen !== undefined) setAutoQueen(p.autoQueen);
@@ -288,7 +292,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
 
   const saveClientPrefs = () => {
     localStorage.setItem("ccb_prefs", JSON.stringify({
-      defaultTimeControl, boardTheme, soundEnabled, moveAnimations, autoQueen, showCoordinates,
+      defaultTimeControl, soundEnabled, moveAnimations, autoQueen, showCoordinates,
       notifTournaments, notifInvites, notifResults, notifDigest, notifWhatsApp,
       profileVisibility, showRealName, showOnlineStatus, allowSpectators, showRating,
     }));
@@ -465,7 +469,13 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
         <div className="space-y-4">
           <SectionCard title="Game Preferences">
             <div><label className="text-sm font-medium block mb-1.5">Default Time Control</label><select value={defaultTimeControl} onChange={(e) => setDefaultTimeControl(e.target.value)} className="input cursor-pointer"><option value="15+10">15+10 (Rapid)</option><option value="10+5">10+5 (Rapid)</option><option value="5+3">5+3 (Blitz)</option><option value="3+2">3+2 (Blitz)</option><option value="1+0">1+0 (Bullet)</option></select></div>
-            <div><label className="text-sm font-medium block mb-1.5">Board Theme</label><select value={boardTheme} onChange={(e) => setBoardTheme(e.target.value)} className="input cursor-pointer"><option value="default">Classic (Green/White)</option><option value="wood">Wood (Brown/Cream)</option><option value="blue">Ocean (Blue/White)</option><option value="dark">Midnight (Dark/Gray)</option></select></div>
+            <div>
+              <label className="text-sm font-medium block mb-1.5">Board Theme</label>
+              <BoardThemePicker
+                inline
+                onThemeChange={(theme) => { setBoardTheme(theme); storeBoardTheme(theme.id); }}
+              />
+            </div>
             <div className="divide-y divide-ccb-border">
               <ToggleRow label="Sound Effects" description="Move sounds, captures, check" value={soundEnabled} onChange={setSoundEnabled} />
               <ToggleRow label="Move Animations" description="Animate piece movements" value={moveAnimations} onChange={setMoveAnimations} />

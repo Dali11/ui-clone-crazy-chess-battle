@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import DraughtsBoard from "./draughts-board";
+import { getStoredBoardTheme, type BoardTheme } from "@/lib/game/board-themes";
 import VictoryOverlay, { type GameOutcome } from "./victory-overlay";
 import GameChat from "./game-chat";
 import PlayerProfilePreview from "./player-profile-preview";
@@ -76,6 +77,7 @@ export default function DraughtsGameClient({
   const [previewUserId, setPreviewUserId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [viewPly, setViewPly] = useState(0); // for move review navigation
+  const [boardTheme, setBoardTheme] = useState<BoardTheme>(getStoredBoardTheme());
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -546,6 +548,7 @@ export default function DraughtsGameClient({
           {/* Board */}
           <div className="flex-1 min-h-0 flex items-center justify-center px-2 py-1">
             <DraughtsBoard
+              boardTheme={boardTheme}
               board={board}
               perspective={perspective}
               selected={selected}

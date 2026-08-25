@@ -2,9 +2,11 @@
 
 import { useMemo } from "react";
 import type { Board, Position, DraughtsMove } from "@/lib/game/draughts-engine";
+import { getStoredBoardTheme, type BoardTheme } from "@/lib/game/board-themes";
 
 interface DraughtsBoardProps {
   board: Board;
+  boardTheme?: BoardTheme;
   perspective: "white" | "black";
   selected: Position | null;
   legalMoves: DraughtsMove[];
@@ -23,8 +25,11 @@ export default function DraughtsBoard({
   onSquareClick,
   lastMove,
   interactive,
+  boardTheme,
 }: DraughtsBoardProps) {
-  // Build the display rows based on perspective
+  const theme = boardTheme || getStoredBoardTheme();
+
+   // Build the display rows based on perspective
   const displayRows = useMemo(() => {
     const rows = board.map((row, i) => row.map((piece, j) => ({ piece, row: i, col: j })));
     if (perspective === "black") {
@@ -59,18 +64,18 @@ export default function DraughtsBoard({
                 onClick={() => interactive && isDark && onSquareClick({ row: cell.row, col: cell.col })}
                 className={`
                   relative flex items-center justify-center
-                  ${isDark ? "bg-amber-800" : "bg-amber-100"}
+
                   ${interactive && isDark ? "cursor-pointer" : ""}
                   transition-colors
                 `}
                 style={{
                   backgroundColor: isDark
                     ? isSelected || isMustJump
-                      ? "#a78b4f"
+                      ? theme.dark + "cc"
                       : isLastMoveFrom || isLastMoveTo
-                      ? "#b8956a"
-                      : "#92400e"
-                    : "#fef3c7",
+                      ? theme.dark + "aa"
+                      : theme.dark
+                    : theme.light,
                 }}
               >
                 {/* Target square indicator */}

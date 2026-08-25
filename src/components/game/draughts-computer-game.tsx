@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import DraughtsBoard from "./draughts-board";
+import { getStoredBoardTheme, type BoardTheme } from "@/lib/game/board-themes";
 import VictoryOverlay, { type GameOutcome } from "./victory-overlay";
 import {
   initialBoard,
@@ -59,6 +60,7 @@ export default function DraughtsComputerGame({
   const [showResignConfirm, setShowResignConfirm] = useState(false);
   const [error] = useState<string | null>(null);
   const [victoryDismissed, setVictoryDismissed] = useState(false);
+  const [boardTheme] = useState<BoardTheme>(getStoredBoardTheme());
   const [mustContinueJump, setMustContinueJump] = useState<Position | null>(null);
 
   const [whiteClockMs, setWhiteClockMs] = useState(initialMinutes * 60 * 1000);
@@ -288,6 +290,7 @@ export default function DraughtsComputerGame({
           {/* Board */}
           <div className="flex-1 min-h-0 flex items-center justify-center px-2 py-1">
             <DraughtsBoard
+        boardTheme={boardTheme}
               board={board}
               perspective={perspective}
               selected={selected}
