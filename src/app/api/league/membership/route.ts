@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getMarketConfig } from "@/lib/league/market-config";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 // GET — Check membership status and pricing (now from market_config table)
 export async function GET(request: NextRequest) {
@@ -96,6 +97,21 @@ export async function POST(request: NextRequest) {
 
     if (!phone || !operatorRefId) {
       return NextResponse.json({ error: 'Phone number and payment operator are required' }, { status: 400 });
+    }
+
+    // ─── Load platform config for membership ──────────────────────
+    const mConfig = await getPlatformConfig(admin, 'membership');
+
+    // Enforce verification requirement if enabled
+    if (mConfig.require_verification) {
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('identity_verified')
+        .eq('id', user.id)
+        .single();
+      if (!profile?.identity_verified) {
+        return NextResponse.json({ error: 'Identity verification required to purchase membership. Please contact an admin to get verified.' }, { status: 403 });
+      }
     }
 
     // Get pricing from market config (not hardcoded)
