@@ -1,6 +1,39 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Image from "next/image";
+
+
+export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
+  const { username } = await params;
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name, username, bio, rating, games_played, wins, avatar_url")
+    .eq("username", username)
+    .single();
+
+  if (!profile) {
+    return {
+      title: "Player Not Found",
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const name = profile.display_name || profile.username;
+  return {
+    title: `${name} — Chess Profile`,
+    description: profile.bio
+      ? `${name} (rating ${profile.rating}) — ${profile.bio}`
+      : `View ${name}'s chess profile: rating ${profile.rating}, ${profile.games_played} games played, ${profile.wins} wins. See game history and stats.`,
+    openGraph: {
+      title: `${name} — Crazy Chess Battles Profile`,
+      description: `Rating ${profile.rating} · ${profile.games_played} games · ${profile.wins} wins`,
+      images: profile.avatar_url ? [{ url: profile.avatar_url }] : undefined,
+    },
+    alternates: { canonical: `https://crazychessbattles.live/profile/${username}` },
+  };
+}
 
 export default async function ProfilePage({
   params,
