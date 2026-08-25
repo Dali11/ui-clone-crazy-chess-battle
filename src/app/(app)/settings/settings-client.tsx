@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   User, LogOut, Save, ChevronRight, Trophy, Swords, Wallet, Camera,
-  Circle, AlertCircle, CheckCircle, Lock, Shield, Bell, Eye,
+  AlertCircle, CheckCircle, Lock, Shield, Bell, Eye,
   Loader2, Upload, Clock, Smartphone, MapPin,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -168,9 +168,26 @@ const COUNTRIES = [
 const GENDER_OPTIONS = [
   { value: "male", label: "Male", icon: User, color: "text-blue-400" },
   { value: "female", label: "Female", icon: User, color: "text-pink-400" },
-  { value: "other", label: "Other", icon: Circle, color: "text-purple-400" },
-  { value: "prefer_not_to_say", label: "Prefer not to say", icon: Circle, color: "text-ccb-muted" },
 ];
+
+function ToggleRow ({ label, description, value, onChange }: { label: string; description?: string; value: boolean; onChange: (v: boolean) => void }) => (
+  <div className="flex items-center justify-between py-2.5">
+    <div className="flex-1 pr-3"><p className="text-sm font-medium text-ccb-text">{label}</p>{description && <p className="text-xs text-ccb-muted mt-0.5">{description}</p>}</div>
+    <button type="button" onClick={() => onChange(!value)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${value ? "bg-ccb-primary" : "bg-ccb-border"}`}>
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${value ? "translate-x-6" : "translate-x-1"}`} />
+    </button>
+  </div>
+);
+function SectionCard ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="card p-4 space-y-4"><h3 className="font-bold text-base">{title}</h3>{children}</div>
+);
+function SaveButton ({ onSave }: { onSave: () => void }) => (
+  <div className="flex items-center gap-3 pt-1">
+    <button onClick={onSave} disabled={saving} className="btn-primary"><Save className="w-4 h-4 mr-1" />{saving ? "Saving..." : "Save Changes"}</button>
+    {saved && <span className="text-sm text-ccb-success">Saved!</span>}
+    {error && <span className="text-sm text-ccb-danger">{error}</span>}
+  </div>
+);
 
 export default function SettingsClient({ profile, userId }: { profile: Profile | null; userId: string }) {
   const router = useRouter();
@@ -314,26 +331,11 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
   const walletBalance = profile?.wallet_balance_cents ? `MK ${Math.floor(profile.wallet_balance_cents/100).toLocaleString("en-US")}` : "MK 0";
   const winRate = profile?.games_played && profile.games_played > 0 ? Math.round(((profile.wins||0)/profile.games_played)*100) : 0;
 
-  const ToggleRow = ({ label, description, value, onChange }: { label: string; description?: string; value: boolean; onChange: (v: boolean) => void }) => (
-    <div className="flex items-center justify-between py-2.5">
-      <div className="flex-1 pr-3"><p className="text-sm font-medium text-ccb-text">{label}</p>{description && <p className="text-xs text-ccb-muted mt-0.5">{description}</p>}</div>
-      <button type="button" onClick={() => onChange(!value)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${value ? "bg-ccb-primary" : "bg-ccb-border"}`}>
-        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${value ? "translate-x-6" : "translate-x-1"}`} />
-      </button>
-    </div>
-  );
 
-  const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="card p-4 space-y-4"><h3 className="font-bold text-base">{title}</h3>{children}</div>
-  );
 
-  const SaveButton = ({ onSave }: { onSave: () => void }) => (
-    <div className="flex items-center gap-3 pt-1">
-      <button onClick={onSave} disabled={saving} className="btn-primary"><Save className="w-4 h-4 mr-1" />{saving ? "Saving..." : "Save Changes"}</button>
-      {saved && <span className="text-sm text-ccb-success">Saved!</span>}
-      {error && <span className="text-sm text-ccb-danger">{error}</span>}
-    </div>
-  );
+
+
+
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-24 sm:pb-6 max-w-2xl">
@@ -381,10 +383,9 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
             <div>
               <label className="text-sm font-medium block mb-2">Gender Identity</label>
               <p className="text-xs text-ccb-muted mb-2.5">Determines which league divisions you're eligible for.</p>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl mb-2.5 text-xs font-medium ${identityVerified ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"}`}>
-                {identityVerified ? <><CheckCircle className="w-3.5 h-3.5" /> Identity verified</> : <><AlertCircle className="w-3.5 h-3.5" /> Not verified — gender-restricted leagues locked</>}
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl mb-2.5 text-xs font-medium ${identityVerified ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30" : "bg-ccb-surface text-ccb-muted border border-ccb-border"}`}>
+                {identityVerified ? <><CheckCircle className="w-3.5 h-3.5" /> Identity verified</> : <><AlertCircle className="w-3.5 h-3.5" /> Not verified</>}
               </div>
-              {!profile?.gender && <div className="flex items-center gap-2 px-3 py-2 rounded-xl mb-2.5 text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"><AlertCircle className="w-3.5 h-3.5" /> Choose carefully — gender is locked once set.</div>}
               <div className="grid grid-cols-2 gap-2">
                 {GENDER_OPTIONS.map((opt) => { const Icon = opt.icon; const sel = gender === opt.value; const locked = !!profile?.gender; return (
                   <button key={opt.value} type="button" disabled={locked} onClick={() => !locked && setGender(opt.value)}
@@ -432,7 +433,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
             </div>
           </SectionCard>
           <SectionCard title="Membership">
-            <div className="flex items-center justify-between"><div><p className="text-sm font-medium">Status</p><p className="text-xs text-ccb-muted mt-0.5">No active membership</p></div><Link href="/league" className="text-xs px-3 py-1.5 rounded-lg bg-ccb-primary text-white font-medium hover:bg-ccb-primary/90">Join League</Link></div>
+            <div className="flex items-center justify-between"><div><p className="text-sm font-medium">Status</p><p className="text-xs text-ccb-muted mt-0.5">No active membership</p></div><Link href="/league/subscribe" className="text-xs px-3 py-1.5 rounded-lg bg-ccb-primary text-white font-medium hover:bg-ccb-primary/90">Join League</Link></div>
           </SectionCard>
         </div>
       )}
@@ -440,8 +441,8 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
       {activeTab === "verification" && (
         <div className="space-y-4">
           <SectionCard title="Identity Verification">
-            <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl mb-4 text-xs font-medium ${identityVerified ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"}`}>
-              {identityVerified ? <><CheckCircle className="w-4 h-4" /> Verified</> : <><AlertCircle className="w-4 h-4" /> Not verified — gender-restricted leagues locked</>}
+            <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl mb-4 text-xs font-medium ${identityVerified ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30" : "bg-ccb-surface text-ccb-muted border border-ccb-border"}`}>
+              {identityVerified ? <><CheckCircle className="w-4 h-4" /> Verified</> : <><AlertCircle className="w-4 h-4" /> Not verified</>}
             </div>
             <p className="text-sm text-ccb-muted mb-4">Verify to unlock gender-restricted leagues and competitive tournaments. Documents are reviewed by admins and kept confidential.</p>
             <div className="space-y-2">
