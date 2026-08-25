@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import { notFound } from "next/navigation";
 import ComputerGameWrapper from "@/components/game/computer-game-wrapper";
 import type { AIDifficulty } from "@/lib/game/chess-ai";
@@ -5,6 +7,12 @@ import { createClient } from "@/lib/supabase/server";
 
 const VALID_DIFFICULTIES = ["easy", "medium", "hard"];
 const VALID_COLORS = ["white", "black"];
+
+
+export const metadata: Metadata = {
+  title: "Play Chess vs Computer — Practice & Train",
+  description: "Practice chess against the AI on Crazy Chess Battles. Choose difficulty, sharpen your tactics, and improve your game.",
+};
 
 export default async function ComputerGamePage({
   searchParams,
