@@ -39,6 +39,7 @@ interface GameClientProps {
   whiteAvatar?: string | null;
   blackAvatar?: string | null;
   battleInfo?: BattleInfo | null;
+  tournamentId?: string | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -61,7 +62,7 @@ function formatClock(ms: number | null): string {
   return `0:${seconds.toString().padStart(2, "0")}`;
 }
 
-export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo }: GameClientProps) {
+export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo, tournamentId }: GameClientProps) {
   const { game, connected, connectionQuality, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw } = useRealtimeGame(gameId, initialGame, currentUserId);
   const router = useRouter();
   const [fen, setFen] = useState(game.fen);
@@ -151,6 +152,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   // Calculate earnings for victory overlay
   const didIWin = game.winner === (isWhite ? "white" : "black");
   const isBattleGame = battleInfo?.isBattle === true;
+  const isTournamentGame = !!tournamentId;
+  const router = useRouter();
   const moneyEarned = isBattleGame && didIWin ? (battleInfo?.winnerPayoutCents ?? 0) / 100 : undefined;
   // For battles, berries are not awarded (they have their own reward system)
   // For non-battle games, berries are awarded as before
@@ -184,6 +187,15 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       playSound("gameEnd");
     }
   }, [gameEnded]);
+
+  // Auto-redirect to tournament page after game ends (tournament games only, non-spectators)
+  useEffect(() => {
+    if (!gameEnded || !isTournamentGame || isSpectator || victoryDismissed) return;
+    const timer = setTimeout(() => {
+      if (tournamentId) router.push(`/tournament/${tournamentId}`);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [gameEnded, isTournamentGame, isSpectator, victoryDismissed, tournamentId, router]);
 
   useEffect(() => {
     setFen(game.fen);
@@ -1167,14 +1179,14 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           moneyEarned={moneyEarned}
           moneyLabel={isBattleGame ? "Battle winnings" : undefined}
           moveCount={game.move_count}
-          subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
+          subtitle={`${game.time_control} · ${isTournamentGame ? "Tournament" : game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
           playerNames={{ white: whiteName, black: blackName }}
           winnerSide={game.winner as "white" | "black" | null}
-          lobbyHref={isBattleGame ? "/battles" : "/play"}
-          newGameLabel={isBattleGame ? "New Match" : "New Game"}
-          playAgainLabel={isBattleGame ? "New Match" : "Play Again"}
-          onPlayAgain={!isSpectator ? handlePlayAgain : undefined}
-          onRematch={!isSpectator && game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
+          lobbyHref={isTournamentGame ? `/tournament/${tournamentId}` : isBattleGame ? "/battles" : "/play"}
+          newGameLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "New Game"}
+          playAgainLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "Play Again"}
+          onPlayAgain={!isSpectator && !isTournamentGame ? handlePlayAgain : isTournamentGame ? () => router.push(`/tournament/${tournamentId}`) : undefined}
+          onRematch={!isSpectator && !isTournamentGame && game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
           rematchState={rematchState}
           onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
           onAcceptRematch={incomingRematch && !isSpectator ? handleAcceptIncomingRematch : undefined}
@@ -1231,14 +1243,14 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         moneyEarned={moneyEarned}
         moneyLabel={isBattleGame ? "Battle winnings" : undefined}
         moveCount={game.move_count}
-        subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
+        subtitle={`${game.time_control} · ${isTournamentGame ? "Tournament" : game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
         playerNames={{ white: whiteName, black: blackName }}
         winnerSide={game.winner as "white" | "black" | null}
-        lobbyHref={isBattleGame ? "/battles" : "/play"}
-        newGameLabel={isBattleGame ? "New Match" : "New Game"}
-        playAgainLabel={isBattleGame ? "New Match" : "Play Again"}
-        onPlayAgain={handlePlayAgain}
-        onRematch={game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
+        lobbyHref={isTournamentGame ? `/tournament/${tournamentId}` : isBattleGame ? "/battles" : "/play"}
+        newGameLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "New Game"}
+        playAgainLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "Play Again"}
+        onPlayAgain={isTournamentGame ? () => router.push(`/tournament/${tournamentId}`) : handlePlayAgain}
+        onRematch={!isTournamentGame && game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
         rematchState={rematchState}
         onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
         onAcceptRematch={incomingRematch ? handleAcceptIncomingRematch : undefined}

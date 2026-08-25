@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, use, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Trophy, Users, Calendar, Clock, DollarSign, RefreshCw, AlertCircle,
   Crown, Star, Swords, ChevronRight, ArrowLeft, Zap, Award, Medal,
@@ -12,6 +13,7 @@ interface TournamentData {
   success: boolean;
   isAdmin: boolean;
   isRegistered: boolean;
+  currentPlayerId: string | null;
   canJoin: boolean;
   joinReason: string | null;
   tournament: {
@@ -96,6 +98,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'standings' | 'rounds' | 'info'>('standings');
+  const [redirecting, setRedirecting] = useState(false);
+  const router = useRouter();
+  const redirectedRef = useRef<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -113,6 +118,38 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   };
 
   useEffect(() => { fetchData(); }, [resolvedParams.id]);
+
+  // Auto-redirect to game when tournament is live and user has a pending game
+  useEffect(() => {
+    if (!data || !data.isRegistered || !data.currentPlayerId || data.tournament.status !== 'active') return;
+
+    const currentRound = data.rounds?.find(r => r.round_number === data.tournament.current_round);
+    if (!currentRound || currentRound.is_complete) return;
+
+    // Find the user's pairing
+    const myPairing = currentRound.pairings?.find(
+      p => p.white === data.currentPlayerId || p.black === data.currentPlayerId
+    );
+    if (!myPairing || !myPairing.game_id || myPairing.result !== null) return;
+
+    // Don't redirect if already redirected to this game
+    if (redirectedRef.current === myPairing.game_id) return;
+    redirectedRef.current = myPairing.game_id;
+
+    // Brief delay so the page renders first, then redirect
+    setRedirecting(true);
+    const timer = setTimeout(() => {
+      router.push(`/game/${myPairing.game_id}`);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [data, router]);
+
+  // Auto-refresh every 15s when tournament is live (to detect new rounds)
+  useEffect(() => {
+    if (!data || data.tournament.status !== 'active') return;
+    const interval = setInterval(() => fetchData(), 15000);
+    return () => clearInterval(interval);
+  }, [data?.tournament.status]);
 
   const handleJoin = async () => {
     setActionLoading(true);
@@ -197,11 +234,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     );
   }
 
-  const { tournament: t, participants, rounds, isAdmin, isRegistered, canJoin, joinReason } = data;
+  const { tournament: t, participants, rounds, isAdmin, isRegistered, currentPlayerId, canJoin, joinReason } = data;
   const hasEntryFee = (t.entry_fee_cents || 0) > 0;
   const hasPrizePool = (t.prize_pool_cents || 0) > 0;
   const hasBerryPrize = (t.berry_prize_pool || 0) > 0;
   const isLive = t.status === 'active';
+
+  // Show redirecting overlay
+  if (redirecting) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4">
+        <div className="w-12 h-12 rounded-full border-3 border-ccb-primary border-t-transparent animate-spin" />
+        <p className="text-sm font-medium text-ccb-muted">Redirecting to your game…</p>
+      </div>
+    );
+  }
   const isFinished = t.status === 'finished' || t.status === 'completed';
 
   const statusInfo = {

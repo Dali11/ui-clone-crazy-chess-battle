@@ -130,6 +130,7 @@ export async function GET(
       success: true,
       isAdmin,
       isRegistered,
+      currentPlayerId: user?.id || null,
       canJoin,
       joinReason,
       tournament,
@@ -142,3 +143,4 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+

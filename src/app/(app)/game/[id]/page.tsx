@@ -130,6 +130,7 @@ export default async function GamePage({
         whiteAvatar={whiteProfile.data?.avatar_url}
         blackAvatar={blackProfile.data?.avatar_url}
         battleInfo={battleInfo}
+        tournamentId={game.tournament_id}
       />
     </>
   );
