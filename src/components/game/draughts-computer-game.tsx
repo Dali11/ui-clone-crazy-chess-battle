@@ -59,6 +59,7 @@ export default function DraughtsComputerGame({
   const [showResignConfirm, setShowResignConfirm] = useState(false);
   const [error] = useState<string | null>(null);
   const [victoryDismissed, setVictoryDismissed] = useState(false);
+  const [mustContinueJump, setMustContinueJump] = useState<Position | null>(null);
 
   const [whiteClockMs, setWhiteClockMs] = useState(initialMinutes * 60 * 1000);
   const [blackClockMs, setBlackClockMs] = useState(initialMinutes * 60 * 1000);
@@ -119,61 +120,78 @@ export default function DraughtsComputerGame({
 
   const applyAndAdvance = useCallback(
     (move: DraughtsMove, mover: Color) => {
-      setBoard((prevBoard) => {
-        const result = applyMove(prevBoard, move, mover, 0, halfMoveClock, variant);
-        if (!result.valid) return prevBoard;
+      const result = applyMove(board, move, mover, 0, halfMoveClock, variant);
+      if (!result.valid) return;
 
-        setLastMove({ from: move.from, to: move.to });
-        setHalfMoveClock(result.halfMoveClock);
-        setTurn(result.nextTurn);
-        setMoveHistory((prev) => [...prev, move]);
+      setBoard(result.board);
+      setLastMove({ from: move.from, to: move.to });
+      setHalfMoveClock(result.halfMoveClock);
+      setTurn(result.nextTurn);
+      setMoveHistory((prev) => [...prev, move]);
 
-        // Increment for whoever just moved
-        if (incrementSeconds > 0) {
-          if (mover === "w") setWhiteClockMs((ms) => ms + incrementSeconds * 1000);
-          else setBlackClockMs((ms) => ms + incrementSeconds * 1000);
+      // Increment for whoever just moved
+      if (incrementSeconds > 0) {
+        if (mover === "w") setWhiteClockMs((ms) => ms + incrementSeconds * 1000);
+        else setBlackClockMs((ms) => ms + incrementSeconds * 1000);
+      }
+
+      if (result.isGameOver) {
+        endGame(result.winner as Color | "draw", "");
+      } else {
+        const check = checkGameOver(result.board, result.nextTurn, result.halfMoveClock, variant);
+        if (check.isGameOver) {
+          endGame(check.winner as Color | "draw", check.reason || "");
         }
+      }
 
-        if (result.isGameOver) {
-          endGame(result.winner as Color | "draw", "");
-        } else {
-          const check = checkGameOver(result.board, result.nextTurn, result.halfMoveClock, variant);
-          if (check.isGameOver) {
-            endGame(check.winner as Color | "draw", check.reason || "");
-          }
-        }
-
-        return result.board;
-      });
-      setSelected(null);
-      setLegalMoves([]);
+      // Track multi-jump continuation
+      if (result.mustContinueJump && result.mustContinueFrom) {
+        setMustContinueJump(result.mustContinueFrom);
+        // Auto-select the piece that must continue jumping
+        setSelected(result.mustContinueFrom);
+        const contMoves = getMovesForPiece(result.board, result.mustContinueFrom, variant);
+        setLegalMoves(contMoves);
+      } else {
+        setMustContinueJump(null);
+        setSelected(null);
+        setLegalMoves([]);
+      }
     },
-    [halfMoveClock, incrementSeconds, endGame]
+    [board, halfMoveClock, variant, incrementSeconds, endGame]
   );
 
-  // Bot's turn
+  // Bot's turn — use boardRef to avoid nested setBoard
+  const boardRef = useRef(board);
+  boardRef.current = board;
+
   useEffect(() => {
     if (status !== "playing" || turn !== botColor) return;
     setBotThinking(true);
     const timer = setTimeout(() => {
-      setBoard((currentBoard) => {
-        const move = getBestDraughtsMove(currentBoard, botColor, difficulty, variant);
-        if (move) {
-          applyAndAdvance(move, botColor);
-        } else {
-          endGame(myColor, `${botColor === "w" ? "White" : "Black"} (bot) has no legal moves.`);
-        }
-        return currentBoard;
-      });
+      const move = getBestDraughtsMove(boardRef.current, botColor, difficulty, variant);
+      if (move) {
+        applyAndAdvance(move, botColor);
+      } else {
+        endGame(myColor, `${botColor === "w" ? "White" : "Black"} (bot) has no legal moves.`);
+      }
       setBotThinking(false);
     }, 150 + Math.random() * 150);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turn, status, botColor, difficulty]);
+  }, [turn, status, botColor, difficulty, variant, applyAndAdvance]);
 
   const handleSquareClick = useCallback(
     (pos: Position) => {
       if (!myTurn || botThinking || !isLiveView) return;
+
+      // During a multi-jump, only allow clicking the forced piece or its targets
+      if (mustContinueJump) {
+        const move = legalMoves.find((m) => m.to.row === pos.row && m.to.col === pos.col);
+        if (move) {
+          applyAndAdvance(move, myColor);
+        }
+        return;
+      }
 
       const piece = board[pos.row][pos.col];
       if (piece) {
@@ -196,7 +214,7 @@ export default function DraughtsComputerGame({
       setSelected(null);
       setLegalMoves([]);
     },
-    [myTurn, botThinking, isLiveView, board, myColor, selected, legalMoves, applyAndAdvance]
+    [myTurn, botThinking, isLiveView, board, myColor, mustContinueJump, selected, legalMoves, applyAndAdvance]
   );
 
   const handleResign = () => {
@@ -274,7 +292,7 @@ export default function DraughtsComputerGame({
               perspective={perspective}
               selected={selected}
               legalMoves={legalMoves}
-              mustContinueJump={null}
+              mustContinueJump={mustContinueJump}
               onSquareClick={handleSquareClick}
               lastMove={lastMove}
               interactive={myTurn && !botThinking && isLiveView}
