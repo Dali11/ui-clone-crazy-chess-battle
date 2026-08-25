@@ -24,17 +24,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Chess Battles are currently disabled" }, { status: 403 });
     }
 
-    // For challenges, allow any stake within min/max bounds
-    const minStake = bConfig.min_stake_cents || 50_000;
-    const maxStake = bConfig.max_stake_cents || 1_000_000;
-    if (stakeCents < minStake) {
-      const minDisplay = Math.floor(minStake / 100).toLocaleString();
-      return NextResponse.json({ error: `Minimum stake is MWK ${minDisplay}` }, { status: 400 });
-    }
-    if (stakeCents > maxStake) {
-      const maxDisplay = Math.floor(maxStake / 100).toLocaleString();
-      return NextResponse.json({ error: `Maximum stake is MWK ${maxDisplay}` }, { status: 400 });
-    }
+    // Challenges have no stake limits — friends agree on any amount
 
     // Check active battle
     const { data: activeBattle } = await admin
