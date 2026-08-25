@@ -89,11 +89,17 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "draughts_games", filter: `id=eq.${game.id}` },
         (payload: any) => {
-          setGame(payload.new);
-          setBoard(stringToBoard(payload.new.board_state));
-          setSelected(null);
-          setLegalMoves([]);
-          setError(null);
+          setGame((prev: any) => {
+            // Skip if this is our own move update we already applied locally
+            if (payload.new.move_count === prev.move_count && payload.new.status === prev.status) {
+              return prev;
+            }
+            setBoard(stringToBoard(payload.new.board_state));
+            setSelected(null);
+            setLegalMoves([]);
+            setError(null);
+            return payload.new;
+          });
         }
       )
       .subscribe();
@@ -105,13 +111,17 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
         const res = await fetch(`/api/draughts/state?gameId=${game.id}`);
         if (res.ok) {
           const data = await res.json();
-          if (data.move_count !== game.move_count || data.status !== game.status) {
-            setGame(data);
-            setBoard(stringToBoard(data.board_state));
-            setSelected(null);
-            setLegalMoves([]);
-            setError(null);
-          }
+          // Use functional update to avoid stale closure
+          setGame((prev: any) => {
+            if (data.move_count !== prev.move_count || data.status !== prev.status) {
+              setBoard(stringToBoard(data.board_state));
+              setSelected(null);
+              setLegalMoves([]);
+              setError(null);
+              return data;
+            }
+            return prev;
+          });
         }
       } catch {}
     }, 3000);
@@ -186,6 +196,21 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
       if (!res.ok) {
         setError(data.error || "Invalid move");
       } else {
+        // Immediately update local state — don't wait for realtime/polling
+        if (data.board) {
+          setBoard(data.board);
+        }
+        setGame((prev: any) => ({
+          ...prev,
+          turn: data.turn,
+          move_count: data.moveCount,
+          status: data.status,
+          winner: data.winner,
+          must_continue_jump: data.mustContinueJump,
+          white_clock_ms: data.whiteClockMs,
+          black_clock_ms: data.blackClockMs,
+          last_move_at: new Date().toISOString(),
+        }));
         setLastMove({ from, to });
         setSelected(null);
         setLegalMoves([]);
