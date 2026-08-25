@@ -51,7 +51,9 @@ DECLARE
   initial_board TEXT;
 BEGIN
   initial_ms := p_initial_minutes * 60 * 1000;
-  initial_board := '[null,"b",null,"b",null,"b",null,"b",null,"b",null,"b",null,"b",null,"b",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"w",null,"w",null,"w",null,"w",null,"w",null,"w",null,"w",null,"w",null,"w"]';
+  -- board_state uses the 8-line dot-notation format expected by stringToBoard():
+  -- '.' = empty, 'b'/'B' = black man/king, 'w'/'W' = white man/king.
+  initial_board := E'.b.b.b.b\nb.b.b.b.\n.b.b.b.b\n........\n........\nw.w.w.w.\n.w.w.w.w\nw.w.w.w.';
   INSERT INTO public.draughts_games (
     white_player_id, black_player_id, white_rating, black_rating,
     time_control, initial_minutes, increment_seconds, rated, status,
