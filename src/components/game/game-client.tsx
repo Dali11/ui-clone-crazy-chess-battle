@@ -62,7 +62,7 @@ function formatClock(ms: number | null): string {
 }
 
 export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo }: GameClientProps) {
-  const { game, connected, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw } = useRealtimeGame(gameId, initialGame, currentUserId);
+  const { game, connected, connectionQuality, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw } = useRealtimeGame(gameId, initialGame, currentUserId);
   const router = useRouter();
   const [fen, setFen] = useState(game.fen);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
@@ -316,6 +316,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       if (isPromotionMove(selectedSquare, square)) {
         setPendingPromotion({ from: selectedSquare, to: square });
       } else {
+        const prevFen = fen;
         try {
           const tempGame = new Chess(fen);
           const move = tempGame.move({ from: selectedSquare, to: square, promotion: "q" });
@@ -328,7 +329,14 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
             if (tempGame.inCheck() && !tempGame.isCheckmate()) {
               setTimeout(() => playSound("check"), 100);
             }
-            makeMove(selectedSquare, square);
+            makeMove(selectedSquare, square).then((res: any) => {
+              if (!res?.success) {
+                setFen(prevFen);
+                setMoveHistory((prev) => prev.slice(0, -1));
+                setViewPly((prev) => Math.max(0, prev - 1));
+                setLastMove(null);
+              }
+            });
           }
         } catch {}
       }
@@ -437,6 +445,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           setPendingPromotion({ from: sourceSquare, to: targetSquare });
           return false;
         }
+        const prevFen = fen;
         try {
           const tempGame = new Chess(fen);
           const move = tempGame.move({ from: sourceSquare, to: targetSquare, promotion: "q" });
@@ -452,7 +461,15 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         } catch {
           return false;
         }
-        makeMove(sourceSquare, targetSquare);
+        // Send to server, roll back on failure
+        makeMove(sourceSquare, targetSquare).then((res: any) => {
+          if (!res?.success) {
+            setFen(prevFen);
+            setMoveHistory((prev) => prev.slice(0, -1));
+            setViewPly((prev) => Math.max(0, prev - 1));
+            setLastMove(null);
+          }
+        });
         return true;
       }
       if (!targetSquare) return false;
@@ -479,18 +496,28 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   const handlePromotionSelect = useCallback((piece: "q" | "r" | "b" | "n") => {
     if (pendingPromotion) {
+      const prevFen = fen;
+      const promoFrom = pendingPromotion.from;
+      const promoTo = pendingPromotion.to;
       try {
         const tempGame = new Chess(fen);
-        const move = tempGame.move({ from: pendingPromotion.from, to: pendingPromotion.to, promotion: piece });
+        const move = tempGame.move({ from: promoFrom, to: promoTo, promotion: piece });
         if (move) {
           setFen(tempGame.fen());
           setMoveHistory((prev) => [...prev, move.san]);
           setViewPly((prev) => prev + 1);
-          setLastMove({ from: pendingPromotion.from, to: pendingPromotion.to });
+          setLastMove({ from: promoFrom, to: promoTo });
           playSound(detectMoveSound(move));
         }
       } catch {}
-      makeMove(pendingPromotion.from, pendingPromotion.to);
+      makeMove(promoFrom, promoTo, piece).then((res: any) => {
+        if (!res?.success) {
+          setFen(prevFen);
+          setMoveHistory((prev) => prev.slice(0, -1));
+          setViewPly((prev) => Math.max(0, prev - 1));
+          setLastMove(null);
+        }
+      });
     }
     setPendingPromotion(null);
   }, [pendingPromotion, fen, makeMove]);
@@ -521,7 +548,11 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           if (game.inCheck() && !game.isCheckmate()) {
             setTimeout(() => playSound("check"), 100);
           }
-          makeMove(premove.from, premove.to);
+          makeMove(premove.from, premove.to).then((res: any) => {
+          if (!res?.success) {
+            // Premove failed — board will auto-correct from server state
+          }
+        });
         }
       } catch {}
       setPremove(null);
@@ -789,9 +820,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         </button>
       </div>
 
-      {!connected && (
-        <div className="shrink-0 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted px-4 py-1.5 text-xs text-center max-w-[600px] mx-auto w-full mt-1">
-          Connecting...
+      {connectionQuality === "reconnecting" && (
+        <div className="shrink-0 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-500 px-4 py-1.5 text-xs text-center max-w-[600px] mx-auto w-full mt-1 flex items-center justify-center gap-1.5">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          Reconnecting… Your moves are queued.
         </div>
       )}
 

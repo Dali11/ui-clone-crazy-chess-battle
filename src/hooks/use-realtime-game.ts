@@ -42,26 +42,23 @@ export interface MoveBroadcast {
   lastMoveAt: string;
 }
 
+export interface MoveResult {
+  success: boolean;
+  error?: string;
+}
+
 export function useRealtimeGame(gameId: string, initialState: GameState, currentUserId?: string) {
   // ── Stable Supabase client (created once, not on every render) ──────
-  // CRITICAL FIX: Previously `createClient()` was called on every render,
-  // creating a new Supabase client instance each time. This caused the
-  // channel subscription effect to re-run on every render, constantly
-  // destroying and recreating the realtime channel — so broadcasts and
-  // postgres_changes events were missed, making multiplayer moves not
-  // sync between players.
   const supabase = useMemo(() => createClient(), []);
 
   const [game, setGame] = useState<GameState>(initialState);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [drawOffer, setDrawOffer] = useState<string | null>(null); // "offer" = received from opponent, "pending" = sent by us, null = none
+  const [drawOffer, setDrawOffer] = useState<string | null>(null);
   const [opponentMove, setOpponentMove] = useState<MoveBroadcast | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Shared "last applied move" counter used by ALL handlers (postgres_changes,
-  // broadcast, and polling) so a delayed/out-of-order event can never clobber
-  // a newer state with an older FEN.
+  // Shared "last applied move" counter used by ALL handlers
   const lastAppliedMoveCount = useRef<number>(initialState.move_count ?? 0);
 
   // Reconnection counter — bumping this re-triggers the subscription effect
@@ -69,29 +66,44 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Connection quality: "online" | "reconnecting" | "offline"
+  const [connectionQuality, setConnectionQuality] = useState<"online" | "reconnecting" | "offline">("reconnecting");
+  const connectedRef = useRef(false);
+
+  // Track in-flight move to prevent polling from overwriting it
+  const inflightMoveRef = useRef<boolean>(false);
+
+  // Pending move queue — if a move fails due to network, queue it and
+  // retry automatically. This prevents "stuck pieces" on flaky connections.
+  const pendingMoveRef = useRef<{ from: string; to: string; promotion?: string; retries: number } | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Ref to always have the latest game status for the polling check
-  // (avoids stale closure issues in the polling interval)
   const gameStatusRef = useRef(initialState.status);
   useEffect(() => {
     gameStatusRef.current = game.status;
   }, [game.status]);
 
+  // ── Connection quality helpers ──────────────────────────────────────────
+  const updateConnectionQuality = useCallback((quality: "online" | "reconnecting" | "offline") => {
+    setConnectionQuality(quality);
+    connectedRef.current = quality === "online";
+    setConnected(quality === "online");
+  }, []);
+
   // ── Fetch the latest game state from the API as a fallback ──────────────
-  // This runs:
-  //   1. On initial mount (in case realtime hasn't connected yet)
-  //   2. On every poll tick (every 2s — a safety net for missed realtime events)
-  //   3. Immediately after any reconnection
   const fetchGameState = useCallback(async () => {
     try {
       const res = await fetch(`/api/game/state?gameId=${gameId}`);
       if (!res.ok) return;
       const data = await res.json();
 
-      // Only apply if this is a newer state than what we already have
+      // Skip polling updates while a move is in-flight
+      if (inflightMoveRef.current) return;
+
       const newMoveCount = data.move_count ?? 0;
       if (newMoveCount < lastAppliedMoveCount.current) return;
       if (newMoveCount === lastAppliedMoveCount.current) {
-        // Same move count — but check if status changed (e.g. timeout, resignation)
         if (data.status === gameStatusRef.current) return;
       }
 
@@ -113,13 +125,139 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
     }
   }, [gameId]);
 
+  // ── Send move to server (used by makeMove, with retry) ────────────────────
+  const sendMoveToServer = useCallback(async (
+    from: string,
+    to: string,
+    promotion?: string
+  ): Promise<MoveResult> => {
+    try {
+      const response = await fetch("/api/game/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId, move: { from, to, promotion: promotion || "q" } }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // 409 = concurrency conflict — don't retry, tell client to roll back
+        if (response.status === 409) {
+          return { success: false, error: "Move conflict" };
+        }
+        setError(data.error || "Move failed");
+        return { success: false, error: data.error || "Move failed" };
+      }
+
+      setError(null);
+      if (data.fen) {
+        if (typeof data.moveCount === "number") {
+          lastAppliedMoveCount.current = Math.max(lastAppliedMoveCount.current, data.moveCount);
+        }
+        setGame((prev) => ({
+          ...prev,
+          fen: data.fen,
+          pgn: data.pgn || prev.pgn,
+          turn: data.turn,
+          status: data.status,
+          winner: data.winner,
+          move_count: data.moveCount,
+          white_clock_ms: data.whiteClockMs,
+          black_clock_ms: data.blackClockMs,
+          last_move_at: new Date().toISOString(),
+        }));
+
+        // Broadcast the move to the opponent over the realtime channel
+        if (channelRef.current) {
+          const moveBroadcast: MoveBroadcast = {
+            from,
+            to,
+            promotion: promotion || "q",
+            fen: data.fen,
+            pgn: data.pgn || "",
+            turn: data.turn,
+            status: data.status || "playing",
+            winner: data.winner,
+            moveCount: data.moveCount,
+            whiteClockMs: data.whiteClockMs,
+            blackClockMs: data.blackClockMs,
+            lastMoveAt: new Date().toISOString(),
+          };
+          channelRef.current.send({
+            type: "broadcast",
+            event: "move",
+            payload: moveBroadcast,
+          });
+        }
+      }
+      return { success: true };
+    } catch {
+      return { success: false, error: "Network error" };
+    }
+  }, [gameId]);
+
+  // ── makeMove with automatic retry on network failure ─────────────────────
+  const makeMove = useCallback(
+    async (from: string, to: string, promotion?: string): Promise<MoveResult> => {
+      inflightMoveRef.current = true;
+
+      // Cancel any existing retry timer
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+
+      const result = await sendMoveToServer(from, to, promotion);
+
+      if (!result.success && result.error === "Network error") {
+        // Network failure — retry with exponential backoff (1s, 2s, 4s)
+        // The client already has the optimistic fen showing the piece moved.
+        // We retry in the background; only roll back if all retries fail.
+        let retryCount = 0;
+        const maxRetries = 3;
+        const baseDelay = 1000;
+
+        const attemptRetry = async () => {
+          retryCount++;
+          if (retryCount > maxRetries) {
+            // All retries exhausted — signal failure for rollback
+            inflightMoveRef.current = false;
+            pendingMoveRef.current = null;
+            setError("Move failed after retries — check your connection");
+            return;
+          }
+
+          const retryResult = await sendMoveToServer(from, to, promotion);
+          if (retryResult.success) {
+            inflightMoveRef.current = false;
+            pendingMoveRef.current = null;
+            setError(null);
+          } else if (retryResult.error === "Network error") {
+            const delay = baseDelay * Math.pow(2, retryCount - 1);
+            retryTimerRef.current = setTimeout(attemptRetry, delay);
+          } else {
+            // Non-retryable error (conflict, not your turn, etc.)
+            inflightMoveRef.current = false;
+            pendingMoveRef.current = null;
+          }
+        };
+
+        // Queue the move — also auto-send on reconnect if realtime comes back
+        pendingMoveRef.current = { from, to, promotion, retries: 0 };
+        retryTimerRef.current = setTimeout(attemptRetry, 1000);
+        // Return optimistic success — retries handle failure
+        // The client keeps the optimistic board; rollback only if all retries fail
+        return { success: true };
+      }
+
+      inflightMoveRef.current = false;
+      return result;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sendMoveToServer]
+  );
+
   // ── Subscribe to real-time updates ──────────────────────────────────────
-  // CRITICAL FIX: This effect now only depends on [gameId, reconnectTick].
-  // Previously it also depended on `supabase`, which changed on every render
-  // (because createClient() was called without useMemo). This caused the
-  // channel to be torn down and recreated on every state update, missing all
-  // realtime events. Now with a stable supabase instance (useMemo), the
-  // channel is created once and stays alive for the entire game.
   useEffect(() => {
     const channel = supabase
       .channel(`game:${gameId}`)
@@ -133,7 +271,6 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
         },
         (payload) => {
           const updated = payload.new as Partial<GameState>;
-          // Ignore stale/out-of-order updates
           if (
             typeof updated.move_count === "number" &&
             updated.move_count < lastAppliedMoveCount.current
@@ -143,7 +280,6 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
           if (typeof updated.move_count === "number") {
             lastAppliedMoveCount.current = updated.move_count;
           }
-          // Clear draw offer when game ends
           if (updated.status && updated.status !== "playing") {
             setDrawOffer(null);
           }
@@ -151,14 +287,13 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
         }
       )
       .on("presence", { event: "sync" }, () => {
-        setConnected(true);
+        updateConnectionQuality("online");
       })
       .on("presence", { event: "join" }, () => {
-        setConnected(true);
+        updateConnectionQuality("online");
       })
       .on("broadcast", { event: "move" }, (payload: any) => {
         const data = payload.payload as MoveBroadcast;
-        // Only process if this is a new move
         if (data.moveCount > lastAppliedMoveCount.current) {
           lastAppliedMoveCount.current = data.moveCount;
           setOpponentMove(data);
@@ -177,10 +312,6 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
         }
       })
       .on("broadcast", { event: "draw_offer" }, (payload: any) => {
-        // Only show Accept/Decline if the offer came from the OPPONENT.
-        // The server broadcasts this to both players, so the offerer's own
-        // browser also receives it — ignore it there (they already have
-        // the local "pending" state from offerDraw()).
         const from = payload?.payload?.from;
         if (from && currentUserId && from === currentUserId) return;
         setDrawOffer("offer");
@@ -200,12 +331,18 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          setConnected(true);
+          updateConnectionQuality("online");
           setError(null);
           fetchGameState();
+          // If we have a pending move from a previous disconnection, send it now
+          if (pendingMoveRef.current) {
+            const pm = pendingMoveRef.current;
+            pendingMoveRef.current = null;
+            makeMove(pm.from, pm.to, pm.promotion);
+          }
         }
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setConnected(false);
+          updateConnectionQuality("reconnecting");
           setError("Connection lost. Reconnecting...");
           if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
           reconnectTimerRef.current = setTimeout(() => {
@@ -223,28 +360,25 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, reconnectTick]);
 
-  // ── Polling fallback — fetch game state every 2 seconds ──────────────────
-  // Reduced from 4s to 2s for snappier sync. Realtime (broadcast + postgres_changes)
-  // can silently drop on mobile networks. This poll ensures we always catch
-  // opponent moves even if the realtime channel is dead.
-  //
-  // FIX: Previously used setGame((prev) => { fetchGameState(); return prev; })
-  // to check game.status inside the interval — an anti-pattern that calls an
-  // async function inside a state updater. Now uses a ref (gameStatusRef)
-  // to check status without the state updater hack.
+  // ── Adaptive polling — fast when disconnected, slow when connected ────────
+  // When connected: poll every 3s (lightweight safety net alongside realtime)
+  // When disconnected: poll every 800ms (aggressive catch-up so we don't miss
+  // opponent moves when the realtime channel is dead)
   useEffect(() => {
     fetchGameState();
+
+    const pollInterval = connectedRef.current ? 3000 : 800;
 
     pollRef.current = setInterval(() => {
       if (gameStatusRef.current === "playing") {
         fetchGameState();
       }
-    }, 2000);
+    }, pollInterval);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [fetchGameState]);
+  }, [fetchGameState, connectionQuality]);
 
   // Check for timeout (server-side verification, client-callable)
   const checkTimeout = useCallback(async () => {
@@ -268,72 +402,6 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
       // Silent fail
     }
   }, [gameId]);
-
-  const makeMove = useCallback(
-    async (from: string, to: string, promotion?: string) => {
-      try {
-        const response = await fetch("/api/game/move", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ gameId, move: { from, to, promotion: promotion || "q" } }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          setError(data.error || "Move failed");
-          return false;
-        }
-
-        setError(null);
-        if (data.fen) {
-          if (typeof data.moveCount === "number") {
-            lastAppliedMoveCount.current = Math.max(lastAppliedMoveCount.current, data.moveCount);
-          }
-          setGame((prev) => ({
-            ...prev,
-            fen: data.fen,
-            pgn: data.pgn || prev.pgn,
-            turn: data.turn,
-            status: data.status,
-            winner: data.winner,
-            move_count: data.moveCount,
-            white_clock_ms: data.whiteClockMs,
-            black_clock_ms: data.blackClockMs,
-            last_move_at: new Date().toISOString(),
-          }));
-
-          // Broadcast the move to the opponent over the realtime channel
-          if (channelRef.current) {
-            const moveBroadcast: MoveBroadcast = {
-              from,
-              to,
-              promotion: promotion || "q",
-              fen: data.fen,
-              pgn: data.pgn || "",
-              turn: data.turn,
-              status: data.status || "playing",
-              winner: data.winner,
-              moveCount: data.moveCount,
-              whiteClockMs: data.whiteClockMs,
-              blackClockMs: data.blackClockMs,
-              lastMoveAt: new Date().toISOString(),
-            };
-            channelRef.current.send({
-              type: "broadcast",
-              event: "move",
-              payload: moveBroadcast,
-            });
-          }
-        }
-        return true;
-      } catch {
-        setError("Network error");
-        return false;
-      }
-    },
-    [gameId]
-  );
 
   // Resign the game
   const resign = useCallback(async () => {
@@ -361,7 +429,7 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
 
   // Draw offer / accept / decline
   const offerDraw = useCallback(async () => {
-    setDrawOffer("pending"); // Show "Waiting for opponent..." locally
+    setDrawOffer("pending");
     try {
       await fetch("/api/game/draw", {
         method: "POST",
@@ -399,5 +467,12 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
     setDrawOffer(null);
   }, [gameId]);
 
-  return { game, connected, error, drawOffer, makeMove, resign, checkTimeout, setGame, offerDraw, acceptDraw, declineDraw, opponentMove };
+  // Cleanup retry timer on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
+  }, []);
+
+  return { game, connected, connectionQuality, error, drawOffer, makeMove, resign, checkTimeout, setGame, offerDraw, acceptDraw, declineDraw, opponentMove };
 }

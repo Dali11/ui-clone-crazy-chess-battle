@@ -105,14 +105,25 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminClient();
-    const { error } = await admin
+    const { error, count } = await admin
       .from("games")
       .update(updateData)
       .eq("id", gameId)
-      .eq("move_count", game.move_count);
+      .eq("move_count", game.move_count)
+      .select("id");
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // If 0 rows updated, another move beat us (concurrency guard) or the
+    // game state changed between our read and write. Tell the client to
+    // refresh — do NOT return the optimistic fen as if it succeeded.
+    if (count === 0) {
+      return NextResponse.json({
+        error: "Move conflict — game state changed. Please retry.",
+        conflict: true,
+      }, { status: 409 });
     }
 
     // If no rows updated, another move beat us — tell client to refresh
