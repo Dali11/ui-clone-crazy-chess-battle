@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronDown, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -80,7 +81,7 @@ const FAQ_SECTIONS = [
       },
       {
         q: "What time controls are available?",
-        a: "Bullet (1+0), Blitz (3+0, 5+0), Rapid (10+0), and Classical (30+0). You can also create custom time controls when hosting tournaments.",
+        a: "The default time control for casual play and battles is 15+10 (15 minutes + 10 seconds increment). Tournaments can also use Bullet (1+0), Blitz (3+0, 5+0), Rapid (10+0), and Classical (30+0). You can set custom time controls when hosting tournaments.",
       },
       {
         q: "How does matchmaking work?",
@@ -118,9 +119,7 @@ export default function FAQPage() {
       <nav className="border-b border-ccb-border bg-ccb-surface sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
           <Link href="/" className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-ccb-primary flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-sm sm:text-lg">♞</span>
-            </div>
+            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
             <span className="font-bold text-sm sm:text-lg truncate">Crazy Chess Battles</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -178,9 +177,7 @@ export default function FAQPage() {
       <footer className="border-t border-ccb-border py-6 px-4">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row-reverse items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-ccb-primary flex items-center justify-center shrink-0">
-              <span className="text-white text-sm">♞</span>
-            </div>
+            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="w-6 h-6 rounded-full shrink-0" />
             <span className="text-xs sm:text-sm text-ccb-muted">© 2026 Crazy Chess Battles</span>
           </div>
           <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-ccb-muted flex-wrap justify-center">

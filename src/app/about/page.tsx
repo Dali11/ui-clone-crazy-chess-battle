@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, Trophy, Zap, Shield, Users, Heart, Quote, BookOpen } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, Trophy, Zap, Shield, Users, Heart, Quote, BookOpen, Disc3, Crown } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +11,7 @@ export default function AboutPage() {
       <nav className="border-b border-ccb-border bg-ccb-surface sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
           <Link href="/" className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-ccb-primary flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-sm sm:text-lg">♞</span>
-            </div>
+            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
             <span className="font-bold text-sm sm:text-lg truncate">Crazy Chess Battles</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -30,7 +29,7 @@ export default function AboutPage() {
             Chess is <span className="text-ccb-primary">Africa&apos;s</span> game too
           </h1>
           <p className="text-sm sm:text-lg text-ccb-muted leading-relaxed">
-            Crazy Chess Battles was built for one reason: to give Malawian chess players a place to compete,
+            Crazy Chess Battles was built for one reason: to give Malawian chess and draughts players a place to compete,
             earn, and grow — without needing a credit card, a foreign bank account, or a VPN.
           </p>
           <p className="text-sm sm:text-lg text-ccb-muted leading-relaxed mt-4">
@@ -86,6 +85,9 @@ export default function AboutPage() {
 
             <p>
               So that I could find people like me who were willing to join a battle, and compete in a tournament.
+            </p>
+            <p>
+              Today, Crazy Chess Battles is more than just battles — it&apos;s a full competitive ecosystem with Swiss qualifiers, a Premier League, season rankings, and draughts alongside chess. We&apos;re building the future of African board gaming, one match at a time.
             </p>
 
             <p>
@@ -170,6 +172,20 @@ export default function AboutPage() {
               </p>
             </div>
             <div className="card">
+              <Disc3 className="w-6 h-6 text-ccb-accent mb-3" />
+              <h3 className="font-semibold mb-2 text-sm">Draughts too</h3>
+              <p className="text-xs sm:text-sm text-ccb-muted">
+                Not just chess — play International, English, or Russian draughts. Same competitive infrastructure, same wallet, same community.
+              </p>
+            </div>
+            <div className="card">
+              <Crown className="w-6 h-6 text-ccb-primary mb-3" />
+              <h3 className="font-semibold mb-2 text-sm">Competitive pipeline</h3>
+              <p className="text-xs sm:text-sm text-ccb-muted">
+                From casual games to Swiss qualifiers to Premier League to Season Champion. A real path from your first game to the title.
+              </p>
+            </div>
+            <div className="card">
               <Users className="w-6 h-6 text-ccb-primary mb-3" />
               <h3 className="font-semibold mb-2 text-sm">Community-owned</h3>
               <p className="text-xs sm:text-sm text-ccb-muted">
@@ -198,9 +214,7 @@ export default function AboutPage() {
       <footer className="border-t border-ccb-border py-6 px-4">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row-reverse items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-ccb-primary flex items-center justify-center shrink-0">
-              <span className="text-white text-sm">♞</span>
-            </div>
+            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="w-6 h-6 rounded-full shrink-0" />
             <span className="text-xs sm:text-sm text-ccb-muted">© 2026 Crazy Chess Battles</span>
           </div>
           <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-ccb-muted flex-wrap justify-center">

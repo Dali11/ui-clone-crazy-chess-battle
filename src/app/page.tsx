@@ -1,7 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   Trophy, Swords, TrendingUp, Zap, Crown, ArrowRight, Check,
-  Users, Smartphone, Shield, Star, Gamepad2,
+  Users, Smartphone, Shield, Star, Gamepad2, Disc3,
 } from "lucide-react";
 import HomeStats from "./home-stats";
 import { createClient } from "@/lib/supabase/server";
@@ -25,14 +26,13 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
       <nav className="border-b border-ccb-border bg-ccb-surface sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-ccb-primary flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-sm sm:text-lg">♞</span>
-            </div>
+            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
             <span className="font-bold text-sm sm:text-lg truncate">CrazyChess</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <Link href="/league" className="btn-ghost text-sm hidden sm:inline-flex">Compete</Link>
             <Link href="/leaderboard" className="btn-ghost text-sm">Ranks</Link>
+            <Link href="/draughts" className="btn-ghost text-sm hidden sm:inline-flex">Draughts</Link>
             <Link href="/how-it-works" className="btn-ghost text-sm hidden sm:inline-flex">How it Works</Link>
             <Link href={`/signup${refParam}`} className="btn-primary text-sm px-3 sm:px-4">Sign up</Link>
           </div>
@@ -46,7 +46,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
         <div className="max-w-3xl text-center relative">
           <div className="inline-flex items-center gap-2 rounded-full border border-ccb-border bg-ccb-card px-3 sm:px-4 py-1.5 mb-6">
             <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-ccb-accent shrink-0" />
-            <span className="text-xs sm:text-sm text-ccb-muted">Swiss Qualifiers · Premier League · Championships</span>
+            <span className="text-xs sm:text-sm text-ccb-muted">Chess · Draughts · Swiss Qualifiers · Premier League · Championships</span>
           </div>
           <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tight mb-4 sm:mb-6 leading-tight">
             Play. Compete. <span className="text-ccb-primary">Climb.</span>
@@ -55,7 +55,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
             Become Champion.
           </p>
           <p className="text-base sm:text-lg text-ccb-muted mb-8 sm:mb-10 max-w-2xl mx-auto px-2">
-            Malawi&apos;s competitive chess ecosystem. Qualify through Swiss tournaments, earn your place in the Premier League, and climb the rankings to become champion.
+            Malawi&apos;s competitive chess and draughts arena. Play casual battles, qualify through Swiss tournaments, earn your place in the Premier League, and climb the rankings to become champion.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
             <Link href={`/signup${refParam}`} className="btn-primary text-base px-8 py-3 w-full sm:w-auto">
@@ -78,6 +78,10 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
             <div className="flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5 text-ccb-success" />
               <span>Real prizes</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-ccb-success" />
+              <span>Chess &amp; Draughts</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5 text-ccb-success" />
@@ -148,6 +152,11 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
               <p className="text-xs sm:text-sm text-ccb-muted">Blitz, bullet, or rapid chess against opponents matched to your skill level.</p>
             </div>
             <div className="card card-hover">
+              <Disc3 className="w-7 h-7 sm:w-8 sm:h-8 text-ccb-accent mb-3 sm:mb-4" />
+              <h3 className="font-semibold mb-2 text-sm sm:text-base">Draughts Arena</h3>
+              <p className="text-xs sm:text-sm text-ccb-muted">International, English, and Russian draughts on 8×8. Play vs computer or challenge friends online.</p>
+            </div>
+            <div className="card card-hover">
               <Trophy className="w-7 h-7 sm:w-8 sm:h-8 text-ccb-accent mb-3 sm:mb-4" />
               <h3 className="font-semibold mb-2 text-sm sm:text-base">Swiss Qualifiers</h3>
               <p className="text-xs sm:text-sm text-ccb-muted">Compete in structured Swiss tournaments with Buchholz tiebreakers. Earn your place in the Premier League.</p>
@@ -185,7 +194,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           </div>
           <h2 className="text-xl sm:text-3xl font-bold mb-4">Unlock Premium Competitions</h2>
           <p className="text-sm sm:text-base text-ccb-muted mb-6 max-w-2xl mx-auto">
-            Join the CrazyChess Club for MK5,000/month to access premium Premier League divisions, priority qualifier entry, season rankings, and exclusive championship events.
+            Join the CrazyChess Club for MK5,000/month to access premium Premier League divisions, priority qualifier entry, season rankings, and exclusive championship events. Membership is configurable per country as we expand across Africa.
           </p>
           <Link href="/league/subscribe" className="btn-primary inline-flex items-center gap-2">
             <Crown className="w-4 h-4" /> View Membership Plans
@@ -210,14 +219,13 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
       <footer className="border-t border-ccb-border py-8 px-4">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-ccb-primary flex items-center justify-center">
-              <span className="text-white font-bold text-xs">♞</span>
-            </div>
+            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="w-6 h-6 rounded-full" />
             <span className="font-bold text-sm">CrazyChess</span>
           </div>
           <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-ccb-muted">
             <Link href="/league" className="hover:text-ccb-text transition-colors">Compete</Link>
             <Link href="/leaderboard" className="hover:text-ccb-text transition-colors">Ranks</Link>
+            <Link href="/draughts" className="hover:text-ccb-text transition-colors">Draughts</Link>
             <Link href="/how-it-works" className="hover:text-ccb-text transition-colors">How it Works</Link>
             <Link href="/about" className="hover:text-ccb-text transition-colors">About</Link>
             <Link href="/faq" className="hover:text-ccb-text transition-colors">FAQ</Link>

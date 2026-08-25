@@ -1,7 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   Users, Smartphone, Swords, Trophy, Wallet, ArrowRight, Check,
-  Gamepad2, Clock, Crown, ChevronRight, Zap,
+  Gamepad2, Clock, Crown, ChevronRight, Zap, Disc3,
 } from "lucide-react";
 import HomeStats from "../home-stats";
 
@@ -14,9 +15,7 @@ export default function HowItWorksPage() {
       <nav className="border-b border-ccb-border bg-ccb-surface sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
           <Link href="/" className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-ccb-primary flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-sm sm:text-lg">♞</span>
-            </div>
+            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
             <span className="font-bold text-sm sm:text-lg truncate">Crazy Chess Battles</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -147,9 +146,14 @@ export default function HowItWorksPage() {
                   <p className="text-xs text-ccb-muted">Enter free or paid Swiss tournaments. Win games, climb the bracket, claim your prize.</p>
                 </div>
                 <div className="card">
+                  <Disc3 className="w-5 h-5 text-ccb-accent mb-2" />
+                  <h3 className="font-semibold text-sm mb-1">Draughts</h3>
+                  <p className="text-xs text-ccb-muted">International, English, or Russian draughts. Play vs computer or challenge a friend online.</p>
+                </div>
+                <div className="card">
                   <Gamepad2 className="w-5 h-5 text-ccb-primary mb-2" />
                   <h3 className="font-semibold text-sm mb-1">Play vs Computer</h3>
-                  <p className="text-xs text-ccb-muted">Practice against the AI. No stakes, no rating impact — just sharpen your skills.</p>
+                  <p className="text-xs text-ccb-muted">Practice chess or draughts against the AI. No stakes, no rating impact — just sharpen your skills.</p>
                 </div>
               </div>
             </div>
@@ -186,8 +190,39 @@ export default function HowItWorksPage() {
         </div>
       </section>
 
-      {/* Create Tournaments */}
+      {/* Competitive Pipeline */}
       <section className="border-t border-ccb-border px-4 py-12 sm:py-16">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-8 sm:mb-10">
+            <Crown className="w-8 h-8 text-ccb-primary mx-auto mb-3" />
+            <h2 className="text-lg sm:text-2xl font-bold mb-2">The Competitive Pipeline</h2>
+            <p className="text-sm text-ccb-muted">From your first casual game to season champion — here&apos;s the path</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+            <div className="card text-center">
+              <div className="text-ccb-muted text-xs font-mono mb-2">Stage 01</div>
+              <Swords className="w-7 h-7 text-ccb-accent mx-auto mb-3" />
+              <h3 className="font-semibold text-sm mb-2">Swiss Qualifiers</h3>
+              <p className="text-xs text-ccb-muted">Compete in Swiss tournaments with Buchholz tiebreakers. Top finishers earn qualification spots for the Premier League.</p>
+            </div>
+            <div className="card text-center">
+              <div className="text-ccb-muted text-xs font-mono mb-2">Stage 02</div>
+              <Trophy className="w-7 h-7 text-ccb-primary mx-auto mb-3" />
+              <h3 className="font-semibold text-sm mb-2">Premier League</h3>
+              <p className="text-xs text-ccb-muted">Round-robin league with football-style scoring — 3 points for a win, 1 for a draw. Climb the table across weekly fixtures.</p>
+            </div>
+            <div className="card text-center">
+              <div className="text-ccb-muted text-xs font-mono mb-2">Stage 03</div>
+              <Crown className="w-7 h-7 text-ccb-success mx-auto mb-3" />
+              <h3 className="font-semibold text-sm mb-2">Season Champion</h3>
+              <p className="text-xs text-ccb-muted">Accumulate season points across all competitions. Top players fight for the championship title and prizes.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Create Tournaments */}
+      <section className="border-t border-ccb-border px-4 py-12 sm:py-16 bg-ccb-surface/30">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-start gap-4 sm:gap-6">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-ccb-primary/10 flex items-center justify-center shrink-0">
@@ -234,9 +269,7 @@ export default function HowItWorksPage() {
       <footer className="border-t border-ccb-border py-6 sm:py-8 px-4">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row-reverse items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-ccb-primary flex items-center justify-center shrink-0">
-              <span className="text-white text-sm">♞</span>
-            </div>
+            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="w-6 h-6 rounded-full shrink-0" />
             <span className="text-xs sm:text-sm text-ccb-muted">© 2026 Crazy Chess Battles</span>
           </div>
           <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-ccb-muted flex-wrap justify-center">
