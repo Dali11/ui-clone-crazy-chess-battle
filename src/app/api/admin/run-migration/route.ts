@@ -500,6 +500,57 @@ export async function POST(req: NextRequest) {
       results.push({ ok: false, error: e.message, sql: 'Seed default league tiers' });
     }
 
+    // Migration 036: Expand withdrawal_config into full platform finance config
+    const migration036Statements = [
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS min_withdrawal_cents INT NOT NULL DEFAULT 1000`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS max_withdrawal_cents INT NOT NULL DEFAULT 5000000`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS min_deposit_cents INT NOT NULL DEFAULT 500`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS processing_fee_pct NUMERIC(5,2) NOT NULL DEFAULT 0.00`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS daily_withdrawal_limit_cents INT NOT NULL DEFAULT 1000000`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS withdrawal_fee_cents INT NOT NULL DEFAULT 0`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS deposit_fee_cents INT NOT NULL DEFAULT 0`,
+      `ALTER TABLE public.deposits ADD COLUMN IF NOT EXISTS admin_notes TEXT`,
+      `ALTER TABLE public.deposits ADD COLUMN IF NOT EXISTS credited_by UUID REFERENCES public.profiles(id)`,
+      `ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS rejection_reason TEXT`,
+    ];
+    for (const sql of migration036Statements) {
+      try {
+        await client.query(sql);
+        results.push({ ok: true, sql: sql.substring(0, 70) });
+      } catch (e: any) {
+        results.push({ ok: false, error: e.message, sql: sql.substring(0, 70) });
+      }
+    }
+
+    // Migration 037: Create platform_settings table + seed defaults
+    const migration037Statements = [
+      `CREATE TABLE IF NOT EXISTS public.platform_settings (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), section TEXT NOT NULL UNIQUE, config JSONB NOT NULL DEFAULT '{}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_by UUID REFERENCES public.profiles(id))`,
+      `ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY`,
+      `DROP POLICY IF EXISTS "Admins manage platform settings" ON public.platform_settings`,
+      `CREATE POLICY "Admins manage platform settings" ON public.platform_settings FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true)) WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true))`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('deposits', '{"enabled": true, "auto_credit": false, "min_amount_cents": 500, "max_amount_cents": 10000000, "allowed_methods": ["mpesa", "airtel", "card"], "require_approval_above_cents": 50000, "show_kpi_cards": true, "default_filter": "pending", "page_size": 20}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('withdrawals', '{"enabled": true, "auto_approve": false, "min_amount_cents": 1000, "max_amount_cents": 5000000, "daily_limit_cents": 1000000, "processing_fee_pct": 0, "withdrawal_fee_cents": 0, "show_kpi_cards": true, "default_filter": "pending", "page_size": 20}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('battles', '{"enabled": true, "min_stake_cents": 100, "max_stake_cents": 1000000, "platform_fee_pct": 10, "auto_cancel_minutes": 10, "show_kpi_cards": true, "page_size": 20}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('games', '{"show_kpi_cards": true, "default_filter": "all", "page_size": 20, "allow_spectators": true, "max_concurrent_games": 5}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('users', '{"allow_signup": true, "require_email_verification": false, "default_is_admin": false, "page_size": 20, "show_kpi_cards": true}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('tournaments', '{"require_approval": true, "auto_approve_below_players": 0, "max_players": 128, "page_size": 20, "show_kpi_cards": true}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('berry', '{"berries_per_win": 10, "berries_per_draw": 5, "berries_per_tournament_win": 50, "daily_cap": 100, "conversion_rate": 100, "show_kpi_cards": true}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('leagues', '{"require_membership": true, "auto_relegate": true, "promotion_spots": 5, "relegation_spots": 5, "page_size": 20, "show_kpi_cards": true}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('seasons', '{"auto_create": false, "default_duration_weeks": 12, "allow_overlap": false, "page_size": 20, "show_kpi_cards": true}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('membership', '{"auto_renew": false, "grace_period_days": 10, "require_verification": false, "page_size": 20, "show_kpi_cards": true}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('verification', '{"require_id_document": true, "require_selfie": false, "auto_approve_trusted": false, "page_size": 20, "show_kpi_cards": true}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('logs', '{"retention_days": 90, "page_size": 50, "show_kpi_cards": true}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('overview', '{"show_kpi_cards": true, "refresh_interval_seconds": 30}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+    ];
+    for (const sql of migration037Statements) {
+      try {
+        await client.query(sql);
+        results.push({ ok: true, sql: sql.substring(0, 70) });
+      } catch (e: any) {
+        results.push({ ok: false, error: e.message, sql: sql.substring(0, 70) });
+      }
+    }
+
     await client.end();
 
     const allOk = results.every((r: any) => r.ok);

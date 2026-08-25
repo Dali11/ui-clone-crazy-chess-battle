@@ -11,6 +11,7 @@ import {
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
   Settings, FileText,
 } from "lucide-react";
+import PlatformSettingsPanel from "./platform-settings-panel";
 
 interface Withdrawal {
   id: string;
@@ -1103,6 +1104,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* OVERVIEW */}
           {tab === "overview" && stats && (
             <div className="space-y-4">
+              <PlatformSettingsPanel section="overview" />
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
                 <StatCard icon={Users} label="Total Users" value={stats.totalUsers || 0} color="text-ccb-primary" />
                 <StatCard icon={Trophy} label="Active Tournaments" value={stats.activeTournaments || 0} color="text-ccb-accent" />
@@ -1152,6 +1154,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* USERS */}
           {tab === "users" && (
             <div className="space-y-3">
+              <PlatformSettingsPanel section="users" />
               {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ccb-muted" />
@@ -1266,6 +1269,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* WITHDRAWALS */}
           {tab === "withdrawals" && (
             <div className="space-y-4">
+              <PlatformSettingsPanel section="withdrawals" />
               {/* Finance Config Panel */}
               {withdrawalConfig && (
                 <div className="card border-ccb-primary/20">
@@ -1562,6 +1566,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
 
           {tab === "tournaments" && (
             <div className="space-y-4">
+              <PlatformSettingsPanel section="tournaments" />
               {/* STATS CARDS */}
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                 <div className="card p-3 text-center">
@@ -2243,6 +2248,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* GAMES */}
           {tab === "games" && (
             <div className="space-y-4">
+              <PlatformSettingsPanel section="games" />
               <div className="flex gap-2">
                 {["all", "playing", "completed", "aborted", "draw"].map((f) => (
                   <button
@@ -2305,6 +2311,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
 
           {tab === "deposits" && (
             <div className="space-y-4">
+              <PlatformSettingsPanel section="deposits" />
               {/* Deposit stats */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                 <div className="card text-center">
@@ -2495,6 +2502,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
 
           {tab === "battles" && (
             <div className="space-y-4">
+              <PlatformSettingsPanel section="battles" />
               {battleConfig && (
                 <div className="card space-y-4">
                   <div className="flex items-center gap-2">
@@ -2681,6 +2689,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* BERRY CONFIG */}
           {tab === "berry" && berryConfig && (
             <div className="space-y-4">
+              <PlatformSettingsPanel section="berry" />
               <div className="card space-y-4">
                 <div className="flex items-center gap-2">
                   <Cherry className="w-5 h-5 text-red-500" />
@@ -2755,6 +2764,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* ADMIN LOGS */}
           {tab === "logs" && (
             <div className="space-y-2">
+              <PlatformSettingsPanel section="logs" />
               {logs.length === 0 ? (
                 <div className="text-center py-12 text-ccb-muted text-sm">
                   <ScrollText className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -2781,6 +2791,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* LEAGUES MANAGEMENT */}
           {tab === "leagues" && (
             <div className="space-y-4">
+              <PlatformSettingsPanel section="leagues" />
               {adminLeagues.length === 0 ? (
                 <div className="text-center py-12 text-ccb-muted text-sm">
                   <Crown className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -2832,6 +2843,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* SEASONS MANAGEMENT */}
           {tab === "seasons" && (
             <div className="space-y-4">
+              <PlatformSettingsPanel section="seasons" />
               {/* Create new season */}
               <div className="card space-y-3">
                 <h3 className="text-sm font-bold flex items-center gap-2"><Calendar className="w-4 h-4 text-ccb-primary" /> Create New Season</h3>
@@ -2881,6 +2893,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* MEMBERSHIP PRICING */}
           {tab === "membership" && (
             <div className="space-y-4">
+              <PlatformSettingsPanel section="membership" />
               <div className="card p-4">
                 <h3 className="text-sm font-bold flex items-center gap-2 mb-2"><Crown className="w-4 h-4 text-ccb-primary" /> Membership Pricing</h3>
                 <p className="text-xs text-ccb-muted">Configure the monthly membership fee for each market. Players pay this to access Premium Leagues and exclusive competitions. Yearly pricing is automatically calculated as 10x monthly (2 months free).</p>
@@ -2956,6 +2969,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* VERIFICATION */}
           {tab === "verification" && (
             <div className="space-y-4">
+              <PlatformSettingsPanel section="verification" />
               <div className="flex items-center gap-2">
                 {(["pending", "verified", "all"] as const).map((f) => (
                   <button
