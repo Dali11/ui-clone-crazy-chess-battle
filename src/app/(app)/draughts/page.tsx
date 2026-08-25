@@ -324,7 +324,10 @@ export default function DraughtsPage() {
             <Disc3 className="w-6 h-6 text-ccb-primary" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold leading-tight">Crazy Draughts Battles ⚔️</h1>
+            <h1 className="text-lg sm:text-3xl font-bold leading-tight">
+              <span className="block sm:inline">Crazy Draughts</span>{" "}
+              <span className="block sm:inline">Battles ⚔️</span>
+            </h1>
             <p className="text-sm text-ccb-text/80 truncate">Play. Compete. Climb.</p>
           </div>
         </div>
