@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Chess Battles are currently disabled" }, { status: 403 });
     }
 
-    // Enforce min/max stake from platform settings
+    // For challenges, allow any stake within min/max bounds
     const minStake = bConfig.min_stake_cents || 50_000;
     const maxStake = bConfig.max_stake_cents || 1_000_000;
     if (stakeCents < minStake) {
@@ -59,16 +59,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient wallet balance" }, { status: 400 });
     }
 
-    // Create battle with platform fee from settings
+    // Debit the challenger's stake into escrow
+    const { error: debitErr } = await admin.rpc("debit_wallet", {
+      p_user_id: user.id,
+      p_amount_cents: stakeCents,
+    });
+
+    if (debitErr) {
+      return NextResponse.json({ error: "Failed to lock stake. Try again." }, { status: 500 });
+    }
+
+    await admin.from("deposits").insert({
+      user_id: user.id,
+      amount_cents: stakeCents,
+      status: "success",
+      method: "battle_challenge_escrow",
+      reference: `battle_challenge_create:${user.id}:${stakeCents}`,
+    });
+
+    // Create the battle record (pending, waiting for acceptor)
     const platformFeePct = bConfig.platform_fee_pct ?? 10;
     const referralCode = profile?.referral_code || profile?.username || null;
 
-    const { data: battle, error } = await admin
+    const { data: battle, error: battleErr } = await admin
       .from("battles")
       .insert({
         white_player_id: user.id,
         stake_cents: stakeCents,
-        time_control: timeControl || "blitz",
+        time_control: timeControl || "rapid15",
         platform_fee_pct: platformFeePct,
         status: "pending",
         referral_code: referralCode,
@@ -76,12 +94,37 @@ export async function POST(req: NextRequest) {
       .select("id")
       .single();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (battleErr || !battle) {
+      // Refund the debit
+      await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount_cents: stakeCents });
+      return NextResponse.json({ error: "Failed to create battle" }, { status: 500 });
     }
 
-    return NextResponse.json({ battleId: battle.id });
+    // Create the challenge record (expires in 24 hours)
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: challenge, error: challengeErr } = await admin
+      .from("battle_challenges")
+      .insert({
+        challenger_id: user.id,
+        stake_cents: stakeCents,
+        time_control: timeControl || "rapid15",
+        status: "pending",
+        battle_id: battle.id,
+        expires_at: expiresAt,
+      })
+      .select("id")
+      .single();
+
+    if (challengeErr || !challenge) {
+      // Refund and clean up battle
+      await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount_cents: stakeCents });
+      await admin.from("battles").delete().eq("id", battle.id);
+      return NextResponse.json({ error: "Failed to create challenge" }, { status: 500 });
+    }
+
+    return NextResponse.json({ challengeId: challenge.id, battleId: battle.id });
   } catch (err: any) {
-    return NextResponse.json({ error: "Failed to create battle" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create challenge" }, { status: 500 });
   }
 }
