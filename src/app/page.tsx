@@ -46,7 +46,6 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <Link href="/league" className="btn-ghost text-sm hidden sm:inline-flex">Compete</Link>
             <Link href="/leaderboard" className="btn-ghost text-sm">Ranks</Link>
-            <Link href="/draughts" className="btn-ghost text-sm hidden sm:inline-flex">Draughts</Link>
             <Link href="/how-it-works" className="btn-ghost text-sm hidden sm:inline-flex">How it Works</Link>
             <Link href={signupUrl} className="btn-primary text-sm px-3 sm:px-4">Sign up</Link>
           </div>
@@ -58,18 +57,11 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
         <div className="absolute inset-0 bg-gradient-to-b from-ccb-primary/5 via-transparent to-transparent pointer-events-none" />
         <div className="absolute -right-20 -top-20 w-72 h-72 bg-ccb-accent/5 rounded-full blur-3xl pointer-events-none" />
         <div className="max-w-3xl text-center relative">
-          <div className="inline-flex items-center gap-2 rounded-full border border-ccb-border bg-ccb-card px-3 sm:px-4 py-1.5 mb-6">
-            <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-ccb-accent shrink-0" />
-            <span className="text-xs sm:text-sm text-ccb-muted">Chess · Draughts · Swiss Qualifiers · Premier League · Championships</span>
-          </div>
           <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tight mb-4 sm:mb-6 leading-tight">
-            Play. Compete. <span className="text-ccb-primary">Climb.</span>
+            Do you think you got it in you?
           </h1>
-          <p className="text-xl sm:text-2xl font-bold text-ccb-accent mb-6 sm:mb-8 tracking-wide">
-            Become Champion.
-          </p>
           <p className="text-base sm:text-lg text-ccb-muted mb-8 sm:mb-10 max-w-2xl mx-auto px-2">
-            {market.countryName}&apos;s competitive chess and draughts arena. Play casual battles, qualify through Swiss tournaments, earn your place in the Premier League, and climb the rankings to become champion.
+            Challenge fellow players into Crazy Chess Battles, either as a free play duel, staked battle, or join our flagship tournaments and win real cash rewards.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
             <Link href={signupUrl} className="btn-primary text-base px-8 py-3 w-full sm:w-auto">
@@ -91,15 +83,11 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
             </div>
             <div className="flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5 text-ccb-success" />
-              <span>Real prizes</span>
+              <span>Real cash prizes</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5 text-ccb-success" />
-              <span>Chess &amp; Draughts</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Check className="w-3.5 h-3.5 text-ccb-success" />
-              <span>Mobile money</span>
+              <span>Staked battles</span>
             </div>
           </div>
         </div>
@@ -166,9 +154,9 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
               <p className="text-xs sm:text-sm text-ccb-muted">Blitz, bullet, or rapid chess against opponents matched to your skill level.</p>
             </div>
             <div className="card card-hover">
-              <Disc3 className="w-7 h-7 sm:w-8 sm:h-8 text-ccb-accent mb-3 sm:mb-4" />
-              <h3 className="font-semibold mb-2 text-sm sm:text-base">Draughts Arena</h3>
-              <p className="text-xs sm:text-sm text-ccb-muted">International, English, and Russian draughts on 8×8. Play vs computer or challenge friends online.</p>
+              <Zap className="w-7 h-7 sm:w-8 sm:h-8 text-ccb-primary mb-3 sm:mb-4" />
+              <h3 className="font-semibold mb-2 text-sm sm:text-base">Staked Battles</h3>
+              <p className="text-xs sm:text-sm text-ccb-muted">Put your skills on the line. Challenge opponents for real stakes and win cash rewards.</p>
             </div>
             <div className="card card-hover">
               <Trophy className="w-7 h-7 sm:w-8 sm:h-8 text-ccb-accent mb-3 sm:mb-4" />
@@ -186,15 +174,18 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
               <p className="text-xs sm:text-sm text-ccb-muted">Accumulate season points across all competitions. Track your progress on the official CrazyChess rankings.</p>
             </div>
             <div className="card card-hover">
-              <Smartphone className="w-7 h-7 sm:w-8 sm:h-8 text-ccb-accent mb-3 sm:mb-4" />
-              <h3 className="font-semibold mb-2 text-sm sm:text-base">Mobile Money</h3>
-              <p className="text-xs sm:text-sm text-ccb-muted">Deposit and withdraw via TNM Mpamba or Airtel Money. Instant payouts to your wallet.</p>
-            </div>
-            <div className="card card-hover">
               <Shield className="w-7 h-7 sm:w-8 sm:h-8 text-ccb-primary mb-3 sm:mb-4" />
               <h3 className="font-semibold mb-2 text-sm sm:text-base">Glicko-2 Ratings</h3>
               <p className="text-xs sm:text-sm text-ccb-muted">The same rating algorithm used by Chess.com. Your rating adjusts after every rated game.</p>
             </div>
+          </div>
+
+          {/* Draughts as accessory */}
+          <div className="mt-6 text-center">
+            <p className="text-xs sm:text-sm text-ccb-muted">
+              <Disc3 className="w-3.5 h-3.5 inline mr-1.5 text-ccb-accent" />
+              Also featuring Draughts — because a great mind deserves more than one battlefield.
+            </p>
           </div>
         </div>
       </section>
@@ -208,7 +199,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           </div>
           <h2 className="text-xl sm:text-3xl font-bold mb-4">Unlock Premium Competitions</h2>
           <p className="text-sm sm:text-base text-ccb-muted mb-6 max-w-2xl mx-auto">
-            Join the Crazy Chess Battles Club for {formatMembershipPrice(market.membershipPrice, market.currencySymbol)} to access premium Premier League divisions, priority qualifier entry, season rankings, and exclusive championship events. Available in {market.countryName} and expanding across Africa.
+            Join the Crazy Chess Battles Club for {formatMembershipPrice(market.membershipPrice, market.currencySymbol)} to access premium Premier League divisions, priority qualifier entry, season rankings, and exclusive championship events.
           </p>
           <Link href="/league/subscribe" className="btn-primary inline-flex items-center gap-2">
             <Crown className="w-4 h-4" /> View Membership Plans
