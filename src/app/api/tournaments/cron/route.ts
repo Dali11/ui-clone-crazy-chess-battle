@@ -13,10 +13,13 @@ export async function POST(req: NextRequest) {
 
 async function handleTournamentCron(req: NextRequest) {
   try {
-    // Vercel Cron sends CRON_SECRET as Authorization header
-    const authHeader = req.headers.get("authorization");
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Auth: CRON_SECRET if configured, otherwise open (safe operations only)
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const authHeader = req.headers.get("authorization");
+      if (authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
     }
 
     const admin = createAdminClient();
