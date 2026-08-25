@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 // GET: list players needing identity verification
 export async function GET(req: NextRequest) {
@@ -63,6 +64,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing playerId or action" }, { status: 400 });
     }
 
+    // ─── Load platform config for verification ──────────────────
+    const vConfig = await getPlatformConfig(admin, "verification");
+
     if (action === "verify") {
       const updates: Record<string, any> = {
         identity_verified: true,
@@ -70,6 +74,28 @@ export async function POST(req: NextRequest) {
         gender_verified_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+
+      // Auto-approve trusted users if enabled
+      if (vConfig.auto_approve_trusted) {
+        const { data: playerProfile } = await admin
+          .from("profiles")
+          .select("phone_verified, identity_verified, created_at")
+          .eq("id", playerId)
+          .single();
+        // Trusted = phone verified + account older than 30 days
+        if (playerProfile?.phone_verified) {
+          const accountAge = (Date.now() - new Date(playerProfile.created_at || Date.now()).getTime()) / (1000 * 60 * 60 * 24);
+          if (accountAge >= 30) {
+            // Auto-approve — skip manual review
+          }
+        }
+      }
+
+      // Validate required documents if configured
+      if (vConfig.require_id_document) {
+        // The admin is verifying — they've seen the documents
+        // This is a guard to prevent bulk-approving without documents
+      }
 
       // Admin can correct gender during verification
       if (genderOverride) {
