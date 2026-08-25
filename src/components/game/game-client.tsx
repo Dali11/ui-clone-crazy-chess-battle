@@ -743,7 +743,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         </div>
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-1.5">
-            <button onClick={() => data.userId && setPreviewUserId(data.userId)} className="text-sm font-semibold leading-tight truncate hover:text-ccb-primary transition-colors cursor-pointer">{data.name}</button>
+            <button onClick={() => data.userId && setPreviewUserId(data.userId)} className="text-sm font-semibold leading-tight truncate hover:text-ccb-primary transition-colors cursor-pointer bg-transparent border-0 p-0 m-0 text-inherit text-left">{data.name}</button>
             {data.rating != null && (
               <span className="text-sm text-ccb-muted/80 shrink-0 flex items-center gap-0.5 font-medium">
                 ({data.rating}
