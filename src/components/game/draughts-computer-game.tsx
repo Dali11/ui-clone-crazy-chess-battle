@@ -199,15 +199,16 @@ export default function DraughtsComputerGame({
     winner === "draw" ? "Draw" : winner === myColor ? "You win!" : winner ? "Bot wins" : "";
 
   return (
-    <div className="flex flex-col items-center gap-4 max-w-[600px] mx-auto pb-20 sm:pb-0">
+    <div className="game-viewport -my-4 sm:-my-6 flex flex-col lg:items-center lg:justify-center">
+      <div className="relative flex flex-col w-full lg:w-[600px] lg:max-w-[600px] lg:my-auto pb-20 sm:pb-0">
       {error && (
-        <div className="w-full px-4 py-2 rounded-lg bg-red-500/15 text-red-400 text-sm text-center">
+        <div className="w-full shrink-0 px-4 py-2 rounded-lg bg-red-500/15 text-red-400 text-sm text-center">
           {error}
         </div>
       )}
 
       {/* Bot info (top) */}
-      <div className="w-full flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
+      <div className="w-full shrink-0 flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-ccb-success/15 flex items-center justify-center">
             <Bot className="w-4 h-4 text-ccb-success" />
@@ -237,7 +238,7 @@ export default function DraughtsComputerGame({
       />
 
       {/* Me (bottom) */}
-      <div className="w-full flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
+      <div className="w-full shrink-0 flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full ${myColor === "w" ? "bg-stone-100" : "bg-stone-900"}`} />
           <span className="text-sm font-medium text-ccb-text">You</span>
@@ -291,6 +292,7 @@ export default function DraughtsComputerGame({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -248,16 +248,17 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
   const winnerLabel = game.winner === "white" ? "White wins!" : game.winner === "black" ? "Black wins!" : "Draw";
 
   return (
-    <div className="flex flex-col items-center gap-4 max-w-[600px] mx-auto">
+    <div className="game-viewport -my-4 sm:-my-6 flex flex-col lg:items-center lg:justify-center">
+      <div className="relative flex flex-col w-full lg:w-[600px] lg:max-w-[600px] lg:my-auto">
       {/* Error banner */}
       {error && (
-        <div className="w-full px-4 py-2 rounded-lg bg-red-500/15 text-red-400 text-sm text-center">
+        <div className="w-full shrink-0 px-4 py-2 rounded-lg bg-red-500/15 text-red-400 text-sm text-center">
           {error}
         </div>
       )}
 
       {/* Opponent info (top) */}
-      <div className="w-full flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
+      <div className="w-full shrink-0 flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full ${perspective === "white" ? "bg-stone-900" : "bg-stone-100"}`} />
           <span className="text-sm font-medium text-ccb-text">
@@ -276,6 +277,7 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
       </div>
 
       {/* Board */}
+      <div className="flex-1 min-h-0 flex items-center justify-center w-full">
       <DraughtsBoard
         board={board}
         perspective={perspective}
@@ -287,8 +289,10 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
         interactive={myTurn && !submitting}
       />
 
+      </div>
+
       {/* My info (bottom) */}
-      <div className="w-full flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
+      <div className="w-full shrink-0 flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full ${perspective === "white" ? "bg-stone-100" : "bg-stone-900"}`} />
           <span className="text-sm font-medium text-ccb-text">
@@ -358,6 +362,7 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
           </div>
         )
       )}
+      </div>
     </div>
   );
 }
