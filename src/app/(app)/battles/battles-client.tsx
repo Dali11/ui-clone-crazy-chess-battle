@@ -8,19 +8,30 @@ import {
   RefreshCw, XCircle, ChevronRight, Users, Target, Sparkles,
 } from "lucide-react";
 
-const DEFAULT_STAKES = [50000, 100000, 250000, 500000, 1000000];
+// Single fixed stake for matchmaking battles: MK 1,000 (100,000 cents)
+const BATTLE_STAKE_CENTS = 100_000;
+
+// Single fixed time control for all battles: Rapid 15+10
+const BATTLE_TIME_CONTROL = "rapid15";
+const BATTLE_TC_LABEL = "Rapid";
+const BATTLE_TC_DESC = "15+10";
 
 const TIME_CONTROLS = [
-  { id: "bullet",    label: "Bullet",    desc: "1+0",   icon: Zap },
-  { id: "blitz3",    label: "Blitz",     desc: "3+2",   icon: Zap },
-  { id: "blitz",     label: "Blitz",     desc: "5+0",   icon: Zap },
-  { id: "rapid",     label: "Rapid",     desc: "10+0",  icon: Clock },
-  { id: "rapid15",   label: "Rapid",     desc: "15+10", icon: Clock },
-  { id: "classical", label: "Classical", desc: "30+0",  icon: Clock },
+  { id: "rapid15", label: "Rapid", desc: "15+10", icon: Clock },
 ];
 
 function formatMKK(cents: number): string {
   return `MK ${Math.floor(cents / 100).toLocaleString("en-US")}`;
+}
+
+function formatCurrency(cents: number, currencyCode: string, rate: number): string {
+  if (currencyCode === "MWK" || !rate || rate === 1) return formatMKK(cents);
+  const converted = Math.round((cents / 100) * rate);
+  try {
+    return new Intl.NumberFormat("en", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(converted);
+  } catch {
+    return formatMKK(cents);
+  }
 }
 
 interface BattleConfig {
@@ -45,8 +56,6 @@ export default function BattlesPage() {
   const [gamesPlayed, setGamesPlayed] = useState(0);
   const MIN_GAMES_FOR_BATTLES = 5;
   const battlesLocked = gamesPlayed < MIN_GAMES_FOR_BATTLES;
-  const [selectedStake, setSelectedStake] = useState<number | null>(null);
-  const [selectedTC, setSelectedTC] = useState("rapid15");
   const [state, setState] = useState<BattleState>("select");
   const [battleId, setBattleId] = useState<string | null>(null);
   const [opponent, setOpponent] = useState<{ username: string; display_name: string; rating: number } | null>(null);
@@ -67,6 +76,14 @@ export default function BattlesPage() {
     stakeCents?: number;
   } | null>(null);
   const [cancellingStuck, setCancellingStuck] = useState(false);
+
+  // Currency state
+  const [currencyCode, setCurrencyCode] = useState("MWK");
+  const [fxRate, setFxRate] = useState(1);
+
+  // Challenge a Friend — custom stake
+  const [customStake, setCustomStake] = useState<string>("");
+  const [stakeError, setStakeError] = useState<string | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const searchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -107,22 +124,25 @@ export default function BattlesPage() {
   useEffect(() => {
     checkActiveBattle();
     loadProfile();
-    // Trigger expired challenge cleanup on page load (since cron is daily on Hobby plan)
     fetch("/api/battles/challenge/cleanup-expired", { method: "POST" }).catch(() => {});
     fetch("/api/battles/config")
       .then(async (r) => {
         const d = await r.json();
-        // Guard: never treat an error response (e.g. auth failure) as a disabled config
         if (!r.ok || d?.error) return;
         setConfig(d);
       })
       .catch(() => {});
+    // Fetch user's currency
+    fetch("/api/currency")
+      .then(async (r) => {
+        if (!r.ok) return;
+        const d = await r.json();
+        setCurrencyCode(d.currencyCode || "MWK");
+        setFxRate(d.rate || 1);
+      })
+      .catch(() => {});
   }, [checkActiveBattle]);
 
-
-  // Re-fetch the profile (games_played, rating, balance) whenever this tab
-  // regains focus or becomes visible again. A long-lived tab can otherwise
-  // show a stale "games played" count even after playing more games elsewhere.
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState === "visible") loadProfile();
@@ -153,7 +173,6 @@ export default function BattlesPage() {
     setCancellingStuck(false);
   };
 
-  // Poll for match while searching
   useEffect(() => {
     if (state !== "searching") return;
 
@@ -190,10 +209,10 @@ export default function BattlesPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            timeControl: selectedTC,
+            timeControl: BATTLE_TIME_CONTROL,
             rated: true,
             context: "battle",
-            stake: selectedStake,
+            stake: BATTLE_STAKE_CENTS,
           }),
         });
         setAdminNotified(true);
@@ -205,14 +224,13 @@ export default function BattlesPage() {
       if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
       if (adminNotifyRef.current) clearTimeout(adminNotifyRef.current);
     };
-  }, [state, selectedTC, selectedStake, supabase]);
+  }, [state, supabase]);
 
   const handleEnterBattle = async () => {
-    if (selectedStake === null) return;
     setError(null);
 
-    if (balance < selectedStake) {
-      setError(`Insufficient balance. You need ${formatMKK(selectedStake)}. Deposit funds first.`);
+    if (balance < BATTLE_STAKE_CENTS) {
+      setError(`Insufficient balance. You need ${formatMKK(BATTLE_STAKE_CENTS)} (${formatCurrency(BATTLE_STAKE_CENTS, currencyCode, fxRate)}). Deposit funds first.`);
       return;
     }
 
@@ -220,7 +238,7 @@ export default function BattlesPage() {
       const res = await fetch("/api/battles/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stakeCents: selectedStake, timeControl: selectedTC }),
+        body: JSON.stringify({ stakeCents: BATTLE_STAKE_CENTS, timeControl: BATTLE_TIME_CONTROL }),
       });
 
       const data = await res.json();
@@ -244,21 +262,29 @@ export default function BattlesPage() {
   };
 
   const handleChallengeFriend = async () => {
-    if (selectedStake === null) return;
-    setError(null);
-    setChallengeUrl(null);
+    setStakeError(null);
+    const stakeValue = parseInt(customStake, 10);
 
-    if (balance < selectedStake) {
-      setError(`Insufficient balance. You need ${formatMKK(selectedStake)}. Deposit funds first.`);
+    if (!customStake || isNaN(stakeValue) || stakeValue <= 0) {
+      setStakeError("Enter a valid stake amount");
       return;
     }
 
+    const stakeCents = stakeValue * 100; // user enters in MWK
+
+    if (balance < stakeCents) {
+      setStakeError(`Insufficient balance. You need MK ${stakeValue.toLocaleString()}.`);
+      return;
+    }
+
+    setError(null);
+    setChallengeUrl(null);
     setCreatingChallenge(true);
     try {
       const res = await fetch("/api/battles/challenge/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stakeCents: selectedStake, timeControl: selectedTC }),
+        body: JSON.stringify({ stakeCents, timeControl: BATTLE_TIME_CONTROL }),
       });
       const data = await res.json();
 
@@ -283,7 +309,7 @@ export default function BattlesPage() {
       const res = await fetch("/api/battles/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ battleId, timeControl: selectedTC }),
+        body: JSON.stringify({ battleId, timeControl: BATTLE_TIME_CONTROL }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Failed to start game"); return; }
@@ -291,8 +317,8 @@ export default function BattlesPage() {
     } catch { setError("Failed to start battle game"); }
   };
 
-  const stakes = config?.stake_levels ?? DEFAULT_STAKES;
   const feePct = config?.platform_fee_pct ?? 10;
+  const payout = BATTLE_STAKE_CENTS * 2 - Math.round(BATTLE_STAKE_CENTS * 2 * (feePct / 100));
 
   // Disabled state
   if (!config?.enabled && config !== null) {
@@ -305,9 +331,6 @@ export default function BattlesPage() {
     );
   }
 
-  // ===== Battles locked — insufficient games played =====
-  // Wait for profile to load before showing the lock — otherwise players with
-  // enough games see the locked wall during the initial fetch (games_played defaults to 0).
   if (!profileLoaded) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -354,7 +377,6 @@ export default function BattlesPage() {
     );
   }
 
-  // Active battle blocking
   if (checkingActive) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -411,9 +433,9 @@ export default function BattlesPage() {
         </div>
 
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-1">{formatMKK(selectedStake!)} Battle</h2>
+          <h2 className="text-2xl font-bold mb-1">{formatMKK(BATTLE_STAKE_CENTS)} Battle</h2>
           <p className="text-sm text-ccb-muted">
-            {TIME_CONTROLS.find((t) => t.id === selectedTC)?.desc} · Searching for opponent...
+            {BATTLE_TC_DESC} · Searching for opponent...
           </p>
           <p className="text-xs text-ccb-muted mt-2 tabular-nums">{searchSeconds}s elapsed</p>
         </div>
@@ -428,12 +450,18 @@ export default function BattlesPage() {
         <div className="w-full max-w-xs p-4 rounded-xl bg-ccb-card border border-ccb-border">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Your stake locked</span>
-            <span className="font-semibold">{formatMKK(selectedStake!)}</span>
+            <span className="font-semibold">{formatMKK(BATTLE_STAKE_CENTS)}</span>
           </div>
+          {currencyCode !== "MWK" && (
+            <div className="flex items-center justify-between text-xs text-ccb-muted mb-2">
+              <span>≈ in your currency</span>
+              <span>{formatCurrency(BATTLE_STAKE_CENTS, currencyCode, fxRate)}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm">
             <span className="text-ccb-muted">Win potential</span>
             <span className="font-bold text-ccb-primary">
-              {formatMKK(selectedStake! * 2 - Math.round(selectedStake! * 2 * (feePct / 100)))}
+              {formatMKK(payout)}
             </span>
           </div>
         </div>
@@ -482,12 +510,18 @@ export default function BattlesPage() {
         <div className="p-4 rounded-xl bg-ccb-card border border-ccb-border max-w-xs mx-auto">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Stake</span>
-            <span className="font-semibold">{formatMKK(selectedStake!)} each</span>
+            <span className="font-semibold">{formatMKK(BATTLE_STAKE_CENTS)} each</span>
           </div>
+          {currencyCode !== "MWK" && (
+            <div className="flex items-center justify-between text-xs text-ccb-muted mb-2">
+              <span>≈ in your currency</span>
+              <span>{formatCurrency(BATTLE_STAKE_CENTS, currencyCode, fxRate)}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm">
             <span className="text-ccb-muted">Winner receives</span>
             <span className="font-bold text-ccb-primary">
-              {formatMKK(selectedStake! * 2 - Math.round(selectedStake! * 2 * (feePct / 100)))}
+              {formatMKK(payout)}
             </span>
           </div>
         </div>
@@ -514,7 +548,7 @@ export default function BattlesPage() {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold">Challenge a Friend</h1>
-              <p className="text-sm text-ccb-muted">Set the stakes, share the link, winner takes the pot</p>
+              <p className="text-sm text-ccb-muted">Set a custom stake, share the link, winner takes the pot</p>
             </div>
           </div>
         </div>
@@ -525,73 +559,64 @@ export default function BattlesPage() {
           </div>
         )}
 
-        {/* Time Control */}
+        {/* Time Control — fixed, shown as info only */}
         <div>
           <h3 className="text-sm font-medium text-ccb-muted mb-3">Time Control</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {TIME_CONTROLS.map((tc) => {
-              const Icon = tc.icon;
-              const isSelected = selectedTC === tc.id;
-              return (
-                <button key={tc.id} onClick={() => setSelectedTC(tc.id)}
-                  className={`tc-btn flex items-center gap-3 text-left ${isSelected ? "tc-active" : ""}`}>
-                  <Icon className={`w-5 h-5 ${isSelected ? "text-ccb-primary" : "text-ccb-muted"}`} />
-                  <div>
-                    <div className="text-sm font-medium">{tc.desc}</div>
-                    <div className="text-xs text-ccb-muted">{tc.label}</div>
-                  </div>
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border">
+            <Clock className="w-5 h-5 text-ccb-primary" />
+            <div>
+              <div className="text-sm font-medium">{BATTLE_TC_DESC}</div>
+              <div className="text-xs text-ccb-muted">{BATTLE_TC_LABEL}</div>
+            </div>
           </div>
         </div>
 
-        {/* Stake */}
+        {/* Custom Stake Input */}
         <div>
-          <h3 className="text-sm font-medium text-ccb-muted mb-3">Choose Your Stake</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {stakes.map((stake) => {
-              const isSelected = selectedStake === stake;
-              const canAfford = balance >= stake;
-              const payout = stake * 2 - Math.round(stake * 2 * (feePct / 100));
-              return (
-                <button key={stake} onClick={() => canAfford && setSelectedStake(stake)} disabled={!canAfford}
-                  className={`p-4 rounded-xl border-2 transition-all text-center ${
-                    isSelected ? "border-ccb-accent bg-ccb-accent/10"
-                      : canAfford ? "border-ccb-border bg-ccb-surface hover:border-ccb-accent/50"
-                      : "border-ccb-border bg-ccb-surface/50 opacity-50 cursor-not-allowed"
-                  }`}>
-                  <Coins className={`w-5 h-5 mx-auto mb-2 ${isSelected ? "text-ccb-accent" : "text-ccb-muted"}`} />
-                  <p className={`font-bold text-lg ${isSelected ? "text-ccb-accent" : ""}`}>{formatMKK(stake)}</p>
-                  <p className="text-xs text-ccb-muted mt-1">Win {formatMKK(payout)}</p>
-                  {!canAfford && <p className="text-xs text-red-400 mt-1">Insufficient</p>}
-                </button>
-              );
-            })}
+          <h3 className="text-sm font-medium text-ccb-muted mb-3">Custom Stake Amount (MWK)</h3>
+          <div className="relative">
+            <input
+              type="number"
+              value={customStake}
+              onChange={(e) => { setCustomStake(e.target.value); setStakeError(null); }}
+              placeholder="e.g. 1000"
+              min="1"
+              className="w-full px-4 py-4 rounded-xl bg-ccb-surface border-2 border-ccb-border text-lg font-bold focus:outline-none focus:border-ccb-accent transition-colors"
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ccb-muted text-sm font-medium">MWK</span>
           </div>
+          {stakeError && (
+            <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5" /> {stakeError}
+            </p>
+          )}
+          {customStake && !isNaN(parseInt(customStake)) && parseInt(customStake) > 0 && (
+            <div className="mt-3 p-4 rounded-xl bg-ccb-card border border-ccb-border">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-ccb-muted">Your stake</span>
+                <span className="font-semibold">MK {parseInt(customStake).toLocaleString()}</span>
+              </div>
+              {currencyCode !== "MWK" && (
+                <div className="flex items-center justify-between text-xs text-ccb-muted mb-2">
+                  <span>≈ in your currency</span>
+                  <span>{formatCurrency(parseInt(customStake) * 100, currencyCode, fxRate)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-ccb-muted">Time control</span>
+                <span className="font-semibold">{BATTLE_TC_DESC}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm pt-2 border-t border-ccb-border">
+                <span className="text-ccb-muted">Winner receives</span>
+                <span className="font-bold text-ccb-accent text-lg">
+                  MK {(parseInt(customStake) * 2 - Math.round(parseInt(customStake) * 2 * (feePct / 100))).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Summary */}
-        {selectedStake !== null && (
-          <div className="p-4 rounded-xl bg-ccb-card border border-ccb-border">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-ccb-muted">Your stake</span>
-              <span className="font-semibold">{formatMKK(selectedStake)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-ccb-muted">Time control</span>
-              <span className="font-semibold">{TIME_CONTROLS.find((t) => t.id === selectedTC)?.desc}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm pt-2 border-t border-ccb-border">
-              <span className="text-ccb-muted">Winner receives</span>
-              <span className="font-bold text-ccb-accent text-lg">
-                {formatMKK(selectedStake * 2 - Math.round(selectedStake * 2 * (feePct / 100)))}
-              </span>
-            </div>
-          </div>
-        )}
-
-        <button onClick={handleChallengeFriend} disabled={selectedStake === null || creatingChallenge}
+        <button onClick={handleChallengeFriend} disabled={!customStake || creatingChallenge}
           className="btn-primary w-full text-base py-3.5">
           {creatingChallenge ? <Loader2 className="w-5 h-5 animate-spin" /> : <Link2 className="w-5 h-5 mr-2" />}
           {creatingChallenge ? "Creating..." : "Create Challenge Link"}
@@ -600,7 +625,7 @@ export default function BattlesPage() {
     );
   }
 
-  // ===== MAIN VIEW — flat, no menu step =====
+  // ===== MAIN VIEW — simplified, fixed stake + time control =====
   return (
     <div className="max-w-2xl mx-auto px-4 py-4 pb-28 sm:py-6 sm:pb-10 space-y-5">
       {/* Header with balance + rating */}
@@ -624,119 +649,105 @@ export default function BattlesPage() {
         </div>
       )}
 
-      {/* Time Control — immediately visible */}
-      <div>
-        <h3 className="text-sm font-medium text-ccb-muted mb-3">Time Control</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {TIME_CONTROLS.map((tc) => {
-            const Icon = tc.icon;
-            const isSelected = selectedTC === tc.id;
-            return (
-              <button key={tc.id} onClick={() => setSelectedTC(tc.id)}
-                className={`tc-btn flex items-center gap-3 text-left ${isSelected ? "tc-active" : ""}`}>
-                <Icon className={`w-5 h-5 ${isSelected ? "text-ccb-primary" : "text-ccb-muted"}`} />
-                <div>
-                  <div className="text-sm font-medium">{tc.desc}</div>
-                  <div className="text-xs text-ccb-muted">{tc.label}</div>
-                </div>
-              </button>
-            );
-          })}
+      {/* Battle configuration card — fixed stake + time control */}
+      <div className="p-5 rounded-2xl bg-ccb-card border border-ccb-border">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium text-ccb-muted">Battle Configuration</h3>
+          <span className="px-2.5 py-1 rounded-full bg-ccb-primary/10 text-ccb-primary text-xs font-medium">Standard</span>
         </div>
-      </div>
 
-      {/* Stake selection — immediately visible */}
-      <div>
-        <h3 className="text-sm font-medium text-ccb-muted mb-3">Choose Your Stake</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {stakes.map((stake) => {
-            const isSelected = selectedStake === stake;
-            const canAfford = balance >= stake;
-            const payout = stake * 2 - Math.round(stake * 2 * (feePct / 100));
-            return (
-              <button key={stake} onClick={() => canAfford && setSelectedStake(stake)} disabled={!canAfford}
-                className={`p-4 rounded-xl border-2 transition-all text-center ${
-                  isSelected ? "border-ccb-primary bg-ccb-primary/10"
-                    : canAfford ? "border-ccb-border bg-ccb-surface hover:border-ccb-primary/50"
-                    : "border-ccb-border bg-ccb-surface/50 opacity-50 cursor-not-allowed"
-                }`}>
-                <Coins className={`w-5 h-5 mx-auto mb-2 ${isSelected ? "text-ccb-primary" : "text-ccb-muted"}`} />
-                <p className={`font-bold text-lg ${isSelected ? "text-ccb-primary" : ""}`}>{formatMKK(stake)}</p>
-                <p className="text-xs text-ccb-muted mt-1">Win {formatMKK(payout)}</p>
-                {!canAfford && <p className="text-xs text-red-400 mt-1">Insufficient</p>}
-              </button>
-            );
-          })}
+        {/* Time control */}
+        <div className="flex items-center gap-3 mb-4 pb-4 border-b border-ccb-border">
+          <div className="w-10 h-10 rounded-xl bg-ccb-primary/10 flex items-center justify-center">
+            <Clock className="w-5 h-5 text-ccb-primary" />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs text-ccb-muted">Time Control</p>
+            <p className="text-sm font-semibold">{BATTLE_TC_LABEL} · {BATTLE_TC_DESC}</p>
+          </div>
         </div>
-      </div>
 
-      {/* Summary */}
-      {selectedStake !== null && (
-        <div className="p-4 rounded-xl bg-ccb-card border border-ccb-border">
-          <div className="flex items-center justify-between text-sm mb-2">
-            <span className="text-ccb-muted">Your stake</span>
-            <span className="font-semibold">{formatMKK(selectedStake)}</span>
+        {/* Stake */}
+        <div className="flex items-center gap-3 mb-4 pb-4 border-b border-ccb-border">
+          <div className="w-10 h-10 rounded-xl bg-ccb-accent/10 flex items-center justify-center">
+            <Coins className="w-5 h-5 text-ccb-accent" />
           </div>
-          <div className="flex items-center justify-between text-sm mb-2">
-            <span className="text-ccb-muted">Time control</span>
-            <span className="font-semibold">{TIME_CONTROLS.find((t) => t.id === selectedTC)?.desc}</span>
+          <div className="flex-1">
+            <p className="text-xs text-ccb-muted">Stake</p>
+            <p className="text-sm font-semibold">{formatMKK(BATTLE_STAKE_CENTS)}</p>
+            {currencyCode !== "MWK" && (
+              <p className="text-xs text-ccb-muted mt-0.5">≈ {formatCurrency(BATTLE_STAKE_CENTS, currencyCode, fxRate)}</p>
+            )}
           </div>
-          <div className="flex items-center justify-between text-sm mb-2">
+        </div>
+
+        {/* Payout summary */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
             <span className="text-ccb-muted">Total pot</span>
-            <span className="font-semibold">{formatMKK(selectedStake * 2)}</span>
+            <span className="font-semibold">{formatMKK(BATTLE_STAKE_CENTS * 2)}</span>
           </div>
-          <div className="flex items-center justify-between text-sm mb-2">
+          <div className="flex items-center justify-between text-sm">
             <span className="text-ccb-muted">Platform fee ({feePct}%)</span>
-            <span className="font-semibold text-red-400">−{formatMKK(Math.round(selectedStake * 2 * (feePct / 100)))}</span>
+            <span className="font-semibold text-red-400">−{formatMKK(Math.round(BATTLE_STAKE_CENTS * 2 * (feePct / 100)))}</span>
           </div>
           <div className="flex items-center justify-between text-sm pt-2 border-t border-ccb-border">
             <span className="text-ccb-muted">Winner receives</span>
             <span className="font-bold text-ccb-primary text-lg">
-              {formatMKK(selectedStake * 2 - Math.round(selectedStake * 2 * (feePct / 100)))}
+              {formatMKK(payout)}
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* Insufficient balance warning */}
+      {balance < BATTLE_STAKE_CENTS && (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>Insufficient balance. You need {formatMKK(BATTLE_STAKE_CENTS)}.
+            <a href="/wallet" className="underline font-medium ml-1">Deposit funds →</a>
+          </span>
         </div>
       )}
 
       {/* Big battle button */}
-      <button onClick={handleEnterBattle} disabled={selectedStake === null}
-        className="btn-primary w-full text-base py-4 text-lg">
-        <Swords className="w-5 h-5 mr-2" /> Enter Battle
+      <button
+        onClick={handleEnterBattle}
+        disabled={balance < BATTLE_STAKE_CENTS}
+        className="btn-primary w-full text-base py-4 disabled:opacity-50 disabled:cursor-not-allowed">
+        <Swords className="w-5 h-5 mr-2" /> Find Battle · {formatMKK(BATTLE_STAKE_CENTS)}
       </button>
 
-      <p className="text-xs text-ccb-muted text-center">
-        No opponent found in 20s? Admin gets notified. Cancel anytime for a full refund.
-      </p>
-
-      {/* Divider */}
-      <div className="relative pt-1">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-ccb-border" />
-        </div>
-        <div className="relative flex justify-center">
-          <span className="bg-ccb-dark px-3 text-xs text-ccb-muted">or</span>
-        </div>
-      </div>
-
-      {/* Secondary action */}
+      {/* Challenge a friend */}
       <button
         onClick={() => setView("challenge")}
-        className="w-full flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-accent/50 hover:bg-ccb-surface transition-colors"
-      >
-        <Link2 className="w-4 h-4 text-ccb-accent" />
-        Challenge a Friend
+        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-ccb-accent bg-ccb-accent/10 border border-ccb-accent/30 hover:bg-ccb-accent/20 transition-colors text-sm">
+        <Link2 className="w-4 h-4" /> Challenge a Friend — Custom Stake
       </button>
 
-      {/* How it works — compact */}
-      <div className="p-4 rounded-xl bg-ccb-surface border border-ccb-border">
-        <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
-          <Target className="w-4 h-4 text-ccb-primary" /> How it works
+      {/* How it works */}
+      <div className="p-4 rounded-xl bg-ccb-surface/50 border border-ccb-border">
+        <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+          <Users className="w-4 h-4 text-ccb-muted" /> How Battles Work
         </h3>
-        <div className="space-y-1.5 text-xs text-ccb-muted">
-          <p>1. Pick stake + time — both players lock funds in escrow</p>
-          <p>2. Win the game, take the pot (minus {feePct}% platform fee)</p>
-          <p>3. Draw triggers Armageddon tiebreak — winner takes the pot</p>
-        </div>
+        <ol className="space-y-2 text-xs text-ccb-muted">
+          <li className="flex gap-2">
+            <span className="font-semibold text-ccb-text">1.</span>
+            <span>Both players lock {formatMKK(BATTLE_STAKE_CENTS)} in escrow</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-semibold text-ccb-text">2.</span>
+            <span>Play a {BATTLE_TC_DESC} {BATTLE_TC_LABEL} game — winner takes the pot</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-semibold text-ccb-text">3.</span>
+            <span>Platform takes {feePct}% fee. Winner receives {formatMKK(payout)}</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-semibold text-ccb-text">4.</span>
+            <span>Players worldwide can match up — stake shown in your currency</span>
+          </li>
+        </ol>
       </div>
     </div>
   );
