@@ -55,7 +55,6 @@ interface WalletClientProps {
 }
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000, 10000, 25000];
-const WITHDRAW_AMOUNTS = [10000, 15000, 20000, 25000, 50000];
 
 const TXN_ICONS: Record<string, any> = {
   deposit: ArrowDown,
@@ -82,7 +81,8 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<"deposit" | "withdraw" | "history">("deposit");
   const [depositAmount, setDepositAmount] = useState(1000);
-  const [withdrawAmount, setWithdrawAmount] = useState(10000);
+  const [withdrawAmount, setWithdrawAmount] = useState(0);
+  const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount_cents: number; max_amount_cents: number; daily_limit_cents: number } | null>(null);
   const [method, setMethod] = useState<"mobile_money" | "card">("mobile_money");
   const [phone, setPhone] = useState(savedPhone || "");
   const [loading, setLoading] = useState(false);
@@ -113,6 +113,19 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
       .then((data) => {
         if (data.berry_value_cents) setBerryConfig(data);
         if (data.min_redemption) setRedeemAmount(data.min_redemption);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch withdrawal limits from platform settings (user-facing endpoint)
+  useEffect(() => {
+    fetch("/api/withdrawals/limits")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.min_amount_cents) {
+          setWithdrawConfig(data);
+          setWithdrawAmount(Math.floor(data.min_amount_cents / 100)); // default to min in MWK
+        }
       })
       .catch(() => {});
   }, []);
@@ -297,8 +310,15 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
         setWithdrawLoading(false);
         return;
       }
-      if (withdrawAmount < 10000) {
-        setError("Minimum withdrawal is MWK 10,000");
+      const minMWK = withdrawConfig ? Math.floor(withdrawConfig.min_amount_cents / 100) : 10000;
+      const maxMWK = withdrawConfig ? Math.floor(withdrawConfig.max_amount_cents / 100) : 500000;
+      if (withdrawAmount < minMWK) {
+        setError(`Minimum withdrawal is MWK ${minMWK.toLocaleString()}`);
+        setWithdrawLoading(false);
+        return;
+      }
+      if (withdrawAmount > maxMWK) {
+        setError(`Maximum withdrawal is MWK ${maxMWK.toLocaleString()}`);
         setWithdrawLoading(false);
         return;
       }
@@ -603,7 +623,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
             <input
               type="number"
               value={withdrawAmount}
-              onChange={(e) => setWithdrawAmount(Math.max(10000, parseInt(e.target.value) || 0))}
+              onChange={(e) => setWithdrawAmount(Math.max(withdrawConfig ? Math.floor(withdrawConfig.min_amount_cents / 100) : 10000, parseInt(e.target.value) || 0))}
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
             />
             <div className="flex gap-2 mt-2 flex-wrap">
