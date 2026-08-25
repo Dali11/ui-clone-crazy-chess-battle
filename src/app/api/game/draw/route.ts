@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Chess } from "chess.js";
 import { settleBattle } from "@/lib/battles/settle";
+import { processTournamentGameResult } from "@/lib/tournament/results";
 
 export async function POST(req: NextRequest) {
   try {
@@ -118,6 +119,17 @@ export async function POST(req: NextRequest) {
 
       if (battle) {
         settleBattle(battle.id, null, "draw").catch((e) => console.error("Battle settlement failed:", e));
+      }
+
+      // Process tournament game result if this is a tournament game
+      if (game.tournament_id) {
+        await processTournamentGameResult({
+          gameId,
+          whitePlayerId: game.white_player_id,
+          blackPlayerId: game.black_player_id,
+          winner: "draw",
+          status: chess.isStalemate() ? "stalemate" : "draw",
+        });
       }
 
       return NextResponse.json({ success: true, status: "draw" });
