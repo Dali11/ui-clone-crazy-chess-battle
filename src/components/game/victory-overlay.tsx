@@ -35,6 +35,7 @@ interface VictoryOverlayProps {
   onDismiss?: () => void;
   rematchState?: RematchState;
   newGameLabel?: string;
+  playAgainLabel?: string;
   lobbyHref?: string;
 }
 
@@ -60,6 +61,7 @@ export default function VictoryOverlay({
   onDismiss,
   rematchState = { status: "idle" },
   newGameLabel = "New Game",
+  playAgainLabel = "Play Again",
   lobbyHref = "/play",
 }: VictoryOverlayProps) {
   const [mounted, setMounted] = useState(false);
@@ -279,7 +281,7 @@ export default function VictoryOverlay({
               className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
               style={{ backgroundColor: accent, color: "#0a0a0f", boxShadow: `0 4px 20px ${accentBg}` }}
             >
-              <Swords className="w-4 h-4" /> Play Again
+              <Swords className="w-4 h-4" /> {playAgainLabel}
             </button>
           )}
 
