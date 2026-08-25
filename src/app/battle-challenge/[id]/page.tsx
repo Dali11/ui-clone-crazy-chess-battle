@@ -212,6 +212,7 @@ export default async function BattleChallengePage({
       challengerName={challengerProfile?.display_name || challengerProfile?.username || "Player"}
       challengerRating={challengerProfile?.rating || 1200}
       stakeCents={challenge.stake_cents}
+      timeControl={challenge.time_control || "rapid15"}
       feePct={feePct}
       initialBalanceCents={myProfile?.wallet_balance_cents ?? 0}
       email={myProfile?.email || user.email || ""}
