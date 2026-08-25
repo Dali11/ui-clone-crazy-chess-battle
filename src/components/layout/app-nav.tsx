@@ -96,8 +96,12 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
               href="/settings"
               className="flex items-center gap-2 text-sm text-ccb-muted hover:text-ccb-text"
             >
-              <div className="w-8 h-8 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center">
-                <User className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-4 h-4" />
+                )}
               </div>
               <span>{profile?.username ?? "Player"}</span>
             </Link>
@@ -128,8 +132,12 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
               <span className="text-xs font-bold text-ccb-text">{formatBalance(profile?.wallet_balance_cents)}</span>
             </Link>
             <Link href="/settings" className="flex items-center gap-2 text-ccb-muted">
-              <div className="w-7 h-7 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center">
-                <User className="w-3.5 h-3.5" />
+              <div className="w-7 h-7 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-3.5 h-3.5" />
+                )}
               </div>
             </Link>
           </div>
