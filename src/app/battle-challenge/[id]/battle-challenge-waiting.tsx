@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Check, Swords } from "lucide-react";
+import { Copy, Check, Swords, X } from "lucide-react";
 
 export default function BattleChallengeWaiting({
   challengeId,
@@ -20,6 +20,7 @@ export default function BattleChallengeWaiting({
   const [error, setError] = useState<string | null>(null);
   const [remainingSec, setRemainingSec] = useState<number | null>(null);
   const [refunded, setRefunded] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const refundingRef = useRef(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -27,6 +28,29 @@ export default function BattleChallengeWaiting({
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCancel = async () => {
+    if (cancelling) return;
+    setCancelling(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/battles/challenge/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setRefunded(true);
+      } else {
+        setError(data.error || "Failed to cancel challenge");
+      }
+    } catch {
+      setError("Failed to cancel challenge");
+    }
+    setCancelling(false);
   };
 
   // Countdown timer
@@ -131,7 +155,7 @@ export default function BattleChallengeWaiting({
             {error}
           </p>
         )}
-        {remainingSec !== null && remainingSec > 0 && (
+        {remainingSec !== null && remainingSec > 0 && !refunded && (
           <div className="flex items-center justify-center gap-1.5 text-xs text-ccb-muted">
             <span>Link expires in </span>
             <span className="font-bold text-ccb-primary tabular-nums">
@@ -142,14 +166,24 @@ export default function BattleChallengeWaiting({
         {refunded && (
           <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 space-y-1">
             <p className="text-sm font-semibold text-emerald-400">Stake Refunded</p>
-            <p className="text-xs text-ccb-muted">Your challenge expired and your stake has been returned to your wallet.</p>
+            <p className="text-xs text-ccb-muted">Your challenge was cancelled and your stake has been returned to your wallet.</p>
             <a href="/wallet" className="inline-block text-xs font-semibold text-ccb-primary hover:text-ccb-primary/80 mt-1">View Wallet →</a>
           </div>
         )}
         {!refunded && (
-          <p className="text-xs text-ccb-muted">
-            Your stake is locked. The battle starts automatically once they accept.
-          </p>
+          <>
+            <p className="text-xs text-ccb-muted">
+              Your stake is locked. The battle starts automatically once they accept.
+            </p>
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="inline-flex items-center justify-center gap-1.5 w-full rounded-lg border border-ccb-danger/30 bg-ccb-danger/5 text-ccb-danger text-sm font-semibold py-2.5 px-4 transition-colors hover:bg-ccb-danger/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <X className="w-4 h-4" />
+              {cancelling ? "Cancelling..." : "Cancel Challenge & Refund Stake"}
+            </button>
+          </>
         )}
       </div>
     </div>
