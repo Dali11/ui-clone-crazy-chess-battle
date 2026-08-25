@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
+
 export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import HistoryClient from "./history-client";
+
+
+export const metadata: Metadata = {
+  title: "Game History",
+};
 
 export default async function HistoryPage() {
   const supabase = await createClient();
