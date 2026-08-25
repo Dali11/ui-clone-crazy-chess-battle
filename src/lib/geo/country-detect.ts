@@ -22,11 +22,11 @@ const DEFAULT_MARKET: MarketConfig = {
 };
 
 /**
- * Detect the visitor's country from request headers and fetch market config.
+ * Detect the visitor's ISO 3166-1 alpha-2 country code from request headers.
  * On Vercel, uses the x-vercel-ip-country header (no API call needed).
- * Falls back to IP geolocation, then to Malawi (default market).
+ * Falls back to IP geolocation, then to Malawi ("MW") as the default.
  */
-export async function detectCountry(request: NextRequest): Promise<MarketConfig> {
+export async function detectCountryCode(request: NextRequest): Promise<string> {
   // 1. Try Vercel's IP country header (always available on Vercel deployments)
   const vercelCountry = request.headers.get("x-vercel-ip-country");
   let countryCode = vercelCountry?.toUpperCase() || "";
@@ -56,7 +56,18 @@ export async function detectCountry(request: NextRequest): Promise<MarketConfig>
     countryCode = "MW";
   }
 
-  // 4. Fetch market config from Supabase
+  return countryCode;
+}
+
+/**
+ * Detect the visitor's country and fetch market config (membership pricing
+ * setup) for it. Falls back to Malawi if the country has no dedicated
+ * market_config row.
+ */
+export async function detectCountry(request: NextRequest): Promise<MarketConfig> {
+  const countryCode = await detectCountryCode(request);
+
+  // Fetch market config from Supabase
   try {
     const supabase = createAdminClient();
     const { data, error } = await supabase
