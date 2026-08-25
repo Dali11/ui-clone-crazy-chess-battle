@@ -585,6 +585,33 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   })();
 
   const handlePlayAgain = async () => {
+    // For battle games, re-join the battle queue with same stake + time control
+    if (isBattleGame && battleInfo?.stakeCents) {
+      try {
+        const res = await fetch("/api/battles/join", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stakeCents: battleInfo.stakeCents, timeControl: tcIdFromGame }),
+        });
+        const data = await res.json();
+        if (data.matched && data.battleId) {
+          // Opponent found immediately — go to the battle
+          const statusRes = await fetch(`/api/battles/status?battleId=${data.battleId}`);
+          if (statusRes.ok) {
+            router.push(`/battles`);
+          } else {
+            router.push("/battles");
+          }
+        } else {
+          // No immediate match — go to battles page which shows searching state
+          router.push("/battles");
+        }
+      } catch {
+        router.push("/battles");
+      }
+      return;
+    }
+    // For regular games, use matchmaking as before
     try {
       const res = await fetch("/api/matchmaking/join", {
         method: "POST",
@@ -1143,7 +1170,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
           playerNames={{ white: whiteName, black: blackName }}
           winnerSide={game.winner as "white" | "black" | null}
-          lobbyHref="/play"
+          lobbyHref={isBattleGame ? "/battles" : "/play"}
+          newGameLabel={isBattleGame ? "New Match" : "New Game"}
+          playAgainLabel={isBattleGame ? "New Match" : "Play Again"}
           onPlayAgain={!isSpectator ? handlePlayAgain : undefined}
           onRematch={!isSpectator && game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
           rematchState={rematchState}
@@ -1205,7 +1234,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         subtitle={`${game.time_control} · ${game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
         playerNames={{ white: whiteName, black: blackName }}
         winnerSide={game.winner as "white" | "black" | null}
-        lobbyHref="/play"
+        lobbyHref={isBattleGame ? "/battles" : "/play"}
+        newGameLabel={isBattleGame ? "New Match" : "New Game"}
+        playAgainLabel={isBattleGame ? "New Match" : "Play Again"}
+        onPlayAgain={handlePlayAgain}
         onRematch={game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
         rematchState={rematchState}
         onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
