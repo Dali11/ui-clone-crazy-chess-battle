@@ -7,7 +7,9 @@ import {
 import HomeStats from "./home-stats";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { detectCountry, formatMembershipPrice, type MarketConfig } from "@/lib/geo/country-detect";
+import { detectCountry, detectCountryCode, formatMembershipPrice, type MarketConfig } from "@/lib/geo/country-detect";
+import { currencyForCountry } from "@/lib/geo/currency-map";
+import { getExchangeRate, getCurrencySymbol } from "@/lib/geo/fx";
 import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +23,14 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
     headers: Object.fromEntries(headersList.entries()),
   });
   const market = await detectCountry(req as any);
+
+  // Convert the membership price to the visitor's local currency using a
+  // live exchange rate, instead of always showing it in Malawi Kwacha.
+  const visitorCountryCode = await detectCountryCode(req as any);
+  const visitorCurrency = currencyForCountry(visitorCountryCode);
+  const fxRate = await getExchangeRate(market.currency, visitorCurrency);
+  const convertedMembershipPrice = Math.round(market.membershipPrice * fxRate);
+  const membershipDisplaySymbol = getCurrencySymbol(visitorCurrency);
   
   // Build signup URL with country + optional ref
   const signupParams = new URLSearchParams();
@@ -199,7 +209,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           </div>
           <h2 className="text-xl sm:text-3xl font-bold mb-4">Unlock Premium Competitions</h2>
           <p className="text-sm sm:text-base text-ccb-muted mb-6 max-w-2xl mx-auto">
-            Join the Crazy Chess Battles Club for {formatMembershipPrice(market.membershipPrice, market.currencySymbol)} to access premium Premier League divisions, priority qualifier entry, season rankings, and exclusive championship events.
+            Join the Crazy Chess Battles Club for {formatMembershipPrice(convertedMembershipPrice, membershipDisplaySymbol)} to access premium Premier League divisions, priority qualifier entry, season rankings, and exclusive championship events.
           </p>
           <Link href="/league/subscribe" className="btn-primary inline-flex items-center gap-2">
             <Crown className="w-4 h-4" /> View Membership Plans
