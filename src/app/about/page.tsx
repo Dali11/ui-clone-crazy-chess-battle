@@ -189,7 +189,7 @@ export default function AboutPage() {
               <Disc3 className="w-6 h-6 text-ccb-accent mb-3" />
               <h3 className="font-semibold mb-2 text-sm">Draughts too</h3>
               <p className="text-xs sm:text-sm text-ccb-muted">
-                Not just chess — play International, English, or Russian draughts on the side. Same wallet, same community.
+                Not just chess — play International draughts on the side. Same wallet, same community.
               </p>
             </div>
           </div>
