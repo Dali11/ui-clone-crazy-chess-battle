@@ -166,7 +166,7 @@ export default function DraughtsComputerGame({
         return currentBoard;
       });
       setBotThinking(false);
-    }, 500 + Math.random() * 500);
+    }, 150 + Math.random() * 150);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turn, status, botColor, difficulty]);

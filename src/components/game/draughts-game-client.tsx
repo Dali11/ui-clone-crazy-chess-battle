@@ -71,6 +71,7 @@ export default function DraughtsGameClient({
   const [submitting, setSubmitting] = useState(false);
   const [victoryDismissed, setVictoryDismissed] = useState(false);
   const [activeSheet, setActiveSheet] = useState<"chat" | "menu" | null>(null);
+  const [drawOffer, setDrawOffer] = useState<null | "pending" | "offer">(null); // null = no offer, "pending" = we sent, "offer" = opponent sent
   const [unreadCount, setUnreadCount] = useState(0);
   const [viewPly, setViewPly] = useState(0); // for move review navigation
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -162,6 +163,24 @@ export default function DraughtsGameClient({
       .subscribe();
     channelRef.current = channel;
 
+    // Listen for draw offer broadcasts
+    channel.on("broadcast", { event: "draw_offer" }, (payload: any) => {
+      if (payload.payload?.from !== myId) {
+        setDrawOffer("offer");
+      }
+    });
+    channel.on("broadcast", { event: "draw_declined" }, (payload: any) => {
+      if (payload.payload?.from !== myId) {
+        setDrawOffer(null);
+      }
+    });
+    channel.on("broadcast", { event: "draw_accepted" }, (payload: any) => {
+      if (payload.payload?.from !== myId) {
+        setDrawOffer(null);
+        // Game will end via DB update
+      }
+    });
+
     pollRef.current = setInterval(async () => {
       try {
         const res = await fetch(`/api/draughts/state?gameId=${game.id}`);
@@ -186,7 +205,7 @@ export default function DraughtsGameClient({
           });
         }
       } catch {}
-    }, 3000);
+    }, 1500);
 
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
@@ -346,6 +365,41 @@ export default function DraughtsGameClient({
     } catch {}
   };
 
+  const offerDraw = async () => {
+    try {
+      setDrawOffer("pending");
+      await fetch("/api/draughts/draw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId: game.id, action: "offer" }),
+      });
+    } catch {
+      setDrawOffer(null);
+    }
+  };
+
+  const acceptDraw = async () => {
+    try {
+      await fetch("/api/draughts/draw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId: game.id, action: "accept" }),
+      });
+      setDrawOffer(null);
+    } catch {}
+  };
+
+  const declineDraw = async () => {
+    try {
+      await fetch("/api/draughts/draw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId: game.id, action: "decline" }),
+      });
+      setDrawOffer(null);
+    } catch {}
+  };
+
   const formatTime = (ms: number) => {
     const totalSec = Math.ceil(ms / 1000);
     const min = Math.floor(totalSec / 60);
@@ -375,6 +429,7 @@ export default function DraughtsGameClient({
     isActive: boolean;
     isMe?: boolean;
     materialAdvantage?: number;
+    pieceCount?: number;
   }) => (
     <div className={`flex items-center justify-between max-w-[600px] mx-auto w-full px-3 py-2 rounded-lg transition-colors ${data.isActive ? "bg-ccb-primary/8" : ""}`}>
       <div className="flex items-center gap-2.5 min-w-0">
@@ -405,11 +460,16 @@ export default function DraughtsGameClient({
           </div>
         </div>
       </div>
-      {/* Material advantage + Clock pill */}
+      {/* Piece count + Material advantage + Clock pill */}
       <div className="flex items-center gap-2 shrink-0">
+        {data.pieceCount != null && (
+          <span className="text-xs font-semibold tabular-nums px-2 py-1 rounded bg-ccb-surface text-ccb-text/70 border border-ccb-border">
+            {data.pieceCount}
+          </span>
+        )}
         {(data.materialAdvantage ?? 0) !== 0 && (
           <span className={`text-xs font-bold tabular-nums px-2 py-1 rounded ${
-            (data.materialAdvantage ?? 0) > 0 ? "text-emerald-500" : "text-ccb-danger"
+            (data.materialAdvantage ?? 0) > 0 ? "text-emerald-500 bg-emerald-500/10" : "text-ccb-danger bg-red-500/10"
           }`}>
             {(data.materialAdvantage ?? 0) > 0 ? `+${data.materialAdvantage}` : data.materialAdvantage}
           </span>
@@ -428,20 +488,20 @@ export default function DraughtsGameClient({
 
   // Determine player data for top/bottom bars
   const opponentData = isWhite
-    ? { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage }
-    : { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage };
+    ? { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black }
+    : { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white };
 
   const myData = isWhite
-    ? { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, isMe: true, materialAdvantage: materialCount.advantage }
-    : { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, isMe: true, materialAdvantage: -materialCount.advantage };
+    ? { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, isMe: true, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white }
+    : { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, isMe: true, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black };
 
   // For spectators: white at bottom, black at top
   const topPlayer = isSpectator
-    ? { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage }
+    ? { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black }
     : opponentData;
 
   const bottomPlayer = isSpectator
-    ? { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage }
+    ? { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white }
     : myData;
 
   return (
@@ -497,6 +557,32 @@ export default function DraughtsGameClient({
           {/* My bar (bottom) */}
           {renderPlayerBar(bottomPlayer)}
 
+          {/* Draw offer banner — received from opponent */}
+          {drawOffer === "offer" && !isSpectator && !gameEnded && (
+            <div className="max-w-[600px] mx-auto w-full px-3 py-2">
+              <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-ccb-primary/10 border border-ccb-primary/30">
+                <span className="text-sm flex items-center gap-1.5">
+                  <Handshake className="w-4 h-4 text-ccb-primary" /> Opponent offers a draw
+                </span>
+                <div className="flex gap-2">
+                  <button onClick={acceptDraw} className="btn-primary text-sm px-4 py-1.5">Accept</button>
+                  <button onClick={declineDraw} className="btn-secondary text-sm px-4 py-1.5">Decline</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Draw offer banner — we sent it, waiting for opponent */}
+          {drawOffer === "pending" && !isSpectator && !gameEnded && (
+            <div className="max-w-[600px] mx-auto w-full px-3 py-2">
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-ccb-muted/10 border border-ccb-border">
+                <div className="w-4 h-4 border-2 border-ccb-muted border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm text-ccb-muted">Waiting for opponent to respond…</span>
+                <button onClick={declineDraw} className="ml-auto text-sm text-ccb-muted hover:text-ccb-danger underline">Cancel</button>
+              </div>
+            </div>
+          )}
+
           {/* Turn indicator */}
           {!gameEnded && (
             <div className="max-w-[600px] mx-auto w-full px-3 py-1">
@@ -534,9 +620,14 @@ export default function DraughtsGameClient({
                   <button onClick={() => setShowResignConfirm(false)} className="btn-secondary text-sm">Cancel</button>
                 </>
               ) : (
-                <button onClick={() => setShowResignConfirm(true)} className="btn-secondary text-sm">
-                  <Flag className="w-4 h-4 mr-1" /> Resign
-                </button>
+                <>
+                  <button onClick={() => setShowResignConfirm(true)} className="btn-secondary text-sm">
+                    <Flag className="w-4 h-4 mr-1" /> Resign
+                  </button>
+                  <button onClick={offerDraw} disabled={drawOffer !== null} className="btn-secondary text-sm disabled:opacity-40">
+                    <Handshake className="w-4 h-4 mr-1" /> Offer Draw
+                  </button>
+                </>
               )}
             </div>
           )}
@@ -586,7 +677,8 @@ export default function DraughtsGameClient({
             ) : (
               <div className="flex items-center justify-around h-14">
                 <button
-                  disabled={isSpectator}
+                  onClick={offerDraw}
+                  disabled={isSpectator || drawOffer !== null}
                   className="flex flex-col items-center gap-0.5 flex-1 py-1 text-ccb-muted disabled:opacity-40"
                 >
                   <Handshake className="w-5 h-5" /><span className="text-[10px]">Draw</span>
