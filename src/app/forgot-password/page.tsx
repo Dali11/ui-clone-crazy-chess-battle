@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import ForgotPasswordClient from "./forgot-password-client";
 
-export const metadata: Metadata = {
-  title: "Forgot Password — Reset Your Account",
-  description: "Reset your Crazy Chess Battles account password. Enter your email to receive a password reset link.",
-};
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
+  title: "Forgot Password — Reset Access",
+  description: "Reset your Crazy Chess Battles account password.",
+  path: "/forgot-password",
+  noIndex: true
+});
 
 export default function ForgotPasswordPage() {
   return <ForgotPasswordClient />;

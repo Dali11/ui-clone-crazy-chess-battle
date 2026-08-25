@@ -4,6 +4,15 @@ import { notFound } from "next/navigation";
 import GameClientWrapper from "@/components/game/game-client-wrapper";
 import type { GameState } from "@/hooks/use-realtime-game";
 
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
+  title: "Chess Game — Live Match",
+  description: "Watch or play a live chess game on Crazy Chess Battles. Real-time moves, clocks, and spectator mode.",
+  path: "/game",
+});
+
+
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;

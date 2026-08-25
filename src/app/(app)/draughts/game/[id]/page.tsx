@@ -6,10 +6,13 @@ import DraughtsGameClient from "@/components/game/draughts-game-client";
 export const dynamic = "force-dynamic";
 
 
-export const metadata: Metadata = {
-  title: "Draughts Game — International Checkers",
-  description: "Watch this International Checkers (10×10) game on Crazy Chess Battles.",
-};
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
+  title: "Draughts Game — Live Match",
+  description: "Watch or play a live International Checkers game on Crazy Chess Battles.",
+  path: "/draughts/game"
+});
 
 export default async function DraughtsGamePage({
   params,

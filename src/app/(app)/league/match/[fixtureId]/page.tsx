@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import MatchClient from "./match-client";
 
-export const metadata: Metadata = {
-  title: "League Match — Live Chess Fixture",
-  description: "View this league match fixture on Crazy Chess Battles. See players, schedule, and live game status.",
-};
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
+  title: "League Match — Fixture Details",
+  description: "View league match fixture details on Crazy Chess Battles.",
+  path: "/league/match"
+});
 
 export default function MatchPage({ params }: { params: Promise<{ fixtureId: string }> }) {
   return <MatchClient params={params} />;

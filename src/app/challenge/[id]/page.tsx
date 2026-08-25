@@ -11,10 +11,16 @@ import ChallengeTaken from "./challenge-taken";
 import ChallengeWaiting from "./challenge-waiting";
 
 
-export const metadata: Metadata = {
-  title: "Chess Challenge — Join the Battle",
-  description: "You've been challenged to a chess battle on Crazy Chess Battles. Accept the challenge and start playing now.",
-};
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return pageMetadata({
+    title: "Chess Challenge — Join the Battle",
+    description: "You've been challenged to a chess battle on Crazy Chess Battles. Accept the challenge and start playing now.",
+    path: `/challenge/${id}`,
+  });
+}
 
 export default async function ChallengePage({
   params,

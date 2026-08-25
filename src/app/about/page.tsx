@@ -4,11 +4,13 @@ import { ArrowRight, Trophy, Zap, Shield, Users, Heart, Quote, BookOpen, Disc3, 
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
   title: "About — Competitive Chess for Everyone",
   description: "Crazy Chess Battles is a global chess competition platform where players of all levels battle in tournaments, leagues, and ranked matches. Learn our story and mission.",
-  alternates: { canonical: "https://crazychessbattles.live/about" },
-};
+  path: "/about",
+});
 
 export default function AboutPage() {
   return (

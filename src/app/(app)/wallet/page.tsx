@@ -4,6 +4,16 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import WalletClient from "./wallet-client";
 
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
+  title: "Wallet — Manage Your Balance",
+  description: "Manage your wallet balance on Crazy Chess Battles. Deposit, withdraw, and track transactions.",
+  path: "/wallet",
+  noIndex: true
+});
+
+
 export default async function WalletPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

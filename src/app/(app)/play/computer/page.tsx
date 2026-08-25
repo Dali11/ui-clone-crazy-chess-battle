@@ -9,10 +9,13 @@ const VALID_DIFFICULTIES = ["easy", "medium", "hard"];
 const VALID_COLORS = ["white", "black"];
 
 
-export const metadata: Metadata = {
-  title: "Play Chess vs Computer — Practice & Train",
-  description: "Practice chess against the AI on Crazy Chess Battles. Choose difficulty, sharpen your tactics, and improve your game.",
-};
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
+  title: "Play vs Computer — Chess Practice",
+  description: "Practice chess against the computer on Crazy Chess Battles. Adjustable difficulty levels.",
+  path: "/play/computer"
+});
 
 export default async function ComputerGamePage({
   searchParams,

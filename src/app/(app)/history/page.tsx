@@ -7,9 +7,14 @@ import { redirect } from "next/navigation";
 import HistoryClient from "./history-client";
 
 
-export const metadata: Metadata = {
-  title: "Game History",
-};
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
+  title: "Game History — Your Match Record",
+  description: "View your complete chess game history on Crazy Chess Battles. Past results, ratings changes, and performance stats.",
+  path: "/history",
+  noIndex: true
+});
 
 export default async function HistoryPage() {
   const supabase = await createClient();

@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
   title: "Leaderboard — Global Chess Rankings",
-  description: "See the top chess players on Crazy Chess Battles. View global rankings, win rates, ratings, and tournament champions. Climb the leaderboard by winning ranked games.",
-  alternates: { canonical: "https://crazychessbattles.live/leaderboard" },
-};
+  description: "See the top chess players on Crazy Chess Battles. Global rankings sorted by rating, wins, and tournament performance. Climb the leaderboard.",
+  path: "/leaderboard",
+});
 
 import { createClient } from "@/lib/supabase/server";
 import { Crown, Medal } from "lucide-react";

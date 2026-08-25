@@ -1,6 +1,17 @@
+import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/metadata";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return pageMetadata({
+    title: "Draughts Challenge — Join the Game",
+    description: "You've been challenged to a game of International Checkers on Crazy Chess Battles. Accept and play now.",
+    path: `/draughts/challenge/${id}`,
+  });
+}
 
 import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";

@@ -14,10 +14,16 @@ function formatMKK(cents: number): string {
 }
 
 
-export const metadata: Metadata = {
-  title: "Battle Challenge — Join the Chess Battle",
-  description: "You've been invited to a chess battle on Crazy Chess Battles. Accept the challenge and compete for victory.",
-};
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return pageMetadata({
+    title: "Battle Challenge — Join the Chess Battle",
+    description: "You've been invited to a chess battle on Crazy Chess Battles. Accept the challenge and compete for victory.",
+    path: `/battle-challenge/${id}`,
+  });
+}
 
 export default async function BattleChallengePage({
   params,

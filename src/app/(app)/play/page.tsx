@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import PlayClient from "./play-client";
 
-export const metadata: Metadata = {
-  title: "Play Chess — Blitz, Bullet & Rapid Games",
-  description: "Play chess online on Crazy Chess Battles. Choose blitz, bullet, or rapid time controls. Challenge friends, play the computer, or match with random opponents.",
-  alternates: { canonical: "https://crazychessbattles.live/play" },
-};
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
+  title: "Play Chess Online — Live Games",
+  description: "Play chess online against players worldwide. Choose from blitz, bullet, and rapid time controls. Find a match instantly on Crazy Chess Battles.",
+  path: "/play",
+});
 
 export default function PlayPage() {
   return <PlayClient />;

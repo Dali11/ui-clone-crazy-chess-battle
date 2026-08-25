@@ -15,9 +15,14 @@ const LEVEL_RATINGS: Record<string, number> = {
 };
 
 
-export const metadata: Metadata = {
-  title: "Dashboard",
-};
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
+  title: "Dashboard — Your Chess Home",
+  description: "Your Crazy Chess Battles dashboard with stats, recent games, and quick actions.",
+  path: "/dashboard",
+  noIndex: true
+});
 
 export default async function DashboardPage() {
   const supabase = await createClient();

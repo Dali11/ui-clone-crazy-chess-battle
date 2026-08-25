@@ -1,11 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
 
-export const metadata = {
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
   title: "Privacy Policy",
   description: "Read the Crazy Chess Battles privacy policy: how we collect, use, and protect your personal data, payment information, and game history.",
-  alternates: { canonical: "https://crazychessbattles.live/privacy" },
-};
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (

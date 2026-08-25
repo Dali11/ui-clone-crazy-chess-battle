@@ -1,11 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
 
-export const metadata = {
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
   title: "Terms of Service",
   description: "The terms and conditions governing your use of Crazy Chess Battles, including tournament rules, prize eligibility, and account responsibilities.",
-  alternates: { canonical: "https://crazychessbattles.live/terms" },
-};
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (

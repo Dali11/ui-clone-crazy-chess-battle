@@ -4,11 +4,13 @@ import { ChevronDown, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
   title: "FAQ — How Crazy Chess Battles Works",
   description: "Get answers to common questions about Crazy Chess Battles: how tournaments work, prize pools, membership, ratings, game rules, and more.",
-  alternates: { canonical: "https://crazychessbattles.live/faq" },
-};
+  path: "/faq",
+});
 
 const FAQ_SECTIONS = [
   {

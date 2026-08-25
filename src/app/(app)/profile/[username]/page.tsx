@@ -21,15 +21,27 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
   }
 
   const name = profile.display_name || profile.username;
+  const desc = profile.bio
+    ? `${name} (rating ${profile.rating}) — ${profile.bio}`
+    : `View ${name}'s chess profile: rating ${profile.rating}, ${profile.games_played} games played, ${profile.wins} wins. See game history and stats.`;
+
   return {
     title: `${name} — Chess Profile`,
-    description: profile.bio
-      ? `${name} (rating ${profile.rating}) — ${profile.bio}`
-      : `View ${name}'s chess profile: rating ${profile.rating}, ${profile.games_played} games played, ${profile.wins} wins. See game history and stats.`,
+    description: desc,
     openGraph: {
       title: `${name} — Crazy Chess Battles Profile`,
       description: `Rating ${profile.rating} · ${profile.games_played} games · ${profile.wins} wins`,
-      images: profile.avatar_url ? [{ url: profile.avatar_url }] : undefined,
+      type: "profile",
+      url: `https://crazychessbattles.live/profile/${username}`,
+      siteName: "Crazy Chess Battles",
+      locale: "en_US",
+      images: profile.avatar_url ? [{ url: profile.avatar_url, width: 1200, height: 630, alt: `${name} — Chess Profile` }] : [{ url: "/og-image.png", width: 1200, height: 630, alt: `${name} — Chess Profile` }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${name} — Crazy Chess Battles Profile`,
+      description: `Rating ${profile.rating} · ${profile.games_played} games · ${profile.wins} wins`,
+      images: profile.avatar_url ? [profile.avatar_url] : ["/og-image.png"],
     },
     alternates: { canonical: `https://crazychessbattles.live/profile/${username}` },
   };

@@ -8,9 +8,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import EarnClient from "./earn-client";
 
 
-export const metadata: Metadata = {
-  title: "Earn — Rewards & Earnings",
-};
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
+  title: "Earn CCB — Rewards & Referrals",
+  description: "Earn CCB rewards through referrals, daily check-ins, and activities on Crazy Chess Battles.",
+  path: "/earn"
+});
 
 export default async function EarnPage() {
   const supabase = await createClient();

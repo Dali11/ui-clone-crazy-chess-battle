@@ -1,6 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import AdminDashboard from "./admin-client";
 
+import { pageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = pageMetadata({
+  title: "Admin Panel",
+  description: "Crazy Chess Battles admin panel.",
+  path: "/admin",
+  noIndex: true
+});
+
+
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
