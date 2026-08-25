@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,6 +13,18 @@ export async function GET(req: NextRequest) {
     const { data: profile } = await admin
       .from("profiles").select("is_admin").eq("id", user.id).single();
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    // ─── Enforce log retention policy ──────────────────────────
+    try {
+      const lConfig = await getPlatformConfig(admin, "logs");
+      const retentionDays = lConfig.retention_days || 90;
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+      await admin
+        .from("admin_logs")
+        .delete()
+        .lt("created_at", cutoffDate.toISOString());
+    } catch {}
 
     const { data: logs, error } = await admin
       .from("admin_logs")
