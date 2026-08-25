@@ -1,3 +1,11 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Leaderboard — Global Chess Rankings",
+  description: "See the top chess players on Crazy Chess Battles. View global rankings, win rates, ratings, and tournament champions. Climb the leaderboard by winning ranked games.",
+  alternates: { canonical: "https://crazychessbattles.live/leaderboard" },
+};
+
 import { createClient } from "@/lib/supabase/server";
 import { Crown, Medal } from "lucide-react";
 import Link from "next/link";
