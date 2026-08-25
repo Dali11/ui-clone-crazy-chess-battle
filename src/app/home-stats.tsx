@@ -2,12 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getCurrencySymbol } from "@/lib/geo/fx";
 
 interface Stats {
   activePlayers: number;
   gamesToday: number;
   liveTournaments: number;
-  totalPrizePool: number;
+  totalPrizePool: number; // in MWK cents (base currency)
+}
+
+interface CurrencyInfo {
+  currencyCode: string;
+  rate: number; // MWK -> currencyCode
 }
 
 function formatNumber(n: number): string {
@@ -16,15 +22,17 @@ function formatNumber(n: number): string {
   return n.toLocaleString("en-US");
 }
 
-function formatMoney(cents: number): string {
-  const kwacha = Math.floor(cents / 100);
-  if (kwacha >= 1_000_000) return `MK ${(kwacha / 1_000_000).toFixed(1)}M`;
-  if (kwacha >= 1_000) return `MK ${(kwacha / 1_000).toFixed(0)}K`;
-  return `MK ${kwacha.toLocaleString("en-US")}`;
+function formatMoney(cents: number, currencyCode: string): string {
+  const symbol = getCurrencySymbol(currencyCode);
+  const units = Math.floor(cents / 100);
+  if (units >= 1_000_000) return `${symbol} ${(units / 1_000_000).toFixed(1)}M`;
+  if (units >= 1_000) return `${symbol} ${(units / 1_000).toFixed(0)}K`;
+  return `${symbol} ${units.toLocaleString("en-US")}`;
 }
 
 export default function HomeStats() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [currency, setCurrency] = useState<CurrencyInfo>({ currencyCode: "MWK", rate: 1 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,16 +43,23 @@ export default function HomeStats() {
         today.setHours(0, 0, 0, 0);
         const todayISO = today.toISOString();
 
-        const [playersRes, gamesRes, tournamentsRes] = await Promise.all([
+        const [playersRes, gamesRes, tournamentsRes, currencyRes] = await Promise.all([
           supabase.from("profiles").select("id", { count: "exact", head: true }),
           supabase.from("games").select("id", { count: "exact", head: true }).gte("created_at", todayISO),
           supabase.from("tournaments").select("prize_pool_cents, status").in("status", ["upcoming", "active"]),
+          // Detect visitor's currency + live MWK exchange rate so the prize
+          // pool displays converted to whatever currency they use locally.
+          fetch("/api/currency").then((r) => (r.ok ? r.json() : null)).catch(() => null),
         ]);
 
         const totalPrizePool = (tournamentsRes.data || []).reduce(
           (sum, t) => sum + (t.prize_pool_cents || 0),
           0
         );
+
+        if (currencyRes?.currencyCode && currencyRes?.rate) {
+          setCurrency({ currencyCode: currencyRes.currencyCode, rate: currencyRes.rate });
+        }
 
         setStats({
           activePlayers: playersRes.count || 0,
@@ -81,11 +96,19 @@ export default function HomeStats() {
 
   if (!stats) return null;
 
+  const convertedPrizePoolCents = Math.round(stats.totalPrizePool * currency.rate);
+
   const items = [
     { value: formatNumber(stats.activePlayers), label: "Players" },
     { value: formatNumber(stats.gamesToday), label: "Games Today" },
     { value: formatNumber(stats.liveTournaments), label: "Live Tournaments" },
-    { value: stats.totalPrizePool > 0 ? formatMoney(stats.totalPrizePool) : "MK 0", label: "Prize Pool" },
+    {
+      value:
+        convertedPrizePoolCents > 0
+          ? formatMoney(convertedPrizePoolCents, currency.currencyCode)
+          : `${getCurrencySymbol(currency.currencyCode)} 0`,
+      label: "Prize Pool",
+    },
   ];
 
   return (
