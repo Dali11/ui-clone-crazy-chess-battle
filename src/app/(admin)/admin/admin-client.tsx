@@ -2306,7 +2306,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {tab === "deposits" && (
             <div className="space-y-4">
               {/* Deposit stats */}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                 <div className="card text-center">
                   <p className="text-xs text-ccb-muted">Total Credited</p>
                   <p className="text-base font-bold mt-1">
