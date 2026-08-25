@@ -16,8 +16,14 @@ const BATTLE_TIME_CONTROL = "rapid15";
 const BATTLE_TC_LABEL = "Rapid";
 const BATTLE_TC_DESC = "15+10";
 
-const TIME_CONTROLS = [
-  { id: "rapid15", label: "Rapid", desc: "15+10", icon: Clock },
+// Time controls available for Challenge a Friend (main battles use the fixed default)
+const CHALLENGE_TIME_CONTROLS = [
+  { id: "bullet", label: "Bullet", desc: "1+0" },
+  { id: "blitz3", label: "Blitz", desc: "3+2" },
+  { id: "blitz", label: "Blitz", desc: "5+0" },
+  { id: "rapid", label: "Rapid", desc: "10+0" },
+  { id: "rapid15", label: "Rapid", desc: "15+10" },
+  { id: "classical", label: "Classical", desc: "30+0" },
 ];
 
 function formatMKK(cents: number): string {
@@ -65,6 +71,7 @@ export default function BattlesPage() {
   const [challengeUrl, setChallengeUrl] = useState<string | null>(null);
   const [creatingChallenge, setCreatingChallenge] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
+  const [selectedChallengeTC, setSelectedChallengeTC] = useState("rapid15");
   const [adminNotified, setAdminNotified] = useState(false);
   const [checkingActive, setCheckingActive] = useState(true);
   const [profileLoaded, setProfileLoaded] = useState(false);
@@ -284,7 +291,7 @@ export default function BattlesPage() {
       const res = await fetch("/api/battles/challenge/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stakeCents, timeControl: BATTLE_TIME_CONTROL }),
+        body: JSON.stringify({ stakeCents, timeControl: selectedChallengeTC }),
       });
       const data = await res.json();
 
@@ -559,15 +566,25 @@ export default function BattlesPage() {
           </div>
         )}
 
-        {/* Time Control — fixed, shown as info only */}
+        {/* Time Control — selectable for challenges */}
         <div>
           <h3 className="text-sm font-medium text-ccb-muted mb-3">Time Control</h3>
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border">
-            <Clock className="w-5 h-5 text-ccb-primary" />
-            <div>
-              <div className="text-sm font-medium">{BATTLE_TC_DESC}</div>
-              <div className="text-xs text-ccb-muted">{BATTLE_TC_LABEL}</div>
-            </div>
+          <div className="grid grid-cols-3 gap-2">
+            {CHALLENGE_TIME_CONTROLS.map((tc) => (
+              <button
+                key={tc.id}
+                onClick={() => setSelectedChallengeTC(tc.id)}
+                className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border-2 transition-all ${
+                  selectedChallengeTC === tc.id
+                    ? "border-ccb-accent bg-ccb-accent/10"
+                    : "border-ccb-border bg-ccb-surface hover:border-ccb-accent/50"
+                }`}
+              >
+                <Clock className={`w-4 h-4 ${selectedChallengeTC === tc.id ? "text-ccb-accent" : "text-ccb-muted"}`} />
+                <span className={`text-sm font-semibold ${selectedChallengeTC === tc.id ? "text-ccb-accent" : "text-ccb-text"}`}>{tc.label}</span>
+                <span className="text-xs text-ccb-muted">{tc.desc}</span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -604,7 +621,7 @@ export default function BattlesPage() {
               )}
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="text-ccb-muted">Time control</span>
-                <span className="font-semibold">{BATTLE_TC_DESC}</span>
+                <span className="font-semibold">{CHALLENGE_TIME_CONTROLS.find(tc => tc.id === selectedChallengeTC)?.desc || "15+10"}</span>
               </div>
               <div className="flex items-center justify-between text-sm pt-2 border-t border-ccb-border">
                 <span className="text-ccb-muted">Winner receives</span>
