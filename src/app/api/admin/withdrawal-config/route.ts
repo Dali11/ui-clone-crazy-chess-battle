@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPlatformConfig } from "@/lib/platform-config";
+
+// Map withdrawal_config field names → platform_settings.withdrawals field names
+const FIELD_MAP: Record<string, string> = {
+  auto_approve_enabled: "auto_approve",
+  min_withdrawal_cents: "min_amount_cents",
+  max_withdrawal_cents: "max_amount_cents",
+  daily_withdrawal_limit_cents: "daily_limit_cents",
+  processing_fee_pct: "processing_fee_pct",
+  withdrawal_fee_cents: "withdrawal_fee_cents",
+};
 
 // GET — fetch withdrawal/deposit config
 export async function GET() {
@@ -26,6 +37,47 @@ export async function GET() {
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}
+
+/**
+ * Sync changed withdrawal_config fields into platform_settings.withdrawals
+ * so backend routes that read via getPlatformConfig(admin, "withdrawals")
+ * see the same values the admin just saved.
+ */
+async function syncToPlatformSettings(
+  admin: ReturnType<typeof createAdminClient>,
+  cleanUpdates: Record<string, unknown>,
+  userId: string
+) {
+  const platformUpdates: Record<string, unknown> = {};
+  for (const [legacyKey, platformKey] of Object.entries(FIELD_MAP)) {
+    if (cleanUpdates[legacyKey] !== undefined) {
+      platformUpdates[platformKey] = cleanUpdates[legacyKey];
+    }
+  }
+  if (Object.keys(platformUpdates).length === 0) return;
+
+  // Merge with existing config to avoid clobbering other fields
+  const existing = await getPlatformConfig(admin, "withdrawals");
+  const mergedConfig = { ...existing, ...platformUpdates };
+
+  const { data: existingRow } = await admin
+    .from("platform_settings")
+    .select("id")
+    .eq("section", "withdrawals")
+    .limit(1)
+    .single();
+
+  if (existingRow?.id) {
+    await admin
+      .from("platform_settings")
+      .update({ config: mergedConfig, updated_at: new Date().toISOString(), updated_by: userId })
+      .eq("id", existingRow.id);
+  } else {
+    await admin
+      .from("platform_settings")
+      .insert({ section: "withdrawals", config: mergedConfig, updated_by: userId });
   }
 }
 
@@ -87,6 +139,9 @@ export async function PATCH(req: NextRequest) {
           .single();
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+        // Sync to platform_settings so backend routes see the change
+        await syncToPlatformSettings(admin, cleanUpdates, user.id);
+
         try {
           await admin.from("admin_logs").insert({
             admin_id: user.id,
@@ -105,6 +160,9 @@ export async function PATCH(req: NextRequest) {
           .select("*")
           .single();
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+        await syncToPlatformSettings(admin, cleanUpdates, user.id);
+
         return NextResponse.json(config);
       }
     }
@@ -117,6 +175,9 @@ export async function PATCH(req: NextRequest) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Sync to platform_settings so backend routes see the change
+    await syncToPlatformSettings(admin, cleanUpdates, user.id);
 
     try {
       await admin.from("admin_logs").insert({
