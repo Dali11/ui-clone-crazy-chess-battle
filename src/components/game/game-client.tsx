@@ -777,10 +777,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         <Link href="/play" className="p-1.5 -ml-1.5 text-ccb-muted hover:text-ccb-primary">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {isSpectator && <Eye className="w-3.5 h-3.5 text-ccb-muted" />}
-          <span className="text-xs font-medium px-2 py-0.5 rounded bg-ccb-surface text-ccb-muted">{game.time_control}</span>
-          <span className={`text-xs font-medium px-2 py-0.5 rounded ${game.rated ? "bg-ccb-primary/15 text-ccb-primary" : "bg-ccb-surface text-ccb-muted"}`}>{game.rated ? "Ranked" : "Casual"}</span>
+          <Swords className="w-3.5 h-3.5 text-ccb-primary" />
+          <span className="text-sm font-bold text-ccb-text">Crazy Chess Battles</span>
         </div>
         <button onClick={() => toggleSheet("menu")} className="p-1.5 -mr-1.5 text-ccb-muted hover:text-ccb-primary">
           <MoreVertical className="w-5 h-5" />
@@ -1033,10 +1033,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           <Link href="/play" className="text-sm text-ccb-muted hover:text-ccb-primary flex items-center gap-1">
             <ArrowLeft className="w-4 h-4" /> Back
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {isSpectator && <span className="flex items-center gap-1 text-xs text-ccb-muted"><Eye className="w-3.5 h-3.5" />Spectating</span>}
-            <span className="text-xs font-medium px-2 py-0.5 rounded bg-ccb-surface text-ccb-muted">{game.time_control}</span>
-            <span className={`text-xs font-medium px-2 py-0.5 rounded ${game.rated ? "bg-ccb-primary/15 text-ccb-primary" : "bg-ccb-surface text-ccb-muted"}`}>{game.rated ? "Ranked" : "Casual"}</span>
+            <Swords className="w-4 h-4 text-ccb-primary" />
+            <span className="text-sm font-bold text-ccb-text">Crazy Chess Battles</span>
           </div>
         </div>
 
