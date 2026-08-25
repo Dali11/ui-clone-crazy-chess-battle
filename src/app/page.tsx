@@ -14,6 +14,12 @@ import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  title: "Crazy Chess Battles — Play Competitive Chess Online & Win Prizes",
+  description: "Compete in live chess tournaments, ranked battles, and leagues. Play blitz, bullet, and rapid chess against players worldwide. Climb the leaderboard and win real prizes.",
+  alternates: { canonical: "https://crazychessbattles.live" },
+};
+
 export default async function LandingPage({ searchParams }: { searchParams: Promise<{ ref?: string }> }) {
   const { ref } = await searchParams;
   
