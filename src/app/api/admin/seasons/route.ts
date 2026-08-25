@@ -50,13 +50,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Name and country are required" }, { status: 400 });
     }
 
+    // ─── Load platform config for seasons ──────────────────────────
+    const sConfig = await getPlatformConfig(admin, 'seasons');
+
+    // Apply default duration if not provided
+    let finalEndDate = end_date;
+    let finalStartDate = start_date;
+    if (!finalStartDate) {
+      finalStartDate = new Date().toISOString().split('T')[0];
+    }
+    if (!finalEndDate && sConfig.default_duration_weeks) {
+      const end = new Date(finalStartDate);
+      end.setDate(end.getDate() + (sConfig.default_duration_weeks * 7));
+      finalEndDate = end.toISOString().split('T')[0];
+    }
+
+    // Check for overlapping seasons if not allowed
+    if (sConfig.allow_overlap === false && finalStartDate && finalEndDate) {
+      const { data: overlapping } = await admin
+        .from('competitive_seasons')
+        .select('id, name')
+        .eq('country', country)
+        .neq('status', 'ended')
+        .or(`start_date.lte.${finalEndDate},end_date.gte.${finalStartDate}`);
+      if (overlapping && overlapping.length > 0) {
+        return NextResponse.json({ error: `Overlapping season exists: ${overlapping.map(s => s.name).join(', ')}. Enable overlap in settings to allow this.` }, { status: 400 });
+      }
+    }
+
     const { data, error } = await admin
       .from("competitive_seasons")
       .insert({
         name,
         country,
-        start_date: start_date || null,
-        end_date: end_date || null,
+        start_date: finalStartDate || null,
+        end_date: finalEndDate || null,
         config: config || {},
         status: "upcoming",
       })
