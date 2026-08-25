@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,22 +11,57 @@ export async function POST(req: NextRequest) {
 
     const { amountCents, phone, operatorRefId, operatorName } = await req.json();
 
-    // Minimum withdrawal is MWK 10,000 (1,000,000 cents)
-    if (!amountCents || amountCents < 1000000) {
-      return NextResponse.json({ error: "Minimum withdrawal is MWK 10,000" }, { status: 400 });
+    // ─── Load platform config ──────────────────────────────────────────
+    const admin = createAdminClient();
+    const wConfig = await getPlatformConfig(admin, "withdrawals");
+
+    // Check if withdrawals are enabled
+    if (!wConfig.enabled) {
+      return NextResponse.json({ error: "Withdrawals are currently disabled" }, { status: 403 });
     }
-    if (!phone || !operatorRefId || !operatorName) {
-      return NextResponse.json({ error: "Phone, operator required" }, { status: 400 });
+
+    // Enforce minimum amount
+    const minAmount = wConfig.min_amount_cents || 1_000_000;
+    if (!amountCents || amountCents < minAmount) {
+      const minDisplay = Math.floor(minAmount / 100).toLocaleString();
+      return NextResponse.json({ error: `Minimum withdrawal is MWK ${minDisplay}` }, { status: 400 });
+    }
+
+    // Enforce maximum amount
+    const maxAmount = wConfig.max_amount_cents || 50_000_000;
+    if (amountCents > maxAmount) {
+      const maxDisplay = Math.floor(maxAmount / 100).toLocaleString();
+      return NextResponse.json({ error: `Maximum withdrawal is MWK ${maxDisplay}` }, { status: 400 });
+    }
+
+    // Enforce daily limit
+    const dailyLimit = wConfig.daily_limit_cents || 0;
+    if (dailyLimit > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { data: todayWithdrawals } = await admin
+        .from("withdrawals")
+        .select("amount_cents")
+        .eq("user_id", user.id)
+        .gte("created_at", today.toISOString())
+        .in("status", ["pending", "approved", "completed"]);
+
+      const todayTotal = (todayWithdrawals || []).reduce((sum, w) => sum + w.amount_cents, 0);
+      if (todayTotal + amountCents > dailyLimit) {
+        const remaining = Math.max(0, Math.floor((dailyLimit - todayTotal) / 100)).toLocaleString();
+        return NextResponse.json({ error: `Daily withdrawal limit reached. Remaining: MWK ${remaining}` }, { status: 400 });
+      }
     }
 
     // Validate phone format (Malawi: 08x, 09x, +265, 265)
+    if (!phone || !operatorRefId || !operatorName) {
+      return NextResponse.json({ error: "Phone, operator required" }, { status: 400 });
+    }
     const phoneDigits = phone.replace(/\D/g, "");
     const localPhone = phoneDigits.startsWith("265") ? "0" + phoneDigits.slice(3) : phoneDigits;
     if (localPhone.length < 9 || !localPhone.match(/^0[89]/)) {
       return NextResponse.json({ error: "Invalid Malawi mobile money number" }, { status: 400 });
     }
-
-    const admin = createAdminClient();
 
     // Check for existing pending withdrawal (prevent spam)
     const { data: existingPending } = await admin
@@ -39,7 +75,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "You already have a pending withdrawal. Wait for it to be processed before requesting another." }, { status: 400 });
     }
 
-    // Call the atomic request_withdrawal RPC
+    // Apply withdrawal fee + processing fee
+    const withdrawalFee = wConfig.withdrawal_fee_cents || 0;
+    const processingFeePct = wConfig.processing_fee_pct || 0;
+    const processingFee = Math.floor(amountCents * (processingFeePct / 100));
+    const totalFees = withdrawalFee + processingFee;
+    const netAmount = amountCents - totalFees;
+
+    // Call the atomic request_withdrawal RPC (debits wallet)
     const { data: withdrawalId, error } = await admin.rpc("request_withdrawal", {
       p_user_id: user.id,
       p_amount_cents: amountCents,
@@ -52,17 +95,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    // Check if auto-approve is enabled
-    const { data: wConfig } = await admin
-      .from("withdrawal_config")
-      .select("auto_approve_enabled")
-      .limit(1)
-      .single();
+    // Record fees (store on the withdrawal record for transparency)
+    if (totalFees > 0) {
+      await admin
+        .from("withdrawals")
+        .update({
+          fee_cents: totalFees,
+          net_amount_cents: netAmount,
+        })
+        .eq("id", withdrawalId);
+    }
 
-    if (wConfig?.auto_approve_enabled) {
-      // Auto-approve: process the payout immediately
+    // Check if auto-approve is enabled (from platform_settings, also synced to withdrawal_config)
+    if (wConfig.auto_approve) {
       try {
-        // Atomic claim: only approve if still pending
         const { data: withdrawal, error: claimError } = await admin
           .from("withdrawals")
           .update({ status: "approved", processed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
@@ -72,13 +118,12 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (claimError || !withdrawal) {
-          // Already being processed by an admin — return pending status
           return NextResponse.json({ withdrawalId, status: "pending" });
         }
 
-        // Initiate Paychangu payout
+        // Initiate Paychangu payout (net amount after fees)
         const chargeId = `wd_${withdrawal.id.slice(0, 8)}_${Date.now()}`;
-        const amountMWK = Math.floor(withdrawal.amount_cents / 100);
+        const amountMWK = Math.floor((netAmount || withdrawal.amount_cents) / 100);
         let payoutSucceeded = false;
 
         try {
@@ -111,7 +156,7 @@ export async function POST(req: NextRequest) {
                 type: "withdrawal_approved",
                 title: "Your withdrawal has been processed",
                 body: `MWK ${amountMWK} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
-                data: { amount: amountMWK, phone: withdrawal.phone, operator: withdrawal.operator_name, auto: true },
+                data: { amount: amountMWK, phone: withdrawal.phone, operator: withdrawal.operator_name, auto: true, fees: totalFees },
                 read: false,
               });
             } catch {}
@@ -121,12 +166,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (!payoutSucceeded) {
-          // Payout failed — refund the wallet
-          await admin.rpc("refund_withdrawal", {
-            p_withdrawal_id: withdrawalId,
-            p_admin_id: null,
-          });
-
+          await admin.rpc("refund_withdrawal", { p_withdrawal_id: withdrawalId, p_admin_id: null });
           try {
             await admin.from("notifications").insert({
               user_id: withdrawal.user_id,
@@ -137,25 +177,22 @@ export async function POST(req: NextRequest) {
               read: false,
             });
           } catch {}
-
           return NextResponse.json({ withdrawalId, status: "rejected", error: "Payout failed. Wallet has been refunded." });
         }
 
-        // Log auto-approval
         try {
           await admin.from("admin_logs").insert({
             admin_id: null,
             action: "withdrawal_auto_approve",
             target_type: "withdrawal",
             target_id: withdrawalId,
-            details: { amount: amountMWK, phone: withdrawal.phone, charge_id: chargeId, auto: true },
+            details: { amount: amountMWK, phone: withdrawal.phone, charge_id: chargeId, auto: true, fees: totalFees },
           });
         } catch {}
 
         return NextResponse.json({ withdrawalId, status: "completed", chargeId, auto: true });
       } catch (autoErr: any) {
         console.error("Auto-approve error:", autoErr);
-        // Fall back to manual approval if auto fails unexpectedly
         return NextResponse.json({ withdrawalId, status: "pending" });
       }
     }
