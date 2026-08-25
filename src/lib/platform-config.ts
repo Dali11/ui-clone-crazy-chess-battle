@@ -1,0 +1,212 @@
+/**
+ * Platform Config — single source of truth for admin-configurable settings.
+ *
+ * All admin settings live in the `platform_settings` table (one row per section,
+ * config stored as JSONB). This helper reads + caches them so every backend route
+ * can enforce the same config the admin panel shows.
+ *
+ * For sections that historically used a separate table (battle_config, berry_config,
+ * withdrawal_config), the PATCH route syncs writes to those tables too so existing
+ * code keeps working during migration.
+ */
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+// ─── Default configs (used when no row exists yet) ─────────────────────────
+
+export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
+  overview: {
+    show_kpi_cards: true,
+    refresh_interval_seconds: 30,
+  },
+  deposits: {
+    enabled: true,
+    auto_credit: false,
+    min_amount_cents: 1000,
+    max_amount_cents: 10_000_000,
+    require_approval_above_cents: 50_000,
+    show_kpi_cards: true,
+    default_filter: "pending",
+    page_size: 20,
+  },
+  withdrawals: {
+    enabled: true,
+    auto_approve: false,
+    min_amount_cents: 1_000_000,
+    max_amount_cents: 5_000_000,
+    daily_limit_cents: 1_000_000,
+    processing_fee_pct: 0,
+    withdrawal_fee_cents: 0,
+    show_kpi_cards: true,
+    default_filter: "pending",
+    page_size: 20,
+  },
+  battles: {
+    enabled: true,
+    min_stake_cents: 50_000,
+    max_stake_cents: 1_000_000,
+    platform_fee_pct: 10,
+    auto_cancel_minutes: 10,
+    show_kpi_cards: true,
+    page_size: 20,
+  },
+  games: {
+    allow_spectators: true,
+    max_concurrent_games: 5,
+    show_kpi_cards: true,
+    default_filter: "all",
+    page_size: 20,
+  },
+  users: {
+    allow_signup: true,
+    require_email_verification: false,
+    default_is_admin: false,
+    show_kpi_cards: true,
+    page_size: 20,
+  },
+  tournaments: {
+    require_approval: true,
+    auto_approve_below_players: 0,
+    max_players: 128,
+    show_kpi_cards: true,
+    page_size: 20,
+  },
+  berry: {
+    berries_per_win: 10,
+    berries_per_draw: 5,
+    berries_per_tournament_win: 50,
+    daily_cap: 100,
+    conversion_rate: 100,
+    show_kpi_cards: true,
+  },
+  leagues: {
+    require_membership: true,
+    auto_relegate: true,
+    promotion_spots: 5,
+    relegation_spots: 5,
+    show_kpi_cards: true,
+    page_size: 20,
+  },
+  seasons: {
+    auto_create: false,
+    default_duration_weeks: 12,
+    allow_overlap: false,
+    show_kpi_cards: true,
+    page_size: 20,
+  },
+  membership: {
+    auto_renew: false,
+    grace_period_days: 10,
+    require_verification: false,
+    show_kpi_cards: true,
+    page_size: 20,
+  },
+  verification: {
+    require_id_document: true,
+    require_selfie: false,
+    auto_approve_trusted: false,
+    show_kpi_cards: true,
+    page_size: 20,
+  },
+  logs: {
+    retention_days: 90,
+    page_size: 50,
+    show_kpi_cards: true,
+  },
+};
+
+// ─── Legacy table sync map ────────────────────────────────────────────────
+
+export const LEGACY_SYNC: Record<string, { table: string; fieldMap: Record<string, string> }> = {
+  withdrawals: {
+    table: "withdrawal_config",
+    fieldMap: {
+      auto_approve: "auto_approve_enabled",
+      min_amount_cents: "min_withdrawal_cents",
+      max_amount_cents: "max_withdrawal_cents",
+      daily_limit_cents: "daily_withdrawal_limit_cents",
+      processing_fee_pct: "processing_fee_pct",
+      withdrawal_fee_cents: "withdrawal_fee_cents",
+    },
+  },
+  battles: {
+    table: "battle_config",
+    fieldMap: {
+      enabled: "enabled",
+      platform_fee_pct: "platform_fee_pct",
+    },
+  },
+  berry: {
+    table: "berry_config",
+    fieldMap: {
+      berries_per_win: "berries_per_win",
+      berries_per_draw: "berries_per_draw",
+      berries_per_tournament_win: "berries_per_tournament_win",
+      daily_cap: "daily_cap",
+      conversion_rate: "conversion_rate",
+    },
+  },
+};
+
+// ─── Helper: read one section's config ────────────────────────────────────
+
+export async function getPlatformConfig(
+  admin: SupabaseClient,
+  section: string
+): Promise<Record<string, any>> {
+  const { data } = await admin
+    .from("platform_settings")
+    .select("config")
+    .eq("section", section)
+    .limit(1)
+    .single();
+
+  return { ...DEFAULT_CONFIGS[section], ...(data?.config || {}) };
+}
+
+// ─── Helper: read multiple sections at once ─────────────────────────────
+
+export async function getPlatformConfigs(
+  admin: SupabaseClient,
+  sections: string[]
+): Promise<Record<string, Record<string, any>>> {
+  const { data } = await admin
+    .from("platform_settings")
+    .select("section, config")
+    .in("section", sections);
+
+  const result: Record<string, Record<string, any>> = {};
+  for (const section of sections) {
+    const row = data?.find((r) => r.section === section);
+    result[section] = { ...DEFAULT_CONFIGS[section], ...(row?.config || {}) };
+  }
+  return result;
+}
+
+// ─── Helper: sync to legacy table on save ────────────────────────────────
+
+export async function syncLegacyTable(
+  admin: SupabaseClient,
+  section: string,
+  config: Record<string, any>,
+  userId: string
+): Promise<void> {
+  const legacy = LEGACY_SYNC[section];
+  if (!legacy) return;
+
+  const updates: Record<string, any> = { updated_at: new Date().toISOString(), updated_by: userId };
+  for (const [platformKey, legacyKey] of Object.entries(legacy.fieldMap)) {
+    if (config[platformKey] !== undefined) {
+      updates[legacyKey] = config[platformKey];
+    }
+  }
+
+  if (Object.keys(updates).length <= 2) return;
+
+  const { data: existing } = await admin.from(legacy.table).select("id").limit(1).single();
+  if (existing?.id) {
+    await admin.from(legacy.table).update(updates).eq("id", existing.id);
+  } else {
+    await admin.from(legacy.table).insert(updates);
+  }
+}
