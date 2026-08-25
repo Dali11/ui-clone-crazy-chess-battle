@@ -7,16 +7,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) {
-      return NextResponse.json({ error: "DATABASE_URL not set" }, { status: 500 });
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceKey) {
+      return NextResponse.json({ error: "Supabase env vars not set" }, { status: 500 });
     }
-
-    const { Client } = await import("pg");
-    const client = new Client({ connectionString: dbUrl });
-    await client.connect();
-
-    const results: any[] = [];
 
     const statements = [
       `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS min_withdrawal_cents INT NOT NULL DEFAULT 1000`,
@@ -31,16 +26,30 @@ export async function POST(req: NextRequest) {
       `ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS rejection_reason TEXT`,
     ];
 
+    const results: { ok: boolean; sql: string; error?: string }[] = [];
+
     for (const sql of statements) {
       try {
-        await client.query(sql);
-        results.push({ ok: true, sql: sql.substring(0, 90) });
+        // Use Supabase REST API to execute raw SQL via the pg_meta endpoint
+        const res = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
+          method: "POST",
+          headers: {
+            "apikey": serviceKey,
+            "Authorization": `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ sql }),
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          results.push({ ok: false, sql: sql.substring(0, 90), error: errText.substring(0, 200) });
+        } else {
+          results.push({ ok: true, sql: sql.substring(0, 90) });
+        }
       } catch (e: any) {
-        results.push({ ok: false, error: e.message, sql: sql.substring(0, 90) });
+        results.push({ ok: false, sql: sql.substring(0, 90), error: e.message });
       }
     }
-
-    await client.end();
 
     const failed = results.filter(r => !r.ok);
     return NextResponse.json({
