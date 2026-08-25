@@ -8,7 +8,7 @@ import {
   Zap, Clock, Swords, Bot, Link2, Disc3, X, Sparkles, ChevronRight, Play,
   Coins, Crown, TrendingUp, Trophy,
 } from "lucide-react";
-import { VARIANTS, VARIANT_LIST, type Variant } from "@/lib/game/draughts-engine";
+import { type Variant } from "@/lib/game/draughts-engine";
 
 const timeControls = [
   { id: "bullet", label: "Bullet", minutes: 1,  increment: 0, desc: "1+0",  icon: Zap },
@@ -26,7 +26,7 @@ type SearchState = "idle" | "searching" | "noPlayers";
 
 export default function DraughtsPage() {
   const [selectedTC, setSelectedTC] = useState("rapid");
-  const [variant, setVariant] = useState<Variant>("international");
+  const [variant] = useState<Variant>("international"); // International is the most widely played competitive variant
   const [rated, setRated] = useState(true);
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [searchSeconds, setSearchSeconds] = useState(0);
@@ -325,13 +325,13 @@ export default function DraughtsPage() {
           </div>
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold leading-tight">Crazy Draughts Battles ⚔️</h1>
-            <p className="text-sm text-ccb-muted truncate">Play. Compete. Climb.</p>
+            <p className="text-sm text-ccb-text/80 truncate">Play. Compete. Climb.</p>
           </div>
         </div>
         {profile && (
-          <div className="text-right shrink-0">
-            <p className="text-[10px] text-ccb-muted uppercase tracking-wide">Rating</p>
-            <p className="text-lg font-bold text-ccb-primary leading-tight">{profile.draughts_rating || 1500}</p>
+          <div className="flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-full bg-ccb-surface border border-ccb-border">
+            <span className="text-[10px] text-ccb-muted uppercase tracking-wide">Rtg</span>
+            <span className="text-sm font-bold text-ccb-primary leading-tight">{profile.draughts_rating || 1500}</span>
           </div>
         )}
       </div>
@@ -364,34 +364,10 @@ export default function DraughtsPage() {
 
       {/* Tab content */}
       {activeTab === "play" && (
-        <div className="space-y-5 animate-slide-up">
-          {/* Variant Selector */}
-          <div>
-            <h3 className="text-sm font-medium text-ccb-muted mb-3">Game Variant</h3>
-            <div className="grid grid-cols-3 gap-3">
-              {VARIANT_LIST.map((v) => {
-                const isSelected = variant === v.id;
-                return (
-                  <button
-                    key={v.id}
-                    onClick={() => setVariant(v.id)}
-                    className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 transition-all text-center ${
-                      isSelected
-                        ? "border-ccb-primary bg-ccb-primary/10 text-ccb-primary"
-                        : "border-ccb-border bg-ccb-surface text-ccb-muted hover:border-ccb-primary/50"
-                    }`}
-                  >
-                    <span className="text-sm font-bold">{v.name}</span>
-                    <span className="text-[10px] leading-tight">{v.description}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
+        <div className="space-y-4 animate-slide-up">
           {/* Time Control */}
           <div>
-            <h3 className="text-sm font-medium text-ccb-muted mb-3">Time Control</h3>
+            <h3 className="text-sm font-semibold text-ccb-text mb-2.5">Time Control</h3>
             <div className="grid grid-cols-3 gap-3">
               {timeControls.map((tc) => {
                 const Icon = tc.icon;
@@ -403,12 +379,12 @@ export default function DraughtsPage() {
                     className={`flex flex-col items-center gap-1.5 py-4 rounded-xl border-2 transition-all ${
                       isSelected
                         ? "border-ccb-primary bg-ccb-primary/10 text-ccb-primary"
-                        : "border-ccb-border bg-ccb-surface text-ccb-muted hover:border-ccb-primary/50"
+                        : "border-ccb-border bg-ccb-surface text-ccb-text/70 hover:border-ccb-primary/50"
                     }`}
                   >
                     <Icon className="w-5 h-5" />
                     <span className="text-sm font-bold">{tc.label}</span>
-                    <span className="text-xs text-ccb-muted">{tc.desc}</span>
+                    <span className="text-xs text-ccb-text/60">{tc.desc}</span>
                   </button>
                 );
               })}
@@ -441,11 +417,11 @@ export default function DraughtsPage() {
           </button>
 
           <p className="text-xs text-ccb-muted text-center">
-            No opponent found in 20s? You'll get the option to play the computer or send a challenge link.
+            No opponent in 20s? You'll get the option to play the computer or send a challenge link.
           </p>
 
           {/* Divider */}
-          <div className="relative pt-2">
+          <div className="relative pt-1">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-ccb-border" />
             </div>
