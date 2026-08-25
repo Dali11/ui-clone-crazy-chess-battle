@@ -20,7 +20,7 @@ export interface BattleConfig {
 export const DEFAULT_CONFIG: BattleConfig = {
   enabled: true,
   stake_levels: [50000, 100000, 250000, 500000, 1000000], // MK500, MK1K, MK2.5K, MK5K, MK10K
-  platform_fee_pct: 10,
+  platform_fee_pct: 5,
   rating_range: 200,
   queue_timeout_s: 120,
   initial_minutes: 5,
