@@ -2,8 +2,9 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
-  title: "Terms of Service — Crazy Chess Battles",
-  description: "Terms and conditions for using Crazy Chess Battles",
+  title: "Terms of Service",
+  description: "The terms and conditions governing your use of Crazy Chess Battles, including tournament rules, prize eligibility, and account responsibilities.",
+  alternates: { canonical: "https://crazychessbattles.live/terms" },
 };
 
 export default function TermsPage() {
