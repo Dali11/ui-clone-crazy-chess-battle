@@ -26,14 +26,14 @@ export default function AboutPage() {
       <section className="px-4 py-12 sm:py-20 text-center">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-4">
-            Chess is <span className="text-ccb-primary">Africa&apos;s</span> game too
+            Chess is <span className="text-ccb-primary">everyone&apos;s</span> game
           </h1>
           <p className="text-sm sm:text-lg text-ccb-muted leading-relaxed">
-            Crazy Chess Battles was built for one reason: to give Malawian chess and draughts players a place to compete,
-            earn, and grow — without needing a credit card, a foreign bank account, or a VPN.
+            Crazy Chess Battles was built for one reason: to give chess players a place to compete,
+            earn, and grow — without needing a credit card or a foreign bank account.
           </p>
           <p className="text-sm sm:text-lg text-ccb-muted leading-relaxed mt-4">
-            Deposit with TNM Mpamba or Airtel Money. Play opponents at your level. Win tournaments and get paid
+            Deposit with mobile money. Play opponents at your level. Win tournaments and get paid
             to your phone. Simple as that.
           </p>
         </div>
@@ -87,7 +87,7 @@ export default function AboutPage() {
               So that I could find people like me who were willing to join a battle, and compete in a tournament.
             </p>
             <p>
-              Today, Crazy Chess Battles is more than just battles — it&apos;s a full competitive ecosystem with Swiss qualifiers, a Premier League, season rankings, and draughts alongside chess. We&apos;re building the future of African board gaming, one match at a time.
+              Today, Crazy Chess Battles is more than just battles — it&apos;s a full competitive ecosystem with Swiss qualifiers, a Premier League, season rankings, and real cash prizes. We&apos;re building the future of competitive chess, one match at a time.
             </p>
 
             <p>
@@ -152,9 +152,9 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="card">
               <Zap className="w-6 h-6 text-ccb-primary mb-3" />
-              <h3 className="font-semibold mb-2 text-sm">Local-first payments</h3>
+              <h3 className="font-semibold mb-2 text-sm">Mobile money payments</h3>
               <p className="text-xs sm:text-sm text-ccb-muted">
-                Built around mobile money — the way Malawians actually pay. No PayPal, no Stripe, no friction.
+                Built around mobile money — the way players actually pay. No PayPal, no Stripe, no friction.
               </p>
             </div>
             <div className="card">
@@ -168,14 +168,7 @@ export default function AboutPage() {
               <Shield className="w-6 h-6 text-ccb-success mb-3" />
               <h3 className="font-semibold mb-2 text-sm">Transparent economics</h3>
               <p className="text-xs sm:text-sm text-ccb-muted">
-                10% platform fee, 40% to tournament creators, 50% to the prize pool. Every kwacha is accounted for.
-              </p>
-            </div>
-            <div className="card">
-              <Disc3 className="w-6 h-6 text-ccb-accent mb-3" />
-              <h3 className="font-semibold mb-2 text-sm">Draughts too</h3>
-              <p className="text-xs sm:text-sm text-ccb-muted">
-                Not just chess — play International, English, or Russian draughts. Same competitive infrastructure, same wallet, same community.
+                10% platform fee, 40% to tournament creators, 50% to the prize pool. Every cent is accounted for.
               </p>
             </div>
             <div className="card">
@@ -190,6 +183,13 @@ export default function AboutPage() {
               <h3 className="font-semibold mb-2 text-sm">Community-owned</h3>
               <p className="text-xs sm:text-sm text-ccb-muted">
                 Players can create their own tournaments, earn from organizing, and build their own chess communities.
+              </p>
+            </div>
+            <div className="card">
+              <Disc3 className="w-6 h-6 text-ccb-accent mb-3" />
+              <h3 className="font-semibold mb-2 text-sm">Draughts too</h3>
+              <p className="text-xs sm:text-sm text-ccb-muted">
+                Not just chess — play International, English, or Russian draughts on the side. Same wallet, same community.
               </p>
             </div>
           </div>
