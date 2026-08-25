@@ -3,37 +3,25 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { AIDifficulty } from "@/lib/game/draughts-ai";
 import {
-  Zap, Clock, Swords, Bot, Link2, Disc3, X, Sparkles, ChevronRight, Play,
+  Clock, Swords, Link2, Disc3, X, Sparkles, ChevronRight, Play,
   Coins, Crown, TrendingUp, Trophy,
 } from "lucide-react";
 import { type Variant } from "@/lib/game/draughts-engine";
 
-const timeControls = [
-  { id: "bullet", label: "Bullet", minutes: 1,  increment: 0, desc: "1+0",  icon: Zap },
-  { id: "blitz",  label: "Blitz",  minutes: 5,  increment: 0, desc: "5+0",  icon: Zap },
-  { id: "rapid",  label: "Rapid",  minutes: 10, increment: 0, desc: "10+0", icon: Clock },
-];
-
-const aiDifficulties: { id: AIDifficulty; label: string; desc: string }[] = [
-  { id: "easy",   label: "Easy",   desc: "Beginner friendly" },
-  { id: "medium", label: "Medium", desc: "A fair challenge" },
-  { id: "hard",   label: "Hard",   desc: "Think carefully" },
-];
+// Draughts free play uses a single fixed time control (shown for info only)
+const FIXED_TC = { id: "rapid", label: "Rapid", minutes: 10, increment: 0, desc: "10+0" };
 
 type SearchState = "idle" | "searching" | "noPlayers";
 
 export default function DraughtsPage() {
-  const [selectedTC, setSelectedTC] = useState("rapid");
+  const selectedTC = FIXED_TC.id;
   const [variant] = useState<Variant>("international"); // International is the most widely played competitive variant
   const [rated, setRated] = useState(true);
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [searchSeconds, setSearchSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<{ draughts_rating?: number; username?: string } | null>(null);
-  const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>("medium");
-  const [aiColor, setAiColor] = useState<"white" | "black">("white");
   const [creatingChallenge, setCreatingChallenge] = useState(false);
   const [challengeExpiry, setChallengeExpiry] = useState(10);
   const [adminNotified, setAdminNotified] = useState(false);
@@ -187,15 +175,6 @@ export default function DraughtsPage() {
     setSearchState("idle");
   };
 
-  const handlePlayBot = () => {
-    const color = Math.random() < 0.5 ? "white" : "black";
-    router.push(`/draughts/play/computer?difficulty=${aiDifficulty}&color=${color}&tc=${selectedTC}&variant=${variant}`);
-  };
-
-  const handlePlayComputer = () => {
-    router.push(`/draughts/play/computer?difficulty=${aiDifficulty}&color=${aiColor}&tc=${selectedTC}&variant=${variant}`);
-  };
-
   const handleCreateChallenge = async () => {
     setCreatingChallenge(true);
     try {
@@ -212,13 +191,10 @@ export default function DraughtsPage() {
     setCreatingChallenge(false);
   };
 
-  // Auto-start search with ?tc=...&search=1 (Play Again flow)
+  // Auto-start search with ?search=1 (Play Again flow) — time control is fixed
   useEffect(() => {
-    const tc = searchParams.get("tc");
     const shouldSearch = searchParams.get("search");
-    if (tc && shouldSearch === "1") {
-      const validTCs = ["bullet", "blitz", "rapid"];
-      if (validTCs.includes(tc)) setSelectedTC(tc);
+    if (shouldSearch === "1") {
       setTimeout(() => handleQuickMatch(), 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -237,7 +213,7 @@ export default function DraughtsPage() {
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-1">Finding draughts opponent...</h2>
           <p className="text-sm text-ccb-muted">
-            {timeControls.find((t) => t.id === selectedTC)?.desc} · {rated ? "Ranked" : "Casual"}
+            {FIXED_TC.desc} · {rated ? "Ranked" : "Casual"}
           </p>
           <p className="text-xs text-ccb-muted mt-2 tabular-nums">{searchSeconds}s elapsed</p>
         </div>
@@ -253,12 +229,12 @@ export default function DraughtsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-6 animate-slide-up px-4">
         <div className="w-24 h-24 rounded-full bg-ccb-primary/10 flex items-center justify-center">
-          <Bot className="w-12 h-12 text-ccb-primary" />
+          <Link2 className="w-12 h-12 text-ccb-primary" />
         </div>
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-bold">No players online right now</h2>
           <p className="text-sm text-ccb-muted max-w-sm">
-            We couldn't find an opponent in 20 seconds. Play the computer or send a challenge link.
+            We couldn't find an opponent in 20 seconds. Send a challenge link to a friend instead.
           </p>
         </div>
 
@@ -269,32 +245,12 @@ export default function DraughtsPage() {
           </div>
         )}
 
-        {/* Difficulty picker */}
-        <div className="flex gap-2">
-          {aiDifficulties.map((d) => (
-            <button
-              key={d.id}
-              onClick={() => setAiDifficulty(d.id)}
-              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                aiDifficulty === d.id
-                  ? "bg-ccb-primary text-white shadow-lg shadow-ccb-primary/20"
-                  : "bg-ccb-card border border-ccb-border text-ccb-muted hover:text-ccb-text"
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
-
         <div className="flex flex-col sm:flex-row items-center gap-3">
-          <button onClick={handlePlayBot} className="btn-primary px-8">
-            <Bot className="w-4 h-4 mr-1.5" /> Play Computer
-          </button>
-          <button onClick={handleCreateChallenge} disabled={creatingChallenge} className="btn-secondary px-6 flex items-center gap-2">
+          <button onClick={handleCreateChallenge} disabled={creatingChallenge} className="btn-primary px-8 flex items-center gap-2">
             {creatingChallenge ? (
-              <span className="w-4 h-4 border-2 border-ccb-accent border-t-transparent rounded-full animate-spin" />
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              <Link2 className="w-4 h-4 text-ccb-accent" />
+              <Link2 className="w-4 h-4" />
             )}
             {creatingChallenge ? "Creating..." : "Challenge a Friend"}
           </button>
@@ -368,29 +324,17 @@ export default function DraughtsPage() {
       {/* Tab content */}
       {activeTab === "play" && (
         <div className="space-y-4 animate-slide-up">
-          {/* Time Control */}
+          {/* Time Control — fixed, shown as info only */}
           <div>
             <h3 className="text-sm font-semibold text-ccb-text mb-2.5">Time Control</h3>
-            <div className="grid grid-cols-3 gap-3">
-              {timeControls.map((tc) => {
-                const Icon = tc.icon;
-                const isSelected = selectedTC === tc.id;
-                return (
-                  <button
-                    key={tc.id}
-                    onClick={() => setSelectedTC(tc.id)}
-                    className={`flex flex-col items-center gap-1.5 py-4 rounded-xl border-2 transition-all ${
-                      isSelected
-                        ? "border-ccb-primary bg-ccb-primary/10 text-ccb-primary"
-                        : "border-ccb-border bg-ccb-surface text-ccb-text/70 hover:border-ccb-primary/50"
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className="text-sm font-bold">{tc.label}</span>
-                    <span className="text-xs text-ccb-text/60">{tc.desc}</span>
-                  </button>
-                );
-              })}
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-ccb-surface border-2 border-ccb-primary">
+              <div className="w-9 h-9 rounded-lg bg-ccb-primary/10 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-ccb-primary" />
+              </div>
+              <div>
+                <span className="text-sm font-bold text-ccb-primary">{FIXED_TC.label}</span>
+                <span className="text-xs text-ccb-text/60 ml-2">{FIXED_TC.desc}</span>
+              </div>
             </div>
           </div>
 
@@ -420,43 +364,32 @@ export default function DraughtsPage() {
           </button>
 
           <p className="text-xs text-ccb-muted text-center">
-            No opponent in 20s? You'll get the option to play the computer or send a challenge link.
+            No opponent in 20s? You'll get the option to send a challenge link.
           </p>
 
-          {/* Divider */}
-          <div className="relative pt-1">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-ccb-border" />
+          {/* Challenge a Friend — directly below Find a Game */}
+          <div className="space-y-2.5 pt-1">
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              <span className="text-xs text-ccb-muted">Link expires in:</span>
+              {[10, 30, 60].map((mins) => (
+                <button
+                  key={mins}
+                  onClick={() => setChallengeExpiry(mins)}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    challengeExpiry === mins
+                      ? "bg-ccb-primary text-ccb-primary-foreground"
+                      : "bg-ccb-surface text-ccb-muted border border-ccb-border hover:border-ccb-primary/40"
+                  }`}
+                >
+                  {mins < 60 ? `${mins}m` : `${mins / 60}h`}
+                </button>
+              ))}
             </div>
-            <div className="relative flex justify-center">
-              <span className="bg-ccb-dark px-3 text-xs text-ccb-muted">or</span>
-            </div>
-          </div>
 
-          {/* Challenge link expiry picker */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-ccb-muted">Link expires in:</span>
-            {[10, 30, 60].map((mins) => (
-              <button
-                key={mins}
-                onClick={() => setChallengeExpiry(mins)}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  challengeExpiry === mins
-                    ? "bg-ccb-primary text-ccb-primary-foreground"
-                    : "bg-ccb-surface text-ccb-muted border border-ccb-border hover:border-ccb-primary/40"
-                }`}
-              >
-                {mins < 60 ? `${mins}m` : `${mins / 60}h`}
-              </button>
-            ))}
-          </div>
-
-          {/* Secondary actions */}
-          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={handleCreateChallenge}
               disabled={creatingChallenge}
-              className="flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-accent/40 hover:bg-ccb-surface transition-colors disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-accent/40 hover:bg-ccb-surface transition-colors disabled:opacity-50"
             >
               {creatingChallenge ? (
                 <span className="w-4 h-4 border-2 border-ccb-accent border-t-transparent rounded-full animate-spin" />
@@ -464,13 +397,6 @@ export default function DraughtsPage() {
                 <Link2 className="w-4 h-4 text-ccb-accent" />
               )}
               {creatingChallenge ? "Creating..." : "Challenge a Friend"}
-            </button>
-            <button
-              onClick={() => router.push(`/draughts/play/computer?difficulty=${aiDifficulty}&color=${aiColor}&tc=${selectedTC}&variant=${variant}`)}
-              className="flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-success/50 hover:bg-ccb-surface transition-colors"
-            >
-              <Bot className="w-4 h-4 text-ccb-success" />
-              Play Computer
             </button>
           </div>
         </div>
