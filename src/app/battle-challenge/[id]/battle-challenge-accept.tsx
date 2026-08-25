@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Swords, Loader2, Wallet, Smartphone, Check, AlertCircle } from "lucide-react";
+import { Swords, Loader2, Wallet, Smartphone, Check, AlertCircle, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { detectOperator } from "@/lib/operator";
 
@@ -10,11 +10,21 @@ function formatMKK(cents: number): string {
   return `MK ${Math.floor(cents / 100).toLocaleString("en-US")}`;
 }
 
+const TIME_CONTROL_LABELS: Record<string, string> = {
+  bullet: "Bullet · 1+0",
+  blitz3: "Blitz · 3+2",
+  blitz: "Blitz · 5+0",
+  rapid: "Rapid · 10+0",
+  rapid15: "Rapid · 15+10",
+  classical: "Classical · 30+0",
+};
+
 interface Props {
   challengeId: string;
   challengerName: string;
   challengerRating: number;
   stakeCents: number;
+  timeControl: string;
   feePct: number;
   initialBalanceCents: number;
   email: string;
@@ -26,6 +36,7 @@ export default function BattleChallengeAccept({
   challengerName,
   challengerRating,
   stakeCents,
+  timeControl,
   feePct,
   initialBalanceCents,
   email,
@@ -170,7 +181,7 @@ export default function BattleChallengeAccept({
         const startRes = await fetch("/api/battles/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ battleId: data.battleId }),
+          body: JSON.stringify({ battleId: data.battleId, timeControl }),
         });
         return { ok: startRes.ok, data: await startRes.json() };
       };
@@ -211,6 +222,10 @@ export default function BattleChallengeAccept({
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Stake (each)</span>
             <span className="font-semibold text-ccb-text">{formatMKK(stakeCents)}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm mb-2">
+            <span className="text-ccb-muted flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Time control</span>
+            <span className="font-semibold text-ccb-text">{TIME_CONTROL_LABELS[timeControl] || timeControl}</span>
           </div>
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Platform fee ({feePct}%)</span>
