@@ -98,7 +98,7 @@ export async function POST(
               tournamentId,
               rankedParticipants.map((p) => ({
                 player_id: p.player_id,
-                final_rank: p.final_rank,
+                final_rank: p.final_rank ?? null,
                 score: p.score ?? 0,
               })),
               actualPrizePool,
@@ -158,7 +158,7 @@ export async function POST(
             tournamentId,
             rankedParticipants.map((p) => ({
               player_id: p.player_id,
-              final_rank: p.final_rank,
+              final_rank: p.final_rank ?? null,
               score: p.score ?? 0,
             })),
             totalCollected,

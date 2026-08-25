@@ -127,7 +127,7 @@ async function handleTournamentCron(req: NextRequest) {
           .eq("tournament_id", tournament.id)
           .eq("current_round", currentRound);
 
-        if (totalGames === 0 || (activeGames?.length || 0) < totalGames) {
+        if (!totalGames || totalGames === 0 || (activeGames?.length || 0) < totalGames) {
           continue; // Not all games done yet
         }
 
@@ -151,24 +151,28 @@ async function handleTournamentCron(req: NextRequest) {
           }
 
           if (whiteScore > 0 || game.status === "draw" || game.status === "stalemate") {
-            await admin.rpc("update_tournament_scores", {
-              p_tournament_id: tournament.id,
-              p_player_id: game.white_player_id,
-              p_score_delta: whiteScore,
-              p_wins_delta: whiteWins,
-              p_draws_delta: whiteDraws,
-              p_losses_delta: whiteLosses,
-            }).catch(() => {});
+            try {
+              await admin.rpc("update_tournament_scores", {
+                p_tournament_id: tournament.id,
+                p_player_id: game.white_player_id,
+                p_score_delta: whiteScore,
+                p_wins_delta: whiteWins,
+                p_draws_delta: whiteDraws,
+                p_losses_delta: whiteLosses,
+              });
+            } catch {}
           }
           if (blackScore > 0 || game.status === "draw" || game.status === "stalemate") {
-            await admin.rpc("update_tournament_scores", {
-              p_tournament_id: tournament.id,
-              p_player_id: game.black_player_id,
-              p_score_delta: blackScore,
-              p_wins_delta: blackWins,
-              p_draws_delta: blackDraws,
-              p_losses_delta: blackLosses,
-            }).catch(() => {});
+            try {
+              await admin.rpc("update_tournament_scores", {
+                p_tournament_id: tournament.id,
+                p_player_id: game.black_player_id,
+                p_score_delta: blackScore,
+                p_wins_delta: blackWins,
+                p_draws_delta: blackDraws,
+                p_losses_delta: blackLosses,
+              });
+            } catch {}
           }
         }
 
