@@ -208,16 +208,20 @@ export default function DraughtsComputerGame({
       )}
 
       {/* Bot info (top) */}
-      <div className="w-full shrink-0 flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-ccb-success/15 flex items-center justify-center">
-            <Bot className="w-4 h-4 text-ccb-success" />
+      <div className={`w-full shrink-0 flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+        turn === botColor && status === "playing" ? "bg-ccb-primary/8" : "bg-ccb-surface border border-ccb-border"
+      }`}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-full bg-ccb-success/15 border-2 border-ccb-border flex items-center justify-center shrink-0">
+            <Bot className="w-5 h-5 text-ccb-success" />
           </div>
-          <span className="text-sm font-medium text-ccb-text capitalize">Bot ({difficulty})</span>
-          {botThinking && <span className="text-xs text-ccb-muted animate-pulse">thinking…</span>}
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-semibold leading-tight truncate capitalize">Bot ({difficulty})</span>
+            {botThinking && <span className="text-xs text-ccb-muted animate-pulse">thinking…</span>}
+          </div>
         </div>
         <div
-          className={`flex items-center gap-1.5 text-sm font-bold tabular-nums ${
+          className={`flex items-center gap-1.5 text-sm font-bold tabular-nums shrink-0 ${
             turn === botColor && status === "playing" ? "text-ccb-primary" : "text-ccb-muted"
           }`}
         >
@@ -238,13 +242,19 @@ export default function DraughtsComputerGame({
       />
 
       {/* Me (bottom) */}
-      <div className="w-full shrink-0 flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
-        <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${myColor === "w" ? "bg-stone-100" : "bg-stone-900"}`} />
-          <span className="text-sm font-medium text-ccb-text">You</span>
+      <div className={`w-full shrink-0 flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+        turn === myColor && status === "playing" ? "bg-ccb-primary/8" : "bg-ccb-surface border border-ccb-border"
+      }`}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors ${
+            turn === myColor && status === "playing" ? "border-ccb-primary bg-ccb-primary/15" : "border-ccb-border bg-ccb-surface"
+          }`}>
+            <div className={`w-3 h-3 rounded-full ${myColor === "w" ? "bg-stone-100" : "bg-stone-900"}`} />
+          </div>
+          <span className="text-sm font-semibold text-ccb-text">You</span>
         </div>
         <div
-          className={`flex items-center gap-1.5 text-sm font-bold tabular-nums ${
+          className={`flex items-center gap-1.5 text-sm font-bold tabular-nums shrink-0 ${
             turn === myColor && status === "playing" ? "text-ccb-primary" : "text-ccb-muted"
           }`}
         >

@@ -23,5 +23,20 @@ export default async function DraughtsGamePage({
 
   if (error || !game) return notFound();
 
-  return <DraughtsGameClient game={game} myId={user.id} />;
+  // Get player profiles for names + avatars (mirrors chess game page)
+  const [whiteProfile, blackProfile] = await Promise.all([
+    supabase.from("profiles").select("username, display_name, avatar_url").eq("id", game.white_player_id).single(),
+    supabase.from("profiles").select("username, display_name, avatar_url").eq("id", game.black_player_id).single(),
+  ]);
+
+  return (
+    <DraughtsGameClient
+      game={game}
+      myId={user.id}
+      whiteName={whiteProfile.data?.display_name || whiteProfile.data?.username || "White"}
+      blackName={blackProfile.data?.display_name || blackProfile.data?.username || "Black"}
+      whiteAvatar={whiteProfile.data?.avatar_url}
+      blackAvatar={blackProfile.data?.avatar_url}
+    />
+  );
 }

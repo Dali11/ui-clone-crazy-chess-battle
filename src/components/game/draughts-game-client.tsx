@@ -24,9 +24,20 @@ function dbToEngine(s: string): Color {
 interface DraughtsGameClientProps {
   game: any;
   myId: string;
+  whiteName?: string;
+  blackName?: string;
+  whiteAvatar?: string | null;
+  blackAvatar?: string | null;
 }
 
-export default function DraughtsGameClient({ game: initialGame, myId }: DraughtsGameClientProps) {
+export default function DraughtsGameClient({
+  game: initialGame,
+  myId,
+  whiteName = "White",
+  blackName = "Black",
+  whiteAvatar,
+  blackAvatar,
+}: DraughtsGameClientProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
@@ -245,7 +256,7 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
   };
 
   // Determine winner label
-  const winnerLabel = game.winner === "white" ? "White wins!" : game.winner === "black" ? "Black wins!" : "Draw";
+  const winnerLabel = game.winner === "white" ? `${whiteName} wins!` : game.winner === "black" ? `${blackName} wins!` : "Draw";
 
   return (
     <div className="game-viewport -my-4 sm:-my-6 flex flex-col lg:items-center lg:justify-center">
@@ -258,17 +269,29 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
       )}
 
       {/* Opponent info (top) */}
-      <div className="w-full shrink-0 flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
-        <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${perspective === "white" ? "bg-stone-900" : "bg-stone-100"}`} />
-          <span className="text-sm font-medium text-ccb-text">
-            {isWhite ? "Black" : "White"}
-          </span>
-          <span className="text-xs text-ccb-muted">
-            ({isWhite ? game.black_rating || "—" : game.white_rating || "—"})
-          </span>
+      <div className={`w-full shrink-0 flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+        currentDbTurn === (isWhite ? "black" : "white") && !gameEnded ? "bg-ccb-primary/8" : "bg-ccb-surface border border-ccb-border"
+      }`}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border-2 overflow-hidden transition-colors ${
+            currentDbTurn === (isWhite ? "black" : "white") && !gameEnded ? "border-ccb-primary bg-ccb-primary/15" : "border-ccb-border bg-ccb-surface"
+          }`}>
+            {(isWhite ? blackAvatar : whiteAvatar) ? (
+              <img src={(isWhite ? blackAvatar : whiteAvatar) as string} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className={`w-3 h-3 rounded-full ${perspective === "white" ? "bg-stone-900" : "bg-stone-100"}`} />
+            )}
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-semibold leading-tight truncate">
+              {isWhite ? blackName : whiteName}
+            </span>
+            <span className="text-xs text-ccb-muted">
+              ({isWhite ? game.black_rating || "—" : game.white_rating || "—"})
+            </span>
+          </div>
         </div>
-        <div className={`flex items-center gap-1.5 text-sm font-bold tabular-nums ${
+        <div className={`flex items-center gap-1.5 text-sm font-bold tabular-nums shrink-0 ${
           currentDbTurn === (isWhite ? "black" : "white") && !gameEnded ? "text-ccb-primary" : "text-ccb-muted"
         }`}>
           <Timer className="w-4 h-4" />
@@ -292,17 +315,29 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
       </div>
 
       {/* My info (bottom) */}
-      <div className="w-full shrink-0 flex items-center justify-between px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border">
-        <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${perspective === "white" ? "bg-stone-100" : "bg-stone-900"}`} />
-          <span className="text-sm font-medium text-ccb-text">
-            {isWhite ? "White (You)" : "Black (You)"}
-          </span>
-          <span className="text-xs text-ccb-muted">
-            ({isWhite ? game.white_rating || "—" : game.black_rating || "—"})
-          </span>
+      <div className={`w-full shrink-0 flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+        currentDbTurn === myDbColor && !gameEnded ? "bg-ccb-primary/8" : "bg-ccb-surface border border-ccb-border"
+      }`}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border-2 overflow-hidden transition-colors ${
+            currentDbTurn === myDbColor && !gameEnded ? "border-ccb-primary bg-ccb-primary/15" : "border-ccb-border bg-ccb-surface"
+          }`}>
+            {(isWhite ? whiteAvatar : blackAvatar) ? (
+              <img src={(isWhite ? whiteAvatar : blackAvatar) as string} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className={`w-3 h-3 rounded-full ${perspective === "white" ? "bg-stone-100" : "bg-stone-900"}`} />
+            )}
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-semibold leading-tight truncate">
+              {isWhite ? whiteName : blackName} <span className="text-ccb-muted font-normal">(You)</span>
+            </span>
+            <span className="text-xs text-ccb-muted">
+              ({isWhite ? game.white_rating || "—" : game.black_rating || "—"})
+            </span>
+          </div>
         </div>
-        <div className={`flex items-center gap-1.5 text-sm font-bold tabular-nums ${
+        <div className={`flex items-center gap-1.5 text-sm font-bold tabular-nums shrink-0 ${
           currentDbTurn === myDbColor && !gameEnded ? "text-ccb-primary" : "text-ccb-muted"
         }`}>
           <Timer className="w-4 h-4" />

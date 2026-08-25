@@ -288,25 +288,23 @@ export default function DraughtsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-5 pb-20 sm:pb-0">
       {/* Header */}
-      <div className="text-center space-y-2">
-        <div className="flex items-center justify-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-ccb-primary/10 flex items-center justify-center">
-            <Disc3 className="w-7 h-7 text-ccb-primary" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-ccb-primary/10 flex items-center justify-center shrink-0">
+            <Disc3 className="w-6 h-6 text-ccb-primary" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Draughts</h1>
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold leading-tight">Draughts</h1>
+            <p className="text-sm text-ccb-muted truncate">{VARIANTS[variant].name} · 8×8 board</p>
+          </div>
         </div>
-        <p className="text-ccb-muted text-sm">English checkers · 8×8 · Captures mandatory</p>
+        {profile && (
+          <div className="text-right shrink-0">
+            <p className="text-[10px] text-ccb-muted uppercase tracking-wide">Rating</p>
+            <p className="text-lg font-bold text-ccb-primary leading-tight">{profile.draughts_rating || 1500}</p>
+          </div>
+        )}
       </div>
-
-      {/* Rating display */}
-      {profile && (
-        <div className="flex items-center justify-center">
-          <div className="px-6 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-center">
-            <p className="text-xs text-ccb-muted mb-1">Your Draughts Rating</p>
-            <p className="text-2xl font-bold text-ccb-primary">{profile.draughts_rating || 1500}</p>
-          </div>
-        </div>
-      )}
 
       {/* Variant Selector */}
       <div>
@@ -430,7 +428,7 @@ export default function DraughtsPage() {
           {creatingChallenge ? "Creating..." : "Challenge a Friend"}
         </button>
         <button
-          onClick={() => router.push(`/draughts/play/computer?difficulty=${aiDifficulty}&color=${aiColor}&tc=${selectedTC}`)}
+          onClick={() => router.push(`/draughts/play/computer?difficulty=${aiDifficulty}&color=${aiColor}&tc=${selectedTC}&variant=${variant}`)}
           className="flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-success/50 hover:bg-ccb-surface transition-colors"
         >
           <Bot className="w-4 h-4 text-ccb-success" />
