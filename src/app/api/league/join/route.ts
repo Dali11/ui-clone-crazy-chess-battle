@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getPlatformConfig } from '@/lib/platform-config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +17,9 @@ export async function POST(request: NextRequest) {
     // Join a Premier League
     if (leagueId) {
       const admin = createAdminClient();
+
+      // ─── Load platform config for leagues ──────────────────────────
+      const lConfig = await getPlatformConfig(admin, 'leagues');
       const { data: league, error } = await admin
         .from('premier_leagues')
         .select('*')
@@ -52,8 +56,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Registration deadline has passed' }, { status: 400 });
       }
 
-      // Check membership requirement
-      if (league.entry_type === 'membership') {
+      // Check membership requirement (configurable via platform settings)
+      const requireMembership = lConfig.require_membership !== false;
+      if (requireMembership && league.entry_type === 'membership') {
         const { data: membership } = await admin
           .from('memberships')
           .select('*')
