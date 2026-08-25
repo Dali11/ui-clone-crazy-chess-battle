@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     // Check wallet balance
     const { data: profile } = await admin
       .from("profiles")
-      .select("wallet_balance_cents, games_played, referral_code, username")
+      .select("wallet_balance_cents")
       .eq("id", user.id)
       .single();
 
@@ -77,30 +77,10 @@ export async function POST(req: NextRequest) {
       reference: `battle_challenge_create:${user.id}:${stakeCents}`,
     });
 
-    // Create the battle record (pending, waiting for acceptor)
-    const platformFeePct = bConfig.platform_fee_pct ?? 10;
-    const referralCode = profile?.referral_code || profile?.username || null;
-
-    const { data: battle, error: battleErr } = await admin
-      .from("battles")
-      .insert({
-        white_player_id: user.id,
-        stake_cents: stakeCents,
-        time_control: timeControl || "rapid15",
-        platform_fee_pct: platformFeePct,
-        status: "pending",
-        referral_code: referralCode,
-      })
-      .select("id")
-      .single();
-
-    if (battleErr || !battle) {
-      // Refund the debit
-      await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount_cents: stakeCents });
-      return NextResponse.json({ error: "Failed to create battle" }, { status: 500 });
-    }
-
-    // Create the challenge record (expires in 24 hours)
+    // Create the challenge record (expires in 24 hours). We do NOT create a
+    // `battles` row here — the opponent (black_player_id) isn't known yet,
+    // and battles.black_player_id is NOT NULL. The /accept route creates the
+    // real battles row (with both players) once someone accepts the link.
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     const { data: challenge, error: challengeErr } = await admin
@@ -110,20 +90,18 @@ export async function POST(req: NextRequest) {
         stake_cents: stakeCents,
         time_control: timeControl || "rapid15",
         status: "pending",
-        battle_id: battle.id,
         expires_at: expiresAt,
       })
       .select("id")
       .single();
 
     if (challengeErr || !challenge) {
-      // Refund and clean up battle
+      // Refund the debit
       await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount_cents: stakeCents });
-      await admin.from("battles").delete().eq("id", battle.id);
       return NextResponse.json({ error: "Failed to create challenge" }, { status: 500 });
     }
 
-    return NextResponse.json({ challengeId: challenge.id, battleId: battle.id });
+    return NextResponse.json({ challengeId: challenge.id });
   } catch (err: any) {
     return NextResponse.json({ error: "Failed to create challenge" }, { status: 500 });
   }

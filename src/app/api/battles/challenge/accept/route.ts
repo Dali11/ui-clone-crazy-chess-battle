@@ -123,6 +123,9 @@ export async function POST(req: NextRequest) {
       .eq("id", challenge.challenger_id)
       .single();
 
+    // NOTE: the `battles` table has no time_control column — the challenge's
+    // time control lives on battle_challenges.time_control and is passed
+    // explicitly by the client to /api/battles/start when kicking off the game.
     const { data: battle, error: battleErr } = await admin
       .from("battles")
       .insert({
@@ -132,7 +135,6 @@ export async function POST(req: NextRequest) {
         pot_cents: pot,
         platform_fee_cents: fee,
         winner_payout_cents: payout,
-        time_control: challenge.time_control || "rapid15",
         status: "pending",
         white_rating: whitePlayer === user.id ? acceptorProfile.rating ?? 1200 : challengerProfile?.rating ?? 1200,
         black_rating: blackPlayer === user.id ? acceptorProfile.rating ?? 1200 : challengerProfile?.rating ?? 1200,
