@@ -1153,6 +1153,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           onReview={() => setVictoryDismissed(true)}
           onDismiss={() => setVictoryDismissed(true)}
         />
+
+        {previewUserId && (
+          <PlayerProfilePreview userId={previewUserId} onClose={() => setPreviewUserId(null)} />
+        )}
       </>
     );
   }
