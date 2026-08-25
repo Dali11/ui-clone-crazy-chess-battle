@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,14 +12,29 @@ export async function POST(req: NextRequest) {
 
     const { amountCents, email } = await req.json();
 
-    if (!amountCents || amountCents < 1000) {
-      return NextResponse.json({ error: "Minimum deposit is MWK 10" }, { status: 400 });
+    // ─── Load platform config ──────────────────────────────────────────
+    const admin = createAdminClient();
+    const dConfig = await getPlatformConfig(admin, "deposits");
+
+    if (!dConfig.enabled) {
+      return NextResponse.json({ error: "Deposits are currently disabled" }, { status: 403 });
+    }
+
+    const minAmount = dConfig.min_amount_cents || 1000;
+    if (!amountCents || amountCents < minAmount) {
+      const minDisplay = Math.floor(minAmount / 100).toLocaleString();
+      return NextResponse.json({ error: `Minimum deposit is MWK ${minDisplay}` }, { status: 400 });
+    }
+
+    const maxAmount = dConfig.max_amount_cents || 10_000_000;
+    if (amountCents > maxAmount) {
+      const maxDisplay = Math.floor(maxAmount / 100).toLocaleString();
+      return NextResponse.json({ error: `Maximum deposit is MWK ${maxDisplay}` }, { status: 400 });
     }
 
     const txRef = `ccb_${Date.now()}_${user.id.slice(0, 8)}`;
     const amount = Math.floor(amountCents / 100).toString();
 
-    const admin = createAdminClient();
     const { data: deposit } = await admin
       .from("deposits")
       .insert({
