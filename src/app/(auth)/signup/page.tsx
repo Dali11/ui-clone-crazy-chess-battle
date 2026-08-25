@@ -175,6 +175,19 @@ export default function SignupPage() {
     setError(null);
 
     try {
+      // Check if signups are allowed via platform settings
+      try {
+        const checkRes = await fetch("/api/auth/signup-check");
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          if (!checkData.allowSignup) {
+            setError("New registrations are currently disabled. Please check back later.");
+            setLoading(false);
+            return;
+          }
+        }
+      } catch {}
+
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
