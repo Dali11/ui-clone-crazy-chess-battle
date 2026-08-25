@@ -170,7 +170,7 @@ const GENDER_OPTIONS = [
   { value: "female", label: "Female", icon: User, color: "text-pink-400" },
 ];
 
-function ToggleRow ({ label, description, value, onChange }: { label: string; description?: string; value: boolean; onChange: (v: boolean) => void }) => (
+const ToggleRow = ({ label, description, value, onChange }: { label: string; description?: string; value: boolean; onChange: (v: boolean) => void }) => (
   <div className="flex items-center justify-between py-2.5">
     <div className="flex-1 pr-3"><p className="text-sm font-medium text-ccb-text">{label}</p>{description && <p className="text-xs text-ccb-muted mt-0.5">{description}</p>}</div>
     <button type="button" onClick={() => onChange(!value)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${value ? "bg-ccb-primary" : "bg-ccb-border"}`}>
@@ -178,10 +178,10 @@ function ToggleRow ({ label, description, value, onChange }: { label: string; de
     </button>
   </div>
 );
-function SectionCard ({ title, children }: { title: string; children: React.ReactNode }) => (
+const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="card p-4 space-y-4"><h3 className="font-bold text-base">{title}</h3>{children}</div>
 );
-function SaveButton ({ onSave }: { onSave: () => void }) => (
+const SaveButton = ({ onSave, saving, saved, error }: { onSave: () => void; saving: boolean; saved: boolean; error: string | null }) => (
   <div className="flex items-center gap-3 pt-1">
     <button onClick={onSave} disabled={saving} className="btn-primary"><Save className="w-4 h-4 mr-1" />{saving ? "Saving..." : "Save Changes"}</button>
     {saved && <span className="text-sm text-ccb-success">Saved!</span>}
@@ -397,7 +397,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
             </div>
             <div><label className="text-sm font-medium block mb-1.5">Bio</label><textarea value={bio} onChange={(e) => setBio(e.target.value)} className="input min-h-[80px] resize-none" placeholder="Tell players about yourself" maxLength={200} /></div>
             <div><label className="text-sm font-medium block mb-1.5">Phone (for withdrawals)</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="input" placeholder="+265 991 23 45 67" /></div>
-            <SaveButton onSave={handleSaveProfile} />
+            <SaveButton onSave={handleSaveProfile} saving={saving} saved={saved} error={error} />
           </SectionCard>
           <SectionCard title="Account">
             <div className="space-y-3">
@@ -484,7 +484,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
               <ToggleRow label="Show Coordinates" description="Algebraic notation on edges" value={showCoordinates} onChange={setShowCoordinates} />
             </div>
           </SectionCard>
-          <SaveButton onSave={saveClientPrefs} />
+          <SaveButton onSave={saveClientPrefs} saving={saving} saved={saved} error={error} />
         </div>
       )}
 
@@ -499,7 +499,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
               <ToggleRow label="WhatsApp Updates" description="Via WhatsApp group" value={notifWhatsApp} onChange={setNotifWhatsApp} />
             </div>
           </SectionCard>
-          <SaveButton onSave={saveClientPrefs} />
+          <SaveButton onSave={saveClientPrefs} saving={saving} saved={saved} error={error} />
         </div>
       )}
 
@@ -514,7 +514,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
               <ToggleRow label="Show Rating" description="To opponents in matchmaking" value={showRating} onChange={setShowRating} />
             </div>
           </SectionCard>
-          <SaveButton onSave={saveClientPrefs} />
+          <SaveButton onSave={saveClientPrefs} saving={saving} saved={saved} error={error} />
         </div>
       )}
 
