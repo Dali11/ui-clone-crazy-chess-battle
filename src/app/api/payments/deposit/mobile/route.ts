@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,15 +12,38 @@ export async function POST(req: NextRequest) {
 
     const { amountCents, phone, operatorRefId, email, firstName, lastName } = await req.json();
 
-    if (!amountCents || amountCents < 1000) {
-      return NextResponse.json({ error: "Minimum deposit is MWK 10" }, { status: 400 });
+    // ─── Load platform config ──────────────────────────────────────────
+    const admin = createAdminClient();
+    const dConfig = await getPlatformConfig(admin, "deposits");
+
+    // Check if deposits are enabled
+    if (!dConfig.enabled) {
+      return NextResponse.json({ error: "Deposits are currently disabled" }, { status: 403 });
     }
+
+    // Enforce minimum amount
+    const minAmount = dConfig.min_amount_cents || 1000;
+    if (!amountCents || amountCents < minAmount) {
+      const minDisplay = Math.floor(minAmount / 100).toLocaleString();
+      return NextResponse.json({ error: `Minimum deposit is MWK ${minDisplay}` }, { status: 400 });
+    }
+
+    // Enforce maximum amount
+    const maxAmount = dConfig.max_amount_cents || 10_000_000;
+    if (amountCents > maxAmount) {
+      const maxDisplay = Math.floor(maxAmount / 100).toLocaleString();
+      return NextResponse.json({ error: `Maximum deposit is MWK ${maxDisplay}` }, { status: 400 });
+    }
+
     if (!phone || !operatorRefId) {
       return NextResponse.json({ error: "Phone number and operator required" }, { status: 400 });
     }
 
     const chargeId = `ccb_${Date.now()}_${user.id.slice(0, 8)}`;
-    const admin = createAdminClient();
+
+    // Determine if this deposit needs manual approval
+    const approvalThreshold = dConfig.require_approval_above_cents || 0;
+    const requiresApproval = approvalThreshold > 0 && amountCents > approvalThreshold;
 
     const { data: deposit, error: depositError } = await admin
       .from("deposits")
@@ -64,7 +88,6 @@ export async function POST(req: NextRequest) {
         .update({ status: "failed", updated_at: new Date().toISOString() })
         .eq("id", deposit.id);
 
-      // Never leak raw API error — use safe messages only
       const safeError = data.status === "failed"
         ? "Payment request failed. Please check your phone number and try again."
         : "Unable to initiate payment. Please try again later.";
@@ -82,6 +105,7 @@ export async function POST(req: NextRequest) {
       chargeId,
       status: data.status || "pending",
       message: data.message || "Check your phone to authorize the payment",
+      requiresApproval,
     });
   } catch {
     return NextResponse.json({ error: "Server error. Please try again." }, { status: 500 });
