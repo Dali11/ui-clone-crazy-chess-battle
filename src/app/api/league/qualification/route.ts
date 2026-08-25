@@ -159,7 +159,7 @@ export async function GET(request: NextRequest) {
             id: 'membership',
             label: 'Active CrazyChess Club membership',
             description: league.entry_type === 'membership'
-              ? 'This competition requires an active membership (MK5,000/month)'
+              ? 'This competition requires an active membership (MK10,000/month)'
               : 'No membership required for this competition',
             done: league.entry_type === 'membership' ? !!membership : true,
             required: league.entry_type === 'membership',

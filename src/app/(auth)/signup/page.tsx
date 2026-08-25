@@ -44,6 +44,7 @@ export default function SignupPage() {
   // Step 0: Profile
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [country, setCountry] = useState("MW");
 
   // Step 1: Experience
   const [chessLevel, setChessLevel] = useState<ChessLevel | null>(null);
@@ -77,6 +78,8 @@ export default function SignupPage() {
   const actionParam = searchParams.get("action");
 
   useEffect(() => {
+    const c = searchParams.get("country");
+    if (c) setCountry(c.toUpperCase());
     const ref = searchParams.get("ref");
     if (ref) {
       setRefCode(ref);
@@ -181,6 +184,7 @@ export default function SignupPage() {
             display_name: username.trim(),
             chess_level: chessLevel,
             chesscom_username: chesscomVerified?.username || null,
+            country: country,
           },
         },
       });
@@ -206,6 +210,7 @@ export default function SignupPage() {
             chessLevel,
             chesscomRating: chesscomVerified?.rating || null,
             chesscomUsername: chesscomVerified?.username || null,
+            country,
           }),
         });
 
@@ -323,6 +328,35 @@ export default function SignupPage() {
                   placeholder="you@example.com"
                   required
                 />
+              </div>
+
+              <div>
+                <label htmlFor="country" className="text-sm font-medium block mb-1.5">Country</label>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="input cursor-pointer"
+                >
+                  <option value="MW">Malawi</option>
+                  <option value="ZM">Zambia</option>
+                  <option value="KE">Kenya</option>
+                  <option value="NG">Nigeria</option>
+                  <option value="ZA">South Africa</option>
+                  <option value="GH">Ghana</option>
+                  <option value="TZ">Tanzania</option>
+                  <option value="UG">Uganda</option>
+                  <option value="ZW">Zimbabwe</option>
+                  <option value="BW">Botswana</option>
+                  <option value="NA">Namibia</option>
+                  <option value="RW">Rwanda</option>
+                  <option value="CM">Cameroon</option>
+                  <option value="EG">Egypt</option>
+                  <option value="ET">Ethiopia</option>
+                  <option value="MA">Morocco</option>
+                  <option value="SN">Senegal</option>
+                  <option value="OTHER">Other</option>
+                </select>
+                <p className="text-xs text-ccb-muted mt-1">Used for competitive divisions and localized pricing.</p>
               </div>
             </div>
           )}

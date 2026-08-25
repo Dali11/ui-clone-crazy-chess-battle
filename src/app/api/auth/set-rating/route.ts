@@ -9,7 +9,7 @@ const LEVEL_RATINGS: Record<string, number> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, chessLevel: bodyLevel, chesscomRating, chesscomUsername } = await req.json();
+    const { userId, chessLevel: bodyLevel, chesscomRating, chesscomUsername, country } = await req.json();
     if (!userId) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }
@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
     const updateData: Record<string, any> = { rating: targetRating };
     if (chesscomUsername) {
       updateData.chesscom_username = chesscomUsername;
+    }
+    if (country) {
+      updateData.country = country === "OTHER" ? null : country;
     }
 
     const { error: updateError } = await supabase
