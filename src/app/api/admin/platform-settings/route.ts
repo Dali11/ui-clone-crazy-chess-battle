@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { syncLegacyTable, DEFAULT_CONFIGS } from "@/lib/platform-config";
 
 // GET — fetch settings for one section, or all sections
-// Usage: GET /api/admin/platform-settings?section=deposits
-//        GET /api/admin/platform-settings (returns all)
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -19,7 +18,9 @@ export async function GET(req: NextRequest) {
 
     if (section) {
       const { data } = await admin.from("platform_settings").select("*").eq("section", section).single();
-      return NextResponse.json(data || { section, config: {} });
+      // Merge with defaults so the panel always shows all fields
+      const mergedConfig = { ...DEFAULT_CONFIGS[section], ...(data?.config || {}) };
+      return NextResponse.json({ ...data, section, config: mergedConfig });
     }
 
     const { data } = await admin.from("platform_settings").select("*").order("section");
@@ -30,7 +31,6 @@ export async function GET(req: NextRequest) {
 }
 
 // PATCH — update settings for a section
-// Body: { section: "deposits", config: { ...partialUpdates } }
 export async function PATCH(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -50,7 +50,6 @@ export async function PATCH(req: NextRequest) {
 
     // Fetch existing config to merge
     const { data: existing } = await admin.from("platform_settings").select("*").eq("section", section).single();
-
     const mergedConfig = { ...(existing?.config || {}), ...(newConfig || {}) };
 
     let result;
@@ -70,6 +69,15 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
+
+    // Sync to legacy tables (battle_config, berry_config, withdrawal_config)
+    // so existing backend code picks up the changes immediately
+    try {
+      await syncLegacyTable(admin, section, mergedConfig, user.id);
+    } catch (syncErr) {
+      console.error(`Legacy sync failed for ${section}:`, syncErr);
+      // Non-fatal — the platform_settings row was saved
+    }
 
     // Log the change
     try {
