@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import DraughtsGameClient from "@/components/game/draughts-game-client";
 
 export const dynamic = "force-dynamic";
+
+
+export const metadata: Metadata = {
+  title: "Draughts Game — International Checkers",
+  description: "Watch this International Checkers (10×10) game on Crazy Chess Battles.",
+};
 
 export default async function DraughtsGamePage({
   params,
