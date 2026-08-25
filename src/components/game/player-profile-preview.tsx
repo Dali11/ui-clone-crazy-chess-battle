@@ -78,18 +78,36 @@ export default function PlayerProfilePreview({ userId, onClose }: PlayerProfileP
 
   if (loading) {
     return (
-      <div
-        ref={ref}
-        className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 z-50 w-[90%] max-w-[340px] rounded-xl border border-ccb-border bg-ccb-card shadow-2xl p-6"
-      >
-        <div className="flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-ccb-primary border-t-transparent rounded-full animate-spin" />
+      <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+        <div className="absolute inset-0 bg-black/40" />
+        <div
+          ref={ref}
+          onClick={(e) => e.stopPropagation()}
+          className="relative w-[90%] max-w-[340px] rounded-xl border border-ccb-border bg-ccb-card shadow-2xl p-6"
+        >
+          <div className="flex items-center justify-center">
+            <div className="w-6 h-6 border-2 border-ccb-primary border-t-transparent rounded-full animate-spin" />
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!profile) return null;
+  if (!profile) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+        <div className="absolute inset-0 bg-black/40" />
+        <div
+          ref={ref}
+          onClick={(e) => e.stopPropagation()}
+          className="relative w-[90%] max-w-[340px] rounded-xl border border-ccb-border bg-ccb-card shadow-2xl p-6 text-center"
+        >
+          <p className="text-sm text-ccb-muted">Player profile not available.</p>
+          <button onClick={onClose} className="mt-3 text-xs text-ccb-primary font-medium">Close</button>
+        </div>
+      </div>
+    );
+  }
 
   const tier = getTier(profile.rating || 1200);
   const winRate = profile.games_played
