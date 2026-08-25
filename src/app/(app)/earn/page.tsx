@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
+
 export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import EarnClient from "./earn-client";
+
+
+export const metadata: Metadata = {
+  title: "Earn — Rewards & Earnings",
+};
 
 export default async function EarnPage() {
   const supabase = await createClient();
