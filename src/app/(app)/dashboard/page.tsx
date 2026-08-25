@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase/server";
@@ -10,6 +12,11 @@ const LEVEL_RATINGS: Record<string, number> = {
   beginner: 400,
   intermediate: 1500,
   expert: 2500,
+};
+
+
+export const metadata: Metadata = {
+  title: "Dashboard",
 };
 
 export default async function DashboardPage() {
