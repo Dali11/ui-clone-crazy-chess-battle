@@ -4,16 +4,6 @@ import { notFound } from "next/navigation";
 import GameClientWrapper from "@/components/game/game-client-wrapper";
 import type { GameState } from "@/hooks/use-realtime-game";
 
-import { pageMetadata } from "@/lib/seo/metadata";
-
-export const metadata = pageMetadata({
-  title: "Chess Game — Live Match",
-  description: "Watch or play a live chess game on Crazy Chess Battles. Real-time moves, clocks, and spectator mode.",
-  path: "/game",
-});
-
-
-
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const supabase = await createClient();
@@ -33,9 +23,27 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const whiteName = white?.display_name || white?.username || "White";
   const blackName = black?.display_name || black?.username || "Black";
 
+  const title = `${whiteName} vs ${blackName} — Live Chess Game`;
+  const description = `Watch this ${game.time_control || "chess"} game between ${whiteName} and ${blackName}. Follow live moves and results on Crazy Chess Battles.`;
+
   return {
-    title: `${whiteName} vs ${blackName} — Live Chess Game`,
-    description: `Watch this ${game.time_control || "chess"} game between ${whiteName} and ${blackName}. Follow live moves and results on Crazy Chess Battles.`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "article",
+      url: `https://crazychessbattles.live/game/${id}`,
+      siteName: "Crazy Chess Battles",
+      locale: "en_US",
+      images: [{ url: "/og-image.png", width: 1200, height: 630, alt: title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["/og-image.png"],
+    },
     alternates: { canonical: `https://crazychessbattles.live/game/${id}` },
   };
 }
