@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import DraughtsBoard from "./draughts-board";
 import VictoryOverlay, { type GameOutcome } from "./victory-overlay";
 import GameChat from "./game-chat";
+import PlayerProfilePreview from "./player-profile-preview";
 import {
   stringToBoard,
   getLegalMoves,
@@ -72,6 +73,7 @@ export default function DraughtsGameClient({
   const [victoryDismissed, setVictoryDismissed] = useState(false);
   const [activeSheet, setActiveSheet] = useState<"chat" | "menu" | null>(null);
   const [drawOffer, setDrawOffer] = useState<null | "pending" | "offer">(null); // null = no offer, "pending" = we sent, "offer" = opponent sent
+  const [previewUserId, setPreviewUserId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [viewPly, setViewPly] = useState(0); // for move review navigation
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -421,6 +423,7 @@ export default function DraughtsGameClient({
 
   // Player bar renderer — chess.com style with avatar, name, rating, clock
   const renderPlayerBar = (data: {
+    userId?: string;
     name: string;
     avatar?: string | null;
     rating?: number | string | null;
@@ -442,7 +445,7 @@ export default function DraughtsGameClient({
         </div>
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-semibold leading-tight truncate">{data.name}</span>
+            <button onClick={() => data.userId && setPreviewUserId(data.userId)} className="text-sm font-semibold leading-tight truncate hover:text-ccb-primary transition-colors cursor-pointer">{data.name}</button>
             {data.isMe && <span className="text-ccb-muted font-normal text-xs">(You)</span>}
           </div>
           <div className="flex items-center gap-1">
@@ -488,20 +491,20 @@ export default function DraughtsGameClient({
 
   // Determine player data for top/bottom bars
   const opponentData = isWhite
-    ? { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black }
-    : { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white };
+    ? { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black }
+    : { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white };
 
   const myData = isWhite
-    ? { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, isMe: true, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white }
-    : { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, isMe: true, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black };
+    ? { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, isMe: true, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white }
+    : { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, isMe: true, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black };
 
   // For spectators: white at bottom, black at top
   const topPlayer = isSpectator
-    ? { name: blackName, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black }
+    ? { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black }
     : opponentData;
 
   const bottomPlayer = isSpectator
-    ? { name: whiteName, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white }
+    ? { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white }
     : myData;
 
   return (
@@ -806,6 +809,10 @@ export default function DraughtsGameClient({
         onReview={() => setVictoryDismissed(true)}
         onDismiss={() => setVictoryDismissed(true)}
       />
+
+      {previewUserId && (
+        <PlayerProfilePreview userId={previewUserId} onClose={() => setPreviewUserId(null)} />
+      )}
     </>
   );
 }
