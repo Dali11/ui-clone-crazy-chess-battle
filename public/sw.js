@@ -1,4 +1,4 @@
-const CACHE_NAME = "ccb-cache-v5";
+const CACHE_NAME = "ccb-cache-v6";
 const PRECACHE_URLS = [
   "/",
   "/manifest.json",
