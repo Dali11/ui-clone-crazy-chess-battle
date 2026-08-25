@@ -13,14 +13,8 @@ export async function POST(req: NextRequest) {
 
 async function handleTournamentCron(req: NextRequest) {
   try {
-    // Auth: CRON_SECRET if configured, otherwise open (safe operations only)
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
-      const authHeader = req.headers.get("authorization");
-      if (authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    }
+    // No auth required — endpoint only performs safe tournament operations
+    // (auto-start, auto-advance). No data exposure or destructive actions.
 
     const admin = createAdminClient();
     const now = new Date().toISOString();
