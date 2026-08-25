@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
     const { data: tournaments, error: tournamentError } = await admin
       .from('tournaments')
       .select('*')
-      .in('status', ['upcoming', 'active', 'pending_approval', 'completed'])
+      .in('status', ['upcoming', 'active', 'pending_approval', 'completed', 'finished'])
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -207,7 +207,7 @@ export async function GET(request: NextRequest) {
         type: 'tournament' as const,
         id: tournament.id,
         name: tournament.name,
-        status: tournament.status === 'pending_approval' ? 'pending' : tournament.status,
+        status: tournament.status === 'pending_approval' ? 'pending' : tournament.status === 'finished' ? 'completed' : tournament.status,
         entryType: tournament.entry_fee_cents > 0 ? 'paid' : 'free',
         entryFee: tournament.entry_fee_cents,
         currency: market.currencyCode,
