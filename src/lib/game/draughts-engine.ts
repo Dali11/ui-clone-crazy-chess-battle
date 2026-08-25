@@ -1,6 +1,5 @@
 /**
- * Multi-Variant Draughts Engine (8×8)
- * Supports: International, English/American, Russian
+ * Draughts Engine — International Checkers rules only.
  * Pure TypeScript, zero external dependencies.
  */
 
@@ -10,7 +9,7 @@ export type Piece = 'w' | 'W' | 'b' | 'B';
 export type Board = Array<Array<Piece | null>>;
 export type Color = 'w' | 'b';
 
-export type Variant = 'international' | 'english' | 'russian';
+export type Variant = 'international';
 
 export type Position = {
   row: number;
@@ -63,27 +62,8 @@ export const VARIANTS: Record<Variant, VariantConfig> = {
     mustTakeMaximum: true,
     promotionEndsTurn: true,
   },
-  english: {
-    id: 'english',
-    name: 'English',
-    description: 'Short kings · Forward only · Mandatory captures',
-    flyingKings: false,
-    menCaptureBackward: false,
-    mustTakeMaximum: false,
-    promotionEndsTurn: true,
-  },
-  russian: {
-    id: 'russian',
-    name: 'Russian',
-    description: 'Flying kings · Men capture backward · Promotion continues turn',
-    flyingKings: true,
-    menCaptureBackward: true,
-    mustTakeMaximum: true,
-    promotionEndsTurn: false,
-  },
 };
 
-export const VARIANT_LIST = Object.values(VARIANTS);
 
 // ─── Board Setup & Serialization ───────────────────────────
 
