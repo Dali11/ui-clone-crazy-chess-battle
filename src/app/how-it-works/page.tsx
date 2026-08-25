@@ -8,6 +8,12 @@ import HomeStats from "../home-stats";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  title: "How It Works — Start Playing Competitive Chess",
+  description: "Learn how to join Crazy Chess Battles: create an account, play your first game, enter tournaments, climb the leaderboard, and earn prizes. A step-by-step guide.",
+  alternates: { canonical: "https://crazychessbattles.live/how-it-works" },
+};
+
 export default function HowItWorksPage() {
   return (
     <div className="min-h-screen flex flex-col">
