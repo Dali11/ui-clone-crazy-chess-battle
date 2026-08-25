@@ -89,7 +89,7 @@ export default function DraughtsBoard({
                     className={`
                       relative w-[78%] h-[78%] rounded-full
                       flex items-center justify-center
-                      shadow-md transition-transform
+                      shadow-md
                       ${cell.piece === "w" || cell.piece === "W"
                         ? "bg-gradient-to-br from-stone-100 to-stone-300 border-2 border-stone-400"
                         : "bg-gradient-to-br from-stone-800 to-stone-950 border-2 border-stone-700"

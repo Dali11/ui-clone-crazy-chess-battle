@@ -41,7 +41,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Add admin notes + processed_by/at (refund_withdrawal RPC doesn't set these)
     await admin
       .from("withdrawals")
-      .update({ admin_notes: adminNotes, processed_by: user.id, processed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({
+        admin_notes: adminNotes,
+        rejection_reason: adminNotes,
+        processed_by: user.id,
+        processed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", id);
 
     // Insert in-app notification directly (no self-HTTP fetch)

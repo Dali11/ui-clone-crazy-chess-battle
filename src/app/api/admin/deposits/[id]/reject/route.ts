@@ -29,7 +29,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Mark as failed
     await admin.from("deposits")
-      .update({ status: "failed", updated_at: new Date().toISOString() })
+      .update({
+        status: "failed",
+        updated_at: new Date().toISOString(),
+        admin_notes: notes || "Rejected by admin",
+        credited_by: user.id,
+      })
       .eq("id", id);
 
     // Notify user

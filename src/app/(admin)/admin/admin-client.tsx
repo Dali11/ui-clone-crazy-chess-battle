@@ -9,6 +9,7 @@ import {
   ShieldCheck, UserRound, XCircle,
   Menu, LogOut, Crown, Play,
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
+  Settings, FileText,
 } from "lucide-react";
 
 interface Withdrawal {
@@ -69,6 +70,9 @@ interface Deposit {
   operator: string | null;
   reference: string | null;
   created_at: string;
+  admin_notes?: string | null;
+  credited_by?: string | null;
+  paychangu_ref?: string | null;
   profiles?: { username: string; display_name: string; email: string } | null;
 }
 
@@ -168,6 +172,15 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [verificationPlayers, setVerificationPlayers] = useState<any[]>([]);
   const [verificationLoading, setVerificationLoading] = useState(false);
   const [verificationFilter, setVerificationFilter] = useState<"pending" | "verified" | "all">("pending");
+  // Finance config
+  const [financeConfigSaving, setFinanceConfigSaving] = useState(false);
+  const [depositSearch, setDepositSearch] = useState("");
+  const [withdrawalSearch, setWithdrawalSearch] = useState("");
+  const [rejectReason, setRejectReason] = useState<string>("");
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [creditingId, setCreditingId] = useState<string | null>(null);
+  const [creditNotes, setCreditNotes] = useState<string>("");
+  const [configEdit, setConfigEdit] = useState<Record<string, string>>({});
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -436,6 +449,85 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     } finally {
       setWithdrawalConfigSaving(false);
     }
+  };
+
+  // Save full finance config (min amounts, fees, limits)
+  const handleSaveFinanceConfig = async (updates: Record<string, any>) => {
+    setFinanceConfigSaving(true);
+    try {
+      const res = await fetch("/api/admin/withdrawal-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...updates, id: withdrawalConfig?.id }),
+      });
+      if (res.ok) {
+        setWithdrawalConfig(await res.json());
+        setConfigEdit({});
+        showToast("Finance settings updated");
+      } else {
+        const data = await res.json();
+        showToast(data.error || "Failed to update settings");
+      }
+    } catch {
+      showToast("Failed to update finance settings");
+    }
+    setFinanceConfigSaving(false);
+  };
+
+  // Reject withdrawal with reason
+  const handleRejectWithReason = async (id: string) => {
+    if (!rejectReason.trim()) {
+      showToast("Please provide a reason for rejection");
+      return;
+    }
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/withdrawals/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: rejectReason }),
+      });
+      if (res.ok) {
+        showToast("Withdrawal rejected & refunded");
+        setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: "rejected", admin_notes: rejectReason } : w));
+        setRejectingId(null);
+        setRejectReason("");
+      } else {
+        const data = await res.json();
+        showToast(data.error || "Failed to reject");
+      }
+    } catch {
+      showToast("Failed to reject withdrawal");
+    }
+    setActionLoading(null);
+  };
+
+  // Credit deposit with notes
+  const handleCreditWithNotes = async (id: string) => {
+    if (!creditNotes.trim()) {
+      showToast("Please add a note for the manual credit");
+      return;
+    }
+    setActionLoading(`${id}_credit`);
+    try {
+      const res = await fetch(`/api/admin/deposits/${id}/credit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: creditNotes }),
+      });
+      if (res.ok) {
+        showToast("Deposit credited successfully");
+        setDeposits(prev => prev.map(d => d.id === id ? { ...d, status: "success", admin_notes: creditNotes } : d));
+        setCreditingId(null);
+        setCreditNotes("");
+      } else {
+        const data = await res.json();
+        showToast(data.error || "Failed to credit deposit");
+      }
+    } catch {
+      showToast("Failed to credit deposit");
+    }
+    setActionLoading(null);
   };
 
   const handleVerifyDeposit = async (id: string) => {
@@ -1174,27 +1266,131 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* WITHDRAWALS */}
           {tab === "withdrawals" && (
             <div className="space-y-4">
-              {/* Auto-approve toggle */}
+              {/* Finance Config Panel */}
               {withdrawalConfig && (
-                <div className="card flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">Auto-Approve Withdrawals</p>
-                    <p className="text-xs text-ccb-muted mt-0.5">
-                      {withdrawalConfig.auto_approve_enabled
-                        ? "Withdrawals are processed automatically via Paychangu. No admin review needed."
-                        : "Withdrawals require manual admin approval before payout is sent."}
-                    </p>
+                <div className="card border-ccb-primary/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Settings className="w-4 h-4 text-ccb-primary" />
+                    <h3 className="text-sm font-bold">Withdrawal & Deposit Settings</h3>
                   </div>
+
+                  {/* Auto-approve toggle */}
+                  <div className="flex items-center justify-between gap-3 py-2">
+                    <div>
+                      <p className="text-sm font-medium">Auto-Approve Withdrawals</p>
+                      <p className="text-xs text-ccb-muted mt-0.5">
+                        {withdrawalConfig.auto_approve_enabled
+                          ? "Withdrawals process automatically via Paychangu."
+                          : "Withdrawals require manual admin approval."}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleToggleAutoApprove(!withdrawalConfig.auto_approve_enabled)}
+                      disabled={withdrawalConfigSaving}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                        withdrawalConfig.auto_approve_enabled ? "bg-ccb-success" : "bg-ccb-border"
+                      } disabled:opacity-50`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        withdrawalConfig.auto_approve_enabled ? "translate-x-6" : "translate-x-1"
+                      }`} />
+                    </button>
+                  </div>
+
+                  <div className="border-t border-ccb-border my-3" />
+
+                  {/* Config grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Min withdrawal */}
+                    <div>
+                      <label className="text-xs font-medium text-ccb-muted">Min Withdrawal (MK)</label>
+                      <input
+                        type="number"
+                        value={configEdit.min_withdrawal_cents ?? Math.floor((withdrawalConfig.min_withdrawal_cents || 1000) / 100)}
+                        onChange={(e) => setConfigEdit(prev => ({ ...prev, min_withdrawal_cents: e.target.value }))}
+                        className="input mt-1 w-full text-sm"
+                        placeholder="10"
+                      />
+                    </div>
+                    {/* Max withdrawal */}
+                    <div>
+                      <label className="text-xs font-medium text-ccb-muted">Max Withdrawal (MK)</label>
+                      <input
+                        type="number"
+                        value={configEdit.max_withdrawal_cents ?? Math.floor((withdrawalConfig.max_withdrawal_cents || 5000000) / 100)}
+                        onChange={(e) => setConfigEdit(prev => ({ ...prev, max_withdrawal_cents: e.target.value }))}
+                        className="input mt-1 w-full text-sm"
+                        placeholder="50000"
+                      />
+                    </div>
+                    {/* Min deposit */}
+                    <div>
+                      <label className="text-xs font-medium text-ccb-muted">Min Deposit (MK)</label>
+                      <input
+                        type="number"
+                        value={configEdit.min_deposit_cents ?? Math.floor((withdrawalConfig.min_deposit_cents || 500) / 100)}
+                        onChange={(e) => setConfigEdit(prev => ({ ...prev, min_deposit_cents: e.target.value }))}
+                        className="input mt-1 w-full text-sm"
+                        placeholder="5"
+                      />
+                    </div>
+                    {/* Daily withdrawal limit */}
+                    <div>
+                      <label className="text-xs font-medium text-ccb-muted">Daily Withdrawal Limit (MK)</label>
+                      <input
+                        type="number"
+                        value={configEdit.daily_withdrawal_limit_cents ?? Math.floor((withdrawalConfig.daily_withdrawal_limit_cents || 1000000) / 100)}
+                        onChange={(e) => setConfigEdit(prev => ({ ...prev, daily_withdrawal_limit_cents: e.target.value }))}
+                        className="input mt-1 w-full text-sm"
+                        placeholder="10000"
+                      />
+                    </div>
+                    {/* Withdrawal fee */}
+                    <div>
+                      <label className="text-xs font-medium text-ccb-muted">Withdrawal Fee (MK)</label>
+                      <input
+                        type="number"
+                        value={configEdit.withdrawal_fee_cents ?? Math.floor((withdrawalConfig.withdrawal_fee_cents || 0) / 100)}
+                        onChange={(e) => setConfigEdit(prev => ({ ...prev, withdrawal_fee_cents: e.target.value }))}
+                        className="input mt-1 w-full text-sm"
+                        placeholder="0"
+                      />
+                    </div>
+                    {/* Processing fee % */}
+                    <div>
+                      <label className="text-xs font-medium text-ccb-muted">Processing Fee (%)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={configEdit.processing_fee_pct ?? (withdrawalConfig.processing_fee_pct || 0)}
+                        onChange={(e) => setConfigEdit(prev => ({ ...prev, processing_fee_pct: e.target.value }))}
+                        className="input mt-1 w-full text-sm"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
                   <button
-                    onClick={() => handleToggleAutoApprove(!withdrawalConfig.auto_approve_enabled)}
-                    disabled={withdrawalConfigSaving}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                      withdrawalConfig.auto_approve_enabled ? "bg-ccb-success" : "bg-ccb-border"
-                    } disabled:opacity-50`}
+                    onClick={() => {
+                      const updates: Record<string, number> = {};
+                      if (configEdit.min_withdrawal_cents !== undefined)
+                        updates.min_withdrawal_cents = Number(configEdit.min_withdrawal_cents) * 100;
+                      if (configEdit.max_withdrawal_cents !== undefined)
+                        updates.max_withdrawal_cents = Number(configEdit.max_withdrawal_cents) * 100;
+                      if (configEdit.min_deposit_cents !== undefined)
+                        updates.min_deposit_cents = Number(configEdit.min_deposit_cents) * 100;
+                      if (configEdit.daily_withdrawal_limit_cents !== undefined)
+                        updates.daily_withdrawal_limit_cents = Number(configEdit.daily_withdrawal_limit_cents) * 100;
+                      if (configEdit.withdrawal_fee_cents !== undefined)
+                        updates.withdrawal_fee_cents = Number(configEdit.withdrawal_fee_cents) * 100;
+                      if (configEdit.processing_fee_pct !== undefined)
+                        updates.processing_fee_pct = Number(configEdit.processing_fee_pct);
+                      if (Object.keys(updates).length > 0) handleSaveFinanceConfig(updates);
+                    }}
+                    disabled={financeConfigSaving || Object.keys(configEdit).length === 0}
+                    className="btn-primary w-full mt-3 text-sm py-2 disabled:opacity-50"
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      withdrawalConfig.auto_approve_enabled ? "translate-x-6" : "translate-x-1"
-                    }`} />
+                    {financeConfigSaving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Save Settings"}
                   </button>
                 </div>
               )}
@@ -1202,7 +1398,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
               {/* Withdrawal stats */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="card text-center">
-                  <p className="text-xs text-ccb-muted">Total Withdrawals</p>
+                  <p className="text-xs text-ccb-muted">Total Paid Out</p>
                   <p className="text-lg font-bold mt-1">
                     {formatMWK(withdrawals.reduce((s, w) => s + (w.status === "completed" ? w.amount_cents : 0), 0))}
                   </p>
@@ -1214,99 +1410,153 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                   </p>
                 </div>
                 <div className="card text-center">
-                  <p className="text-xs text-ccb-muted">Completed</p>
-                  <p className="text-lg font-bold mt-1 text-ccb-success">
-                    {withdrawals.filter(w => w.status === "completed").length}
+                  <p className="text-xs text-ccb-muted">Rejected</p>
+                  <p className="text-lg font-bold mt-1 text-ccb-danger">
+                    {withdrawals.filter(w => w.status === "rejected").length}
                   </p>
                 </div>
               </div>
 
-              {/* Filters */}
-              <div className="flex gap-2 flex-wrap">
-                {["pending", "completed", "approved", "rejected", "all"].map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setWithdrawalFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-all ${
-                      withdrawalFilter === f
-                        ? "bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30"
-                        : "text-ccb-muted hover:text-ccb-text border border-transparent"
-                    }`}
-                  >
-                    {f}
-                  </button>
-                ))}
+              {/* Search + Filters */}
+              <div className="flex flex-col gap-2">
+                <input
+                  type="text"
+                  placeholder="Search by name, phone, or amount..."
+                  value={withdrawalSearch}
+                  onChange={(e) => setWithdrawalSearch(e.target.value)}
+                  className="input w-full text-sm"
+                />
+                <div className="flex gap-2 flex-wrap">
+                  {["pending", "completed", "approved", "rejected", "all"].map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setWithdrawalFilter(f)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-all ${
+                        withdrawalFilter === f
+                          ? "bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30"
+                          : "text-ccb-muted hover:text-ccb-text border border-transparent"
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {withdrawals.length === 0 ? (
-                <div className="text-center py-12 text-ccb-muted text-sm">
-                  <ArrowDownUp className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  No withdrawals found
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {withdrawals.map((w) => (
-                    <div key={w.id} className="card">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold">{formatMWK(w.amount_cents)}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${
-                              w.status === "completed" ? "bg-ccb-success/10 text-ccb-success" :
-                              w.status === "pending" ? "bg-ccb-accent/10 text-ccb-accent" :
-                              w.status === "rejected" ? "bg-ccb-danger/10 text-ccb-danger" :
-                              w.status === "approved" ? "bg-ccb-primary/10 text-ccb-primary" :
-                              "bg-ccb-surface text-ccb-muted"
-                            }`}>{w.status}</span>
+              {(() => {
+                const filtered = withdrawals.filter(w => {
+                  if (withdrawalFilter !== "all" && w.status !== withdrawalFilter) return false;
+                  if (withdrawalSearch) {
+                    const q = withdrawalSearch.toLowerCase();
+                    const name = (w.profiles?.display_name || w.profiles?.username || "").toLowerCase();
+                    return name.includes(q) || w.phone.includes(q) || String(w.amount_cents).includes(q);
+                  }
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-ccb-muted text-sm">
+                      <ArrowDownUp className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      No withdrawals found
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2">
+                    {filtered.map((w) => (
+                      <div key={w.id} className="card">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold">{formatMWK(w.amount_cents)}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded ${
+                                w.status === "completed" ? "bg-ccb-success/10 text-ccb-success" :
+                                w.status === "pending" ? "bg-ccb-accent/10 text-ccb-accent" :
+                                w.status === "rejected" ? "bg-ccb-danger/10 text-ccb-danger" :
+                                w.status === "approved" ? "bg-ccb-primary/10 text-ccb-primary" :
+                                "bg-ccb-surface text-ccb-muted"
+                              }`}>{w.status}</span>
+                            </div>
+                            <div className="text-xs text-ccb-muted mt-1.5 space-y-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <Users className="w-3 h-3" />
+                                {w.profiles?.display_name || w.profiles?.username || "Unknown"}
+                                {w.profiles?.email ? ` · ${w.profiles.email}` : ""}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <Smartphone className="w-3 h-3" />
+                                {w.phone} · {w.operator_name}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <Clock className="w-3 h-3" />
+                                {formatDate(w.created_at)}
+                              </div>
+                              {w.admin_notes && (
+                                <div className="flex items-center gap-1.5 text-ccb-danger">
+                                  <AlertCircle className="w-3 h-3" />
+                                  {w.admin_notes}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-xs text-ccb-muted mt-1.5 space-y-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <Users className="w-3 h-3" />
-                              {w.profiles?.display_name || w.profiles?.username || "Unknown"}
-                              {w.profiles?.email ? ` · ${w.profiles.email}` : ""}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <Smartphone className="w-3 h-3" />
-                              {w.phone} · {w.operator_name}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <Clock className="w-3 h-3" />
-                              {formatDate(w.created_at)}
-                            </div>
-                            {w.admin_notes && (
-                              <div className="flex items-center gap-1.5 text-ccb-danger">
-                                <AlertCircle className="w-3 h-3" />
-                                {w.admin_notes}
+                        </div>
+
+                        {w.status === "pending" && (
+                          <div className="mt-3 pt-3 border-t border-ccb-border space-y-2">
+                            {rejectingId === w.id ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  placeholder="Reason for rejection (shown to user)..."
+                                  value={rejectReason}
+                                  onChange={(e) => setRejectReason(e.target.value)}
+                                  className="input w-full text-sm resize-none"
+                                  rows={2}
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleRejectWithReason(w.id)}
+                                    disabled={actionLoading === w.id}
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-danger text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                                  >
+                                    {actionLoading === w.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                                    Confirm Reject
+                                  </button>
+                                  <button
+                                    onClick={() => { setRejectingId(null); setRejectReason(""); }}
+                                    className="px-3 py-1.5 rounded-lg text-ccb-muted text-xs font-medium hover:text-ccb-text"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleApprove(w.id)}
+                                  disabled={actionLoading === w.id}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-success text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                                >
+                                  {actionLoading === w.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                  Approve & Send
+                                </button>
+                                <button
+                                  onClick={() => { setRejectingId(w.id); setRejectReason(""); }}
+                                  disabled={actionLoading === w.id}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-danger text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                                >
+                                  <X className="w-3.5 h-3.5" /> Reject & Refund
+                                </button>
                               </div>
                             )}
                           </div>
-                        </div>
+                        )}
                       </div>
-
-                      {w.status === "pending" && (
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-ccb-border">
-                          <button
-                            onClick={() => handleApprove(w.id)}
-                            disabled={actionLoading === w.id}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-success text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
-                          >
-                            {actionLoading === w.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                            Approve & Send
-                          </button>
-                          <button
-                            onClick={() => handleReject(w.id)}
-                            disabled={actionLoading === w.id}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-danger text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
-                          >
-                            {actionLoading === w.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-                            Reject & Refund
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -2056,119 +2306,190 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {tab === "deposits" && (
             <div className="space-y-4">
               {/* Deposit stats */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="card text-center">
-                  <p className="text-xs text-ccb-muted">Total Deposits</p>
-                  <p className="text-lg font-bold mt-1">
+                  <p className="text-xs text-ccb-muted">Total Credited</p>
+                  <p className="text-base font-bold mt-1">
                     {formatMWK(deposits.reduce((s, d) => s + (d.status === "success" ? d.amount_cents : 0), 0))}
                   </p>
                 </div>
                 <div className="card text-center">
                   <p className="text-xs text-ccb-muted">Pending</p>
-                  <p className="text-lg font-bold mt-1 text-ccb-accent">
+                  <p className="text-base font-bold mt-1 text-ccb-accent">
                     {deposits.filter(d => d.status === "pending").length}
                   </p>
                 </div>
                 <div className="card text-center">
                   <p className="text-xs text-ccb-muted">Successful</p>
-                  <p className="text-lg font-bold mt-1 text-ccb-success">
+                  <p className="text-base font-bold mt-1 text-ccb-success">
                     {deposits.filter(d => d.status === "success").length}
+                  </p>
+                </div>
+                <div className="card text-center">
+                  <p className="text-xs text-ccb-muted">Failed</p>
+                  <p className="text-base font-bold mt-1 text-ccb-danger">
+                    {deposits.filter(d => d.status === "failed").length}
                   </p>
                 </div>
               </div>
 
-              {/* Filters */}
-              <div className="flex gap-2 flex-wrap">
-                {["all", "pending", "processing", "success", "failed"].map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setDepositFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-all ${
-                      depositFilter === f
-                        ? "bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30"
-                        : "text-ccb-muted hover:text-ccb-text border border-transparent"
-                    }`}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-
-              {deposits.length === 0 ? (
-                <div className="text-center py-12 text-ccb-muted text-sm">
-                  <DollarSign className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  No deposits found
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {deposits.map((d) => (
-                    <div key={d.id} className="card">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{formatMWK(d.amount_cents)}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${
-                              d.status === "success" ? "bg-ccb-success/10 text-ccb-success" :
-                              d.status === "pending" ? "bg-ccb-accent/10 text-ccb-accent" :
-                              d.status === "processing" ? "bg-ccb-primary/10 text-ccb-primary" :
-                              d.status === "failed" ? "bg-ccb-danger/10 text-ccb-danger" :
-                              "bg-ccb-surface text-ccb-muted"
-                            }`}>{d.status}</span>
-                          </div>
-                          <div className="text-xs text-ccb-muted mt-1.5 space-y-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <Users className="w-3 h-3" />
-                              {d.profiles?.display_name || d.profiles?.username || "Unknown"}
-                              {d.profiles?.email ? ` · ${d.profiles.email}` : ""}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <Smartphone className="w-3 h-3" />
-                              {d.method === "mobile_money" ? "Mobile Money" : "Card"}
-                              {d.phone ? ` · ${d.phone}` : ""}
-                              {d.operator ? ` · ${d.operator}` : ""}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <Clock className="w-3 h-3" />
-                              {formatDate(d.created_at)}
-                              {d.charge_id ? ` · ${d.charge_id.slice(0, 20)}...` : d.tx_ref ? ` · ${d.tx_ref.slice(0, 20)}...` : ""}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Action buttons for pending/processing deposits */}
-                      {(d.status === "pending" || d.status === "processing") && (
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-ccb-border">
-                          <button
-                            onClick={() => handleVerifyDeposit(d.id)}
-                            disabled={actionLoading === `${d.id}_verify`}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-primary text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
-                          >
-                            {actionLoading === `${d.id}_verify` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Shield className="w-3.5 h-3.5" />}
-                            Verify
-                          </button>
-                          <button
-                            onClick={() => handleCreditDeposit(d.id)}
-                            disabled={actionLoading === `${d.id}_credit`}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-success text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
-                          >
-                            {actionLoading === `${d.id}_credit` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                            Manual Credit
-                          </button>
-                          <button
-                            onClick={() => handleRejectDeposit(d.id)}
-                            disabled={actionLoading === `${d.id}_reject`}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-danger text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
-                          >
-                            {actionLoading === `${d.id}_reject` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-                            Reject
-                          </button>
-                        </div>
-                      )}
-                    </div>
+              {/* Search + Filters */}
+              <div className="flex flex-col gap-2">
+                <input
+                  type="text"
+                  placeholder="Search by name, phone, tx ref, or amount..."
+                  value={depositSearch}
+                  onChange={(e) => setDepositSearch(e.target.value)}
+                  className="input w-full text-sm"
+                />
+                <div className="flex gap-2 flex-wrap">
+                  {["all", "pending", "processing", "success", "failed"].map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setDepositFilter(f)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-all ${
+                        depositFilter === f
+                          ? "bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30"
+                          : "text-ccb-muted hover:text-ccb-text border border-transparent"
+                      }`}
+                    >
+                      {f}
+                    </button>
                   ))}
                 </div>
-              )}
+              </div>
+
+              {(() => {
+                const filtered = deposits.filter(d => {
+                  if (depositFilter !== "all" && d.status !== depositFilter) return false;
+                  if (depositSearch) {
+                    const q = depositSearch.toLowerCase();
+                    const name = (d.profiles?.display_name || d.profiles?.username || "").toLowerCase();
+                    return name.includes(q) ||
+                      (d.phone || "").includes(q) ||
+                      (d.tx_ref || "").toLowerCase().includes(q) ||
+                      (d.charge_id || "").toLowerCase().includes(q) ||
+                      String(d.amount_cents).includes(q);
+                  }
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-ccb-muted text-sm">
+                      <DollarSign className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      No deposits found
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2">
+                    {filtered.map((d) => (
+                      <div key={d.id} className="card">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">{formatMWK(d.amount_cents)}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded ${
+                                d.status === "success" ? "bg-ccb-success/10 text-ccb-success" :
+                                d.status === "pending" ? "bg-ccb-accent/10 text-ccb-accent" :
+                                d.status === "processing" ? "bg-ccb-primary/10 text-ccb-primary" :
+                                d.status === "failed" ? "bg-ccb-danger/10 text-ccb-danger" :
+                                "bg-ccb-surface text-ccb-muted"
+                              }`}>{d.status}</span>
+                              <span className="text-xs text-ccb-muted">{d.method === "mobile_money" ? "MoMo" : d.method}</span>
+                            </div>
+                            <div className="text-xs text-ccb-muted mt-1.5 space-y-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <Users className="w-3 h-3" />
+                                {d.profiles?.display_name || d.profiles?.username || "Unknown"}
+                                {d.profiles?.email ? ` · ${d.profiles.email}` : ""}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <Smartphone className="w-3 h-3" />
+                                {d.method === "mobile_money" ? "Mobile Money" : "Card"}
+                                {d.phone ? ` · ${d.phone}` : ""}
+                                {d.operator ? ` · ${d.operator}` : ""}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <Clock className="w-3 h-3" />
+                                {formatDate(d.created_at)}
+                                {d.tx_ref ? ` · ${d.tx_ref.slice(0, 24)}...` : ""}
+                              </div>
+                              {d.admin_notes && (
+                                <div className="flex items-center gap-1.5 text-ccb-muted">
+                                  <FileText className="w-3 h-3" />
+                                  {d.admin_notes}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons for pending/processing deposits */}
+                        {(d.status === "pending" || d.status === "processing") && (
+                          <div className="mt-3 pt-3 border-t border-ccb-border space-y-2">
+                            {creditingId === d.id ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  placeholder="Reason for manual credit (e.g. 'Paychangu confirmed via dashboard')..."
+                                  value={creditNotes}
+                                  onChange={(e) => setCreditNotes(e.target.value)}
+                                  className="input w-full text-sm resize-none"
+                                  rows={2}
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleCreditWithNotes(d.id)}
+                                    disabled={actionLoading === `${d.id}_credit`}
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-success text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                                  >
+                                    {actionLoading === `${d.id}_credit` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                    Confirm Credit
+                                  </button>
+                                  <button
+                                    onClick={() => { setCreditingId(null); setCreditNotes(""); }}
+                                    className="px-3 py-1.5 rounded-lg text-ccb-muted text-xs font-medium hover:text-ccb-text"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2 flex-wrap">
+                                <button
+                                  onClick={() => handleVerifyDeposit(d.id)}
+                                  disabled={actionLoading === `${d.id}_verify`}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-primary text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                                >
+                                  {actionLoading === `${d.id}_verify` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Shield className="w-3.5 h-3.5" />}
+                                  Verify
+                                </button>
+                                <button
+                                  onClick={() => { setCreditingId(d.id); setCreditNotes(""); }}
+                                  disabled={actionLoading === `${d.id}_credit`}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-success text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                                >
+                                  <Check className="w-3.5 h-3.5" /> Manual Credit
+                                </button>
+                                <button
+                                  onClick={() => handleRejectDeposit(d.id)}
+                                  disabled={actionLoading === `${d.id}_reject`}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-danger text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                                >
+                                  {actionLoading === `${d.id}_reject` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

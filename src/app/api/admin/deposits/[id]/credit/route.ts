@@ -31,7 +31,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Only succeeds if the deposit is still in pending/processing (not already claimed)
     const { data: claimed } = await admin
       .from("deposits")
-      .update({ status: "success", updated_at: new Date().toISOString() })
+      .update({
+        status: "success",
+        updated_at: new Date().toISOString(),
+        admin_notes: notes || "Manually credited by admin",
+        credited_by: user.id,
+      })
       .eq("id", id)
       .in("status", ["pending", "processing"])
       .select("id");
