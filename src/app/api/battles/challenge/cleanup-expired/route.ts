@@ -151,6 +151,16 @@ async function handleCleanup(req: NextRequest) {
     });
   } catch (e: any) {
     console.error("Cleanup error:", e);
+        // Also trigger membership cleanup (consolidated into one daily cron)
+    try {
+      const memModule = await import("@/app/api/league/membership-cleanup/route");
+      if (memModule.POST) {
+        await memModule.POST(req);
+      }
+    } catch (memErr) {
+      console.error("Membership cleanup failed:", memErr);
+    }
+
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
   }
 }

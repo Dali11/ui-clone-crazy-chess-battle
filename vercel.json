@@ -7,12 +7,12 @@
   },
   "crons": [
     {
-      "path": "/api/battles/challenge/cleanup-expired",
-      "schedule": "0 0 * * *"
+      "path": "/api/tournaments/cron",
+      "schedule": "*/2 * * * *"
     },
     {
-      "path": "/api/league/membership-cleanup",
-      "schedule": "0 2 * * *"
+      "path": "/api/battles/challenge/cleanup-expired",
+      "schedule": "0 0 * * *"
     }
   ],
   "headers": [
