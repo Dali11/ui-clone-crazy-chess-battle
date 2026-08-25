@@ -56,12 +56,24 @@ export default function SubscriptionPage() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [visitorCurrency, setVisitorCurrency] = useState<string>('MWK');
+  const [fxRate, setFxRate] = useState<number>(1);
+
   const fetchMembership = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/league/membership');
-      const json = await res.json();
+      const [membershipRes, currencyRes] = await Promise.all([
+        fetch('/api/league/membership'),
+        fetch('/api/currency'),
+      ]);
+      const json = await membershipRes.json();
       setData(json);
+      // Get visitor's detected currency + exchange rate for display conversion
+      try {
+        const cur = await currencyRes.json();
+        if (cur.currencyCode) setVisitorCurrency(cur.currencyCode);
+        if (cur.rate) setFxRate(cur.rate);
+      } catch {}
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message });
     } finally {
@@ -166,9 +178,11 @@ export default function SubscriptionPage() {
   const hasActive = data?.hasActiveMembership;
   const history = data?.history || [];
 
-  const monthlyPrice = config?.price || 10000;
+  // Convert backend price to visitor's local currency for display
+  const baseMonthlyPrice = config?.price || 10000;
+  const monthlyPrice = Math.round(baseMonthlyPrice * fxRate);
   const yearlyPrice = monthlyPrice * 10;
-  const currencyLabel = config?.currency || 'MWK';
+  const currencyLabel = fxRate !== 1 ? visitorCurrency : (config?.currency || visitorCurrency);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -233,7 +247,7 @@ export default function SubscriptionPage() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-black text-ccb-primary">{membership.price.toLocaleString()} {membership.currency}</div>
+                <div className="text-2xl font-black text-ccb-primary">{Math.round(membership.price * fxRate).toLocaleString()} {fxRate !== 1 ? visitorCurrency : membership.currency}</div>
                 <div className="text-xs text-ccb-muted">per {membership.billing_cycle === 'yearly' ? 'year' : 'month'}</div>
                 <div className="mt-2 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-ccb-success/10 border border-ccb-success/30 text-ccb-success text-xs font-semibold">
                   <Check className="w-3 h-3" /> Active
@@ -326,7 +340,7 @@ export default function SubscriptionPage() {
                       <Crown className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-medium">{m.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'} — {m.price.toLocaleString()} {m.currency}</div>
+                      <div className="text-sm font-medium">{m.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'} — {Math.round(m.price * fxRate).toLocaleString()} {fxRate !== 1 ? visitorCurrency : m.currency}</div>
                       <div className="text-xs text-ccb-muted">{formatDate(m.start_date)} → {formatDate(m.end_date)}</div>
                     </div>
                   </div>
