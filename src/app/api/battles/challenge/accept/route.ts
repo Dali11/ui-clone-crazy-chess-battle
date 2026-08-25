@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
         pot_cents: pot,
         platform_fee_cents: fee,
         winner_payout_cents: payout,
+        time_control: challenge.time_control || "rapid15",
         status: "pending",
         white_rating: whitePlayer === user.id ? acceptorProfile.rating ?? 1200 : challengerProfile?.rating ?? 1200,
         black_rating: blackPlayer === user.id ? acceptorProfile.rating ?? 1200 : challengerProfile?.rating ?? 1200,
