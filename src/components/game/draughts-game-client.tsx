@@ -115,8 +115,12 @@ export default function DraughtsGameClient({
   const isLiveView = viewPly >= moveHistory.length;
 
   // Live clock calculation
+  // Clock doesn't start until the first move is made — show full time before that
+  const clockStarted = game.move_count > 0 || game.status !== "playing";
+
   const whiteClockMs = (() => {
     if (gameEnded) return game.white_clock_ms;
+    if (!clockStarted) return game.white_clock_ms;
     void clockTick;
     const elapsed = Date.now() - new Date(game.last_move_at || game.created_at).getTime();
     return currentDbTurn === "white" ? Math.max(0, game.white_clock_ms - elapsed) : game.white_clock_ms;
@@ -124,6 +128,7 @@ export default function DraughtsGameClient({
 
   const blackClockMs = (() => {
     if (gameEnded) return game.black_clock_ms;
+    if (!clockStarted) return game.black_clock_ms;
     void clockTick;
     const elapsed = Date.now() - new Date(game.last_move_at || game.created_at).getTime();
     return currentDbTurn === "black" ? Math.max(0, game.black_clock_ms - elapsed) : game.black_clock_ms;

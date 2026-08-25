@@ -60,6 +60,24 @@ export async function POST(req: NextRequest) {
       }
 
       // ── Clock expiry check ───────────────────────────────────────────
+      // Clock doesn't start until the first move is made. Before that,
+      // no player should be timed out on clock — BUT for tournament games,
+      // if the full clock time has elapsed since creation without a single
+      // move, the no-show player loses on time (tournaments must resolve).
+      if (game.move_count === 0) {
+        if (game.tournament_id) {
+          const initialClockMs = game.turn === "white"
+            ? game.white_clock_ms
+            : game.black_clock_ms;
+          const elapsedSinceCreation = now - new Date(game.created_at).getTime();
+          if (initialClockMs && elapsedSinceCreation >= initialClockMs) {
+            await resolveTimeoutForGame(admin, game);
+            timedOut++;
+          }
+        }
+        continue;
+      }
+
       const lastMoveTime = new Date(game.last_move_at || game.created_at).getTime();
       const elapsedMs = now - lastMoveTime;
       const currentClockMs = game.turn === "white" ? game.white_clock_ms : game.black_clock_ms;

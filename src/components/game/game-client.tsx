@@ -286,6 +286,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   const getLiveClock = (player: "white" | "black") => {
     if (!game.last_move_at || !game.white_clock_ms || !game.black_clock_ms) return "—";
+    // Clock hasn't started until the first move is made — show full time
+    if (game.move_count === 0 && game.status === "playing") {
+      return formatClock(player === "white" ? game.white_clock_ms : game.black_clock_ms);
+    }
     if (gameEnded || game.turn !== player) {
       return formatClock(player === "white" ? game.white_clock_ms : game.black_clock_ms);
     }

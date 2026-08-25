@@ -66,14 +66,15 @@ export async function POST(req: NextRequest) {
 
     const engineTurn = dbToEngineColor(dbTurn);
 
-    // Check clock
+    // Check clock — first move doesn't cost time (clock starts, not consumed)
     const now = Date.now();
+    const isFirstMove = game.move_count === 0;
     const lastMoveTime = new Date(game.last_move_at || game.created_at).getTime();
-    const elapsedMs = now - lastMoveTime;
+    const elapsedMs = isFirstMove ? 0 : now - lastMoveTime;
     const currentClockMs = dbTurn === "white" ? game.white_clock_ms : game.black_clock_ms;
     const remainingMs = (currentClockMs ?? 0) - elapsedMs;
 
-    if (remainingMs <= 0) {
+    if (!isFirstMove && remainingMs <= 0) {
       // Player's clock expired — they lose on time
       const admin = createAdminClient();
       const winner = dbTurn === "white" ? "black" : "white";

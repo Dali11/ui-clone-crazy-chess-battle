@@ -50,13 +50,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if the player's own clock has expired (they lose on time)
+    // On the very first move (move_count === 0), the clock hasn't started yet —
+    // the first move launches the clock, it doesn't consume time.
     const now = Date.now();
+    const isFirstMove = game.move_count === 0;
     const lastMoveTime = new Date(game.last_move_at || game.created_at).getTime();
-    const elapsedMs = now - lastMoveTime;
+    const elapsedMs = isFirstMove ? 0 : now - lastMoveTime;
     const currentClockMs = game.turn === "white" ? game.white_clock_ms : game.black_clock_ms;
     const remainingMs = (currentClockMs ?? 0) - elapsedMs;
 
-    if (remainingMs <= 0) {
+    if (!isFirstMove && remainingMs <= 0) {
       // Player's clock expired — they lose on time (or the game is
       // aborted if nobody ever made a first move — see resolveTimeoutForGame)
       const admin = createAdminClient();
@@ -70,13 +73,19 @@ export async function POST(req: NextRequest) {
     }
 
     //     // Validate and apply the move
+    // On the first move, pass "now" as lastMoveAt so the engine calculates
+    // zero elapsed time — the first move starts the clock, it doesn't cost time.
+    const engineLastMoveAt = isFirstMove
+      ? new Date().toISOString()
+      : (game.last_move_at || new Date().toISOString());
+
     const result = validateAndApplyMove(
       game.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
       move,
       game.pgn || "",
       game.white_clock_ms,
       game.black_clock_ms,
-      game.last_move_at || new Date().toISOString(),
+      engineLastMoveAt,
       game.turn as "white" | "black",
       game.increment_seconds || 0
     );
