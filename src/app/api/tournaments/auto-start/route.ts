@@ -2,7 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Can be triggered by cron (with CRON_SECRET) or by any authenticated user
+// Also support GET for cron-job.org
+export async function GET(req: NextRequest) {
+  return handleAutoStart(req);
+}
+
 export async function POST(req: NextRequest) {
+  return handleAutoStart(req);
+}
+
+async function handleAutoStart(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
     const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
