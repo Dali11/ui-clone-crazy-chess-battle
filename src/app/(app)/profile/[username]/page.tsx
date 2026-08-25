@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
+import Image from "next/image";
 
 export default async function ProfilePage({
   params,
@@ -45,10 +46,14 @@ export default async function ProfilePage({
       {/* Profile header */}
       <div className="card">
         <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center">
-            <span className="text-2xl font-bold text-ccb-primary">
-              {(profile.display_name || profile.username).charAt(0).toUpperCase()}
-            </span>
+          <div className="w-16 h-16 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">
+            {profile.avatar_url ? (
+              <Image src={profile.avatar_url} alt={profile.display_name || profile.username} width={64} height={64} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-2xl font-bold text-ccb-primary">
+                {(profile.display_name || profile.username).charAt(0).toUpperCase()}
+              </span>
+            )}
           </div>
           <div className="flex-1">
             <h1 className="text-xl font-bold">{profile.display_name || profile.username}</h1>
