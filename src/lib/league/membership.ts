@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getPlatformConfig } from '@/lib/platform-config';
 
 /**
  * Creates + activates a CrazyChess Club membership row and notifies the user.
@@ -18,6 +19,10 @@ export async function activateMembership(
     .eq('payment_reference', chargeId)
     .single();
   if (existing) return existing;
+
+  // Load membership config for auto_renew setting
+  const mConfig = await getPlatformConfig(admin, 'membership');
+  const autoRenew = mConfig.auto_renew === true;
 
   const billingCycle = reference?.includes('yearly') ? 'yearly' : 'monthly';
   const price = billingCycle === 'yearly' ? 50000 : 5000;
@@ -41,7 +46,7 @@ export async function activateMembership(
       country: 'MW',
       start_date: now.toISOString(),
       end_date: endDate.toISOString(),
-      auto_renew: false,
+      auto_renew: autoRenew,
       payment_method: 'mobile_money',
       payment_reference: chargeId,
     })
