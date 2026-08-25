@@ -116,11 +116,37 @@ async function handleTournamentCron(req: NextRequest) {
           last_move_at: new Date().toISOString(),
         }));
 
-        const writes: PromiseLike<any>[] = [];
-        if (gameRows.length > 0) writes.push(admin.from("games").insert(gameRows));
+        // Insert games and get back their IDs
+        let createdGameIds: Record<string, string> = {};
+        if (gameRows.length > 0) {
+          const { data: insertedGames } = await admin
+            .from("games")
+            .insert(gameRows)
+            .select("id, white_player_id, black_player_id");
+          for (const g of insertedGames || []) {
+            createdGameIds[`${g.white_player_id}|${g.black_player_id}`] = g.id;
+          }
+        }
+
+        // Update round pairings with game_id
+        const pairingsWithGameIds = pairings.map((p, i) => ({
+          board: i + 1,
+          white: p.white || null,
+          black: p.black || null,
+          bye: p.bye || null,
+          result: null,
+          game_id: createdGameIds[`${p.white}|${p.black}`] || null,
+        }));
+        await admin
+          .from("tournament_rounds")
+          .update({ pairings: pairingsWithGameIds })
+          .eq("tournament_id", tournament.id)
+          .eq("round_number", 1);
+
+        // Handle byes
         if (byePairings.length > 0) {
-          writes.push(
-            ...byePairings.map((p) =>
+          await Promise.all(
+            byePairings.map((p) =>
               admin
                 .from("tournament_participants")
                 .update({ score: 1, wins: 1, games_played: 1 })
@@ -129,7 +155,6 @@ async function handleTournamentCron(req: NextRequest) {
             )
           );
         }
-        await Promise.all(writes);
 
         await admin.from("tournaments").update({ status: "active", current_round: 1 }).eq("id", tournament.id);
         results.started++;
@@ -285,11 +310,37 @@ async function handleTournamentCron(req: NextRequest) {
           last_move_at: new Date().toISOString(),
         }));
 
-        const writes: PromiseLike<any>[] = [];
-        if (gameRows.length > 0) writes.push(admin.from("games").insert(gameRows));
+        // Insert games and get back their IDs
+        let createdGameIds: Record<string, string> = {};
+        if (gameRows.length > 0) {
+          const { data: insertedGames } = await admin
+            .from("games")
+            .insert(gameRows)
+            .select("id, white_player_id, black_player_id");
+          for (const g of insertedGames || []) {
+            createdGameIds[`${g.white_player_id}|${g.black_player_id}`] = g.id;
+          }
+        }
+
+        // Update round pairings with game_id
+        const pairingsWithGameIds = pairings.map((p, i) => ({
+          board: i + 1,
+          white: p.white || null,
+          black: p.black || null,
+          bye: p.bye || null,
+          result: null,
+          game_id: createdGameIds[`${p.white}|${p.black}`] || null,
+        }));
+        await admin
+          .from("tournament_rounds")
+          .update({ pairings: pairingsWithGameIds })
+          .eq("tournament_id", tournament.id)
+          .eq("round_number", nextRound);
+
+        // Handle byes
         if (byePairings.length > 0) {
-          writes.push(
-            ...byePairings.map((p) => {
+          await Promise.all(
+            byePairings.map((p) => {
               const byeP = participants.find((pp: any) => pp.player_id === p.bye);
               return admin
                 .from("tournament_participants")
@@ -303,7 +354,6 @@ async function handleTournamentCron(req: NextRequest) {
             })
           );
         }
-        await Promise.all(writes);
 
         await admin.from("tournaments").update({ current_round: nextRound }).eq("id", tournament.id);
 
