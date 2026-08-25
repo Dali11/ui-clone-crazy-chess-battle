@@ -128,6 +128,19 @@ interface AdminLog {
 
 type Tab = "overview" | "users" | "withdrawals" | "tournaments" | "games" | "deposits" | "battles" | "berry" | "logs" | "leagues" | "seasons" | "membership" | "verification";
 
+// Convert datetime-local (user's local TZ) to UTC ISO string for API
+function localToUTC(localValue: string): string {
+  if (!localValue) return localValue;
+  return new Date(localValue).toISOString();
+}
+
+// Convert UTC ISO string to datetime-local format for the input (user's local TZ)
+function utcToLocalInput(utcValue: string): string {
+  if (!utcValue) return "";
+  const d = new Date(utcValue);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
 export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [stats, setStats] = useState<Stats | null>(null);
@@ -679,8 +692,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       max_rating: t.max_rating || "",
       rounds: t.rounds || "",
       duration_minutes: t.duration_minutes || "",
-      starts_at: t.starts_at ? t.starts_at.slice(0, 16) : "",
-      ends_at: t.ends_at ? t.ends_at.slice(0, 16) : "",
+      starts_at: t.starts_at ? utcToLocalInput(t.starts_at) : "",
+      ends_at: t.ends_at ? utcToLocalInput(t.ends_at) : "",
       entry_fee_cents: t.entry_fee_cents || 0,
       prize_pool_cents: t.prize_pool_cents || 0,
     });
@@ -692,7 +705,13 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     try {
       const body: Record<string, any> = { tournamentId: editingTournament.id, action: "edit" };
       for (const [k, v] of Object.entries(editForm)) {
-        if (v !== "" && v !== null) body[k] = v === "" ? null : v;
+        if (v !== "" && v !== null) {
+          if (k === "starts_at" || k === "ends_at") {
+            body[k] = v ? localToUTC(v as string) : null;
+          } else {
+            body[k] = v === "" ? null : v;
+          }
+        }
       }
       const res = await fetch("/api/admin/tournaments", {
         method: "PATCH",
@@ -805,8 +824,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           minPlayers: Number(createForm.min_players) || 2,
           rounds: createForm.rounds ? Number(createForm.rounds) : null,
           durationMinutes: createForm.duration_minutes ? Number(createForm.duration_minutes) : null,
-          startsAt: createForm.starts_at,
-          endsAt: createForm.ends_at || null,
+          startsAt: localToUTC(createForm.starts_at),
+          endsAt: createForm.ends_at ? localToUTC(createForm.ends_at) : null,
           entryFeeCents: Number(createForm.entry_fee_cents) || 0,
           creatorProfitPercent: Number(createForm.creator_profit_percent) || 0,
           minRating: Number(createForm.min_rating) || 0,
