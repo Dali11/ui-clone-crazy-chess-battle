@@ -148,7 +148,7 @@ export default function HowItWorksPage() {
                 <div className="card">
                   <Disc3 className="w-5 h-5 text-ccb-accent mb-2" />
                   <h3 className="font-semibold text-sm mb-1">Draughts</h3>
-                  <p className="text-xs text-ccb-muted">International, English, or Russian draughts. Play vs computer or challenge a friend online.</p>
+                  <p className="text-xs text-ccb-muted">International draughts (10×10). Play vs computer or challenge a friend online.</p>
                 </div>
                 <div className="card">
                   <Gamepad2 className="w-5 h-5 text-ccb-primary mb-2" />
