@@ -16,6 +16,10 @@ async function handleAutoStart(req: NextRequest) {
     const authHeader = req.headers.get("authorization");
     const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
 
+    if (!isCron) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const admin = createAdminClient();
     const now = new Date().toISOString();
 

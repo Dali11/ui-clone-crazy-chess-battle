@@ -65,26 +65,18 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Rank participants by score (then by wins as tiebreak)
-    const { data: participants } = await admin
-      .from("tournament_participants")
-      .select("id, player_id, score, wins")
-      .eq("tournament_id", tournamentId)
-      .order("score", { ascending: false })
-      .order("wins", { ascending: false });
+    // Rank participants using proper Swiss tiebreaks (Buchholz, Sonneborn-Berger)
+    const { calculateTiebreaks } = await import("@/lib/tournament/tiebreaks");
+    const rankedParticipants = await calculateTiebreaks(admin, tournamentId);
 
-    if (participants && participants.length > 0) {
-      // Assign final ranks
-      const rankedParticipants = participants.map((p, i) => ({
-        ...p,
-        final_rank: i + 1,
-      }));
+    if (rankedParticipants && rankedParticipants.length > 0) {
 
       for (const p of rankedParticipants) {
         await admin
           .from("tournament_participants")
           .update({ final_rank: p.final_rank })
-          .eq("id", p.id);
+          .eq("player_id", p.player_id)
+          .eq("tournament_id", tournamentId);
       }
 
       // Calculate prize distribution

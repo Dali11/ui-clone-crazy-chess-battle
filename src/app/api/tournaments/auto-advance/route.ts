@@ -116,8 +116,28 @@ async function handleAutoAdvance(req: NextRequest) {
         // Swiss pairing: sort by score, pair within groups, avoid rematches
         const pairings: Array<{ white: string; black: string; bye?: string }> = [];
         const used = new Set<string>();
+        // Sort by score, then by Buchholz (opponent strength), then by seed
+        // Fetch all games for Buchholz calculation
+        const { data: allGames } = await admin
+          .from("games")
+          .select("white_player_id, black_player_id")
+          .eq("tournament_id", tournament.id);
+        const oppScores: Record<string, number[]> = {};
+        const scoreLookup: Record<string, number> = {};
+        for (const p of participants) scoreLookup[p.player_id] = p.score || 0;
+        for (const g of allGames || []) {
+          (oppScores[g.white_player_id] ||= []).push(scoreLookup[g.black_player_id] || 0);
+          (oppScores[g.black_player_id] ||= []).push(scoreLookup[g.white_player_id] || 0);
+        }
+        const buchholz = (pid: string) => {
+          const scores = [...(oppScores[pid] || [])].sort((a, b) => a - b);
+          return scores.length > 1 ? scores.slice(1).reduce((s, v) => s + v, 0) : (scores[0] || 0);
+        };
         const sorted = [...participants].sort(
-          (a, b) => (b.score || 0) - (a.score || 0) || (a.seed || 0) - (b.seed || 0)
+          (a, b) =>
+            (b.score || 0) - (a.score || 0) ||
+            buchholz(b.player_id) - buchholz(a.player_id) ||
+            (a.seed || 0) - (b.seed || 0)
         );
 
         for (let i = 0; i < sorted.length; i++) {
