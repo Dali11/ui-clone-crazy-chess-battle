@@ -112,8 +112,18 @@ function getLeagueMeta(tier: number) {
   return LEAGUE_META[tier] || LEAGUE_META[5];
 }
 
-function formatMoney(cents: number, symbol: string) {
-  return `${symbol}${(cents / 100).toLocaleString()}`;
+function formatMoney(cents: number, symbol: string, rate: number = 1) {
+  const converted = Math.round((cents / 100) * rate);
+  return `${symbol}${converted.toLocaleString()}`;
+}
+
+function getSymbol(currencyCode: string): string {
+  try {
+    const parts = new Intl.NumberFormat("en", { style: "currency", currency: currencyCode, currencyDisplay: "narrowSymbol" }).formatToParts(0);
+    return parts.find(p => p.type === "currency")?.value || currencyCode;
+  } catch {
+    return currencyCode;
+  }
 }
 
 function getPayout(cents: number, position: number, config: Record<string, number> | null) {
@@ -176,7 +186,18 @@ export default function PremiumLeaguesTab() {
     }
   };
 
-  useEffect(() => { fetchData(); fetchCompetitions(); }, []);
+  const [visitorCurrency, setVisitorCurrency] = useState<string>('MWK');
+  const [fxRate, setFxRate] = useState<number>(1);
+
+  useEffect(() => {
+    fetchData();
+    fetchCompetitions();
+    // Fetch visitor's currency for prize pool conversion
+    fetch('/api/currency').then(r => r.json()).then(c => {
+      if (c.currencyCode) setVisitorCurrency(c.currencyCode);
+      if (c.rate) setFxRate(c.rate);
+    }).catch(() => {});
+  }, []);
 
   const handleRegister = async (leagueId: string) => {
     setRegistering(leagueId);
@@ -198,7 +219,7 @@ export default function PremiumLeaguesTab() {
     }
   };
 
-  const symbol = data?.market?.currencySymbol || 'MK';
+  const symbol = fxRate !== 1 ? getSymbol(visitorCurrency) : (data?.market?.currencySymbol || 'MK');
   const allLeagues = data?.leagues || [];
   const leagues = allLeagues.filter(l => l.gender_restriction === genderView);
   const hasMembership = data?.hasMembership || false;
@@ -216,7 +237,7 @@ export default function PremiumLeaguesTab() {
               <h3 className="font-bold text-sm mb-1">Premium Membership Required</h3>
               <p className="text-xs text-ccb-muted leading-relaxed">
                 Premium Leagues are exclusive to CrazyChess Club members. Join for{' '}
-                {formatMoney(data?.market?.membershipPrice || 1000000, symbol)}/month
+                {formatMoney(data?.market?.membershipPrice || 1000000, symbol, fxRate)}/month
                 to access tiered leagues, prize pools, promotion/relegation, and exclusive competitions.
               </p>
               <Link href="/league/subscribe" className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white text-xs font-bold shadow-lg shadow-ccb-primary/20">
@@ -268,7 +289,7 @@ export default function PremiumLeaguesTab() {
             const meta = getLeagueMeta(league.tier);
             const Icon = meta.icon;
             const isExpanded = expandedLeague === league.tier;
-            const prizeFormatted = formatMoney(league.prize_pool_cents, league.prize_currency || symbol);
+            const prizeFormatted = formatMoney(league.prize_pool_cents, fxRate !== 1 ? symbol : (league.prize_currency || symbol), fxRate !== 1 ? fxRate : 1);
             const standings = league.standings || [];
             const capacity = league.league_size || 0;
             const qual = league.qualification;
@@ -337,7 +358,7 @@ export default function PremiumLeaguesTab() {
                                 <span className={`w-6 h-6 rounded-full bg-ccb-card border border-ccb-border flex items-center justify-center text-[11px] font-bold ${meta.color}`}>{pos}</span>
                                 <span className="text-xs text-ccb-muted">Place</span>
                               </div>
-                              <span className="text-sm font-bold">{formatMoney(payout, league.prize_currency || symbol)}</span>
+                              <span className="text-sm font-bold">{formatMoney(payout, fxRate !== 1 ? symbol : (league.prize_currency || symbol), fxRate !== 1 ? fxRate : 1)}</span>
                             </div>
                           );
                         })}
@@ -553,7 +574,7 @@ export default function PremiumLeaguesTab() {
                     <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted capitalize">{comp.status.replace('_', ' ')}</span>
                     {comp.prize_pool_cents > 0 && (
                       <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">
-                        {formatMoney(comp.prize_pool_cents, comp.prize_currency === 'MWK' ? 'MK' : comp.prize_currency)} prize
+                        {formatMoney(comp.prize_pool_cents, fxRate !== 1 ? symbol : (comp.prize_currency === 'MWK' ? 'MK' : comp.prize_currency), fxRate !== 1 ? fxRate : 1)} prize
                       </span>
                     )}
                   </div>
