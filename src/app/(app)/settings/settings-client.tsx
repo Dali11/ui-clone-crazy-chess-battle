@@ -299,7 +299,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
     if (newPassword.length < 8) { setPasswordError("Min 8 characters"); return; }
     setPasswordUpdating(true); setPasswordError(null);
     try {
-      const { error } = await supabase.auth.updatePassword(newPassword);
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) setPasswordError(error.message); else { setPasswordSuccess(true); setNewPassword(""); setTimeout(() => setPasswordSuccess(false), 3000); }
     } catch (err: any) { setPasswordError(err.message); }
     finally { setPasswordUpdating(false); }

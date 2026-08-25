@@ -32,11 +32,13 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://crazychessbattles.live",
     siteName: "Crazy Chess Battles",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Crazy Chess Battles" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Crazy Chess Battles — Compete. Win. Dominate.",
     description: "Malawi's competitive chess arena. Tournaments, prizes, and ranked battles.",
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,

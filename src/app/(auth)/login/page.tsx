@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 
 export const dynamic = "force-dynamic";
@@ -53,9 +54,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 rounded-lg bg-ccb-primary flex items-center justify-center">
-              <span className="text-white font-bold text-xl">♞</span>
-            </div>
+            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={40} height={40} className="w-10 h-10 rounded-full" />
             <span className="text-lg font-bold">Crazy Chess Battles</span>
           </Link>
           <h1 className="text-2xl font-bold mt-4">Welcome back</h1>
