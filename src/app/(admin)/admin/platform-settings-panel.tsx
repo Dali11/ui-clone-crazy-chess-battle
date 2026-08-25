@@ -1,140 +1,171 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Settings, Save, Loader2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Settings, Save, Loader2, SlidersHorizontal } from "lucide-react";
 
-// ─── Section-specific settings field definitions ─────────────────────────────
+// ─── Field definitions ────────────────────────────────────────────────────
+
 interface SettingField {
   key: string;
   label: string;
   type: "toggle" | "number" | "text" | "select";
   options?: { value: string; label: string }[];
   help?: string;
+  group?: "control" | "display";
+  unit?: string;
 }
 
 const SECTION_FIELDS: Record<string, SettingField[]> = {
   overview: [
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", help: "Display stat cards at the top" },
-    { key: "refresh_interval_seconds", label: "Refresh Interval (sec)", type: "number", help: "Auto-refresh stats every N seconds" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display", help: "Display stat cards at the top" },
+    { key: "refresh_interval_seconds", label: "Refresh Interval", type: "number", group: "display", unit: "sec", help: "Auto-refresh stats every N seconds" },
   ],
   deposits: [
-    { key: "enabled", label: "Deposits Enabled", type: "toggle", help: "Allow new deposit requests" },
-    { key: "auto_credit", label: "Auto-Credit", type: "toggle", help: "Automatically credit approved deposits" },
-    { key: "min_amount_cents", label: "Min Amount (cents)", type: "number", help: "Minimum deposit in cents" },
-    { key: "max_amount_cents", label: "Max Amount (cents)", type: "number", help: "Maximum deposit in cents" },
-    { key: "require_approval_above_cents", label: "Approval Threshold (cents)", type: "number", help: "Deposits above this require manual approval" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
-    { key: "default_filter", label: "Default Filter", type: "select", options: [
-      { value: "all", label: "All" },
-      { value: "pending", label: "Pending" },
-      { value: "success", label: "Successful" },
-      { value: "failed", label: "Failed" },
+    { key: "enabled", label: "Deposits Enabled", type: "toggle", group: "control", help: "Allow new deposit requests" },
+    { key: "auto_credit", label: "Auto-Credit", type: "toggle", group: "control", help: "Automatically credit approved deposits" },
+    { key: "min_amount_cents", label: "Minimum Deposit", type: "number", group: "control", unit: "MWK" },
+    { key: "max_amount_cents", label: "Maximum Deposit", type: "number", group: "control", unit: "MWK" },
+    { key: "require_approval_above_cents", label: "Approval Threshold", type: "number", group: "control", unit: "MWK", help: "Deposits above this require manual approval" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
+    { key: "default_filter", label: "Default Filter", type: "select", group: "display", options: [
+      { value: "all", label: "All" }, { value: "pending", label: "Pending" },
+      { value: "success", label: "Successful" }, { value: "failed", label: "Failed" },
     ]},
-    { key: "page_size", label: "Page Size", type: "number", help: "Records per page" },
+    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
   withdrawals: [
-    { key: "enabled", label: "Withdrawals Enabled", type: "toggle", help: "Allow new withdrawal requests" },
-    { key: "auto_approve", label: "Auto-Approve", type: "toggle", help: "Automatically approve withdrawals" },
-    { key: "min_amount_cents", label: "Min Amount (cents)", type: "number" },
-    { key: "max_amount_cents", label: "Max Amount (cents)", type: "number" },
-    { key: "daily_limit_cents", label: "Daily Limit (cents)", type: "number" },
-    { key: "processing_fee_pct", label: "Processing Fee %", type: "number" },
-    { key: "withdrawal_fee_cents", label: "Withdrawal Fee (cents)", type: "number" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
-    { key: "default_filter", label: "Default Filter", type: "select", options: [
-      { value: "all", label: "All" },
-      { value: "pending", label: "Pending" },
-      { value: "approved", label: "Approved" },
-      { value: "rejected", label: "Rejected" },
+    { key: "enabled", label: "Withdrawals Enabled", type: "toggle", group: "control", help: "Allow new withdrawal requests" },
+    { key: "auto_approve", label: "Auto-Approve", type: "toggle", group: "control", help: "Automatically approve and process withdrawals" },
+    { key: "min_amount_cents", label: "Minimum Withdrawal", type: "number", group: "control", unit: "MWK" },
+    { key: "max_amount_cents", label: "Maximum Withdrawal", type: "number", group: "control", unit: "MWK" },
+    { key: "daily_limit_cents", label: "Daily Limit", type: "number", group: "control", unit: "MWK", help: "Max total withdrawals per user per day" },
+    { key: "processing_fee_pct", label: "Processing Fee", type: "number", group: "control", unit: "%" },
+    { key: "withdrawal_fee_cents", label: "Withdrawal Fee", type: "number", group: "control", unit: "MWK", help: "Flat fee per withdrawal" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
+    { key: "default_filter", label: "Default Filter", type: "select", group: "display", options: [
+      { value: "all", label: "All" }, { value: "pending", label: "Pending" },
+      { value: "approved", label: "Approved" }, { value: "rejected", label: "Rejected" },
     ]},
-    { key: "page_size", label: "Page Size", type: "number" },
+    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
   battles: [
-    { key: "enabled", label: "Battles Enabled", type: "toggle", help: "Allow staked battles" },
-    { key: "min_stake_cents", label: "Min Stake (cents)", type: "number" },
-    { key: "max_stake_cents", label: "Max Stake (cents)", type: "number" },
-    { key: "platform_fee_pct", label: "Platform Fee %", type: "number", help: "Platform cut of each battle" },
-    { key: "auto_cancel_minutes", label: "Auto-Cancel (min)", type: "number", help: "Cancel unmatched battles after N minutes" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
-    { key: "page_size", label: "Page Size", type: "number" },
+    { key: "enabled", label: "Battles Enabled", type: "toggle", group: "control", help: "Allow staked battles" },
+    { key: "min_stake_cents", label: "Min Stake", type: "number", group: "control", unit: "MWK" },
+    { key: "max_stake_cents", label: "Max Stake", type: "number", group: "control", unit: "MWK" },
+    { key: "platform_fee_pct", label: "Platform Fee", type: "number", group: "control", unit: "%", help: "Platform cut of each battle" },
+    { key: "auto_cancel_minutes", label: "Auto-Cancel", type: "number", group: "control", unit: "min", help: "Cancel unmatched battles after N minutes" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
+    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
   games: [
-    { key: "allow_spectators", label: "Allow Spectators", type: "toggle" },
-    { key: "max_concurrent_games", label: "Max Concurrent Games", type: "number" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
-    { key: "default_filter", label: "Default Filter", type: "select", options: [
-      { value: "all", label: "All" },
-      { value: "active", label: "Active" },
+    { key: "allow_spectators", label: "Allow Spectators", type: "toggle", group: "control" },
+    { key: "max_concurrent_games", label: "Max Concurrent Games", type: "number", group: "control" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
+    { key: "default_filter", label: "Default Filter", type: "select", group: "display", options: [
+      { value: "all", label: "All" }, { value: "active", label: "Active" },
       { value: "completed", label: "Completed" },
     ]},
-    { key: "page_size", label: "Page Size", type: "number" },
+    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
   users: [
-    { key: "allow_signup", label: "Allow Signups", type: "toggle" },
-    { key: "require_email_verification", label: "Require Email Verification", type: "toggle" },
-    { key: "default_is_admin", label: "New Users Admin", type: "toggle", help: "Dangerous — new users get admin access" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
-    { key: "page_size", label: "Page Size", type: "number" },
+    { key: "allow_signup", label: "Allow Signups", type: "toggle", group: "control", help: "Allow new user registrations" },
+    { key: "require_email_verification", label: "Require Email Verification", type: "toggle", group: "control" },
+    { key: "default_is_admin", label: "New Users Admin", type: "toggle", group: "control", help: "Dangerous — new users get admin access" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
+    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
   tournaments: [
-    { key: "require_approval", label: "Require Approval", type: "toggle", help: "Tournaments need admin approval" },
-    { key: "auto_approve_below_players", label: "Auto-Approve Under N Players", type: "number" },
-    { key: "max_players", label: "Max Players", type: "number" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
-    { key: "page_size", label: "Page Size", type: "number" },
+    { key: "require_approval", label: "Require Approval", type: "toggle", group: "control", help: "Tournaments need admin approval before going live" },
+    { key: "auto_approve_below_players", label: "Auto-Approve Under", type: "number", group: "control", unit: "players", help: "Auto-approve tournaments with fewer than N players" },
+    { key: "max_players", label: "Max Players", type: "number", group: "control" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
+    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
   berry: [
-    { key: "berries_per_win", label: "Berries Per Win", type: "number" },
-    { key: "berries_per_draw", label: "Berries Per Draw", type: "number" },
-    { key: "berries_per_tournament_win", label: "Berries Per Tournament Win", type: "number" },
-    { key: "daily_cap", label: "Daily Cap", type: "number", help: "Max berries per user per day" },
-    { key: "conversion_rate", label: "Conversion Rate", type: "number", help: "Berries to 1 MWK" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
+    { key: "berries_per_win", label: "Berries Per Win", type: "number", group: "control" },
+    { key: "berries_per_draw", label: "Berries Per Draw", type: "number", group: "control" },
+    { key: "berries_per_tournament_win", label: "Berries Per Tournament Win", type: "number", group: "control" },
+    { key: "daily_cap", label: "Daily Cap", type: "number", group: "control", help: "Max berries per user per day" },
+    { key: "conversion_rate", label: "Conversion Rate", type: "number", group: "control", help: "Berries to 1 MWK" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
   ],
   leagues: [
-    { key: "require_membership", label: "Require Membership", type: "toggle" },
-    { key: "auto_relegate", label: "Auto-Relegate", type: "toggle", help: "Auto-relegate inactive members" },
-    { key: "promotion_spots", label: "Promotion Spots", type: "number" },
-    { key: "relegation_spots", label: "Relegation Spots", type: "number" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
-    { key: "page_size", label: "Page Size", type: "number" },
+    { key: "require_membership", label: "Require Membership", type: "toggle", group: "control" },
+    { key: "auto_relegate", label: "Auto-Relegate", type: "toggle", group: "control", help: "Auto-relegate inactive members" },
+    { key: "promotion_spots", label: "Promotion Spots", type: "number", group: "control" },
+    { key: "relegation_spots", label: "Relegation Spots", type: "number", group: "control" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
+    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
   seasons: [
-    { key: "auto_create", label: "Auto-Create Seasons", type: "toggle" },
-    { key: "default_duration_weeks", label: "Default Duration (weeks)", type: "number" },
-    { key: "allow_overlap", label: "Allow Overlap", type: "toggle", help: "Allow overlapping seasons" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
-    { key: "page_size", label: "Page Size", type: "number" },
+    { key: "auto_create", label: "Auto-Create Seasons", type: "toggle", group: "control" },
+    { key: "default_duration_weeks", label: "Default Duration", type: "number", group: "control", unit: "weeks" },
+    { key: "allow_overlap", label: "Allow Overlap", type: "toggle", group: "control", help: "Allow overlapping seasons" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
+    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
   membership: [
-    { key: "auto_renew", label: "Auto-Renew", type: "toggle" },
-    { key: "grace_period_days", label: "Grace Period (days)", type: "number" },
-    { key: "require_verification", label: "Require Verification", type: "toggle" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
-    { key: "page_size", label: "Page Size", type: "number" },
+    { key: "auto_renew", label: "Auto-Renew", type: "toggle", group: "control" },
+    { key: "grace_period_days", label: "Grace Period", type: "number", group: "control", unit: "days" },
+    { key: "require_verification", label: "Require Verification", type: "toggle", group: "control" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
+    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
   verification: [
-    { key: "require_id_document", label: "Require ID Document", type: "toggle" },
-    { key: "require_selfie", label: "Require Selfie", type: "toggle" },
-    { key: "auto_approve_trusted", label: "Auto-Approve Trusted", type: "toggle", help: "Auto-approve verified users" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
-    { key: "page_size", label: "Page Size", type: "number" },
+    { key: "require_id_document", label: "Require ID Document", type: "toggle", group: "control" },
+    { key: "require_selfie", label: "Require Selfie", type: "toggle", group: "control" },
+    { key: "auto_approve_trusted", label: "Auto-Approve Trusted", type: "toggle", group: "control", help: "Auto-approve users from trusted sources" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
+    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
   logs: [
-    { key: "retention_days", label: "Retention (days)", type: "number", help: "Auto-delete logs older than N days" },
-    { key: "page_size", label: "Page Size", type: "number" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle" },
+    { key: "retention_days", label: "Retention Period", type: "number", group: "control", unit: "days", help: "Auto-delete logs older than N days" },
+    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
+    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
 };
+
+// ─── Display helpers ──────────────────────────────────────────────────────
+
+function formatValue(value: any, unit?: string): string {
+  if (unit === "MWK") return `MWK ${(value / 100).toLocaleString()}`;
+  if (unit === "%") return `${value}%`;
+  if (unit === "days") return `${value} day${value !== 1 ? "s" : ""}`;
+  if (unit === "weeks") return `${value} week${value !== 1 ? "s" : ""}`;
+  if (unit === "min") return `${value} min`;
+  if (unit === "sec") return `${value} sec`;
+  if (unit === "players") return `${value} players`;
+  return String(value ?? "");
+}
+
+const SECTION_LABELS: Record<string, string> = {
+  overview: "Overview",
+  deposits: "Deposits",
+  withdrawals: "Withdrawals",
+  battles: "Battles",
+  games: "Games",
+  users: "Users",
+  tournaments: "Tournaments",
+  berry: "Berry Rewards",
+  leagues: "Leagues",
+  seasons: "Seasons",
+  membership: "Membership",
+  verification: "Verification",
+  logs: "Admin Logs",
+};
+
+// ─── Component ────────────────────────────────────────────────────────────
 
 export default function PlatformSettingsPanel({ section }: { section: string }) {
   const [config, setConfig] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
   const fields = SECTION_FIELDS[section] || [];
+  const controlFields = fields.filter((f) => f.group !== "display");
+  const displayFields = fields.filter((f) => f.group === "display");
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -144,15 +175,13 @@ export default function PlatformSettingsPanel({ section }: { section: string }) 
         setConfig(data.config || {});
       }
     } catch {
-      // silent fail — settings just won't show
+      // silent — settings just won't show
     } finally {
       setLoading(false);
     }
   }, [section]);
 
-  useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -163,17 +192,15 @@ export default function PlatformSettingsPanel({ section }: { section: string }) 
         body: JSON.stringify({ section, config }),
       });
       if (res.ok) {
-        setToast("Settings saved");
-        setTimeout(() => setToast(null), 2000);
+        setToast({ msg: "Settings saved and enforced", ok: true });
       } else {
-        setToast("Failed to save");
-        setTimeout(() => setToast(null), 2000);
+        setToast({ msg: "Failed to save", ok: false });
       }
     } catch {
-      setToast("Failed to save");
-      setTimeout(() => setToast(null), 2000);
+      setToast({ msg: "Failed to save", ok: false });
     } finally {
       setSaving(false);
+      setTimeout(() => setToast(null), 2500);
     }
   };
 
@@ -181,96 +208,184 @@ export default function PlatformSettingsPanel({ section }: { section: string }) 
     setConfig((prev) => ({ ...prev, [key]: value }));
   };
 
+  // Convert MWK display values to cents on save, and cents to MWK on load
+  const getDisplayValue = (field: SettingField): any => {
+    const raw = config[field.key];
+    if (raw === undefined || raw === null) return "";
+    if (field.unit === "MWK") return Math.floor(raw / 100);
+    return raw;
+  };
+
+  const setFieldValue = (field: SettingField, value: any) => {
+    if (field.unit === "MWK") {
+      updateField(field.key, Number(value) * 100);
+    } else {
+      updateField(field.key, value);
+    }
+  };
+
   if (loading || fields.length === 0) return null;
 
   return (
-    <div className="mb-4">
-      {/* Toggle button */}
+    <div className="mb-3">
       <button
-        onClick={() => setShowSettings(!showSettings)}
-        className="flex items-center gap-1.5 text-xs text-ccb-muted hover:text-ccb-text transition-colors"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 text-xs font-medium text-ccb-muted hover:text-ccb-text transition-colors py-1"
       >
-        <Settings className="w-3.5 h-3.5" />
-        {showSettings ? "Hide Settings" : "Section Settings"}
+        <SlidersHorizontal className="w-3.5 h-3.5" />
+        {expanded ? "Hide Settings" : "Settings"}
       </button>
 
-      {showSettings && (
-        <div className="mt-3 rounded-xl border border-ccb-border bg-ccb-surface/50 p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-ccb-text">Platform Settings — {section}</h3>
-            {toast && <span className="text-xs text-ccb-success">{toast}</span>}
+      {expanded && (
+        <div className="mt-2 rounded-xl border border-ccb-border bg-ccb-surface/40 overflow-hidden">
+          {/* Header bar */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-ccb-border bg-ccb-surface/60">
+            <div className="flex items-center gap-2">
+              <Settings className="w-4 h-4 text-ccb-primary" />
+              <span className="text-sm font-semibold text-ccb-text">
+                {SECTION_LABELS[section] || section} Settings
+              </span>
+            </div>
+            {toast && (
+              <span className={`text-xs font-medium ${toast.ok ? "text-ccb-success" : "text-red-400"}`}>
+                {toast.msg}
+              </span>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {fields.map((field) => (
-              <div key={field.key} className="space-y-1">
-                <label className="text-xs font-medium text-ccb-muted flex items-center gap-1">
-                  {field.label}
-                  {field.help && (
-                    <span className="text-[10px] text-ccb-muted/60 italic" title={field.help}>
-                      ⓘ
-                    </span>
-                  )}
-                </label>
-
-                {field.type === "toggle" && (
-                  <button
-                    onClick={() => updateField(field.key, !config[field.key])}
-                    className="flex items-center gap-1"
-                  >
-                    {config[field.key] ? (
-                      <ToggleRight className="w-9 h-5 text-ccb-success" />
-                    ) : (
-                      <ToggleLeft className="w-9 h-5 text-ccb-border" />
-                    )}
-                    <span className="text-xs text-ccb-muted">{config[field.key] ? "On" : "Off"}</span>
-                  </button>
-                )}
-
-                {field.type === "number" && (
-                  <input
-                    type="number"
-                    value={config[field.key] ?? ""}
-                    onChange={(e) => updateField(field.key, Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-ccb-dark border border-ccb-border text-ccb-text focus:outline-none focus:border-ccb-primary"
-                  />
-                )}
-
-                {field.type === "text" && (
-                  <input
-                    type="text"
-                    value={config[field.key] ?? ""}
-                    onChange={(e) => updateField(field.key, e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-ccb-dark border border-ccb-border text-ccb-text focus:outline-none focus:border-ccb-primary"
-                  />
-                )}
-
-                {field.type === "select" && (
-                  <select
-                    value={config[field.key] ?? ""}
-                    onChange={(e) => updateField(field.key, e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-ccb-dark border border-ccb-border text-ccb-text focus:outline-none focus:border-ccb-primary"
-                  >
-                    {field.options?.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
+          <div className="p-4 space-y-5">
+            {/* Control settings */}
+            {controlFields.length > 0 && (
+              <div className="space-y-2.5">
+                <p className="text-[11px] uppercase tracking-wide font-semibold text-ccb-muted/70">Controls</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {controlFields.map((field) => (
+                    <FieldRow
+                      key={field.key}
+                      field={field}
+                      value={getDisplayValue(field)}
+                      onChange={(v) => setFieldValue(field, v)}
+                    />
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
+            )}
 
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-ccb-primary text-white hover:bg-ccb-primary/90 disabled:opacity-50 transition-colors"
-          >
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-            Save Settings
-          </button>
+            {/* Display settings */}
+            {displayFields.length > 0 && (
+              <div className="space-y-2.5 pt-3 border-t border-ccb-border/60">
+                <p className="text-[11px] uppercase tracking-wide font-semibold text-ccb-muted/70">Display</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {displayFields.map((field) => (
+                    <FieldRow
+                      key={field.key}
+                      field={field}
+                      value={getDisplayValue(field)}
+                      onChange={(v) => setFieldValue(field, v)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Save button */}
+            <div className="flex items-center gap-3 pt-2 border-t border-ccb-border/60">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-ccb-primary text-white hover:bg-ccb-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Save & Apply
+              </button>
+              {Object.keys(config).length > 0 && (
+                <span className="text-[11px] text-ccb-muted/50">
+                  Changes take effect immediately
+                </span>
+              )}
+            </div>
+          </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Field Row ────────────────────────────────────────────────────────────
+
+function FieldRow({
+  field,
+  value,
+  onChange,
+}: {
+  field: SettingField;
+  value: any;
+  onChange: (v: any) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1.5">
+        <label className="text-xs font-medium text-ccb-text">{field.label}</label>
+        {field.help && (
+          <span className="text-[10px] text-ccb-muted/50 italic" title={field.help}>
+            ({field.help})
+          </span>
+        )}
+      </div>
+
+      {/* Toggle */}
+      {field.type === "toggle" && (
+        <button
+          onClick={() => onChange(!value)}
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+            value ? "bg-ccb-primary" : "bg-ccb-border"
+          }`}
+        >
+          <span
+            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+              value ? "translate-x-4.5" : "translate-x-1"
+            }`}
+            style={{ transform: value ? "translateX(20px)" : "translateX(4px)" }}
+          />
+        </button>
+      )}
+
+      {/* Number with unit */}
+      {field.type === "number" && (
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="flex-1 min-w-0 px-2.5 py-1.5 text-sm rounded-lg bg-ccb-dark border border-ccb-border text-ccb-text focus:outline-none focus:border-ccb-primary transition-colors"
+          />
+          {field.unit && (
+            <span className="text-xs text-ccb-muted shrink-0 w-8">{field.unit}</span>
+          )}
+        </div>
+      )}
+
+      {/* Text */}
+      {field.type === "text" && (
+        <input
+          type="text"
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-ccb-dark border border-ccb-border text-ccb-text focus:outline-none focus:border-ccb-primary transition-colors"
+        />
+      )}
+
+      {/* Select */}
+      {field.type === "select" && (
+        <select
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-ccb-dark border border-ccb-border text-ccb-text focus:outline-none focus:border-ccb-primary transition-colors"
+        >
+          {field.options?.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
       )}
     </div>
   );
