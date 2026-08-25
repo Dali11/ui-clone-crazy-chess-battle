@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
@@ -8,6 +9,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import ChallengeAccept from "./challenge-accept";
 import ChallengeTaken from "./challenge-taken";
 import ChallengeWaiting from "./challenge-waiting";
+
+
+export const metadata: Metadata = {
+  title: "Chess Challenge — Join the Battle",
+  description: "You've been challenged to a chess battle on Crazy Chess Battles. Accept the challenge and start playing now.",
+};
 
 export default async function ChallengePage({
   params,
