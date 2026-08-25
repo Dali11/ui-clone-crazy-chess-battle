@@ -627,20 +627,26 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
             />
             <div className="flex gap-2 mt-2 flex-wrap">
-              {WITHDRAW_AMOUNTS.map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => setWithdrawAmount(amt)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    withdrawAmount === amt ? "bg-ccb-primary text-white" : "bg-ccb-surface text-ccb-muted border border-ccb-border"
-                  }`}
-                >
-                  {amt.toLocaleString()}
-                </button>
-              ))}
+              {(() => {
+                const minW = withdrawConfig ? Math.floor(withdrawConfig.min_amount_cents / 100) : 10000;
+                const maxW = withdrawConfig ? Math.floor(withdrawConfig.max_amount_cents / 100) : 500000;
+                const amounts = [minW, minW * 2, minW * 5, Math.min(minW * 10, maxW), Math.min(minW * 20, maxW)];
+                const unique = [...new Set(amounts)].filter(a => a <= maxW);
+                return unique.map((amt) => (
+                  <button
+                    key={amt}
+                    onClick={() => setWithdrawAmount(amt)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      withdrawAmount === amt ? "bg-ccb-primary text-white" : "bg-ccb-surface text-ccb-muted border border-ccb-border"
+                    }`}
+                  >
+                    {amt.toLocaleString()}
+                  </button>
+                ));
+              })()}
             </div>
             <p className="text-xs text-ccb-muted mt-2">
-              Available: {formatMWK(balance)} · Min: MWK 10,000
+              Available: {formatMWK(balance)} · Min: MWK {(withdrawConfig ? Math.floor(withdrawConfig.min_amount_cents / 100) : 10000).toLocaleString()}
             </p>
           </div>
 
