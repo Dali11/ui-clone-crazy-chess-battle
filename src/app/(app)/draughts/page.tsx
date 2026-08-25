@@ -7,6 +7,7 @@ import type { AIDifficulty } from "@/lib/game/draughts-ai";
 import {
   Zap, Clock, Swords, Bot, Link2, Disc3, X, Sparkles, ChevronRight, Play,
 } from "lucide-react";
+import { VARIANTS, VARIANT_LIST, type Variant } from "@/lib/game/draughts-engine";
 
 const timeControls = [
   { id: "bullet", label: "Bullet", minutes: 1,  increment: 0, desc: "1+0",  icon: Zap },
@@ -24,6 +25,7 @@ type SearchState = "idle" | "searching" | "noPlayers";
 
 export default function DraughtsPage() {
   const [selectedTC, setSelectedTC] = useState("rapid");
+  const [variant, setVariant] = useState<Variant>("international");
   const [rated, setRated] = useState(true);
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [searchSeconds, setSearchSeconds] = useState(0);
@@ -81,7 +83,7 @@ export default function DraughtsPage() {
       const response = await fetch("/api/draughts/matchmaking/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timeControl: selectedTC, rated }),
+        body: JSON.stringify({ timeControl: selectedTC, rated, variant }),
       });
       const data = await response.json();
 
@@ -129,7 +131,7 @@ export default function DraughtsPage() {
             await fetch("/api/notify-admin", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ timeControl: selectedTC, rated, game: "draughts" }),
+              body: JSON.stringify({ timeControl: selectedTC, rated, variant, game: "draughts" }),
             });
             setAdminNotified(true);
           } catch {}
@@ -164,11 +166,11 @@ export default function DraughtsPage() {
 
   const handlePlayBot = () => {
     const color = Math.random() < 0.5 ? "white" : "black";
-    router.push(`/draughts/play/computer?difficulty=${aiDifficulty}&color=${color}&tc=${selectedTC}`);
+    router.push(`/draughts/play/computer?difficulty=${aiDifficulty}&color=${color}&tc=${selectedTC}&variant=${variant}`);
   };
 
   const handlePlayComputer = () => {
-    router.push(`/draughts/play/computer?difficulty=${aiDifficulty}&color=${aiColor}&tc=${selectedTC}`);
+    router.push(`/draughts/play/computer?difficulty=${aiDifficulty}&color=${aiColor}&tc=${selectedTC}&variant=${variant}`);
   };
 
   const handleCreateChallenge = async () => {
@@ -177,7 +179,7 @@ export default function DraughtsPage() {
       const response = await fetch("/api/draughts/challenge/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timeControl: selectedTC, rated, expiryMinutes: challengeExpiry }),
+        body: JSON.stringify({ timeControl: selectedTC, rated, expiryMinutes: challengeExpiry, variant }),
       });
       const data = await response.json();
       if (data.challengeId) {
@@ -305,6 +307,30 @@ export default function DraughtsPage() {
           </div>
         </div>
       )}
+
+      {/* Variant Selector */}
+      <div>
+        <h3 className="text-sm font-medium text-ccb-muted mb-3">Game Variant</h3>
+        <div className="grid grid-cols-3 gap-3">
+          {VARIANT_LIST.map((v) => {
+            const isSelected = variant === v.id;
+            return (
+              <button
+                key={v.id}
+                onClick={() => setVariant(v.id)}
+                className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 transition-all text-center ${
+                  isSelected
+                    ? "border-ccb-primary bg-ccb-primary/10 text-ccb-primary"
+                    : "border-ccb-border bg-ccb-surface text-ccb-muted hover:border-ccb-primary/50"
+                }`}
+              >
+                <span className="text-sm font-bold">{v.name}</span>
+                <span className="text-[10px] leading-tight">{v.description}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Time Control */}
       <div>

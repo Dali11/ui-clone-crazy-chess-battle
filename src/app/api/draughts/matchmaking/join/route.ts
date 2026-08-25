@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { timeControl, rated } = await req.json();
+    const { timeControl, rated, variant } = await req.json();
 
     if (!timeControl) {
       return NextResponse.json({ error: "Time control required" }, { status: 400 });
@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
         time_control: timeControl,
         rated: rated ?? true,
         rating: myRating,
+        variant: variant || "international",
       });
 
     if (error) {
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
       .neq("player_id", user.id)
       .eq("time_control", timeControl)
       .eq("rated", rated ?? true)
+      .eq("variant", variant || "international")
       .order("joined_at", { ascending: true })
       .limit(10);
 
@@ -91,6 +93,7 @@ export async function POST(req: NextRequest) {
         p_initial_minutes: tc.minutes,
         p_increment_seconds: tc.increment,
         p_rated: rated ?? true,
+        p_variant: variant || "international",
       });
 
       if (gameError || !gameId) {

@@ -1,11 +1,16 @@
 /**
- * English/American Draughts (Checkers) Game Engine
+ * Multi-Variant Draughts Engine (8×8)
+ * Supports: International, English/American, Russian
  * Pure TypeScript, zero external dependencies.
  */
+
+// ─── Types ────────────────────────────────────────────────
 
 export type Piece = 'w' | 'W' | 'b' | 'B';
 export type Board = Array<Array<Piece | null>>;
 export type Color = 'w' | 'b';
+
+export type Variant = 'international' | 'english' | 'russian';
 
 export type Position = {
   row: number;
@@ -36,6 +41,52 @@ export type MoveResult = {
   notation?: string;
 };
 
+// ─── Variant Config ───────────────────────────────────────
+
+export interface VariantConfig {
+  id: Variant;
+  name: string;
+  description: string;
+  flyingKings: boolean;       // kings move/capture any distance diagonally
+  menCaptureBackward: boolean; // men can capture in all 4 diagonal directions
+  mustTakeMaximum: boolean;    // must take the sequence with the most captures
+  promotionEndsTurn: boolean;  // promotion during a jump ends the turn (vs continuing as king)
+}
+
+export const VARIANTS: Record<Variant, VariantConfig> = {
+  international: {
+    id: 'international',
+    name: 'International',
+    description: 'Flying kings · Men capture backward · Must take maximum',
+    flyingKings: true,
+    menCaptureBackward: true,
+    mustTakeMaximum: true,
+    promotionEndsTurn: true,
+  },
+  english: {
+    id: 'english',
+    name: 'English',
+    description: 'Short kings · Forward only · Mandatory captures',
+    flyingKings: false,
+    menCaptureBackward: false,
+    mustTakeMaximum: false,
+    promotionEndsTurn: true,
+  },
+  russian: {
+    id: 'russian',
+    name: 'Russian',
+    description: 'Flying kings · Men capture backward · Promotion continues turn',
+    flyingKings: true,
+    menCaptureBackward: true,
+    mustTakeMaximum: true,
+    promotionEndsTurn: false,
+  },
+};
+
+export const VARIANT_LIST = Object.values(VARIANTS);
+
+// ─── Board Setup & Serialization ───────────────────────────
+
 /**
  * Creates and returns the standard initial 8x8 draughts board.
  * Dark squares are where (row + col) % 2 === 1.
@@ -59,19 +110,12 @@ export function initialBoard(): Board {
   return board;
 }
 
-/**
- * Converts a Board to an 8-line string representation ('.' for null).
- */
 export function boardToString(board: Board): string {
   return board
     .map(row => row.map(cell => cell ?? '.').join(''))
     .join('\n');
 }
 
-/**
- * Parses a string representation back into an 8x8 Board.
- * Supports multi-line format (8 rows) or single 64-char string.
- */
 export function stringToBoard(str: string): Board {
   const lines = str.trim().split(/\r?\n/).filter(line => line.length > 0);
   const board: Board = Array.from({ length: 8 }, () => Array(8).fill(null));
@@ -100,18 +144,14 @@ export function stringToBoard(str: string): Board {
   return board;
 }
 
-/**
- * Converts position { row, col } to algebraic notation (e.g. {row: 7, col: 0} -> 'a1').
- */
+// ─── Notation ──────────────────────────────────────────────
+
 export function posToAlgebraic(pos: Position): string {
-  const colChar = String.fromCharCode(97 + pos.col); // 0 -> 'a'
-  const rank = 8 - pos.row;                          // 7 -> 1, 0 -> 8
+  const colChar = String.fromCharCode(97 + pos.col);
+  const rank = 8 - pos.row;
   return `${colChar}${rank}`;
 }
 
-/**
- * Converts algebraic notation (e.g. 'a1') to position { row, col }.
- */
 export function algebraicToPos(str: string): Position {
   if (!str || str.length < 2) return { row: 0, col: 0 };
   const col = str.charCodeAt(0) - 97;
@@ -120,9 +160,6 @@ export function algebraicToPos(str: string): Position {
   return { row, col };
 }
 
-/**
- * Returns algebraic notation for a move (e.g. 'e3-d4' for simple, 'c3xe5xg7' for captures).
- */
 export function getMoveNotation(move: DraughtsMove): string {
   if (move.isCapture && move.path && move.path.length > 1) {
     return move.path.map(posToAlgebraic).join('x');
@@ -130,40 +167,17 @@ export function getMoveNotation(move: DraughtsMove): string {
   return `${posToAlgebraic(move.from)}-${posToAlgebraic(move.to)}`;
 }
 
-/**
- * Helper: gets color of a piece.
- */
+// ─── Helpers ──────────────────────────────────────────────
+
 function getPieceColor(piece: Piece): Color {
   return piece === 'w' || piece === 'W' ? 'w' : 'b';
 }
 
-/**
- * Helper: gets allowed step directions for a piece.
- * Men move forward diagonally (white moves up towards row 0, black moves down towards row 7).
- * Kings move in all 4 diagonal directions.
- */
-function getDirections(piece: Piece): [number, number][] {
-  if (piece === 'W' || piece === 'B') {
-    return [[-1, -1], [-1, 1], [1, -1], [1, 1]];
-  }
-  if (piece === 'w') {
-    return [[-1, -1], [-1, 1]];
-  }
-  // 'b'
-  return [[1, -1], [1, 1]];
-}
-
-/**
- * Helper: checks if a piece is an opponent piece.
- */
 function isOpponentPiece(piece: Piece | null, myColor: Color): boolean {
   if (!piece) return false;
   return getPieceColor(piece) !== myColor;
 }
 
-/**
- * Helper: checks if reaching a row promotes a man to a King.
- */
 function doesPromote(piece: Piece, row: number): boolean {
   if (piece === 'w' && row === 0) return true;
   if (piece === 'b' && row === 7) return true;
@@ -171,7 +185,41 @@ function doesPromote(piece: Piece, row: number): boolean {
 }
 
 /**
- * Recursively searches for all jump paths for a piece starting at pos.
+ * Gets move directions for a piece.
+ * Kings always get all 4 diagonals.
+ * Men get forward-only for simple moves.
+ * For captures, men get all 4 directions if menCaptureBackward is true.
+ */
+function getMoveDirections(piece: Piece): [number, number][] {
+  if (piece === 'W' || piece === 'B') {
+    return [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+  }
+  if (piece === 'w') {
+    return [[-1, -1], [-1, 1]];
+  }
+  return [[1, -1], [1, 1]];
+}
+
+function getCaptureDirections(piece: Piece, config: VariantConfig): [number, number][] {
+  if (piece === 'W' || piece === 'B') {
+    return [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+  }
+  // Men
+  if (config.menCaptureBackward) {
+    return [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+  }
+  // Forward only
+  if (piece === 'w') {
+    return [[-1, -1], [-1, 1]];
+  }
+  return [[1, -1], [1, 1]];
+}
+
+// ─── Jump Path Finding ────────────────────────────────────
+
+/**
+ * Recursively searches for all jump paths for a piece.
+ * Supports both short-range (1 square) and flying king (any distance) captures.
  */
 function findJumpPathsForPiece(
   board: Board,
@@ -180,71 +228,154 @@ function findJumpPathsForPiece(
   currentPiece: Piece,
   color: Color,
   path: Position[],
-  captures: Position[]
+  captures: Position[],
+  config: VariantConfig
 ): DraughtsMove[] {
   const moves: DraughtsMove[] = [];
-  const directions = getDirections(currentPiece);
+  const isKing = currentPiece === 'W' || currentPiece === 'B';
+  const directions = getCaptureDirections(currentPiece, config);
 
   for (const [dr, dc] of directions) {
-    const midRow = curPos.row + dr;
-    const midCol = curPos.col + dc;
-    const landRow = curPos.row + 2 * dr;
-    const landCol = curPos.col + 2 * dc;
+    if (isKing && config.flyingKings) {
+      // Flying king: scan along diagonal until we find a piece
+      let step = 1;
+      let foundOpponent = false;
+      let opponentPos: Position | null = null;
 
-    if (
-      landRow >= 0 && landRow < 8 && landCol >= 0 && landCol < 8 &&
-      midRow >= 0 && midRow < 8 && midCol >= 0 && midCol < 8
-    ) {
-      const midPiece = board[midRow][midCol];
-      const landPiece = board[landRow][landCol];
+      while (true) {
+        const scanRow = curPos.row + dr * step;
+        const scanCol = curPos.col + dc * step;
+        if (scanRow < 0 || scanRow > 7 || scanCol < 0 || scanCol > 7) break;
 
-      const isAlreadyCaptured = captures.some(c => c.row === midRow && c.col === midCol);
-      const isLandEmpty = landPiece === null || (landRow === startPos.row && landCol === startPos.col && path.length > 1);
+        const cell = board[scanRow][scanCol];
 
-      if (midPiece && isOpponentPiece(midPiece, color) && !isAlreadyCaptured && isLandEmpty) {
-        const nextCaptures = [...captures, { row: midRow, col: midCol }];
-        const nextPath = [...path, { row: landRow, col: landCol }];
-        const promoted = doesPromote(currentPiece, landRow);
-
-        // Under standard rules, promoting to King during a jump ends the turn immediately.
-        if (promoted) {
-          moves.push({
-            from: startPos,
-            to: { row: landRow, col: landCol },
-            path: nextPath,
-            captures: nextCaptures,
-            isCapture: true,
-            promoted: true
-          });
-        } else {
-          // Temporarily simulate move on board copy to recurse
-          const nextBoard = board.map(r => [...r]);
-          nextBoard[curPos.row][curPos.col] = null;
-          nextBoard[midRow][midCol] = null;
-          nextBoard[landRow][landCol] = currentPiece;
-
-          const subMoves = findJumpPathsForPiece(
-            nextBoard,
-            startPos,
-            { row: landRow, col: landCol },
-            currentPiece,
-            color,
-            nextPath,
-            nextCaptures
-          );
-
-          if (subMoves.length > 0) {
-            moves.push(...subMoves);
+        if (!foundOpponent) {
+          if (cell === null) {
+            // Empty square — keep scanning
+            step++;
+            continue;
+          }
+          // Hit a piece
+          if (isOpponentPiece(cell, color)) {
+            const isAlreadyCaptured = captures.some(c => c.row === scanRow && c.col === scanCol);
+            if (isAlreadyCaptured) break;
+            foundOpponent = true;
+            opponentPos = { row: scanRow, col: scanCol };
+            step++;
+            continue;
           } else {
-            // End of jump path
+            // Own piece — blocked
+            break;
+          }
+        } else {
+          // Found opponent — this is a potential landing square
+          if (cell === null || (scanRow === startPos.row && scanCol === startPos.col && path.length > 1)) {
+            // Valid landing square
+            const landRow = scanRow;
+            const landCol = scanCol;
+            const nextCaptures = [...captures, opponentPos!];
+            const nextPath = [...path, { row: landRow, col: landCol }];
+            const promoted = doesPromote(currentPiece, landRow);
+
+            if (promoted && config.promotionEndsTurn) {
+              moves.push({
+                from: startPos,
+                to: { row: landRow, col: landCol },
+                path: nextPath,
+                captures: nextCaptures,
+                isCapture: true,
+                promoted: true,
+              });
+            } else {
+              // Simulate and recurse
+              const nextBoard = board.map(r => [...r]);
+              nextBoard[curPos.row][curPos.col] = null;
+              nextBoard[opponentPos!.row][opponentPos!.col] = null;
+              nextBoard[landRow][landCol] = promoted ? (color === 'w' ? 'W' : 'B') : currentPiece;
+
+              const subMoves = findJumpPathsForPiece(
+                nextBoard, startPos, { row: landRow, col: landCol },
+                promoted ? (color === 'w' ? 'W' : 'B') : currentPiece,
+                color, nextPath, nextCaptures, config
+              );
+
+              if (subMoves.length > 0) {
+                moves.push(...subMoves);
+              } else {
+                moves.push({
+                  from: startPos,
+                  to: { row: landRow, col: landCol },
+                  path: nextPath,
+                  captures: nextCaptures,
+                  isCapture: true,
+                  promoted,
+                });
+              }
+            }
+            // For flying kings, can land on ANY empty square beyond the captured piece
+            step++;
+            continue;
+          } else {
+            // Blocked — can't land here
+            break;
+          }
+        }
+      }
+    } else {
+      // Short-range capture (1 square jump, 2 squares landing)
+      const midRow = curPos.row + dr;
+      const midCol = curPos.col + dc;
+      const landRow = curPos.row + 2 * dr;
+      const landCol = curPos.col + 2 * dc;
+
+      if (
+        landRow >= 0 && landRow < 8 && landCol >= 0 && landCol < 8 &&
+        midRow >= 0 && midRow < 8 && midCol >= 0 && midCol < 8
+      ) {
+        const midPiece = board[midRow][midCol];
+        const landPiece = board[landRow][landCol];
+
+        const isAlreadyCaptured = captures.some(c => c.row === midRow && c.col === midCol);
+        const isLandEmpty = landPiece === null || (landRow === startPos.row && landCol === startPos.col && path.length > 1);
+
+        if (midPiece && isOpponentPiece(midPiece, color) && !isAlreadyCaptured && isLandEmpty) {
+          const nextCaptures = [...captures, { row: midRow, col: midCol }];
+          const nextPath = [...path, { row: landRow, col: landCol }];
+          const promoted = doesPromote(currentPiece, landRow);
+
+          if (promoted && config.promotionEndsTurn) {
             moves.push({
               from: startPos,
               to: { row: landRow, col: landCol },
               path: nextPath,
               captures: nextCaptures,
               isCapture: true,
-              promoted: false
+              promoted: true,
             });
+          } else {
+            const nextBoard = board.map(r => [...r]);
+            nextBoard[curPos.row][curPos.col] = null;
+            nextBoard[midRow][midCol] = null;
+            nextBoard[landRow][landCol] = promoted ? (color === 'w' ? 'W' : 'B') : currentPiece;
+
+            const subMoves = findJumpPathsForPiece(
+              nextBoard, startPos, { row: landRow, col: landCol },
+              promoted ? (color === 'w' ? 'W' : 'B') : currentPiece,
+              color, nextPath, nextCaptures, config
+            );
+
+            if (subMoves.length > 0) {
+              moves.push(...subMoves);
+            } else {
+              moves.push({
+                from: startPos,
+                to: { row: landRow, col: landCol },
+                path: nextPath,
+                captures: nextCaptures,
+                isCapture: true,
+                promoted,
+              });
+            }
           }
         }
       }
@@ -254,50 +385,70 @@ function findJumpPathsForPiece(
   return moves;
 }
 
+// ─── Simple Moves ──────────────────────────────────────────
+
 /**
- * Returns simple 1-square non-capture diagonal moves for a piece at pos.
+ * Returns non-capture diagonal moves for a piece.
+ * Flying kings can move any distance; men move 1 square forward only.
  */
-function getSimpleMovesForPiece(board: Board, pos: Position): DraughtsMove[] {
+function getSimpleMovesForPiece(board: Board, pos: Position, config: VariantConfig): DraughtsMove[] {
   const piece = board[pos.row]?.[pos.col];
   if (!piece) return [];
   const moves: DraughtsMove[] = [];
-  const directions = getDirections(piece);
+  const isKing = piece === 'W' || piece === 'B';
+  const directions = getMoveDirections(piece);
 
   for (const [dr, dc] of directions) {
-    const r = pos.row + dr;
-    const c = pos.col + dc;
-    if (r >= 0 && r < 8 && c >= 0 && c < 8 && board[r][c] === null) {
-      const promoted = doesPromote(piece, r);
-      moves.push({
-        from: pos,
-        to: { row: r, col: c },
-        path: [pos, { row: r, col: c }],
-        captures: [],
-        isCapture: false,
-        promoted
-      });
+    if (isKing && config.flyingKings) {
+      // Flying king: slide any distance
+      let step = 1;
+      while (true) {
+        const r = pos.row + dr * step;
+        const c = pos.col + dc * step;
+        if (r < 0 || r > 7 || c < 0 || c > 7) break;
+        if (board[r][c] !== null) break; // blocked
+        moves.push({
+          from: pos,
+          to: { row: r, col: c },
+          path: [pos, { row: r, col: c }],
+          captures: [],
+          isCapture: false,
+          promoted: false,
+        });
+        step++;
+      }
+    } else {
+      // Short move (1 square)
+      const r = pos.row + dr;
+      const c = pos.col + dc;
+      if (r >= 0 && r < 8 && c >= 0 && c < 8 && board[r][c] === null) {
+        const promoted = doesPromote(piece, r);
+        moves.push({
+          from: pos,
+          to: { row: r, col: c },
+          path: [pos, { row: r, col: c }],
+          captures: [],
+          isCapture: false,
+          promoted,
+        });
+      }
     }
   }
 
   return moves;
 }
 
-/**
- * Checks if the specified color has any available capture moves on the board.
- */
-export function hasAnyCaptures(board: Board, color: Color): boolean {
+// ─── Public API ────────────────────────────────────────────
+
+export function hasAnyCaptures(board: Board, color: Color, variant: Variant = 'international'): boolean {
+  const config = VARIANTS[variant];
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
       const piece = board[r][c];
       if (piece && getPieceColor(piece) === color) {
         const jumps = findJumpPathsForPiece(
-          board,
-          { row: r, col: c },
-          { row: r, col: c },
-          piece,
-          color,
-          [{ row: r, col: c }],
-          []
+          board, { row: r, col: c }, { row: r, col: c },
+          piece, color, [{ row: r, col: c }], [], config
         );
         if (jumps.length > 0) return true;
       }
@@ -308,9 +459,10 @@ export function hasAnyCaptures(board: Board, color: Color): boolean {
 
 /**
  * Returns all legal moves for color on board.
- * Captures are MANDATORY: if any captures are available, only capture moves are returned.
+ * Captures are MANDATORY. If mustTakeMaximum, only the longest capture sequences are returned.
  */
-export function getLegalMoves(board: Board, color: Color): DraughtsMove[] {
+export function getLegalMoves(board: Board, color: Color, variant: Variant = 'international'): DraughtsMove[] {
+  const config = VARIANTS[variant];
   const allJumps: DraughtsMove[] = [];
   const allSimple: DraughtsMove[] = [];
 
@@ -319,48 +471,42 @@ export function getLegalMoves(board: Board, color: Color): DraughtsMove[] {
       const piece = board[r][c];
       if (piece && getPieceColor(piece) === color) {
         const pos = { row: r, col: c };
-        const jumps = findJumpPathsForPiece(board, pos, pos, piece, color, [pos], []);
+        const jumps = findJumpPathsForPiece(board, pos, pos, piece, color, [pos], [], config);
         if (jumps.length > 0) {
           allJumps.push(...jumps);
         } else {
-          allSimple.push(...getSimpleMovesForPiece(board, pos));
+          allSimple.push(...getSimpleMovesForPiece(board, pos, config));
         }
       }
     }
   }
 
   if (allJumps.length > 0) {
+    if (config.mustTakeMaximum) {
+      const maxCaptures = Math.max(...allJumps.map(m => m.captures.length));
+      return allJumps.filter(m => m.captures.length === maxCaptures);
+    }
     return allJumps;
   }
   return allSimple;
 }
 
-/**
- * Returns legal moves for the piece at pos on board.
- * Enforces mandatory capture rules across the board.
- */
-export function getMovesForPiece(board: Board, pos: Position): DraughtsMove[] {
+export function getMovesForPiece(board: Board, pos: Position, variant: Variant = 'international'): DraughtsMove[] {
   const piece = board[pos.row]?.[pos.col];
   if (!piece) return [];
   const color = getPieceColor(piece);
-  const legalMoves = getLegalMoves(board, color);
+  const legalMoves = getLegalMoves(board, color, variant);
 
   return legalMoves.filter(
     m => m.from.row === pos.row && m.from.col === pos.col
   );
 }
 
-/**
- * Checks if the game is over and returns winner or draw status.
- * Conditions:
- * - Opponent has no pieces left -> Current color wins.
- * - Opponent has no legal moves -> Current color wins.
- * - 40 moves (80 half-moves) without capture -> Draw.
- */
 export function checkGameOver(
   board: Board,
   turn: Color,
-  halfMoveClock: number = 0
+  halfMoveClock: number = 0,
+  variant: Variant = 'international'
 ): { isGameOver: boolean; winner: Color | 'draw' | null; reason?: string } {
   let whiteCount = 0;
   let blackCount = 0;
@@ -380,12 +526,11 @@ export function checkGameOver(
     return { isGameOver: true, winner: 'w', reason: 'Black has no pieces remaining.' };
   }
 
-  // Draw after 40 moves without capture (80 half-moves or 40 full moves)
   if (halfMoveClock >= 80) {
     return { isGameOver: true, winner: 'draw', reason: 'Draw by 40 moves without capture.' };
   }
 
-  const legalMoves = getLegalMoves(board, turn);
+  const legalMoves = getLegalMoves(board, turn, variant);
   if (legalMoves.length === 0) {
     const winner: Color = turn === 'w' ? 'b' : 'w';
     return {
@@ -398,61 +543,83 @@ export function checkGameOver(
   return { isGameOver: false, winner: null };
 }
 
-/**
- * Applies a move on board for turn, validating legality, removing captured pieces,
- * promoting kings, checking multi-jump continuation, switching turn, and checking game over.
- */
 export function applyMove(
   board: Board,
   move: DraughtsMove,
   turn: Color,
   moveCount: number = 0,
-  halfMoveClock: number = 0
+  halfMoveClock: number = 0,
+  variant: Variant = 'international'
 ): MoveResult {
+  const config = VARIANTS[variant];
   const piece = board[move.from.row]?.[move.from.col];
   if (!piece || getPieceColor(piece) !== turn) {
     return {
-      valid: false,
-      board,
-      nextTurn: turn,
-      moveCount,
-      halfMoveClock,
-      isGameOver: false,
-      winner: null,
+      valid: false, board, nextTurn: turn, moveCount, halfMoveClock,
+      isGameOver: false, winner: null,
       error: `No ${turn === 'w' ? 'white' : 'black'} piece at position (${move.from.row}, ${move.from.col}).`
     };
   }
 
-  const legalMoves = getLegalMoves(board, turn);
+  const legalMoves = getLegalMoves(board, turn, variant);
 
-  // 1. Try finding exact full move match
+  // 1. Try exact full move match
   let matchedMove = legalMoves.find(m =>
-    m.from.row === move.from.row &&
-    m.from.col === move.from.col &&
-    m.to.row === move.to.row &&
-    m.to.col === move.to.col
+    m.from.row === move.from.row && m.from.col === move.from.col &&
+    m.to.row === move.to.row && m.to.col === move.to.col
   );
 
-  // 2. If no direct full move match, check if this is a single jump step in a multi-jump path
+  // 2. Partial step for multi-jump
   let isPartialStep = false;
   let partialStepCapture: Position | null = null;
 
   if (!matchedMove && move.isCapture) {
     const dr = move.to.row - move.from.row;
     const dc = move.to.col - move.from.col;
-    if (Math.abs(dr) === 2 && Math.abs(dc) === 2) {
-      const midRow = move.from.row + dr / 2;
-      const midCol = move.from.col + dc / 2;
-      const midPiece = board[midRow]?.[midCol];
-      if (midPiece && isOpponentPiece(midPiece, turn) && board[move.to.row]?.[move.to.col] === null) {
-        const parentMove = legalMoves.find(m =>
-          m.from.row === move.from.row &&
-          m.from.col === move.from.col &&
-          m.captures.some(c => c.row === midRow && c.col === midCol)
-        );
-        if (parentMove) {
-          isPartialStep = true;
-          partialStepCapture = { row: midRow, col: midCol };
+    const absDr = Math.abs(dr);
+    const absDc = Math.abs(dc);
+
+    // For short-range: must be exactly 2 squares
+    // For flying kings: can be any distance (dr and dc must be equal magnitude)
+    if (absDr === absDc && absDr >= 2) {
+      const stepDr = dr / absDr;
+      const stepDc = dc / absDc;
+
+      if (config.flyingKings && (piece === 'W' || piece === 'B')) {
+        // Flying king partial step: scan for the captured piece along the diagonal
+        for (let s = 1; s < absDr; s++) {
+          const midRow = move.from.row + stepDr * s;
+          const midCol = move.from.col + stepDc * s;
+          const midPiece = board[midRow]?.[midCol];
+          if (midPiece && isOpponentPiece(midPiece, turn)) {
+            const isAlreadyCaptured = (move.captures || []).some(c => c.row === midRow && c.col === midCol);
+            if (!isAlreadyCaptured) {
+              const parentMove = legalMoves.find(m =>
+                m.from.row === move.from.row && m.from.col === move.from.col &&
+                m.captures.some(c => c.row === midRow && c.col === midCol)
+              );
+              if (parentMove) {
+                isPartialStep = true;
+                partialStepCapture = { row: midRow, col: midCol };
+                break;
+              }
+            }
+          }
+        }
+      } else if (absDr === 2 && absDc === 2) {
+        // Short-range partial step
+        const midRow = move.from.row + dr / 2;
+        const midCol = move.from.col + dc / 2;
+        const midPiece = board[midRow]?.[midCol];
+        if (midPiece && isOpponentPiece(midPiece, turn) && board[move.to.row]?.[move.to.col] === null) {
+          const parentMove = legalMoves.find(m =>
+            m.from.row === move.from.row && m.from.col === move.from.col &&
+            m.captures.some(c => c.row === midRow && c.col === midCol)
+          );
+          if (parentMove) {
+            isPartialStep = true;
+            partialStepCapture = { row: midRow, col: midCol };
+          }
         }
       }
     }
@@ -460,30 +627,21 @@ export function applyMove(
 
   if (!matchedMove && !isPartialStep) {
     return {
-      valid: false,
-      board,
-      nextTurn: turn,
-      moveCount,
-      halfMoveClock,
-      isGameOver: false,
-      winner: null,
+      valid: false, board, nextTurn: turn, moveCount, halfMoveClock,
+      isGameOver: false, winner: null,
       error: 'Illegal move.'
     };
   }
 
-  // Create new board copy
+  // Apply move on new board
   const newBoard: Board = board.map(row => [...row]);
-
-  // Remove original piece from source square
   newBoard[move.from.row][move.from.col] = null;
 
-  // Remove captured pieces
   const capturesToRemove = matchedMove ? matchedMove.captures : (partialStepCapture ? [partialStepCapture] : []);
   for (const cap of capturesToRemove) {
     newBoard[cap.row][cap.col] = null;
   }
 
-  // Check promotion
   let finalPiece = piece;
   let promoted = false;
   if (piece === 'w' && move.to.row === 0) {
@@ -499,19 +657,13 @@ export function applyMove(
   const newHalfMoveClock = (matchedMove?.isCapture || isPartialStep) ? 0 : halfMoveClock + 1;
   const newMoveCount = moveCount + 1;
 
-  // Check if player must continue jumping
+  // Check multi-jump continuation
   let mustContinueJump = false;
   let mustContinueFrom: Position | null = null;
 
-  if (isPartialStep && !promoted) {
+  if (isPartialStep && !(promoted && config.promotionEndsTurn)) {
     const furtherJumps = findJumpPathsForPiece(
-      newBoard,
-      move.to,
-      move.to,
-      finalPiece,
-      turn,
-      [move.to],
-      []
+      newBoard, move.to, move.to, finalPiece, turn, [move.to], [], config
     );
     if (furtherJumps.length > 0) {
       mustContinueJump = true;
@@ -520,7 +672,7 @@ export function applyMove(
   }
 
   const nextTurn: Color = mustContinueJump ? turn : (turn === 'w' ? 'b' : 'w');
-  const gameOver = checkGameOver(newBoard, nextTurn, newHalfMoveClock);
+  const gameOver = checkGameOver(newBoard, nextTurn, newHalfMoveClock, variant);
 
   const appliedMoveObject: DraughtsMove = matchedMove ?? {
     from: move.from,
@@ -528,7 +680,7 @@ export function applyMove(
     path: move.path || [move.from, move.to],
     captures: capturesToRemove,
     isCapture: capturesToRemove.length > 0,
-    promoted
+    promoted,
   };
 
   return {
@@ -542,6 +694,6 @@ export function applyMove(
     mustContinueJump,
     mustContinueFrom,
     capturedPositions: capturesToRemove,
-    notation: getMoveNotation(appliedMoveObject)
+    notation: getMoveNotation(appliedMoveObject),
   };
 }

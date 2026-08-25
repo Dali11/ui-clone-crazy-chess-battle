@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { AIDifficulty } from "@/lib/game/draughts-ai";
+import type { Variant } from "@/lib/game/draughts-engine";
 
 const DraughtsComputerGame = dynamic(() => import("./draughts-computer-game"), {
   ssr: false,
@@ -17,6 +18,7 @@ export default function DraughtsComputerGameWrapper(props: {
   playerColor: "white" | "black";
   initialMinutes: number;
   incrementSeconds: number;
+  variant: Variant;
 }) {
   return <DraughtsComputerGame {...props} />;
 }

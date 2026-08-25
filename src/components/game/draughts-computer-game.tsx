@@ -12,6 +12,7 @@ import {
   type Position,
   type DraughtsMove,
   type Color,
+  type Variant,
 } from "@/lib/game/draughts-engine";
 import { getBestDraughtsMove, type AIDifficulty } from "@/lib/game/draughts-ai";
 import { Flag, Timer, Bot } from "lucide-react";
@@ -21,6 +22,7 @@ interface DraughtsComputerGameProps {
   playerColor: "white" | "black";
   initialMinutes: number;
   incrementSeconds: number;
+  variant: Variant;
 }
 
 function toEngine(c: "white" | "black"): Color {
@@ -32,6 +34,7 @@ export default function DraughtsComputerGame({
   playerColor,
   initialMinutes,
   incrementSeconds,
+  variant = "international",
 }: DraughtsComputerGameProps) {
   const router = useRouter();
   const myColor: Color = toEngine(playerColor);
@@ -102,7 +105,7 @@ export default function DraughtsComputerGame({
   const applyAndAdvance = useCallback(
     (move: DraughtsMove, mover: Color) => {
       setBoard((prevBoard) => {
-        const result = applyMove(prevBoard, move, mover, 0, halfMoveClock);
+        const result = applyMove(prevBoard, move, mover, 0, halfMoveClock, variant);
         if (!result.valid) return prevBoard;
 
         setLastMove({ from: move.from, to: move.to });
@@ -118,7 +121,7 @@ export default function DraughtsComputerGame({
         if (result.isGameOver) {
           endGame(result.winner as Color | "draw", "");
         } else {
-          const check = checkGameOver(result.board, result.nextTurn, result.halfMoveClock);
+          const check = checkGameOver(result.board, result.nextTurn, result.halfMoveClock, variant);
           if (check.isGameOver) {
             endGame(check.winner as Color | "draw", check.reason || "");
           }
@@ -138,7 +141,7 @@ export default function DraughtsComputerGame({
     setBotThinking(true);
     const timer = setTimeout(() => {
       setBoard((currentBoard) => {
-        const move = getBestDraughtsMove(currentBoard, botColor, difficulty);
+        const move = getBestDraughtsMove(currentBoard, botColor, difficulty, variant);
         if (move) {
           applyAndAdvance(move, botColor);
         } else {
@@ -161,7 +164,7 @@ export default function DraughtsComputerGame({
         const pieceColor: Color = piece === "w" || piece === "W" ? "w" : "b";
         if (pieceColor === myColor) {
           setSelected(pos);
-          setLegalMoves(getMovesForPiece(board, pos));
+          setLegalMoves(getMovesForPiece(board, pos, variant));
           return;
         }
       }

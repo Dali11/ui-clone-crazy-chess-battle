@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       p_initial_minutes: claimed.initial_minutes,
       p_increment_seconds: claimed.increment_seconds,
       p_rated: claimed.rated,
+      p_variant: claimed.variant || "international",
     });
 
     if (gameError || !gameId)

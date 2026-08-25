@@ -8,6 +8,7 @@ import {
   type DraughtsMove,
   type Position,
   type Color,
+  type Variant,
 } from "@/lib/game/draughts-engine";
 
 // Map DB turn ('white'/'black') to engine Color ('w'/'b')
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     // Load current game state
     const { data: game } = await supabase
       .from("draughts_games")
-      .select("id, white_player_id, black_player_id, board_state, move_history, turn, status, move_count, moves_since_capture, must_continue_jump, white_clock_ms, black_clock_ms, last_move_at, increment_seconds, created_at, white_rating, black_rating, rated")
+      .select("id, white_player_id, black_player_id, board_state, move_history, turn, status, move_count, moves_since_capture, must_continue_jump, white_clock_ms, black_clock_ms, last_move_at, increment_seconds, created_at, white_rating, black_rating, rated, variant")
       .eq("id", gameId)
       .single();
 
@@ -115,7 +116,8 @@ export async function POST(req: NextRequest) {
       isCapture: !!(move.captures && move.captures.length > 0),
     };
 
-    const result = applyMove(board, draughtsMove, engineTurn, game.move_count, game.moves_since_capture || 0);
+    const gameVariant: Variant = (game.variant as Variant) || "international";
+    const result = applyMove(board, draughtsMove, engineTurn, game.move_count, game.moves_since_capture || 0, gameVariant);
 
     if (!result.valid) {
       return NextResponse.json({ error: result.error || "Invalid move" }, { status: 400 });

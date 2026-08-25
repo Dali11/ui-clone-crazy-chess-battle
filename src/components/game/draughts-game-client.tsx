@@ -12,6 +12,7 @@ import {
   type Position,
   type DraughtsMove,
   type Color,
+  type Variant,
 } from "@/lib/game/draughts-engine";
 import { Flag, Timer } from "lucide-react";
 
@@ -40,6 +41,9 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
   const [submitting, setSubmitting] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Variant rules — default to international
+  const variant: Variant = (game.variant as Variant) || "international";
 
   const isWhite = game.white_player_id === myId;
   const isBlack = game.black_player_id === myId;
@@ -153,7 +157,7 @@ export default function DraughtsGameClient({ game: initialGame, myId }: Draughts
       const pieceColor = (piece === "w" || piece === "W") ? "w" : "b";
       if (pieceColor === myEngineColor) {
         setSelected(pos);
-        const moves = getMovesForPiece(board, pos);
+        const moves = getMovesForPiece(board, pos, variant);
         setLegalMoves(moves);
         return;
       }

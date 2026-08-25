@@ -1,9 +1,9 @@
 /**
  * Draughts (Checkers) AI — minimax with alpha-beta pruning.
  * Reuses the pure draughts-engine move generator so it automatically
- * respects mandatory captures and multi-jump chains.
+ * respects mandatory captures, multi-jump chains, and variant rules.
  */
-import { getLegalMoves, applyMove, type Board, type Color, type DraughtsMove } from "./draughts-engine";
+import { getLegalMoves, applyMove, type Board, type Color, type DraughtsMove, type Variant } from "./draughts-engine";
 
 export type AIDifficulty = "easy" | "medium" | "hard";
 
@@ -43,18 +43,16 @@ function evaluateBoard(board: Board): number {
   return score;
 }
 
-function minimax(board: Board, color: Color, depth: number, alpha: number, beta: number): number {
-  const moves = getLegalMoves(board, color);
+function minimax(board: Board, color: Color, depth: number, alpha: number, beta: number, variant: Variant): number {
+  const moves = getLegalMoves(board, color, variant);
 
   if (moves.length === 0) {
-    // The side to move has no legal moves — they lose.
     return color === "w" ? -WIN_SCORE - depth : WIN_SCORE + depth;
   }
   if (depth === 0) {
     return evaluateBoard(board);
   }
 
-  // Move ordering: prioritize bigger capture chains for better pruning
   const ordered = [...moves].sort((a, b) => b.captures.length - a.captures.length);
   const next = opposite(color);
   const maximizing = color === "w";
@@ -62,8 +60,8 @@ function minimax(board: Board, color: Color, depth: number, alpha: number, beta:
   if (maximizing) {
     let best = -Infinity;
     for (const move of ordered) {
-      const result = applyMove(board, move, color);
-      const val = minimax(result.board, next, depth - 1, alpha, beta);
+      const result = applyMove(board, move, color, 0, 0, variant);
+      const val = minimax(result.board, next, depth - 1, alpha, beta, variant);
       best = Math.max(best, val);
       alpha = Math.max(alpha, val);
       if (beta <= alpha) break;
@@ -72,8 +70,8 @@ function minimax(board: Board, color: Color, depth: number, alpha: number, beta:
   } else {
     let best = Infinity;
     for (const move of ordered) {
-      const result = applyMove(board, move, color);
-      const val = minimax(result.board, next, depth - 1, alpha, beta);
+      const result = applyMove(board, move, color, 0, 0, variant);
+      const val = minimax(result.board, next, depth - 1, alpha, beta, variant);
       best = Math.min(best, val);
       beta = Math.min(beta, val);
       if (beta <= alpha) break;
@@ -89,9 +87,10 @@ function minimax(board: Board, color: Color, depth: number, alpha: number, beta:
 export function getBestDraughtsMove(
   board: Board,
   color: Color,
-  difficulty: AIDifficulty = "medium"
+  difficulty: AIDifficulty = "medium",
+  variant: Variant = "international"
 ): DraughtsMove | null {
-  const moves = getLegalMoves(board, color);
+  const moves = getLegalMoves(board, color, variant);
   if (moves.length === 0) return null;
 
   if (Math.random() < RANDOM_MOVE_CHANCE[difficulty]) {
@@ -107,8 +106,8 @@ export function getBestDraughtsMove(
 
   const ordered = [...moves].sort((a, b) => b.captures.length - a.captures.length);
   for (const move of ordered) {
-    const result = applyMove(board, move, color);
-    const score = minimax(result.board, next, depth - 1, -Infinity, Infinity);
+    const result = applyMove(board, move, color, 0, 0, variant);
+    const score = minimax(result.board, next, depth - 1, -Infinity, Infinity, variant);
     if (maximizing ? score > bestScore : score < bestScore) {
       bestScore = score;
       bestMove = move;

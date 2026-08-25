@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { timeControl, rated, expiryMinutes } = await req.json();
+    const { timeControl, rated, expiryMinutes, variant } = await req.json();
     const admin = createAdminClient();
 
     const expiryMins = Math.min(Math.max(expiryMinutes || 10, 10), 1440);
@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
         initial_minutes: tc.minutes,
         increment_seconds: tc.increment,
         rated: rated ?? true,
+        variant: variant || "international",
         color: "random",
         status: "pending",
         expires_at: new Date(Date.now() + expiryMins * 60 * 1000).toISOString(),
