@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase/server";
@@ -10,6 +12,12 @@ import BattleChallengeWaiting from "./battle-challenge-waiting";
 function formatMKK(cents: number): string {
   return `MK ${Math.floor(cents / 100).toLocaleString("en-US")}`;
 }
+
+
+export const metadata: Metadata = {
+  title: "Battle Challenge — Join the Chess Battle",
+  description: "You've been invited to a chess battle on Crazy Chess Battles. Accept the challenge and compete for victory.",
+};
 
 export default async function BattleChallengePage({
   params,
