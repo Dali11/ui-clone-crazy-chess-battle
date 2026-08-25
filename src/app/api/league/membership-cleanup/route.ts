@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 /**
  * Membership Cleanup — called daily by Vercel cron.
@@ -15,16 +16,19 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *    -> Set membership status='cancelled'
  */
 
-const GRACE_PERIOD_DAYS = 10;
-
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
     const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
 
     const admin = createAdminClient();
+
+    // ─── Load platform config for membership ──────────────────────
+    const mConfig = await getPlatformConfig(admin, 'membership');
+    const gracePeriodDays = mConfig.grace_period_days || 10;
+
     const now = new Date();
-    const tenDaysAgo = new Date(now.getTime() - GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+    const tenDaysAgo = new Date(now.getTime() - gracePeriodDays * 24 * 60 * 60 * 1000);
 
     const results = {
       markedExpired: 0,
