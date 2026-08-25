@@ -4,6 +4,12 @@ import { ChevronDown, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  title: "FAQ — How Crazy Chess Battles Works",
+  description: "Get answers to common questions about Crazy Chess Battles: how tournaments work, prize pools, membership, ratings, game rules, and more.",
+  alternates: { canonical: "https://crazychessbattles.live/faq" },
+};
+
 const FAQ_SECTIONS = [
   {
     title: "Getting Started",
