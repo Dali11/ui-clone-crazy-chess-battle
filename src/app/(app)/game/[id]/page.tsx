@@ -1,7 +1,35 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import GameClientWrapper from "@/components/game/game-client-wrapper";
 import type { GameState } from "@/hooks/use-realtime-game";
+
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createClient();
+
+  const { data: game } = await supabase
+    .from("games")
+    .select("id, status, time_control, white_player:profiles!games_white_player_id_fkey(username, display_name), black_player:profiles!games_black_player_id_fkey(username, display_name)")
+    .eq("id", id)
+    .single();
+
+  if (!game) {
+    return { title: "Game Not Found", robots: { index: false, follow: false } };
+  }
+
+  const white = (game as any).white_player;
+  const black = (game as any).black_player;
+  const whiteName = white?.display_name || white?.username || "White";
+  const blackName = black?.display_name || black?.username || "Black";
+
+  return {
+    title: `${whiteName} vs ${blackName} — Live Chess Game`,
+    description: `Watch this ${game.time_control || "chess"} game between ${whiteName} and ${blackName}. Follow live moves and results on Crazy Chess Battles.`,
+    alternates: { canonical: `https://crazychessbattles.live/game/${id}` },
+  };
+}
 
 export const dynamic = "force-dynamic";
 
