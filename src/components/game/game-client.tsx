@@ -882,8 +882,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       {renderPlayerBar(topPlayer)}
 
       {/* Board */}
-      <div ref={boardContainerRef} className="flex-1 min-h-0 flex items-center justify-center px-2 py-1">
-        <div style={{ width: boardSize, height: boardSize }}>
+      <div ref={boardContainerRef} className="relative flex-1 min-h-0 flex items-center justify-center px-2 py-1">
+        <div style={{ width: boardSize, height: boardSize }} className="relative">
           <Chessboard options={{
             position: displayFen,
             pieces: customPieces,
@@ -892,7 +892,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
               if (!targetSquare) return false;
               return onDrop(sourceSquare, targetSquare);
             },
-            allowDragging: !gameEnded && !isSpectator && isLiveView,
+            allowDragging: !gameEnded && !isSpectator && isLiveView && !isWaiting,
             squareStyles: squareStyles,
             showAnimations: false,
             animationDurationInMs: 0,
@@ -905,6 +905,16 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
             lightSquareStyle: { backgroundColor: boardTheme.light },
             boardStyle: { borderRadius: "6px", overflow: "hidden" },
           }} />
+          {isWaiting && (
+            <PreGameCountdown
+              scheduledStart={game.scheduled_start ?? null}
+              whiteName={whiteName}
+              blackName={blackName}
+              whiteAvatar={whiteAvatar}
+              blackAvatar={blackAvatar}
+              overlay
+            />
+          )}
         </div>
       </div>
 
@@ -1162,17 +1172,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   // ============ SPECTATOR VIEW ============
   if (isSpectator) {
-    if (game.status === "waiting" && game.scheduled_start) {
-      return (
-        <PreGameCountdown
-          scheduledStart={game.scheduled_start}
-          whiteName={whiteName}
-          blackName={blackName}
-          whiteAvatar={whiteAvatar}
-          blackAvatar={blackAvatar}
-        />
-      );
-    }
+    const isWaiting = game.status === "waiting" && game.scheduled_start;
     const topPlayer = { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" };
     const bottomPlayer = { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };
 
@@ -1216,20 +1216,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     );
   }
 
-  // ============ WAITING STATE (pre-game countdown) ============
-  if (game.status === "waiting" && game.scheduled_start) {
-    return (
-      <PreGameCountdown
-        scheduledStart={game.scheduled_start}
-        whiteName={whiteName}
-        blackName={blackName}
-        whiteAvatar={whiteAvatar}
-        blackAvatar={blackAvatar}
-      />
-    );
-  }
-
-  // ============ PLAYER VIEW ============
+  // ============ PLAYER VIEW (also used for waiting state — countdown overlays the board) ============
+  const isWaiting = game.status === "waiting" && game.scheduled_start;
   const playerData = isWhite
     ? { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" }
     : { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };

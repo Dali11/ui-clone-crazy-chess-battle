@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Lightweight endpoint that returns the current game state.
- * Used as a polling fallback when Supabase realtime drops (common on mobile
+ * Used as a polling fallback when SUPABASE realtime drops (common on mobile
  * networks). The client polls this frequently and ignores responses where the
  * move_count hasn't advanced, so it's a cheap single-row SELECT.
  *
@@ -12,6 +12,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * session has expired (common on mobile), we fall back to the admin client
  * to read the game — games are publicly viewable (RLS policy: USING TRUE),
  * so this is safe.
+ *
+ * ALSO: If a game is in "waiting" status and its scheduled_start has passed,
+ * this endpoint auto-transitions it to "playing" and sets last_move_at.
+ * This ensures games start on time even without a cron job — as soon as
+ * any player or spectator polls the state after the countdown, the game
+ * begins.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -31,7 +37,24 @@ export async function GET(req: NextRequest) {
         .eq("id", gameId)
         .single();
 
-      if (!error && game) return NextResponse.json(game);
+      if (!error && game) {
+        // Auto-transition waiting → playing when scheduled_start has passed
+        if (game.status === "waiting" && game.scheduled_start) {
+          const now = Date.now();
+          const start = new Date(game.scheduled_start).getTime();
+          if (now >= start) {
+            const admin = createAdminClient();
+            const nowIso = new Date().toISOString();
+            await admin
+              .from("games")
+              .update({ status: "playing", last_move_at: nowIso })
+              .eq("id", gameId);
+            // Return updated state immediately
+            return NextResponse.json({ ...game, status: "playing", last_move_at: nowIso });
+          }
+        }
+        return NextResponse.json(game);
+      }
     }
 
     // Fallback for spectators or expired sessions — games are publicly readable
@@ -44,6 +67,20 @@ export async function GET(req: NextRequest) {
 
     if (error || !game) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
+    }
+
+    // Auto-transition waiting → playing when scheduled_start has passed
+    if (game.status === "waiting" && game.scheduled_start) {
+      const now = Date.now();
+      const start = new Date(game.scheduled_start).getTime();
+      if (now >= start) {
+        const nowIso = new Date().toISOString();
+        await admin
+          .from("games")
+          .update({ status: "playing", last_move_at: nowIso })
+          .eq("id", gameId);
+        return NextResponse.json({ ...game, status: "playing", last_move_at: nowIso });
+      }
     }
 
     return NextResponse.json(game);

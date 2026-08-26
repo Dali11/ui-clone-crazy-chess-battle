@@ -140,10 +140,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     // Don't redirect if already redirected to this game
     if (redirectedRef.current === myPairing.game_id) return;
 
-    // Don't auto-redirect if the round hasn't started yet (scheduled start in the future)
-    const currentRd = data.rounds?.find(r => r.round_number === data.tournament.current_round);
-    if (currentRd?.starts_at && new Date(currentRd.starts_at).getTime() > Date.now()) return;
-
+    // Redirect immediately to the game board — the board itself shows a
+    // countdown overlay during the pre-game wait period, so players land
+    // on the board and wait there until the real clock starts.
     redirectedRef.current = myPairing.game_id;
 
     // Brief delay so the page renders first, then redirect
