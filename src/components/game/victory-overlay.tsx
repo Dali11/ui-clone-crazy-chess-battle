@@ -37,6 +37,13 @@ interface VictoryOverlayProps {
   newGameLabel?: string;
   playAgainLabel?: string;
   lobbyHref?: string;
+  // Battle draw → Armageddon: staked draws can't just end — a sudden-death
+  // decider is required. These gate that flow behind an explicit choice.
+  isArmageddonDraw?: boolean;
+  armageddonLoading?: boolean;
+  armageddonForfeiting?: boolean;
+  onStartArmageddon?: () => void;
+  onResignArmageddon?: () => void;
 }
 
 export default function VictoryOverlay({
@@ -63,6 +70,11 @@ export default function VictoryOverlay({
   newGameLabel = "New Game",
   playAgainLabel = "Play Again",
   lobbyHref = "/play",
+  isArmageddonDraw = false,
+  armageddonLoading = false,
+  armageddonForfeiting = false,
+  onStartArmageddon,
+  onResignArmageddon,
 }: VictoryOverlayProps) {
   const [mounted, setMounted] = useState(false);
   const [showButtons, setShowButtons] = useState(false);
@@ -208,6 +220,17 @@ export default function VictoryOverlay({
 
         <p className="text-xs text-white/35 mb-5">{subtitle}</p>
 
+        {/* Battle draw → mandatory Armageddon decider */}
+        {isArmageddonDraw && (
+          <div className="mb-4 px-4 py-3 rounded-xl text-left" style={{ backgroundColor: accentBg, border: `1px solid ${accentBorder}` }}>
+            <p className="text-xs leading-relaxed text-white/70">
+              <span className="font-bold" style={{ color: accent }}>Sudden-death Armageddon:</span>{" "}
+              this battle can&apos;t end in a draw with money on the line. A decider game starts now with{" "}
+              <span className="font-semibold text-white/90">half the time</span> — first to win takes the whole pot.
+            </p>
+          </div>
+        )}
+
         {/* Rematch waiting state */}
         {rematchState.status === "waiting" && (
           <div className="mb-3 px-4 py-3 rounded-xl flex items-center justify-center gap-2" style={{ backgroundColor: accentBg, border: `1px solid ${accentBorder}` }}>
@@ -272,6 +295,34 @@ export default function VictoryOverlay({
               style={{ backgroundColor: "rgba(248,113,113,0.1)", color: "#f87171", border: "1px solid rgba(248,113,113,0.2)" }}
             >
               <X className="w-4 h-4" /> Decline
+            </button>
+          )}
+
+          {/* Battle draw → Armageddon action buttons */}
+          {isArmageddonDraw && armageddonLoading && !onStartArmageddon && (
+            <div className="flex items-center justify-center gap-2 py-3 text-sm text-white/50">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Preparing armageddon...
+            </div>
+          )}
+          {onStartArmageddon && (
+            <button
+              onClick={onStartArmageddon}
+              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{ backgroundColor: "#a78bfa", color: "#0a0a0f", boxShadow: "0 4px 20px rgba(167,139,250,0.3)" }}
+            >
+              <Swords className="w-4 h-4" /> Start Armageddon Battle
+            </button>
+          )}
+          {onResignArmageddon && (
+            <button
+              onClick={onResignArmageddon}
+              disabled={armageddonForfeiting}
+              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              style={{ backgroundColor: "rgba(248,113,113,0.1)", color: "#f87171", border: "1px solid rgba(248,113,113,0.2)" }}
+            >
+              {armageddonForfeiting ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+              {armageddonForfeiting ? "Forfeiting..." : "Resign (Forfeit Battle)"}
             </button>
           )}
 

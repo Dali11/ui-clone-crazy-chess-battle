@@ -20,11 +20,27 @@ export default function ActiveBattleWatcher() {
   const router = useRouter();
   const [redirecting, setRedirecting] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRedirectedGameId = useRef<string | null>(null);
 
   // Skip on pages that already own their own redirect/poll logic — avoids
   // duplicate work and any race with in-game realtime subscriptions.
   const skip = pathname.startsWith("/game/") || pathname.startsWith("/battle-challenge/");
+
+  // As soon as we land on a page this watcher should stay quiet on (most
+  // importantly the game page itself, right after the redirect it triggered),
+  // clear the banner. Without this, the "jumping in..." toast — since this
+  // component stays mounted globally across navigation — would linger
+  // forever on the destination page until a full refresh reset React state.
+  useEffect(() => {
+    if (skip) {
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+        hideTimeoutRef.current = null;
+      }
+      setRedirecting(false);
+    }
+  }, [skip]);
 
   useEffect(() => {
     if (skip) return;
@@ -44,6 +60,10 @@ export default function ActiveBattleWatcher() {
           lastRedirectedGameId.current = data.gameId;
           setRedirecting(true);
           router.push(`/game/${data.gameId}`);
+          // Safety net: even if navigation is slow/blocked, don't let the
+          // banner sit forever — hide it after a few seconds regardless.
+          if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+          hideTimeoutRef.current = setTimeout(() => setRedirecting(false), 4000);
         }
       } catch {}
     };
@@ -55,6 +75,12 @@ export default function ActiveBattleWatcher() {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [pathname, skip, router]);
+
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
+  }, []);
 
   if (!redirecting) return null;
 

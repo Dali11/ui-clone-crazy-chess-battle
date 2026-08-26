@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     const admin = createAdminClient();
     const { data: battle } = await admin
       .from("battles")
-      .select("white_player_id, black_player_id, white_rating, black_rating, status, game_id, stake_cents, winner_payout_cents")
+      .select("white_player_id, black_player_id, white_rating, black_rating, status, game_id, stake_cents, winner_payout_cents, armageddon_game_id, armageddon_round")
       .eq("id", battleId)
       .single();
 
@@ -44,7 +44,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       status: battle.status,
-      gameId: battle.game_id,
+      gameId: battle.status === "draw_armageddon" ? (battle.armageddon_game_id ?? battle.game_id) : battle.game_id,
+      armageddonGameId: battle.armageddon_game_id,
+      armageddonRound: battle.armageddon_round,
       opponent: opponent
         ? {
             username: opponent.username,

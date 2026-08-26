@@ -25,9 +25,11 @@ import PlayerProfilePreview from "./player-profile-preview";
 
 interface BattleInfo {
   isBattle: boolean;
+  battleId?: string;
   stakeCents: number;
   winnerPayoutCents: number;
   winnerId: string | null;
+  isArmageddon?: boolean;
 }
 
 interface GameClientProps {
@@ -94,6 +96,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const [unreadCount, setUnreadCount] = useState(0);
   const [previewUserId, setPreviewUserId] = useState<string | null>(null);
   const [desktopTab, setDesktopTab] = useState<"moves" | "chat">("moves");
+  const [armageddonGameId, setArmageddonGameId] = useState<string | null>(null);
+  const [armageddonLoading, setArmageddonLoading] = useState(false);
+  const [armageddonForfeiting, setArmageddonForfeiting] = useState(false);
   const chatVisibleMobile = activeSheet === "chat";
   const chatVisibleDesktop = desktopTab === "chat";
   const lastFenRef = useRef(game.fen);
@@ -144,6 +149,61 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   // For battles, berries are not awarded (they have their own reward system)
   // For non-battle games, berries are awarded as before
   const berriesEarned = !isBattleGame && didIWin ? (game.rated ? 10 : 15) : 0;
+
+  // Battle draw → Armageddon: the backend already auto-creates the sudden-death
+  // game as soon as the draw is settled, but we gate the redirect behind an
+  // explicit player choice instead of yanking them straight into it. Poll
+  // battle status until the new armageddon game shows up.
+  const isBattleDraw = isBattleGame && gameEnded && game.winner === null && game.status !== "abort";
+  useEffect(() => {
+    if (!isBattleDraw || !battleInfo?.battleId || isSpectator) return;
+    let cancelled = false;
+    setArmageddonLoading(true);
+    setArmageddonGameId(null);
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/battles/status?battleId=${battleInfo.battleId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const newGameId = data.armageddonGameId as string | null;
+        if (newGameId && newGameId !== gameId && !cancelled) {
+          setArmageddonGameId(newGameId);
+          setArmageddonLoading(false);
+        }
+      } catch {}
+    };
+
+    poll();
+    const interval = setInterval(poll, 1500);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isBattleDraw, battleInfo?.battleId, isSpectator, gameId]);
+
+  const handleStartArmageddon = useCallback(() => {
+    if (armageddonGameId) router.push(`/game/${armageddonGameId}`);
+  }, [armageddonGameId, router]);
+
+  const handleResignArmageddon = useCallback(async () => {
+    if (!armageddonGameId || armageddonForfeiting) return;
+    setArmageddonForfeiting(true);
+    try {
+      const res = await fetch("/api/game/resign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId: armageddonGameId }),
+      });
+      if (res.ok) {
+        router.push("/battles");
+      } else {
+        setArmageddonForfeiting(false);
+      }
+    } catch {
+      setArmageddonForfeiting(false);
+    }
+  }, [armageddonGameId, armageddonForfeiting, router]);
 
   const captured = useMemo(() => getCapturedPieces(displayFen), [displayFen]);
   const checkSquare = useMemo(() => getCheckSquare(displayFen), [displayFen]);
@@ -1199,8 +1259,13 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           lobbyHref={isTournamentGame ? `/tournament/${tournamentId}` : isBattleGame ? "/battles" : "/play"}
           newGameLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "New Game"}
           playAgainLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "Play Again"}
-          onPlayAgain={!isSpectator && !isTournamentGame ? handlePlayAgain : isTournamentGame ? () => router.push(`/tournament/${tournamentId}`) : undefined}
-          onRematch={!isSpectator && !isTournamentGame && game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
+          isArmageddonDraw={isBattleDraw}
+          armageddonLoading={armageddonLoading}
+          armageddonForfeiting={armageddonForfeiting}
+          onStartArmageddon={isBattleDraw && armageddonGameId ? handleStartArmageddon : undefined}
+          onResignArmageddon={isBattleDraw && armageddonGameId ? handleResignArmageddon : undefined}
+          onPlayAgain={isBattleDraw ? undefined : !isSpectator && !isTournamentGame ? handlePlayAgain : isTournamentGame ? () => router.push(`/tournament/${tournamentId}`) : undefined}
+          onRematch={!isSpectator && !isTournamentGame && !isBattleDraw && game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
           rematchState={rematchState}
           onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
           onAcceptRematch={incomingRematch && !isSpectator ? handleAcceptIncomingRematch : undefined}
@@ -1249,8 +1314,13 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         lobbyHref={isTournamentGame ? `/tournament/${tournamentId}` : isBattleGame ? "/battles" : "/play"}
         newGameLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "New Game"}
         playAgainLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "Play Again"}
-        onPlayAgain={isTournamentGame ? () => router.push(`/tournament/${tournamentId}`) : handlePlayAgain}
-        onRematch={!isTournamentGame && game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
+        isArmageddonDraw={isBattleDraw}
+        armageddonLoading={armageddonLoading}
+        armageddonForfeiting={armageddonForfeiting}
+        onStartArmageddon={isBattleDraw && armageddonGameId ? handleStartArmageddon : undefined}
+        onResignArmageddon={isBattleDraw && armageddonGameId ? handleResignArmageddon : undefined}
+        onPlayAgain={isBattleDraw ? undefined : isTournamentGame ? () => router.push(`/tournament/${tournamentId}`) : handlePlayAgain}
+        onRematch={!isTournamentGame && !isBattleDraw && game.status !== "abort" && !incomingRematch ? handleRematch : undefined}
         rematchState={rematchState}
         onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
         onAcceptRematch={incomingRematch ? handleAcceptIncomingRematch : undefined}
