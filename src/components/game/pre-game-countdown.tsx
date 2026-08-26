@@ -93,7 +93,7 @@ export default function PreGameCountdown({
         {/* Soft brand-colored glow behind the VS badge for depth */}
         <div className="absolute w-56 h-56 rounded-full bg-ccb-primary/10 blur-3xl" />
 
-        <div className="relative text-center px-4 py-6 w-full flex flex-col items-center">
+        <div className="relative text-center px-4 pt-10 pb-6 w-full flex flex-col items-center">
           {/* Player VS strip — each side is its own solid card so names/avatars
               always stay legible no matter what's behind them */}
           <div className="flex items-center justify-center gap-3 mb-5">
