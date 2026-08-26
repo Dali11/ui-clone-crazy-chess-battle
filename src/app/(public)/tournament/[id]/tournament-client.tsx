@@ -288,14 +288,14 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   return (
     <div className="pb-20 sm:pb-8">
       {/* BACK LINK */}
-      <div className="px-4 sm:px-6 lg:px-8 mb-4">
+      <div className="px-5 sm:px-6 lg:px-8 mb-4">
         <Link href="/league" className="inline-flex items-center gap-1.5 text-sm text-ccb-muted hover:text-ccb-text transition-colors">
           <ArrowLeft className="w-4 h-4" /> Compete
         </Link>
       </div>
 
       {/* HERO HEADER */}
-      <div className="px-4 sm:px-6 lg:px-8 mb-5">
+      <div className="px-5 sm:px-6 lg:px-8 mb-5">
         <div className={`relative overflow-hidden rounded-2xl border ${isLive ? 'border-ccb-success/30' : 'border-ccb-border'} bg-gradient-to-br from-ccb-card via-ccb-card to-ccb-surface`}>
           {isLive && <div className="absolute -right-20 -top-20 w-64 h-64 bg-ccb-success/5 rounded-full blur-3xl pointer-events-none" />}
           {!isLive && hasPrizePool && <div className="absolute -right-20 -top-20 w-64 h-64 bg-ccb-accent/5 rounded-full blur-3xl pointer-events-none" />}
@@ -462,7 +462,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       {/* TAB BAR */}
-      <div className="px-4 sm:px-6 lg:px-8 mb-4">
+      <div className="px-5 sm:px-6 lg:px-8 mb-4">
         <div className="flex gap-1.5 p-1 bg-ccb-surface rounded-xl border border-ccb-border">
           {(['standings', 'rounds', 'info'] as const).map(tab => (
             <button
@@ -494,7 +494,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       {/* TAB CONTENT */}
-      <div className="px-4 sm:px-6 lg:px-8">
+      <div className="px-5 sm:px-6 lg:px-8">
 
         {/* ========== STANDINGS ========== */}
         {activeTab === 'standings' && (
@@ -537,7 +537,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 {/* STANDINGS TABLE */}
                 <div className="bg-ccb-card border border-ccb-border rounded-2xl overflow-hidden">
                   {/* Header */}
-                  <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-ccb-surface border-b border-ccb-border text-[10px] uppercase tracking-wider text-ccb-muted font-semibold">
+                  <div className="grid grid-cols-12 gap-2 px-5 py-2.5 bg-ccb-surface border-b border-ccb-border text-[10px] uppercase tracking-wider text-ccb-muted font-semibold">
                     <div className="col-span-1 text-center">#</div>
                     <div className="col-span-6 sm:col-span-5">Player</div>
                     <div className="col-span-2 text-center">Score</div>
@@ -554,7 +554,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       <Link
                         key={p.player_id}
                         href={`/profile/${p.profile?.username}`}
-                        className={`grid grid-cols-12 gap-2 px-4 py-3 hover:bg-ccb-surface transition-colors items-center border-b border-ccb-border/50 last:border-0 ${
+                        className={`grid grid-cols-12 gap-2 px-5 py-3 hover:bg-ccb-surface transition-colors items-center border-b border-ccb-border/50 last:border-0 ${
                           isTop3 ? 'bg-ccb-surface/30' : ''
                         }`}
                       >
@@ -609,7 +609,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               rounds.map((round) => (
                 <div key={round.id} className="bg-ccb-card border border-ccb-border rounded-2xl overflow-hidden">
                   {/* Round header */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-ccb-border">
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-ccb-border">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-lg bg-ccb-primary/10 border border-ccb-primary/30 flex items-center justify-center">
                         <Swords className="w-4 h-4 text-ccb-primary" />
@@ -635,7 +635,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       const isDraw = hasResult && pairing.result === 'draw';
 
                       return (
-                        <div key={idx} className="px-4 py-3">
+                        <div key={idx} className="px-5 py-3">
                           {pairing.bye ? (
                             <div className="flex items-center gap-3 py-1">
                               <div className="w-7 h-7 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center text-[10px] font-bold text-ccb-muted shrink-0">
