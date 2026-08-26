@@ -873,19 +873,22 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         </div>
       </div>
 
-      {/* Horizontal move scroller — chess.com style, at the very top above the opponent bar */}
-      <div className="relative max-w-[600px] mx-auto w-full px-2 py-1">
+      {/* Moves + opening area — fixed height slot, nothing enters/leaves flow */}
+      <div className="relative max-w-[600px] mx-auto w-full px-2 py-1 h-[62px]">
+        {/* Opening badge — absolutely positioned, never affects layout */}
         {moveHistory.length >= 2 && (
-          <div className="mb-1">
+          <div className="absolute top-0.5 left-3 z-10">
             <OpeningBadge moves={moveHistory} />
           </div>
         )}
-        <div className="rounded-lg bg-ccb-surface/50 border border-ccb-border/50 px-2 py-1.5">
+        {/* Move scroller — pinned to bottom of the fixed-height slot */}
+        <div className="absolute bottom-1 inset-x-2 rounded-lg bg-ccb-surface/50 border border-ccb-border/50 px-2 py-1.5">
           <MoveScroller moves={moveHistory} currentPly={viewPly} onPlyChange={setViewPly} />
         </div>
 
+        {/* Reconnecting overlay — covers the entire fixed slot */}
         {connectionQuality === "reconnecting" && (
-          <div className="absolute inset-0 z-20 rounded-lg bg-amber-500/95 border border-amber-500 text-black px-4 flex items-center justify-center gap-2 text-xs text-center shadow-lg">
+          <div className="absolute inset-2 z-30 rounded-lg bg-amber-500/95 border border-amber-500 text-black px-4 flex items-center justify-center gap-2 text-xs text-center shadow-lg">
             <span className="inline-flex items-center gap-1.5 font-medium">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
               Reconnecting… Your moves are queued.
@@ -933,10 +936,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       {/* Your bar */}
       {renderPlayerBar(bottomPlayer)}
 
-      {/* Draw offer banner — received from opponent */}
+      {/* Draw offer banner — floats over the board, never affects layout */}
       {drawOffer === "offer" && !isSpectator && !gameEnded && (
-        <div className="max-w-[600px] mx-auto w-full px-2 py-2">
-          <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-ccb-primary/10 border border-ccb-primary/30">
+        <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+          <div className="pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-ccb-surface/95 border border-ccb-primary/40 shadow-2xl backdrop-blur-md max-w-[90%]">
             <span className="text-sm flex items-center gap-1.5">
               <Handshake className="w-4 h-4 text-ccb-primary" /> Opponent offers a draw
             </span>
@@ -948,10 +951,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         </div>
       )}
 
-      {/* Draw offer banner — we sent it, waiting for opponent */}
+      {/* Draw offer pending — floats over the board, never affects layout */}
       {drawOffer === "pending" && !isSpectator && !gameEnded && (
-        <div className="max-w-[600px] mx-auto w-full px-2 py-2">
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-ccb-muted/10 border border-ccb-border">
+        <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-xl bg-ccb-surface/95 border border-ccb-border shadow-2xl backdrop-blur-md">
             <div className="w-4 h-4 border-2 border-ccb-muted border-t-transparent rounded-full animate-spin" />
             <span className="text-sm text-ccb-muted">Waiting for opponent to respond…</span>
             <button onClick={declineDraw} className="ml-auto text-sm text-ccb-muted hover:text-ccb-danger underline">Cancel</button>
@@ -959,39 +962,41 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         </div>
       )}
 
-      {/* Live position indicator when reviewing past moves */}
+      {/* Live position indicator — floats over the board, never affects layout */}
       {!isLiveView && moveHistory.length > 0 && (
-        <div className="max-w-[600px] mx-auto w-full px-2">
+        <div className="absolute inset-x-0 bottom-2 z-40 flex justify-center pointer-events-none">
           <button
             onClick={() => { setReviewFen(null); setViewPly(moveHistory.length); }}
-            className="w-full text-center text-xs text-ccb-primary hover:underline py-1"
+            className="pointer-events-auto px-4 py-1.5 rounded-full bg-ccb-primary text-white text-xs font-medium shadow-lg hover:bg-ccb-primary/90 transition-colors"
           >
             ← Return to live position
           </button>
         </div>
       )}
 
-      {/* Desktop resign/draw controls */}
-      {showControls && !gameEnded && (
-        <div className="hidden lg:flex items-center justify-center gap-3 max-w-[600px] mx-auto mt-2 shrink-0">
-          {showResignConfirm ? (
-            <>
-              <span className="text-sm text-ccb-muted">Resign?</span>
-              <button onClick={handleResign} className="btn bg-ccb-danger text-white px-4 py-2 text-sm">Yes, resign</button>
-              <button onClick={() => setShowResignConfirm(false)} className="btn-secondary text-sm">Cancel</button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => setShowResignConfirm(true)} className="btn-secondary text-sm">
-                <Flag className="w-4 h-4 mr-1" /> Resign
-              </button>
-              <button onClick={offerDraw} disabled={drawOffer !== null} className="btn-secondary text-sm disabled:opacity-40">
-                <Handshake className="w-4 h-4 mr-1" /> Offer Draw
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      {/* Desktop resign/draw controls — fixed height slot, content may disappear without shifting */}
+      <div className="hidden lg:flex items-center justify-center gap-3 max-w-[600px] mx-auto mt-2 h-11 shrink-0">
+        {showControls && !gameEnded && (
+          <>
+            {showResignConfirm ? (
+              <>
+                <span className="text-sm text-ccb-muted">Resign?</span>
+                <button onClick={handleResign} className="btn bg-ccb-danger text-white px-4 py-2 text-sm">Yes, resign</button>
+                <button onClick={() => setShowResignConfirm(false)} className="btn-secondary text-sm">Cancel</button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setShowResignConfirm(true)} className="btn-secondary text-sm">
+                  <Flag className="w-4 h-4 mr-1" /> Resign
+                </button>
+                <button onClick={offerDraw} disabled={drawOffer !== null} className="btn-secondary text-sm disabled:opacity-40">
+                  <Handshake className="w-4 h-4 mr-1" /> Offer Draw
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Mobile bottom toolbar — chess.com style: live play shows Chat/Draw/Resign,
           finished games switch to Options/Chat/Back/Forward for reviewing moves */}
