@@ -886,13 +886,11 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           <MoveScroller moves={moveHistory} currentPly={viewPly} onPlyChange={setViewPly} />
         </div>
 
-        {/* Reconnecting overlay — covers the entire fixed slot */}
+        {/* Reconnecting overlay — small pill, doesn't cover the whole bar */}
         {connectionQuality === "reconnecting" && (
-          <div className="absolute inset-2 z-30 rounded-lg bg-amber-500/95 border border-amber-500 text-black px-4 flex items-center justify-center gap-2 text-xs text-center shadow-lg">
-            <span className="inline-flex items-center gap-1.5 font-medium">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
-              Reconnecting… Your moves are queued.
-            </span>
+          <div className="absolute top-0.5 right-3 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/95 border border-amber-500 text-black text-[11px] shadow-md">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+            <span className="font-medium">Reconnecting…</span>
             <button
               onClick={() => window.location.reload()}
               className="underline font-semibold shrink-0"
