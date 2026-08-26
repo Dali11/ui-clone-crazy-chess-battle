@@ -193,15 +193,14 @@ export async function GET(request: NextRequest) {
           .eq('player_id', user.id)
           .single();
         isRegistered = !!existing;
-
-        if (isRegistered) { canJoin = false; reason = 'already_registered'; }
-        else if (tournament.status === 'active') { canJoin = false; reason = 'already_started'; }
-        else if (tournament.status === 'pending_approval') { canJoin = false; reason = 'pending_approval'; }
-        else if (tournament.status === 'completed') { canJoin = false; reason = 'completed'; }
-      } else {
-        canJoin = false;
-        reason = 'not_authenticated';
       }
+
+      if (isRegistered) { canJoin = false; reason = 'already_registered'; }
+      else if (tournament.status === 'active') { canJoin = false; reason = 'already_started'; }
+      else if (tournament.status === 'pending_approval') { canJoin = false; reason = 'pending_approval'; }
+      else if (tournament.status === 'completed' || tournament.status === 'finished') { canJoin = false; reason = 'completed'; }
+      else if (tournament.status !== 'upcoming') { canJoin = false; reason = 'not_joinable'; }
+      else if (!user) { canJoin = false; reason = 'not_authenticated'; }
 
       tournamentList.push({
         type: 'tournament' as const,

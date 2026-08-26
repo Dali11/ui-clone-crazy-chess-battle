@@ -269,7 +269,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// DELETE — permanently delete a tournament (only if upcoming, no games played)
+// DELETE — permanently delete a tournament (upcoming, cancelled, or finished)
 export async function DELETE(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -290,25 +290,38 @@ export async function DELETE(req: NextRequest) {
       .from("tournaments").select("status, entry_fee_cents").eq("id", tournamentId).single();
     if (!tournament) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
 
-    if (!["upcoming", "cancelled"].includes(tournament.status)) {
+    if (!["upcoming", "cancelled", "finished"].includes(tournament.status)) {
       return NextResponse.json({
-        error: "Can only delete upcoming or cancelled tournaments. Use Cancel first for active ones.",
+        error: "Can only delete upcoming, cancelled, or finished tournaments. Use Cancel first for active ones.",
       }, { status: 400 });
     }
 
-    // Check for any games associated with this tournament
-    const { count: gameCount } = await admin
-      .from("games")
-      .select("id", { count: "exact", head: true })
-      .eq("tournament_id", tournamentId);
+    // For finished tournaments, delete associated games first (they're over)
+    if (tournament.status === "finished") {
+      const { count: gameCount } = await admin
+        .from("games")
+        .select("id", { count: "exact", head: true })
+        .eq("tournament_id", tournamentId);
 
-    if (gameCount && gameCount > 0) {
-      return NextResponse.json({
-        error: `Cannot delete: ${gameCount} games are linked to this tournament. Cancel instead.`,
-      }, { status: 400 });
+      if (gameCount && gameCount > 0) {
+        // Delete all games linked to this finished tournament
+        await admin.from("games").delete().eq("tournament_id", tournamentId);
+      }
+    } else {
+      // For upcoming/cancelled: block if games exist (shouldn't have any, but safety check)
+      const { count: gameCount } = await admin
+        .from("games")
+        .select("id", { count: "exact", head: true })
+        .eq("tournament_id", tournamentId);
+
+      if (gameCount && gameCount > 0) {
+        return NextResponse.json({
+          error: `Cannot delete: ${gameCount} games are linked to this tournament. Cancel instead.`,
+        }, { status: 400 });
+      }
     }
 
-    // Refund any paid participants before deleting
+    // Refund any paid participants before deleting (only for upcoming, not finished)
     if (tournament.entry_fee_cents > 0 && tournament.status === "upcoming") {
       const { data: participants } = await admin
         .from("tournament_participants")

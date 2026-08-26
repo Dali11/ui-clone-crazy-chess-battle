@@ -735,7 +735,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   };
 
   const handleTournamentDelete = async (tournamentId: string) => {
-    if (!confirm("Permanently delete this tournament? This will refund all paid participants and remove all data. This cannot be undone.")) return;
+    if (!confirm("Permanently delete this tournament and all associated data (games, rounds, participants)? For upcoming tournaments, paid entry fees will be refunded. For finished tournaments, data is removed but no refunds are issued (prizes already distributed). This cannot be undone.")) return;
     setActionLoading(`${tournamentId}_delete`);
     try {
       const res = await fetch(`/api/admin/tournaments?id=${tournamentId}`, { method: "DELETE" });
@@ -1818,8 +1818,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           </button>
                         )}
 
-                        {/* Delete — upcoming or cancelled only */}
-                        {(t.status === "upcoming" || t.status === "cancelled") && (
+                        {/* Delete — upcoming, cancelled, or finished */}
+                        {(t.status === "upcoming" || t.status === "cancelled" || t.status === "finished") && (
                           <button
                             onClick={() => handleTournamentDelete(t.id)}
                             disabled={actionLoading === `${t.id}_delete`}

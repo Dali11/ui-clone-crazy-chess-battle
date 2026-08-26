@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Trophy, Swords, Calendar, Users, RefreshCw, ShieldAlert,
   CheckCircle2, Lock, Zap, Clock, DollarSign,
@@ -50,6 +51,7 @@ function formatDate(dateStr?: string) {
 type FilterTab = 'all' | 'active' | 'upcoming' | 'completed';
 
 export default function TournamentsTab() {
+  const router = useRouter();
   const [tournaments, setTournaments] = useState<Competition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -183,7 +185,11 @@ export default function TournamentsTab() {
             const isParticipating = comp.isRegistered;
 
             return (
-              <div key={comp.id} className={`bg-ccb-card border rounded-2xl flex flex-col overflow-hidden ${isLive ? 'border-ccb-success/30' : 'border-ccb-border'}`}>
+              <div
+                key={comp.id}
+                onClick={() => router.push(`/tournament/${comp.id}`)}
+                className={`bg-ccb-card border rounded-2xl flex flex-col overflow-hidden cursor-pointer transition-all hover:border-ccb-accent/40 ${isLive ? 'border-ccb-success/30' : 'border-ccb-border'}`}
+              >
                 {/* THUMBNAIL BANNER (only when thumbnail exists) */}
                 {comp.thumbnailUrl && (
                   <div className="relative h-28 overflow-hidden">
@@ -255,7 +261,7 @@ export default function TournamentsTab() {
                       <CheckCircle2 className="w-4 h-4" /> Participating
                     </div>
                   ) : canJoin ? (
-                    <button onClick={() => handleJoin(comp)} disabled={joining === comp.id}
+                    <button onClick={(e) => { e.stopPropagation(); handleJoin(comp); }} disabled={joining === comp.id}
                       className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-ccb-accent text-ccb-dark font-bold text-sm hover:bg-ccb-gold transition-all disabled:opacity-50">
                       {joining === comp.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />} Join
                     </button>
