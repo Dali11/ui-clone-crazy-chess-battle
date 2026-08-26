@@ -84,7 +84,14 @@ export async function GET(
 
     const enrichedRounds = (rounds || []).map((round: any) => {
       const pairings = (round.pairings || []).map((p: any) => {
-        const whitePlayer = participantMap.get(p.white);
+        // Bye pairings store the advancing player's id in `p.bye`, with
+        // `white`/`black` left as empty strings ("") — see
+        // generateKnockoutBracket / advance-round's bye handling. Looking up
+        // p.white for a bye always missed (participantMap has no "" key),
+        // so every bye row rendered as "Unknown" even though the system
+        // knew exactly who the bye player was (it's used correctly
+        // elsewhere, e.g. tournaments/cron for bracket advancement).
+        const whitePlayer = p.bye ? participantMap.get(p.bye) : participantMap.get(p.white);
         const blackPlayer = p.bye ? null : participantMap.get(p.black);
         return {
           ...p,
