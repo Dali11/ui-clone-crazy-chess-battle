@@ -34,12 +34,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not a battle participant" }, { status: 403 });
     }
 
+    // Idempotency check MUST come before the status check. This endpoint is
+    // called with retry logic from the client (and can be double-tapped by
+    // an impatient user) — if the first call already succeeded, battle.status
+    // is "playing" and game_id is set. Checking status first would reject
+    // that retry with "Battle is not pending" even though everything worked,
+    // which is exactly what was happening: a successful accept + game
+    // creation, followed by a client-side retry that got permanently
+    // rejected here instead of just handing back the existing game.
+    if (battle.game_id) {
+      return NextResponse.json({ gameId: battle.game_id });
+    }
+
     if (battle.status !== "pending") {
       return NextResponse.json({ error: "Battle is not pending" }, { status: 400 });
     }
 
-    if (battle.game_id) {
-      return NextResponse.json({ gameId: battle.game_id });
+    // Atomically claim this battle for game creation — only succeeds if
+    // status is still "pending". This closes the remaining race: without
+    // it, two /start calls that both read status="pending" a moment apart
+    // (the client's own retry, or a genuine double-tap/double-send) would
+    // both pass the check above and both call create_game, producing two
+    // orphaned games for one battle. battles.status has a DB check
+    // constraint (pending/playing/completed/draw_armageddon/cancelled/
+    // disputed) so we can't invent a new "claiming" value — instead we flip
+    // straight to "playing" as the claim itself; if game creation fails we
+    // roll back to "pending" below.
+    const { data: claimedBattle, error: claimErr } = await admin
+      .from("battles")
+      .update({ status: "playing", started_at: new Date().toISOString() })
+      .eq("id", battleId)
+      .eq("status", "pending")
+      .select("id")
+      .single();
+
+    if (claimErr || !claimedBattle) {
+      return NextResponse.json({ error: "Battle is already being started — try again in a moment" }, { status: 409 });
     }
 
     // Determine time control: client-provided > battle record > config default
@@ -76,16 +106,14 @@ export async function POST(req: NextRequest) {
 
     if (gameErr || !gameId) {
       console.error("Game creation failed:", gameErr);
+      // Roll back the claim so a retry isn't permanently stuck on "playing" with no game
+      await admin.from("battles").update({ status: "pending" }).eq("id", battleId);
       return NextResponse.json({ error: "Failed to start game" }, { status: 500 });
     }
 
     await admin
       .from("battles")
-      .update({
-        game_id: gameId,
-        status: "playing",
-        started_at: new Date().toISOString(),
-      })
+      .update({ game_id: gameId })
       .eq("id", battleId);
 
     return NextResponse.json({ gameId, battleId });
