@@ -50,34 +50,30 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if the player's own clock has expired (they lose on time)
-    // On the very first move (move_count === 0), the clock hasn't started yet —
-    // the first move launches the clock, it doesn't consume time.
+    // Clock starts when the game transitions to "playing" (last_move_at is set
+    // by the tournament cron at that moment). The first move consumes time
+    // like any other move.
     const now = Date.now();
-    const isFirstMove = game.move_count === 0;
     const lastMoveTime = new Date(game.last_move_at || game.created_at).getTime();
-    const elapsedMs = isFirstMove ? 0 : now - lastMoveTime;
+    const elapsedMs = now - lastMoveTime;
     const currentClockMs = game.turn === "white" ? game.white_clock_ms : game.black_clock_ms;
     const remainingMs = (currentClockMs ?? 0) - elapsedMs;
 
-    if (!isFirstMove && remainingMs <= 0) {
-      // Player's clock expired — they lose on time (or the game is
-      // aborted if nobody ever made a first move — see resolveTimeoutForGame)
+    if (remainingMs <= 0) {
+      // Player's clock expired — they lose on time
       const admin = createAdminClient();
       const result = await resolveTimeoutForGame(admin, game);
       return NextResponse.json({
-        error: result.status === "abort" ? "Game aborted — no moves were made in time" : "Your clock has expired",
+        error: "Your clock has expired",
         gameEnded: true,
         status: result.status,
         winner: result.winner,
       }, { status: 400 });
     }
 
-    //     // Validate and apply the move
-    // On the first move, pass "now" as lastMoveAt so the engine calculates
-    // zero elapsed time — the first move starts the clock, it doesn't cost time.
-    const engineLastMoveAt = isFirstMove
-      ? new Date().toISOString()
-      : (game.last_move_at || new Date().toISOString());
+    // Validate and apply the move — clock has been ticking since the game
+    // started (last_move_at set by cron or previous move).
+    const engineLastMoveAt = game.last_move_at || new Date().toISOString();
 
     const result = validateAndApplyMove(
       game.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",

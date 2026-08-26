@@ -1,5 +1,4 @@
 "use client";
-import { getAbortSeconds } from "@/lib/game/abort-config";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -7,7 +6,7 @@ import { Chessboard } from "react-chessboard";
 import { customPieces } from "@/lib/game/piece-styles";
 import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
-import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Timer, Swords, RefreshCw } from "lucide-react";
+import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Swords, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { getCapturedPieces, getCheckSquare } from "@/lib/game/board-helpers";
 import { playSound, detectMoveSound, setSoundEnabled } from "@/lib/game/sound";
@@ -118,22 +117,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const isLiveView = moveHistory.length === 0 || viewPly >= moveHistory.length;
   const displayFen = reviewFen ?? fen;
 
-  // ── First-move abort countdown ──────────────────────────────────────────
-  // When no moves have been made, show a countdown until the game is auto-aborted.
-  // The abort threshold depends on the game mode (bullet=10s, blitz=15s, rapid=20s, classical=30s).
-  const isFirstMovePending = game.move_count === 0 && game.status === "playing";
-  const abortSeconds = getAbortSeconds(game.time_control);
-  const abortRemainingMs = (() => {
-    if (!isFirstMovePending) return 0;
-    void clockTick; // recompute every tick
-    const createdAt = game.created_at || game.last_move_at || new Date(0).toISOString();
-    const elapsed = Date.now() - new Date(createdAt).getTime();
-    return Math.max(0, abortSeconds * 1000 - elapsed);
-  })();
-  const abortRemainingSec = Math.ceil(abortRemainingMs / 1000);
-  const abortRemainingDisplay = abortRemainingSec >= 60
-    ? `${Math.floor(abortRemainingSec / 60)}:${String(abortRemainingSec % 60).padStart(2, '0')}`
-    : `${abortRemainingSec}s`;
+  // Clocks now start ticking as soon as the game transitions to "playing"
+  // (last_move_at is set by the tournament cron at that moment).
 
   useEffect(() => {
     if (gameEnded) return;
@@ -288,10 +273,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   const getLiveClock = (player: "white" | "black") => {
     if (!game.last_move_at || !game.white_clock_ms || !game.black_clock_ms) return "—";
-    // Clock hasn't started until the first move is made — show full time
-    if (game.move_count === 0 && game.status === "playing") {
-      return formatClock(player === "white" ? game.white_clock_ms : game.black_clock_ms);
-    }
+    // Clock starts ticking as soon as the game is "playing" (last_move_at
+    // is set by the tournament cron at that moment). No first-move exemption.
     if (gameEnded || game.turn !== player) {
       return formatClock(player === "white" ? game.white_clock_ms : game.black_clock_ms);
     }
@@ -1257,21 +1240,6 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   return (
     <>
-      {/* First-move abort countdown banner */}
-      {isFirstMovePending && (
-        <div className={`flex items-center justify-center gap-2 px-4 py-2 mb-1 rounded-lg text-sm font-medium transition-colors ${
-          abortRemainingSec <= 10
-            ? "bg-red-500/15 text-red-400 border border-red-500/30"
-            : "bg-ccb-surface text-ccb-muted border border-ccb-border"
-        }`}>
-          <Timer className="w-4 h-4" />
-          {myTurn
-            ? <span>Make your first move! <span className="tabular-nums font-bold">{abortRemainingDisplay}</span></span>
-            : <span>Waiting for opponent... <span className="tabular-nums">{abortRemainingDisplay}</span></span>
-          }
-        </div>
-      )}
-
       <div className="game-viewport -my-4 sm:-my-6 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
         {boardColumn(playerData, myData, true)}
         {renderDesktopSidebar()}

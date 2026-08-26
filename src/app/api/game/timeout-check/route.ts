@@ -82,12 +82,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Clock expiry check ──────────────────────────────────────────────
-    // Clock doesn't start until the first move is made — before that,
-    // no player can be timed out on clock.
-    if (game.move_count === 0) {
-      return NextResponse.json({ timedOut: false, status: "playing" });
-    }
-
+    // Clock starts as soon as the game transitions to "playing" (last_move_at
+    // is set at that moment). No special-casing for move_count === 0.
     const lastMoveTime = new Date(game.last_move_at || game.created_at).getTime();
     const elapsedMs = now - lastMoveTime;
     const currentClockMs = game.turn === "white" ? game.white_clock_ms : game.black_clock_ms;
