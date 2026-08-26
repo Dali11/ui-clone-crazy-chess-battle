@@ -461,6 +461,13 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
+      {/* PRIZE DISTRIBUTION */}
+      {hasPrizePool && (
+        <div className="px-5 sm:px-6 lg:px-8 mb-4">
+          <PrizeDistribution t={t} formatMoney={formatMoney} />
+        </div>
+      )}
+
       {/* TAB BAR */}
       <div className="px-5 sm:px-6 lg:px-8 mb-4">
         <div className="flex gap-1.5 p-1 bg-ccb-surface rounded-xl border border-ccb-border">
@@ -534,10 +541,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   </div>
                 )}
 
-                {/* PRIZE DISTRIBUTION PREVIEW */}
-              {hasPrizePool && <PrizeDistribution t={t} formatMoney={formatMoney} />}
-
-              {/* STANDINGS TABLE */}
+                {/* STANDINGS TABLE */}
                 <div className="bg-ccb-card border border-ccb-border rounded-2xl overflow-hidden">
                   {/* Header */}
                   <div className="grid grid-cols-12 gap-2 px-5 py-2.5 bg-ccb-surface border-b border-ccb-border text-[10px] uppercase tracking-wider text-ccb-muted font-semibold">
@@ -739,9 +743,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               </div>
             </div>
 
-            {/* Prize Distribution */}
-            {hasPrizePool && <PrizeDistribution t={t} formatMoney={formatMoney} />}
-
             {/* Prizes */}
             <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
               <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-3 flex items-center gap-1.5">
@@ -827,9 +828,7 @@ function PrizeDistribution({ t, formatMoney }: { t: any; formatMoney: (c: number
         })}
       </div>
       <p className="text-[10px] text-ccb-muted mt-3 leading-relaxed">
-        {isFixed
-          ? 'Fixed prize pool — entry fees do not increase the pool.'
-          : isFlat
+        {isFlat
           ? 'Fixed amounts per rank.'
           : 'Percentages of the prize pool. Final amounts depend on total pool.'}
       </p>
