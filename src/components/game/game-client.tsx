@@ -117,7 +117,13 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const isWhite = game.white_player_id === currentUserId;
   const isBlack = game.black_player_id === currentUserId;
   const myTurn = (isWhite && game.turn === "white") || (isBlack && game.turn === "black");
-  const gameEnded = game.status !== "playing";
+  // Only these are genuinely terminal. "waiting" (pre-game countdown, used by
+  // tournament pairings before their scheduled_start) is NOT one of them —
+  // treating it as ended (the old `!== "playing"` check did) fired the
+  // Victory/Draw overlay during the countdown itself, showing a bogus
+  // "Draw · 0 moves" result before the game had even started.
+  const TERMINAL_STATUSES = ["checkmate", "stalemate", "draw", "resign", "timeout", "abort"];
+  const gameEnded = TERMINAL_STATUSES.includes(game.status);
 
   const isLiveView = moveHistory.length === 0 || viewPly >= moveHistory.length;
   const displayFen = reviewFen ?? fen;
@@ -980,6 +986,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
               blackName={blackName}
               whiteAvatar={whiteAvatar}
               blackAvatar={blackAvatar}
+              whiteRating={game.white_rating}
+              blackRating={game.black_rating}
               overlay
             />
           )}

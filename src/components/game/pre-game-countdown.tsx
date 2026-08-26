@@ -8,8 +8,48 @@ interface PreGameCountdownProps {
   blackName: string;
   whiteAvatar?: string | null;
   blackAvatar?: string | null;
+  whiteRating?: number | null;
+  blackRating?: number | null;
   /** When true, renders as a translucent overlay on top of the board. When false, renders as a standalone full-screen card. */
   overlay?: boolean;
+}
+
+function initials(name: string) {
+  return name.trim().slice(0, 2).toUpperCase();
+}
+
+/** Avatar + name + rating, wrapped in its own solid card so it stays legible
+ * regardless of what's showing through the blurred board behind it. */
+function PlayerBadge({
+  name,
+  avatar,
+  rating,
+}: {
+  name: string;
+  avatar?: string | null;
+  rating?: number | null;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-2xl bg-ccb-surface/95 border border-ccb-border shadow-lg backdrop-blur-sm min-w-[92px]">
+      {avatar ? (
+        <img
+          src={avatar}
+          alt={name}
+          className="w-11 h-11 rounded-full ring-2 ring-ccb-primary/50 object-cover"
+        />
+      ) : (
+        <div className="w-11 h-11 rounded-full ring-2 ring-ccb-primary/50 bg-ccb-primary/15 flex items-center justify-center text-sm font-bold text-ccb-primary">
+          {initials(name)}
+        </div>
+      )}
+      <span className="text-xs font-semibold text-ccb-foreground truncate max-w-[84px] text-center">
+        {name}
+      </span>
+      {rating != null && (
+        <span className="text-[10px] font-medium text-ccb-muted -mt-1">({rating})</span>
+      )}
+    </div>
+  );
 }
 
 export default function PreGameCountdown({
@@ -18,6 +58,8 @@ export default function PreGameCountdown({
   blackName,
   whiteAvatar,
   blackAvatar,
+  whiteRating,
+  blackRating,
   overlay = false,
 }: PreGameCountdownProps) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
@@ -41,38 +83,41 @@ export default function PreGameCountdown({
   const seconds = secondsLeft % 60;
   const isUrgent = secondsLeft <= 30;
 
-  // ── Overlay mode: translucent panel on top of the board ──
+  // ── Overlay mode: sits on top of the board ──
   if (overlay) {
     return (
-      <div className="absolute inset-0 z-30 flex items-center justify-center bg-ccb-bg/80 backdrop-blur-sm rounded-lg">
-        <div className="text-center px-6 py-6 max-w-xs w-full">
-          {/* Player VS strip */}
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="flex flex-col items-center gap-1">
-              {whiteAvatar && (
-                <img src={whiteAvatar} alt={whiteName} className="w-10 h-10 rounded-full ring-2 ring-ccb-primary/40" />
-              )}
-              <span className="text-xs font-semibold text-ccb-foreground truncate max-w-[80px]">{whiteName}</span>
-            </div>
-            <span className="text-lg font-bold text-ccb-muted">vs</span>
-            <div className="flex flex-col items-center gap-1">
-              {blackAvatar && (
-                <img src={blackAvatar} alt={blackName} className="w-10 h-10 rounded-full ring-2 ring-ccb-primary/40" />
-              )}
-              <span className="text-xs font-semibold text-ccb-foreground truncate max-w-[80px]">{blackName}</span>
-            </div>
+      <div className="absolute inset-0 z-30 flex items-center justify-center rounded-lg overflow-hidden">
+        {/* Strong solid backdrop — the board underneath should read as a
+            faint texture, not a distracting, half-legible game of pieces. */}
+        <div className="absolute inset-0 bg-ccb-bg/92 backdrop-blur-md" />
+        {/* Soft brand-colored glow behind the VS badge for depth */}
+        <div className="absolute w-56 h-56 rounded-full bg-ccb-primary/10 blur-3xl" />
+
+        <div className="relative text-center px-4 py-6 w-full flex flex-col items-center">
+          {/* Player VS strip — each side is its own solid card so names/avatars
+              always stay legible no matter what's behind them */}
+          <div className="flex items-center justify-center gap-3 mb-5">
+            <PlayerBadge name={whiteName} avatar={whiteAvatar} rating={whiteRating} />
+            <span className="text-sm font-bold text-ccb-muted px-1.5 py-1 rounded-full bg-ccb-surface/70 border border-ccb-border/70">
+              vs
+            </span>
+            <PlayerBadge name={blackName} avatar={blackAvatar} rating={blackRating} />
           </div>
 
           {/* Countdown timer */}
           <div className="mb-3">
-            <p className="text-xs text-ccb-muted mb-1">Game starts in</p>
-            <div className={`text-5xl font-bold tabular-nums ${isUrgent ? "text-red-500 animate-pulse" : "text-ccb-primary"}`}>
+            <p className="text-xs text-ccb-muted mb-1 tracking-wide uppercase">Game starts in</p>
+            <div
+              className={`text-5xl font-bold tabular-nums ${
+                isUrgent ? "text-red-500 animate-pulse" : "text-ccb-primary"
+              }`}
+            >
               {minutes}:{seconds.toString().padStart(2, "0")}
             </div>
           </div>
 
           {/* Status */}
-          <div className="flex items-center justify-center gap-2 text-xs text-ccb-muted">
+          <div className="flex items-center justify-center gap-2 text-xs text-ccb-muted px-3 py-1 rounded-full bg-ccb-surface/70 border border-ccb-border/50">
             <span className="w-2 h-2 rounded-full bg-ccb-primary animate-pulse" />
             <span>{secondsLeft > 0 ? "Waiting for countdown" : "Starting now…"}</span>
           </div>
@@ -88,17 +133,27 @@ export default function PreGameCountdown({
         {/* VS header */}
         <div className="flex items-center justify-center gap-4 mb-8">
           <div className="flex flex-col items-center gap-2">
-            {whiteAvatar && (
-              <img src={whiteAvatar} alt={whiteName} className="w-12 h-12 rounded-full" />
+            {whiteAvatar ? (
+              <img src={whiteAvatar} alt={whiteName} className="w-12 h-12 rounded-full ring-2 ring-ccb-primary/40 object-cover" />
+            ) : (
+              <div className="w-12 h-12 rounded-full ring-2 ring-ccb-primary/40 bg-ccb-primary/15 flex items-center justify-center text-sm font-bold text-ccb-primary">
+                {initials(whiteName)}
+              </div>
             )}
             <span className="text-sm font-semibold text-ccb-foreground">{whiteName}</span>
+            {whiteRating != null && <span className="text-xs text-ccb-muted">({whiteRating})</span>}
           </div>
           <span className="text-xl font-bold text-ccb-muted">vs</span>
           <div className="flex flex-col items-center gap-2">
-            {blackAvatar && (
-              <img src={blackAvatar} alt={blackName} className="w-12 h-12 rounded-full" />
+            {blackAvatar ? (
+              <img src={blackAvatar} alt={blackName} className="w-12 h-12 rounded-full ring-2 ring-ccb-primary/40 object-cover" />
+            ) : (
+              <div className="w-12 h-12 rounded-full ring-2 ring-ccb-primary/40 bg-ccb-primary/15 flex items-center justify-center text-sm font-bold text-ccb-primary">
+                {initials(blackName)}
+              </div>
             )}
             <span className="text-sm font-semibold text-ccb-foreground">{blackName}</span>
+            {blackRating != null && <span className="text-xs text-ccb-muted">({blackRating})</span>}
           </div>
         </div>
 
