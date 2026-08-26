@@ -5,7 +5,7 @@
   "start_url": "/?source=pwa",
   "id": "/",
   "scope": "/",
-  "display": "minimal-ui",
+  "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0a0a0f",
   "theme_color": "#0a0a0f",
@@ -88,8 +88,18 @@
     }
   ],
   "display_override": [
-    "minimal-ui",
     "standalone",
+    "minimal-ui",
     "browser"
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "/og-image.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Crazy Chess Battles Home"
+    }
+  ],
+  "prefer_related_applications": false
 }
