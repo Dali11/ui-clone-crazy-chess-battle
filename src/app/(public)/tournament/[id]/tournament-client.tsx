@@ -534,7 +534,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   </div>
                 )}
 
-                {/* STANDINGS TABLE */}
+                {/* PRIZE DISTRIBUTION PREVIEW */}
+              {hasPrizePool && <PrizeDistribution t={t} formatMoney={formatMoney} />}
+
+              {/* STANDINGS TABLE */}
                 <div className="bg-ccb-card border border-ccb-border rounded-2xl overflow-hidden">
                   {/* Header */}
                   <div className="grid grid-cols-12 gap-2 px-5 py-2.5 bg-ccb-surface border-b border-ccb-border text-[10px] uppercase tracking-wider text-ccb-muted font-semibold">
@@ -736,6 +739,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               </div>
             </div>
 
+            {/* Prize Distribution */}
+            {hasPrizePool && <PrizeDistribution t={t} formatMoney={formatMoney} />}
+
             {/* Prizes */}
             <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
               <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-3 flex items-center gap-1.5">
@@ -776,6 +782,57 @@ function StatTile({ icon: Icon, label, value }: { icon: any; label: string; valu
         <Icon className="w-3 h-3" /> {label}
       </div>
       <div className="text-sm font-bold truncate">{value}</div>
+    </div>
+  );
+}
+
+function PrizeDistribution({ t, formatMoney }: { t: any; formatMoney: (c: number) => string }) {
+  const dist = t.prize_distribution;
+  if (!dist || !dist.payouts || dist.payouts.length === 0) return null;
+
+  const pool = t.prize_pool_cents || 0;
+  const isFixed = t.pool_source === 'fixed';
+  const isFlat = dist.type === 'flat';
+
+  return (
+    <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+      <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-3 flex items-center gap-1.5">
+        <Trophy className="w-3.5 h-3.5" /> Prize Distribution
+      </h4>
+      <div className="space-y-2">
+        {dist.payouts.map((payout: any) => {
+          const amount = isFlat
+            ? payout.amount_cents
+            : pool > 0 ? Math.floor(pool * (payout.percentage / 100)) : 0;
+          const rankLabel = payout.rank === 1 ? '1st' : payout.rank === 2 ? '2nd' : payout.rank === 3 ? '3rd' : `${payout.rank}th`;
+          const medalIcon = payout.rank === 1 ? <Crown className="w-4 h-4 text-ccb-accent" /> :
+                            payout.rank === 2 ? <Medal className="w-4 h-4 text-ccb-muted" /> :
+                            payout.rank === 3 ? <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" /> : null;
+          return (
+            <div key={payout.rank} className={`flex items-center justify-between px-3 py-2.5 rounded-xl ${payout.rank <= 3 ? 'bg-ccb-surface/60' : 'bg-ccb-surface/30'}`}>
+              <div className="flex items-center gap-2">
+                {medalIcon || <span className="w-4 text-center text-xs font-bold text-ccb-muted">{payout.rank}</span>}
+                <span className="text-sm font-bold">{rankLabel}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                {!isFlat && (
+                  <span className="text-[10px] text-ccb-muted font-medium">{payout.percentage}%</span>
+                )}
+                <span className="text-sm font-bold text-ccb-accent">
+                  {pool > 0 ? formatMoney(amount) : isFlat ? formatMoney(amount) : '—'}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-ccb-muted mt-3 leading-relaxed">
+        {isFixed
+          ? 'Fixed prize pool — entry fees do not increase the pool.'
+          : isFlat
+          ? 'Fixed amounts per rank.'
+          : 'Percentages of the prize pool. Final amounts depend on total pool.'}
+      </p>
     </div>
   );
 }
