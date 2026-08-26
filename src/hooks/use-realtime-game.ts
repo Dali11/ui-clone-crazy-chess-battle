@@ -25,6 +25,8 @@ export interface GameState {
   increment_seconds: number;
   rated: boolean;
   created_at?: string;
+  scheduled_start?: string | null;
+  tournament_id?: string | null;
 }
 
 export interface MoveBroadcast {
@@ -119,6 +121,7 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
         white_clock_ms: data.white_clock_ms ?? prev.white_clock_ms,
         black_clock_ms: data.black_clock_ms ?? prev.black_clock_ms,
         last_move_at: data.last_move_at ?? prev.last_move_at,
+        scheduled_start: data.scheduled_start ?? prev.scheduled_start,
       }));
     } catch {
       // Silent — polling will retry

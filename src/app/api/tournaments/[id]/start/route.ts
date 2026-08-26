@@ -132,7 +132,11 @@ export async function POST(
       }
     }
 
-    // Create tournament round entry
+    // Calculate when Round 1 games should start (now + countdown minutes)
+    const countdownMinutes = tournament.countdown_minutes || 2;
+    const scheduledStart = new Date(Date.now() + countdownMinutes * 60 * 1000);
+
+    // Create tournament round entry with scheduled start time
     const { error: roundError } = await admin
       .from("tournament_rounds")
       .insert({
@@ -146,6 +150,7 @@ export async function POST(
           result: null,
         })),
         is_complete: false,
+        starts_at: scheduledStart.toISOString(),
       });
 
     if (roundError) {
@@ -165,7 +170,7 @@ export async function POST(
       black_player_id: pairing.black,
       white_rating: ratingMap.get(pairing.white) || 1200,
       black_rating: ratingMap.get(pairing.black) || 1200,
-      status: "playing",
+      status: "waiting",
       time_control: tournament.time_control,
       initial_minutes: tournament.initial_minutes,
       increment_seconds: tournament.increment_seconds,
@@ -177,7 +182,7 @@ export async function POST(
       move_count: 0,
       white_clock_ms: initialMs,
       black_clock_ms: initialMs,
-      last_move_at: new Date().toISOString(),
+      scheduled_start: scheduledStart.toISOString(),
     }));
 
     const writes: PromiseLike<any>[] = [];
@@ -214,10 +219,27 @@ export async function POST(
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
+    // Send notifications to all participants
+    const notifData = { tournamentName: tournament.name, tournamentId, startTime: scheduledStart.toISOString() };
+    await Promise.all(
+      participants.map((p) =>
+        admin.from("notifications").insert({
+          user_id: p.player_id,
+          type: "round_starting",
+          title: `Round 1 starts in ${countdownMinutes} minutes — ${tournament.name}`,
+          body: `Get ready! Your game starts at ${new Date(scheduledStart.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} CAT. Go to the tournament page and enter your game.`,
+          data: notifData,
+          read: false,
+        }).then(() => {}, () => {})
+      )
+    );
+
     return NextResponse.json({
       success: true,
       pairings: pairings.length,
       round: 1,
+      scheduledStart: scheduledStart.toISOString(),
+      countdownMinutes,
     });
   } catch (e: any) {
     console.error("Start tournament error:", e);

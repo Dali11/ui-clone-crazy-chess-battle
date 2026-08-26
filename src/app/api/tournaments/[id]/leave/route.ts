@@ -22,7 +22,7 @@ export async function POST(
     // Verify tournament exists and is upcoming
     const { data: tournament } = await supabase
       .from("tournaments")
-      .select("status, entry_fee_cents, prize_pool_cents")
+      .select("status, entry_fee_cents, prize_pool_cents, pool_source")
       .eq("id", tournamentId)
       .single();
 
@@ -53,13 +53,15 @@ export async function POST(
         p_amount_cents: tournament.entry_fee_cents,
       });
 
-      // Deduct from prize pool
-      await admin
-        .from("tournaments")
-        .update({
-          prize_pool_cents: Math.max(0, (tournament.prize_pool_cents || 0) - tournament.entry_fee_cents),
-        })
-        .eq("id", tournamentId);
+      // Deduct from prize pool ONLY if pool_source is 'entry_fees' (not 'fixed')
+      if (tournament.pool_source !== 'fixed') {
+        await admin
+          .from("tournaments")
+          .update({
+            prize_pool_cents: Math.max(0, (tournament.prize_pool_cents || 0) - tournament.entry_fee_cents),
+          })
+          .eq("id", tournamentId);
+      }
     }
 
     const { error } = await admin

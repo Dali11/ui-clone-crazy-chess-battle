@@ -27,7 +27,7 @@ async function handleAutoAdvance(req: NextRequest) {
     // Find all active tournaments
     const { data: tournaments } = await admin
       .from("tournaments")
-      .select("id, name, status, current_round, rounds, type, time_control, initial_minutes, increment_seconds")
+      .select("id, name, status, current_round, rounds, type, time_control, initial_minutes, increment_seconds, rest_minutes, countdown_minutes")
       .eq("status", "active");
 
     if (!tournaments || tournaments.length === 0) {
@@ -159,7 +159,11 @@ async function handleAutoAdvance(req: NextRequest) {
           }
         }
 
-        // Create round entry
+        // Calculate when next round games should start (now + rest minutes)
+        const restMinutes = tournament.rest_minutes || 5;
+        const scheduledStart = new Date(Date.now() + restMinutes * 60 * 1000);
+
+        // Create round entry with scheduled start time
         await admin.from("tournament_rounds").insert({
           tournament_id: tournament.id,
           round_number: nextRound,
@@ -171,6 +175,7 @@ async function handleAutoAdvance(req: NextRequest) {
             result: null,
           })),
           is_complete: false,
+          starts_at: scheduledStart.toISOString(),
         });
 
         // Split byes from matches for bulk insert
@@ -183,7 +188,7 @@ async function handleAutoAdvance(req: NextRequest) {
           black_player_id: pairing.black,
           white_rating: profiles?.find((p: any) => p.id === pairing.white)?.rating || 1200,
           black_rating: profiles?.find((p: any) => p.id === pairing.black)?.rating || 1200,
-          status: "playing",
+          status: "waiting",
           time_control: tournament.time_control,
           initial_minutes: tournament.initial_minutes,
           increment_seconds: tournament.increment_seconds,
@@ -195,7 +200,7 @@ async function handleAutoAdvance(req: NextRequest) {
           move_count: 0,
           white_clock_ms: initialMs,
           black_clock_ms: initialMs,
-          last_move_at: new Date().toISOString(),
+          scheduled_start: scheduledStart.toISOString(),
         }));
 
         const writes: PromiseLike<any>[] = [];
@@ -217,6 +222,21 @@ async function handleAutoAdvance(req: NextRequest) {
           );
         }
         await Promise.all(writes);
+
+        // Notify all participants about upcoming round
+        const allParticipants = participants.map((p) => p.player_id);
+        await Promise.all(
+          allParticipants.map((pid) =>
+            admin.from("notifications").insert({
+              user_id: pid,
+              type: "round_starting",
+              title: `Round ${nextRound} starts in ${restMinutes} minutes — ${tournament.name}`,
+              body: `Get ready! Round ${nextRound} starts soon. Go to the tournament page and enter your game.`,
+              data: { tournamentName: tournament.name, tournamentId: tournament.id, round: nextRound, startTime: scheduledStart.toISOString() },
+              read: false,
+            }).then(() => {}, () => {})
+          )
+        );
 
         // Update tournament current round
         await admin

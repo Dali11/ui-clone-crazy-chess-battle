@@ -24,7 +24,7 @@ export async function POST(
     // Verify tournament exists and is upcoming
     const { data: tournament, error: tErr } = await admin
       .from("tournaments")
-      .select("id, status, max_players, min_rating, max_rating, entry_fee_cents, prize_pool_cents")
+      .select("id, status, max_players, min_rating, max_rating, entry_fee_cents, prize_pool_cents, pool_source")
       .eq("id", tournamentId)
       .single();
 
@@ -119,15 +119,17 @@ export async function POST(
 
       paidEntryFee = true;
 
-      // Add entry fee to prize pool (non-fatal if this fails)
-      const { error: poolErr } = await admin
-        .from("tournaments")
-        .update({
-          prize_pool_cents: (tournament.prize_pool_cents || 0) + entryFee,
-        })
-        .eq("id", tournamentId);
+      // Add entry fee to prize pool ONLY if pool_source is 'entry_fees' (not 'fixed')
+      if (tournament.pool_source !== 'fixed') {
+        const { error: poolErr } = await admin
+          .from("tournaments")
+          .update({
+            prize_pool_cents: (tournament.prize_pool_cents || 0) + entryFee,
+          })
+          .eq("id", tournamentId);
 
-      if (poolErr) console.error("Prize pool update failed:", poolErr);
+        if (poolErr) console.error("Prize pool update failed:", poolErr);
+      }
 
       // Record deposit entry for audit trail (non-fatal — must not block the join)
       const { error: depositErr } = await admin.from("deposits").insert({

@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
     const { data: game, error } = await supabase
       .from("games")
-      .select("id, fen, pgn, turn, status, winner, move_count, white_clock_ms, black_clock_ms, last_move_at, white_player_id, black_player_id, white_rating, black_rating, white_rating_change, black_rating_change, time_control, initial_minutes, increment_seconds, rated, created_at")
+      .select("id, fen, pgn, turn, status, winner, move_count, white_clock_ms, black_clock_ms, last_move_at, white_player_id, black_player_id, white_rating, black_rating, white_rating_change, black_rating_change, time_control, initial_minutes, increment_seconds, rated, created_at, scheduled_start, tournament_id")
       .eq("id", gameId)
       .single();
 

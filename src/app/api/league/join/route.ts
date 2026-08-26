@@ -236,10 +236,12 @@ export async function POST(request: NextRequest) {
         }
         paidEntryFee = true;
 
-        // Add entry fee to prize pool
-        await admin.from('tournaments')
-          .update({ prize_pool_cents: (tournament.prize_pool_cents || 0) + entryFee })
-          .eq('id', tournamentId);
+        // Add entry fee to prize pool ONLY if pool_source is not 'fixed'
+        if (tournament.pool_source !== 'fixed') {
+          await admin.from('tournaments')
+            .update({ prize_pool_cents: (tournament.prize_pool_cents || 0) + entryFee })
+            .eq('id', tournamentId);
+        }
 
         // Audit log
         await admin.from('deposits').insert({

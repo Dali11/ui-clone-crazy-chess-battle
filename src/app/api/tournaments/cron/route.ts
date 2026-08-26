@@ -23,7 +23,7 @@ async function handleTournamentCron(req: NextRequest) {
     // ── 1. AUTO-START: Start tournaments whose start time has passed ──
     const { data: toStart } = await admin
       .from("tournaments")
-      .select("id, name, starts_at, status, type, initial_minutes, increment_seconds, time_control, min_players, entry_fee_cents, max_players")
+      .select("id, name, starts_at, status, type, initial_minutes, increment_seconds, time_control, min_players, entry_fee_cents, max_players, rest_minutes, countdown_minutes")
       .eq("status", "upcoming")
       .lte("starts_at", now);
 
@@ -78,6 +78,9 @@ async function handleTournamentCron(req: NextRequest) {
         }
 
         // Create tournament round entry
+        const countdownMin1 = tournament.countdown_minutes || 2;
+        const r1Start = new Date(Date.now() + countdownMin1 * 60 * 1000);
+
         await admin.from("tournament_rounds").insert({
           tournament_id: tournament.id,
           round_number: 1,
@@ -89,6 +92,7 @@ async function handleTournamentCron(req: NextRequest) {
             result: null,
           })),
           is_complete: false,
+          starts_at: r1Start.toISOString(),
         });
 
         // Split byes from matches for bulk insert
@@ -101,7 +105,7 @@ async function handleTournamentCron(req: NextRequest) {
           black_player_id: pairing.black,
           white_rating: ratingMap.get(pairing.white) || 1200,
           black_rating: ratingMap.get(pairing.black) || 1200,
-          status: "playing",
+          status: "waiting",
           time_control: tournament.time_control || "rapid",
           initial_minutes: tournament.initial_minutes || 10,
           increment_seconds: tournament.increment_seconds || 0,
@@ -113,7 +117,7 @@ async function handleTournamentCron(req: NextRequest) {
           move_count: 0,
           white_clock_ms: initialMs,
           black_clock_ms: initialMs,
-          last_move_at: new Date().toISOString(),
+          scheduled_start: r1Start.toISOString(),
         }));
 
         // Insert games and get back their IDs
@@ -166,7 +170,7 @@ async function handleTournamentCron(req: NextRequest) {
     // ── 2. AUTO-ADVANCE: Advance when current round is complete ──
     const { data: activeTournaments } = await admin
       .from("tournaments")
-      .select("id, name, current_round, rounds, type, time_control, initial_minutes, increment_seconds")
+      .select("id, name, current_round, rounds, type, time_control, initial_minutes, increment_seconds, rest_minutes, countdown_minutes")
       .eq("status", "active");
 
     for (const tournament of activeTournaments || []) {
@@ -273,6 +277,9 @@ async function handleTournamentCron(req: NextRequest) {
           }
         }
 
+        const restMin = tournament.rest_minutes || 5;
+        const rnStart = new Date(Date.now() + restMin * 60 * 1000);
+
         await admin.from("tournament_rounds").insert({
           tournament_id: tournament.id,
           round_number: nextRound,
@@ -284,6 +291,7 @@ async function handleTournamentCron(req: NextRequest) {
             result: null,
           })),
           is_complete: false,
+          starts_at: rnStart.toISOString(),
         });
 
         const byePairings = pairings.filter((p) => p.bye);
@@ -295,7 +303,7 @@ async function handleTournamentCron(req: NextRequest) {
           black_player_id: pairing.black,
           white_rating: profiles?.find((p: any) => p.id === pairing.white)?.rating || 1200,
           black_rating: profiles?.find((p: any) => p.id === pairing.black)?.rating || 1200,
-          status: "playing",
+          status: "waiting",
           time_control: tournament.time_control || "rapid",
           initial_minutes: tournament.initial_minutes || 10,
           increment_seconds: tournament.increment_seconds || 0,
@@ -307,7 +315,7 @@ async function handleTournamentCron(req: NextRequest) {
           move_count: 0,
           white_clock_ms: initialMs,
           black_clock_ms: initialMs,
-          last_move_at: new Date().toISOString(),
+          scheduled_start: rnStart.toISOString(),
         }));
 
         // Insert games and get back their IDs

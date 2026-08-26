@@ -88,6 +88,7 @@ interface Tournament {
   increment_seconds: number;
   entry_fee_cents: number;
   prize_pool_cents: number;
+  pool_source: string | null;
   prize_distribution: any;
   max_players: number | null;
   min_rating: number;
@@ -696,6 +697,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       ends_at: t.ends_at ? utcToLocalInput(t.ends_at) : "",
       entry_fee_cents: t.entry_fee_cents || 0,
       prize_pool_cents: t.prize_pool_cents || 0,
+      pool_source: t.pool_source || 'entry_fees',
     });
   };
 
@@ -828,6 +830,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           endsAt: createForm.ends_at ? localToUTC(createForm.ends_at) : null,
           entryFeeCents: Number(createForm.entry_fee_cents) || 0,
           creatorProfitPercent: Number(createForm.creator_profit_percent) || 0,
+          prizePoolCents: Number(createForm.prize_pool_cents) || 0,
+          poolSource: createForm.pool_source || 'entry_fees',
           minRating: Number(createForm.min_rating) || 0,
           maxRating: createForm.max_rating ? Number(createForm.max_rating) : null,
         }),
@@ -1655,6 +1659,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       ends_at: "",
                       entry_fee_cents: 0,
                       creator_profit_percent: 0,
+                      prize_pool_cents: 0,
+                      pool_source: 'entry_fees',
                       min_rating: 0,
                       max_rating: "",
                     });
@@ -1696,6 +1702,9 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                             {t.rounds && <span className="flex items-center gap-1"><Trophy className="w-3 h-3" />R{t.current_round}/{t.rounds}</span>}
                             <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{formatMWK(t.entry_fee_cents)}</span>
                             <span className="flex items-center gap-1"><Gift className="w-3 h-3" />{formatMWK(t.prize_pool_cents)}</span>
+                            {t.pool_source === 'fixed' && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-ccb-accent/10 text-ccb-accent border border-ccb-accent/30">FIXED</span>
+                            )}
                           </div>
                           {t.description && (
                             <div className="text-xs text-ccb-muted mt-1 line-clamp-1">{t.description}</div>
@@ -1921,6 +1930,39 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           <input type="number" value={createForm.creator_profit_percent ?? 0} onChange={(e) => setCreateForm({ ...createForm, creator_profit_percent: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                       </div>
+                      {/* Prize Pool Source */}
+                      <div>
+                        <label className="text-xs font-medium text-ccb-muted">Prize Pool Source</label>
+                        <div className="flex gap-2 mt-1">
+                          <button
+                            type="button"
+                            onClick={() => setCreateForm({ ...createForm, pool_source: 'entry_fees' })}
+                            className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${createForm.pool_source === 'entry_fees' || !createForm.pool_source ? 'bg-ccb-primary/10 text-ccb-primary border-ccb-primary/30' : 'bg-ccb-surface text-ccb-muted border-ccb-border'}`}
+                          >
+                            From Entry Fees
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCreateForm({ ...createForm, pool_source: 'fixed' })}
+                            className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${createForm.pool_source === 'fixed' ? 'bg-ccb-primary/10 text-ccb-primary border-ccb-primary/30' : 'bg-ccb-surface text-ccb-muted border-ccb-border'}`}
+                          >
+                            Fixed Amount
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-ccb-muted mt-1">
+                          {createForm.pool_source === 'fixed'
+                            ? 'Admin sets a fixed prize pool. Entry fees still charged but do NOT add to the pool.'
+                            : 'Prize pool grows as players join and pay entry fees. Default behavior.'}
+                        </p>
+                      </div>
+                      {/* Fixed Prize Pool Amount (only shown when pool_source = 'fixed') */}
+                      {createForm.pool_source === 'fixed' && (
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Fixed Prize Pool (MK cents)</label>
+                          <input type="number" value={createForm.prize_pool_cents ?? 0} onChange={(e) => setCreateForm({ ...createForm, prize_pool_cents: e.target.value })} className="input-field mt-1 w-full" placeholder="e.g. 100000 = MK 1,000" />
+                          <p className="text-[10px] text-ccb-muted mt-1">This amount is guaranteed by the platform regardless of player count.</p>
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2 pt-2">
                       <button
@@ -2201,6 +2243,31 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           <label className="text-xs font-medium text-ccb-muted">Prize Pool (MK cents)</label>
                           <input type="number" value={editForm.prize_pool_cents ?? 0} onChange={(e) => setEditForm({ ...editForm, prize_pool_cents: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
+                      </div>
+                      {/* Prize Pool Source */}
+                      <div>
+                        <label className="text-xs font-medium text-ccb-muted">Prize Pool Source</label>
+                        <div className="flex gap-2 mt-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditForm({ ...editForm, pool_source: 'entry_fees' })}
+                            className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${editForm.pool_source === 'entry_fees' || !editForm.pool_source ? 'bg-ccb-primary/10 text-ccb-primary border-ccb-primary/30' : 'bg-ccb-surface text-ccb-muted border-ccb-border'}`}
+                          >
+                            From Entry Fees
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditForm({ ...editForm, pool_source: 'fixed' })}
+                            className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${editForm.pool_source === 'fixed' ? 'bg-ccb-primary/10 text-ccb-primary border-ccb-primary/30' : 'bg-ccb-surface text-ccb-muted border-ccb-border'}`}
+                          >
+                            Fixed Amount
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-ccb-muted mt-1">
+                          {editForm.pool_source === 'fixed'
+                            ? 'Fixed prize pool. Entry fees do NOT add to the pool.'
+                            : 'Prize pool grows as players join and pay entry fees.'}
+                        </p>
                       </div>
                     </div>
                     <div className="flex gap-2 pt-2">

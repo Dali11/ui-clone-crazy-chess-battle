@@ -107,6 +107,8 @@ export default async function GamePage({
     increment_seconds: game.increment_seconds,
     rated: game.rated,
     created_at: game.created_at,
+    scheduled_start: game.scheduled_start,
+    tournament_id: game.tournament_id,
   };
 
   // Battle info for earnings display

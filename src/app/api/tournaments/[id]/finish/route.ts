@@ -29,7 +29,8 @@ export async function POST(
         entry_fee_cents,
         creator_profit_percent,
         created_by,
-        name
+        name,
+        pool_source
       `)
       .eq("id", tournamentId)
       .single();
@@ -84,7 +85,19 @@ export async function POST(
       const creatorProfitPercent = tournament.creator_profit_percent || 0;
 
       if (totalCollected > 0) {
-        if (creatorProfitPercent > 0) {
+        if (tournament.pool_source === 'fixed') {
+          // Fixed pool: distribute the full amount to winners, no platform cut or creator profit
+          await distributePrizes(
+            tournamentId,
+            rankedParticipants.map((p) => ({
+              player_id: p.player_id,
+              final_rank: p.final_rank ?? null,
+              score: p.score ?? 0,
+            })),
+            totalCollected,
+            tournament.prize_distribution || { type: "flat", payouts: [] }
+          );
+        } else if (creatorProfitPercent > 0) {
           // User-created paid tournament: 10% platform cut, creator profit, rest is prize pool
           const PLATFORM_CUT_PERCENT = 10;
           const platformCut = Math.floor(totalCollected * (PLATFORM_CUT_PERCENT / 100));

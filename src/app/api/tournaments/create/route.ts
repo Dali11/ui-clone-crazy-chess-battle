@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
       initialMinutes = 5, incrementSeconds = 0, maxPlayers, minPlayers = 2,
       rounds, durationMinutes, startsAt, endsAt,
       entryFeeCents = 0, creatorProfitPercent = 0, minRating = 0, maxRating,
+      prizePoolCents = 0, poolSource = "entry_fees",
     } = body;
 
     if (!name || !startsAt) {
@@ -82,7 +83,8 @@ export async function POST(req: NextRequest) {
         duration_minutes: durationMinutes ? Number(durationMinutes) : null,
         starts_at: startsAt, ends_at: endsAt || null,
         entry_fee_cents: Number(entryFeeCents || 0),
-        prize_pool_cents: isPaid ? 0 : Number(entryFeeCents || 0),
+        prize_pool_cents: poolSource === 'fixed' ? (Number(prizePoolCents) || 0) : (isPaid ? 0 : Number(entryFeeCents || 0)),
+        pool_source: poolSource === 'fixed' ? 'fixed' : 'entry_fees',
         creator_profit_percent: isPaid ? profitPercent : 0,
         prize_distribution: { type: "percentage", payouts },
         min_rating: Number(minRating || 0),

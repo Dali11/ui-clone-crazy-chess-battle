@@ -35,6 +35,7 @@ interface TournamentData {
     ends_at: string | null;
     entry_fee_cents: number;
     prize_pool_cents: number;
+    pool_source: string | null;
     berry_prize_pool: number | null;
     prize_distribution: any;
     min_players: number;
@@ -64,6 +65,7 @@ interface TournamentData {
     id: string;
     round_number: number;
     is_complete: boolean;
+    starts_at?: string | null;
     pairings: Array<{
       white: string;
       black: string;
@@ -134,6 +136,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
     // Don't redirect if already redirected to this game
     if (redirectedRef.current === myPairing.game_id) return;
+
+    // Don't auto-redirect if the round hasn't started yet (scheduled start in the future)
+    const currentRd = data.rounds?.find(r => r.round_number === data.tournament.current_round);
+    if (currentRd?.starts_at && new Date(currentRd.starts_at).getTime() > Date.now()) return;
+
     redirectedRef.current = myPairing.game_id;
 
     // Brief delay so the page renders first, then redirect
@@ -144,12 +151,17 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     return () => clearTimeout(timer);
   }, [data, router]);
 
-  // Auto-refresh every 15s when tournament is live (to detect new rounds)
+  // Auto-refresh when tournament is live — faster (5s) when round is starting soon
   useEffect(() => {
     if (!data || data.tournament.status !== 'active') return;
-    const interval = setInterval(() => fetchData(), 15000);
+    // Check if current round is starting soon
+    const currentRd = data.rounds?.find(r => r.round_number === data.tournament.current_round);
+    const startsIn = currentRd?.starts_at ? Math.max(0, Math.floor((new Date(currentRd.starts_at).getTime() - Date.now()) / 1000)) : 0;
+    const startingSoon = !!currentRd?.starts_at && startsIn > 0;
+    const intervalMs = startingSoon ? 5000 : 15000;
+    const interval = setInterval(() => fetchData(), intervalMs);
     return () => clearInterval(interval);
-  }, [data?.tournament.status]);
+  }, [data?.tournament.status, data?.rounds]);
 
   const handleJoin = async () => {
     setActionLoading(true);
@@ -235,6 +247,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   }
 
   const { tournament: t, participants, rounds, isAdmin, isRegistered, currentPlayerId, canJoin, joinReason } = data;
+
+  // Find the current round and check if it has a scheduled start time
+  const currentRoundData = rounds?.find(r => r.round_number === t.current_round);
+  const roundStartsAt = currentRoundData?.starts_at;
+  const roundStartsIn = roundStartsAt ? Math.max(0, Math.floor((new Date(roundStartsAt).getTime() - Date.now()) / 1000)) : 0;
+  const isRoundStartingSoon = roundStartsAt && roundStartsIn > 0;
   const hasEntryFee = (t.entry_fee_cents || 0) > 0;
   const hasPrizePool = (t.prize_pool_cents || 0) > 0;
   const hasBerryPrize = (t.berry_prize_pool || 0) > 0;
@@ -414,6 +432,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <div className="flex items-center gap-2 text-sm text-ccb-success">
                     <div className="w-2 h-2 rounded-full bg-ccb-success animate-pulse" />
                     <span className="font-bold">Round {t.current_round} of {t.rounds}</span>
+                    {isRoundStartingSoon && (
+                      <span className="ml-3 text-xs font-bold px-2.5 py-1 rounded-full bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30 tabular-nums animate-pulse">
+                        ⏱ Starts in {Math.floor(roundStartsIn / 60)}:{(roundStartsIn % 60).toString().padStart(2, '0')}
+                      </span>
+                    )}
                   </div>
                   {isAdmin && (
                     <button
@@ -651,7 +674,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                                     href={`/game/${pairing.game_id}`}
                                     className="text-xs font-bold px-3 py-1.5 rounded-lg bg-ccb-primary text-white hover:bg-ccb-primary/90 transition-colors flex items-center gap-1"
                                   >
-                                    <Gamepad2 className="w-3.5 h-3.5" /> Play
+                                    <Gamepad2 className="w-3.5 h-3.5" /> {isRoundStartingSoon ? 'Enter' : 'Play'}
                                   </Link>
                                 ) : (
                                   <span className="text-xs text-ccb-muted px-2">vs</span>
@@ -719,7 +742,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 <Trophy className="w-3.5 h-3.5" /> Prizes &amp; Entry
               </h4>
               <div className="space-y-3">
-                {hasPrizePool && <InfoRow icon={Trophy} label="Cash Prize Pool" value={formatMoney(t.prize_pool_cents)} />}
+                {hasPrizePool && <InfoRow icon={Trophy} label={t.pool_source === 'fixed' ? "Cash Prize Pool (Fixed)" : "Cash Prize Pool (Entry Fees)"} value={formatMoney(t.prize_pool_cents)} />}
                 {hasBerryPrize && <InfoRow icon={Zap} label="Berry Prize Pool" value={`${t.berry_prize_pool} berries`} />}
                 {hasEntryFee ? (
                   <InfoRow icon={DollarSign} label="Entry Fee" value={formatMoney(t.entry_fee_cents)} />
@@ -727,7 +750,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <InfoRow icon={CheckCircle} label="Entry Fee" value="Free" />
                 )}
                 {!hasPrizePool && !hasBerryPrize && (
-                  <p className="text-xs text-ccb-muted">No prize pool for this tournament.</p>
+                  <p className="text-xs text-ccb-muted">{t.entry_fee_cents > 0 ? "Prize pool grows as players join." : "No prize pool for this tournament."}</p>
                 )}
               </div>
             </div>

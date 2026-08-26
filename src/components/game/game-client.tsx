@@ -20,6 +20,7 @@ import PromotionDialog from "./promotion-dialog";
 import BoardThemePicker from "./board-theme-picker";
 import OpeningBadge from "./opening-badge";
 import GameChat from "./game-chat";
+import PreGameCountdown from "./pre-game-countdown";
 import PlayerProfilePreview from "./player-profile-preview";
 
 interface BattleInfo {
@@ -1162,6 +1163,17 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   // ============ SPECTATOR VIEW ============
   if (isSpectator) {
+    if (game.status === "waiting" && game.scheduled_start) {
+      return (
+        <PreGameCountdown
+          scheduledStart={game.scheduled_start}
+          whiteName={whiteName}
+          blackName={blackName}
+          whiteAvatar={whiteAvatar}
+          blackAvatar={blackAvatar}
+        />
+      );
+    }
     const topPlayer = { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" };
     const bottomPlayer = { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };
 
@@ -1202,6 +1214,19 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           <PlayerProfilePreview userId={previewUserId} onClose={() => setPreviewUserId(null)} />
         )}
       </>
+    );
+  }
+
+  // ============ WAITING STATE (pre-game countdown) ============
+  if (game.status === "waiting" && game.scheduled_start) {
+    return (
+      <PreGameCountdown
+        scheduledStart={game.scheduled_start}
+        whiteName={whiteName}
+        blackName={blackName}
+        whiteAvatar={whiteAvatar}
+        blackAvatar={blackAvatar}
+      />
     );
   }
 

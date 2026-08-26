@@ -142,7 +142,11 @@ export async function POST(
       }
     }
 
-    // Create round entry
+    // Calculate when next round games should start (now + rest minutes)
+    const restMinutes = tournament.rest_minutes || 5;
+    const scheduledStart = new Date(Date.now() + restMinutes * 60 * 1000);
+
+    // Create round entry with scheduled start time
     await admin.from("tournament_rounds").insert({
       tournament_id: tournamentId,
       round_number: nextRound,
@@ -154,6 +158,7 @@ export async function POST(
         result: null,
       })),
       is_complete: false,
+      starts_at: scheduledStart.toISOString(),
     });
 
     // Split byes from real matches so we bulk-insert games in ONE call
@@ -168,7 +173,7 @@ export async function POST(
       black_player_id: pairing.black,
       white_rating: profiles?.find((p: any) => p.id === pairing.white)?.rating || 1200,
       black_rating: profiles?.find((p: any) => p.id === pairing.black)?.rating || 1200,
-      status: "playing",
+      status: "waiting",
       time_control: tournament.time_control,
       initial_minutes: tournament.initial_minutes,
       increment_seconds: tournament.increment_seconds,
@@ -180,7 +185,7 @@ export async function POST(
       move_count: 0,
       white_clock_ms: initialMs,
       black_clock_ms: initialMs,
-      last_move_at: new Date().toISOString(),
+      scheduled_start: scheduledStart.toISOString(),
     }));
 
     const writes: PromiseLike<any>[] = [];
@@ -212,13 +217,27 @@ export async function POST(
       console.error("Round game/bye creation error:", writeError);
     }
 
+    // Notify all participants about upcoming round
+    await Promise.all(
+      participants.map((p) =>
+        admin.from("notifications").insert({
+          user_id: p.player_id,
+          type: "round_starting",
+          title: `Round ${nextRound} starts in ${restMinutes} minutes — ${tournament.name}`,
+          body: `Get ready! Round ${nextRound} starts soon. Go to the tournament page and enter your game.`,
+          data: { tournamentName: tournament.name, tournamentId, round: nextRound, startTime: scheduledStart.toISOString() },
+          read: false,
+        }).then(() => {}, () => {})
+      )
+    );
+
     // Update tournament current round
     await admin
       .from("tournaments")
       .update({ current_round: nextRound })
       .eq("id", tournamentId);
 
-    return NextResponse.json({ success: true, round: nextRound, pairings: pairings.length });
+    return NextResponse.json({ success: true, round: nextRound, pairings: pairings.length, scheduledStart: scheduledStart.toISOString(), restMinutes });
   } catch (e: any) {
     console.error("Advance round error:", e);
     return NextResponse.json({ error: e.message || "Failed to advance round" }, { status: 500 });

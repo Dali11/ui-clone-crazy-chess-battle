@@ -68,7 +68,7 @@ export async function GET(
     // Fetch rounds with pairings
     const { data: rounds, error: rErr } = await admin
       .from('tournament_rounds')
-      .select('id, round_number, pairings, is_complete, created_at')
+      .select('id, round_number, pairings, is_complete, created_at, starts_at')
       .eq('tournament_id', tournamentId)
       .order('round_number', { ascending: true });
 

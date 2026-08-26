@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       .from("tournaments")
       .select(`
         id, name, description, type, status, time_control, initial_minutes, increment_seconds,
-        entry_fee_cents, prize_pool_cents, prize_distribution,
+        entry_fee_cents, prize_pool_cents, prize_distribution, pool_source, pool_source,
         max_players, min_rating, max_rating, current_round, rounds, duration_minutes,
         starts_at, ends_at, created_at, created_by
       `)
@@ -83,7 +83,7 @@ export async function PATCH(req: NextRequest) {
         "name", "description", "type", "time_control", "initial_minutes",
         "increment_seconds", "max_players", "min_rating", "max_rating",
         "rounds", "duration_minutes", "starts_at", "ends_at",
-        "entry_fee_cents", "prize_pool_cents"
+        "entry_fee_cents", "prize_pool_cents", "pool_source"
       ];
 
       for (const field of editableFields) {
@@ -361,7 +361,7 @@ export async function POST(req: NextRequest) {
       .select(`
         name, description, type, time_control, initial_minutes, increment_seconds,
         max_players, min_rating, max_rating, rounds, duration_minutes,
-        entry_fee_cents, prize_pool_cents, prize_distribution
+        entry_fee_cents, prize_pool_cents, prize_distribution, pool_source
       `)
       .eq("id", tournamentId)
       .single();
@@ -388,6 +388,7 @@ export async function POST(req: NextRequest) {
         starts_at: sevenDaysLater,
         entry_fee_cents: source.entry_fee_cents,
         prize_pool_cents: source.prize_pool_cents,
+        pool_source: source.pool_source || 'entry_fees',
         prize_distribution: source.prize_distribution || {
           type: "percentage",
           payouts: PRIZE_SPLITS_BY_TYPE[source.type] || DEFAULT_PRIZE_SPLITS,
