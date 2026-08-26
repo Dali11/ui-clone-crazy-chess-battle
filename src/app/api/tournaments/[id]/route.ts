@@ -100,6 +100,32 @@ export async function GET(
       };
     });
 
+    // Attach game_id to each pairing by matching white/black player IDs
+    // with games created for this tournament. Without this, the client
+    // can never auto-redirect players to their game board.
+    const { data: tournamentGames } = await admin
+      .from("games")
+      .select("id, white_player_id, black_player_id, tournament_round, status")
+      .eq("tournament_id", tournamentId)
+      .in("status", ["waiting", "playing"]);
+
+    // Build a lookup: "whiteId|blackId|round" → gameId
+    const gameLookup = new Map<string, string>();
+    for (const g of tournamentGames || []) {
+      gameLookup.set(`${g.white_player_id}|${g.black_player_id}|${g.tournament_round}`, g.id);
+      gameLookup.set(`${g.black_player_id}|${g.white_player_id}|${g.tournament_round}`, g.id);
+    }
+
+    // Attach game_id to each enriched round pairing
+    const roundsWithGameIds = enrichedRounds.map((round: any) => {
+      const roundNumber = round.round_number;
+      const pairings = (round.pairings || []).map((p: any) => {
+        const gameId = gameLookup.get(`${p.white}|${p.black}|${roundNumber}`);
+        return { ...p, game_id: gameId || undefined };
+      });
+      return { ...round, pairings };
+    });
+
     // Can join?
     let canJoin = false;
     let joinReason = null;
@@ -135,7 +161,7 @@ export async function GET(
       joinReason,
       tournament,
       participants: participants || [],
-      rounds: enrichedRounds,
+      rounds: roundsWithGameIds,
       participantCount: participants?.length || 0,
     });
   } catch (error: any) {

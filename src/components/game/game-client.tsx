@@ -889,6 +889,14 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     </div>
   );
 
+  // Computed once, above boardColumn's definition, so its closure never hits
+  // the temporal dead zone — previously this was declared separately inside
+  // each branch (spectator vs player), and since boardColumn's closure binds
+  // to the outer scope, calling it from the spectator branch (which returns
+  // before ever reaching the player-view declaration) threw "Cannot access
+  // 'isWaiting' before initialization".
+  const isWaiting = game.status === "waiting" && game.scheduled_start;
+
   // ============ SHARED BOARD COLUMN ============
   const boardColumn = (topPlayer: any, bottomPlayer: any, showControls: boolean) => (
     <div className="relative flex flex-col h-full w-full lg:w-[600px] lg:max-w-[600px] lg:h-auto lg:shrink-0 lg:my-auto">
@@ -1232,7 +1240,6 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   // ============ SPECTATOR VIEW ============
   if (isSpectator) {
-    const isWaiting = game.status === "waiting" && game.scheduled_start;
     const topPlayer = { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" };
     const bottomPlayer = { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };
 
@@ -1282,7 +1289,6 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   }
 
   // ============ PLAYER VIEW (also used for waiting state — countdown overlays the board) ============
-  const isWaiting = game.status === "waiting" && game.scheduled_start;
   const playerData = isWhite
     ? { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" }
     : { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };

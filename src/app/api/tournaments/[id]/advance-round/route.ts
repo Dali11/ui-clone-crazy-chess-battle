@@ -374,8 +374,31 @@ export async function POST(
         scheduled_start: scheduledStart.toISOString(),
       }));
 
+      let pureKoGameIds: Record<string, string> = {};
       if (gameRows.length > 0) {
-        await admin.from("games").insert(gameRows);
+        const { data: insertedGames } = await admin.from("games")
+          .insert(gameRows)
+          .select("id, white_player_id, black_player_id");
+        for (const g of insertedGames || []) {
+          pureKoGameIds[`${g.white_player_id}|${g.black_player_id}`] = g.id;
+        }
+      }
+
+      // Update round pairings with game_id
+      if (Object.keys(pureKoGameIds).length > 0) {
+        await admin.from("tournament_rounds")
+          .update({
+            pairings: pairings.map((p, i) => ({
+              board: i + 1,
+              white: p.white || null,
+              black: p.black || null,
+              bye: p.bye || null,
+              result: null,
+              game_id: pureKoGameIds[`${p.white}|${p.black}`] || null,
+            })),
+          })
+          .eq("tournament_id", tournamentId)
+          .eq("round_number", nextRound);
       }
 
       // Handle byes (auto-advance)

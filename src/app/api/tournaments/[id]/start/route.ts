@@ -288,9 +288,19 @@ export async function POST(
     }));
 
     const writes: PromiseLike<any>[] = [];
+    let createdGameIds: Record<string, string> = {};
 
     if (gameRows.length > 0) {
-      writes.push(admin.from("games").insert(gameRows));
+      writes.push(
+        admin.from("games")
+          .insert(gameRows)
+          .select("id, white_player_id, black_player_id")
+          .then((res: any) => {
+            for (const g of res.data || []) {
+              createdGameIds[`${g.white_player_id}|${g.black_player_id}`] = g.id;
+            }
+          })
+      );
     }
 
     if (byePairings.length > 0) {
@@ -309,6 +319,20 @@ export async function POST(
     const writeError = writeResults.find((r: any) => r?.error)?.error;
     if (writeError) {
       console.error("Game/bye creation error:", writeError);
+    }
+
+    // Update round pairings with the created game_ids so the client can
+    // auto-redirect players to their game board.
+    if (Object.keys(createdGameIds).length > 0) {
+      const pairingsWithGameIds = groupSchedulePairings.map((p: any) => ({
+        ...p,
+        game_id: createdGameIds[`${p.white}|${p.black}`] || null,
+      }));
+      await admin
+        .from("tournament_rounds")
+        .update({ pairings: pairingsWithGameIds })
+        .eq("tournament_id", tournamentId)
+        .eq("round_number", 1);
     }
 
     // Update tournament status
