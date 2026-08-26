@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// Combined tournament cron — does auto-start + auto-advance in one call.
-// Runs every 5 minutes via Base44 workflow (backend function trigger).
+// Combined tournament cron — does auto-start + auto-advance + start-scheduled in one call.
+// Triggered by Base44 workflow (every 5 min) or cron-job.org. No auth required.
 export async function GET(req: NextRequest) {
   return handleTournamentCron(req);
 }
@@ -383,6 +383,55 @@ async function handleTournamentCron(req: NextRequest) {
       } catch (e: any) {
         results.errors.push(`${tournament.name} advance: ${e.message}`);
       }
+    }
+
+    // ── 3. START-SCHEDULED GAMES: Transition "waiting" games to "playing" when their scheduled_start has passed ──
+    const { data: waitingGames } = await admin
+      .from("games")
+      .select("id, tournament_id, white_player_id, black_player_id, tournament_round")
+      .eq("status", "waiting")
+      .not("scheduled_start", "is", null)
+      .lte("scheduled_start", now);
+
+    if (waitingGames && waitingGames.length > 0) {
+      const gameIds = waitingGames.map((g) => g.id);
+      await admin
+        .from("games")
+        .update({ status: "playing", last_move_at: now })
+        .in("id", gameIds);
+
+      // Send game_started notifications
+      const tournamentIds = [...new Set(waitingGames.map((g) => g.tournament_id))];
+      const { data: tournaments } = await admin
+        .from("tournaments")
+        .select("id, name")
+        .in("id", tournamentIds);
+      const tournamentMap = new Map((tournaments || []).map((t) => [t.id, t.name]));
+
+      const notifications = waitingGames.flatMap((g) => [
+        {
+          user_id: g.white_player_id,
+          type: "game_started",
+          title: `Your game has started — ${tournamentMap.get(g.tournament_id) || "Tournament"}`,
+          body: `Round ${g.tournament_round} has begun! Your clock is running. Make your move now.`,
+          data: { gameId: g.id, tournamentId: g.tournament_id },
+          read: false,
+        },
+        {
+          user_id: g.black_player_id,
+          type: "game_started",
+          title: `Your game has started — ${tournamentMap.get(g.tournament_id) || "Tournament"}`,
+          body: `Round ${g.tournament_round} has begun! Your clock is running. Make your move now.`,
+          data: { gameId: g.id, tournamentId: g.tournament_id },
+          read: false,
+        },
+      ]);
+
+      if (notifications.length > 0) {
+        await admin.from("notifications").insert(notifications).then(() => {}, () => {});
+      }
+
+      (results as any).gamesStarted = gameIds.length;
     }
 
     return NextResponse.json(results);
