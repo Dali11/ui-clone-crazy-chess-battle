@@ -875,12 +875,6 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
       {/* Moves + opening area — fixed height slot, nothing enters/leaves flow */}
       <div className="relative max-w-[600px] mx-auto w-full px-2 py-1 h-[62px]">
-        {/* Opening badge — absolutely positioned, never affects layout */}
-        {moveHistory.length >= 2 && (
-          <div className="absolute top-0.5 left-3 z-10">
-            <OpeningBadge moves={moveHistory} />
-          </div>
-        )}
         {/* Move scroller — pinned to bottom of the fixed-height slot */}
         <div className="absolute bottom-1 inset-x-2 rounded-lg bg-ccb-surface/50 border border-ccb-border/50 px-2 py-1.5">
           <MoveScroller moves={moveHistory} currentPly={viewPly} onPlyChange={setViewPly} />
