@@ -22,7 +22,7 @@ export async function POST(
     // Verify tournament exists and is upcoming
     const { data: tournament } = await supabase
       .from("tournaments")
-      .select("status, entry_fee_cents, prize_pool_cents, pool_source")
+      .select("status")
       .eq("id", tournamentId)
       .single();
 
@@ -37,33 +37,9 @@ export async function POST(
       );
     }
 
-    // Check if player paid entry fee — refund if so
+    // Remove participant — entry fee is NOT refunded on voluntary withdrawal.
+    // Refunds only happen when admin cancels the tournament.
     const admin = createAdminClient();
-    const { data: participant } = await admin
-      .from("tournament_participants")
-      .select("paid_entry_fee")
-      .eq("tournament_id", tournamentId)
-      .eq("player_id", user.id)
-      .single();
-
-    if (participant?.paid_entry_fee && tournament.entry_fee_cents) {
-      // Refund entry fee
-      await admin.rpc("credit_wallet", {
-        p_user_id: user.id,
-        p_amount_cents: tournament.entry_fee_cents,
-      });
-
-      // Deduct from prize pool ONLY if pool_source is 'entry_fees' (not 'fixed')
-      if (tournament.pool_source !== 'fixed') {
-        await admin
-          .from("tournaments")
-          .update({
-            prize_pool_cents: Math.max(0, (tournament.prize_pool_cents || 0) - tournament.entry_fee_cents),
-          })
-          .eq("id", tournamentId);
-      }
-    }
-
     const { error } = await admin
       .from("tournament_participants")
       .delete()
