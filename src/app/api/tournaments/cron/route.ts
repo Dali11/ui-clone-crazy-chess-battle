@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 
 // Combined tournament cron — does auto-start + auto-advance + start-scheduled in one call.
 // Triggered by Base44 workflow (every 5 min) or cron-job.org. No auth required.

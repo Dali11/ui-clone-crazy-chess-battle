@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
 import { settleBattle } from "@/lib/battles/settle";
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -66,6 +67,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         // Insert in-app notification directly (no self-HTTP fetch)
         try {
+          // Send branded email
+          await sendEmail({
+            to: (await admin.from("profiles").select("email").eq("id", withdrawal.user_id).single()).data?.email || "",
+            subject: `Withdrawal sent — ${withdrawal.amount} ${withdrawal.currency || "MWK"}`,
+            template: "withdrawal_approved",
+            data: { amount: withdrawal.amount, currency: withdrawal.currency || "MWK", method: withdrawal.method, reference: withdrawal.reference },
+          }).catch(() => {});
+
           await admin.from("notifications").insert({
             user_id: withdrawal.user_id,
             type: "withdrawal_approved",

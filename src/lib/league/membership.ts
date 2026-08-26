@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getPlatformConfig } from '@/lib/platform-config';
+import { sendEmail } from '@/lib/email';
 
 /**
  * Creates + activates a CrazyChess Club membership row and notifies the user.
@@ -66,6 +67,17 @@ export async function activateMembership(
   }
 
   try {
+    // Send membership email
+    const memProfile = await admin.from('profiles').select('email').eq('id', userId).single();
+    if (memProfile.data?.email) {
+      await sendEmail({
+        to: memProfile.data.email,
+        subject: 'Membership is active! 🎟️',
+        template: 'membership_activated',
+        data: { planName: 'CrazyChess Club', expiresAt: new Date(Date.now() + 30*24*60*60*1000).toLocaleDateString() },
+      }).catch(() => {});
+    }
+
     await admin.from('notifications').insert({
       user_id: userId,
       type: 'membership_active',

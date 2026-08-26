@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -40,7 +41,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Notify user
     const amountMWK = Math.floor(deposit.amount_cents / 100);
     try {
-      await admin.from("notifications").insert({
+      // Send branded email
+    const rejProfile = await admin.from("profiles").select("email").eq("id", deposit.user_id).single();
+    await sendEmail({
+      to: rejProfile.data?.email || "",
+      subject: "Deposit update — Crazy Chess Battles",
+      template: "withdrawal_rejected",
+      data: { amount: (deposit.amount_cents / 100).toFixed(2), currency: "MWK", reason: notes || "Deposit could not be verified" },
+    }).catch(() => {});
+
+    await admin.from("notifications").insert({
         user_id: deposit.user_id,
         type: "deposit_failed",
         title: "Deposit failed",

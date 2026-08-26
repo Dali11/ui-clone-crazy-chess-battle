@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateKnockoutBracket, knockoutRoundCount, generateGroups, generateGroupRoundRobin } from "@/lib/tournament/knockout";
+import { sendEmail } from "@/lib/email";
 
 // Allow enough time for large tournaments (100+ players) to seed + create games
 export const maxDuration = 60;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -53,7 +54,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Insert in-app notification directly (no self-HTTP fetch)
     const amountMWK = Math.floor(withdrawal.amount_cents / 100);
     try {
-      await admin.from("notifications").insert({
+      // Send branded email
+    await sendEmail({
+      to: (await admin.from("profiles").select("email").eq("id", withdrawal.user_id).single()).data?.email || "",
+      subject: "Withdrawal update — Crazy Chess Battles",
+      template: "withdrawal_rejected",
+      data: { amount: (withdrawal.amount_cents / 100).toFixed(2), currency: "MWK", reason: adminNotes || "Could not be processed" },
+    }).catch(() => {});
+
+    await admin.from("notifications").insert({
         user_id: withdrawal.user_id,
         type: "withdrawal_rejected",
         title: "Your withdrawal request was rejected",

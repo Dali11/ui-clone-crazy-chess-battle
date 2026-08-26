@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 
 const LEVEL_RATINGS: Record<string, number> = {
   beginner: 400,
@@ -44,6 +45,18 @@ export async function POST(req: NextRequest) {
     if (updateError) {
       console.error("Failed to update rating:", updateError);
       return NextResponse.json({ error: "Failed to set rating" }, { status: 500 });
+    }
+
+    // Send welcome email
+    const username = userData.user.user_metadata?.username || "Player";
+    const email = userData.user.email || "";
+    if (email) {
+      await sendEmail({
+        to: email,
+        subject: `Welcome to Crazy Chess Battles, ${username}! ♟️`,
+        template: "welcome",
+        data: { username, rating: targetRating },
+      });
     }
 
     return NextResponse.json({ 

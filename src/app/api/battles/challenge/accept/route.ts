@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 import { DEFAULT_CONFIG, calcPayout } from "@/lib/battles/battle-helpers";
 
 /**

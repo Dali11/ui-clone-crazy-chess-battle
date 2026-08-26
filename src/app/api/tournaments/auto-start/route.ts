@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 
 // Can be triggered by cron (with CRON_SECRET) or by any authenticated user
 // Also support GET for cron-job.org
@@ -80,6 +81,22 @@ async function handleAutoStart(req: NextRequest) {
           // Notify all participants
           for (const p of participants || []) {
             try {
+              // Send cancellation email
+              const cancelProfile = await admin.from("profiles").select("email").eq("id", p.player_id).single();
+              if (cancelProfile.data?.email) {
+                await sendEmail({
+                  to: cancelProfile.data.email,
+                  subject: `${tournament.name} has been cancelled`,
+                  template: "tournament_cancelled",
+                  data: {
+                    tournamentName: tournament.name,
+                    refunded: true,
+                    reason: "Insufficient players to start",
+                    tournamentId: tournament.id,
+                  },
+                }).catch(() => {});
+              }
+
               await admin.from("notifications").insert({
                 user_id: p.player_id,
                 type: "tournament_cancelled",

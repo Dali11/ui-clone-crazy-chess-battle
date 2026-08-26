@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -59,6 +60,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Notify user
     const amountMWK = Math.floor(deposit.amount_cents / 100);
     try {
+      // Send branded email
+      const depProfile = await admin.from("profiles").select("email").eq("id", deposit.user_id).single();
+      await sendEmail({
+        to: depProfile.data?.email || "",
+        subject: `Deposit confirmed — ${amountMWK.toLocaleString()} MWK`,
+        template: "deposit_credited",
+        data: { amount: amountMWK.toLocaleString(), currency: "MWK", newBalance: amountMWK.toLocaleString(), method: deposit.method },
+      }).catch(() => {});
+
       await admin.from("notifications").insert({
         user_id: deposit.user_id,
         type: "deposit_success",
