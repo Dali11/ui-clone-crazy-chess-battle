@@ -126,7 +126,7 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
     const battleWinnerId = winner === "white"
       ? (isArmageddon ? battle.black_player_id : battle.white_player_id)
       : (isArmageddon ? battle.white_player_id : battle.black_player_id);
-    settleBattle(battle.id, battleWinnerId, "timeout").catch((e) => console.error("Battle settlement failed:", e));
+    await settleBattle(battle.id, battleWinnerId, "timeout").catch((e) => console.error("Battle settlement failed:", e));
   }
 
   return { status: "timeout" as const, winner };

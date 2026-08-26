@@ -223,7 +223,7 @@ export async function POST(req: NextRequest) {
         }
         // result.winner null = draw -> battleWinnerId stays null -> triggers armageddon
 
-        settleBattle(battle.id, battleWinnerId, result.status || "draw").catch((e) => console.error("Battle settlement failed:", e));
+        await settleBattle(battle.id, battleWinnerId, result.status || "draw").catch((e) => console.error("Battle settlement failed:", e));
       }
     }
 

@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
         ? (isArmageddon ? battle.black_player_id : battle.white_player_id)
         : (isArmageddon ? battle.white_player_id : battle.black_player_id);
 
-      settleBattle(battle.id, battleWinnerId, "resign").catch((e) => console.error("Battle settlement failed:", e));
+      await settleBattle(battle.id, battleWinnerId, "resign").catch((e) => console.error("Battle settlement failed:", e));
     }
 
     return NextResponse.json({ status: "resigned", winner, berries });
