@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Chessboard } from "react-chessboard";
 import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
-import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Timer, Swords } from "lucide-react";
+import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Timer, Swords, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { getCapturedPieces, getCheckSquare } from "@/lib/game/board-helpers";
 import { playSound, detectMoveSound, setSoundEnabled } from "@/lib/game/sound";
@@ -858,15 +858,32 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           <Swords className="w-3.5 h-3.5 text-ccb-primary" />
           <span className="text-sm font-bold text-ccb-text">Crazy Chess Battles</span>
         </div>
-        <button onClick={() => toggleSheet("menu")} className="p-1.5 -mr-1.5 text-ccb-muted hover:text-ccb-primary">
-          <MoreVertical className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => window.location.reload()}
+            className="p-1.5 -mr-1 text-ccb-muted hover:text-ccb-primary"
+            title="Refresh if the board looks stuck"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button onClick={() => toggleSheet("menu")} className="p-1.5 -mr-1.5 text-ccb-muted hover:text-ccb-primary">
+            <MoreVertical className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {connectionQuality === "reconnecting" && (
-        <div className="shrink-0 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-500 px-4 py-1.5 text-xs text-center max-w-[600px] mx-auto w-full mt-1 flex items-center justify-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          Reconnecting… Your moves are queued.
+        <div className="shrink-0 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-500 px-4 py-1.5 text-xs text-center max-w-[600px] mx-auto w-full mt-1 flex items-center justify-center gap-2">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Reconnecting… Your moves are queued.
+          </span>
+          <button
+            onClick={() => window.location.reload()}
+            className="underline font-medium shrink-0"
+          >
+            Refresh
+          </button>
         </div>
       )}
 
