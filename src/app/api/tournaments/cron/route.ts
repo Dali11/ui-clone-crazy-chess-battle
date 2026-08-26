@@ -29,6 +29,27 @@ async function handleTournamentCron(req: NextRequest) {
       .eq("status", "upcoming")
       .lte("starts_at", now);
 
+    // DEBUG: also fetch all upcoming tournaments (regardless of starts_at)
+    // and all non-completed tournaments to diagnose auto-start failures
+    const { data: allUpcoming } = await admin
+      .from("tournaments")
+      .select("id, name, starts_at, status, min_players")
+      .eq("status", "upcoming")
+      .order("starts_at", { ascending: true })
+      .limit(10);
+    const { data: allOther } = await admin
+      .from("tournaments")
+      .select("id, name, starts_at, status, min_players")
+      .in("status", ["pending_approval", "active", "cancelled"])
+      .order("starts_at", { ascending: true })
+      .limit(10);
+    (results as any)._debug = {
+      now,
+      upcomingReadyToStart: (toStart || []).map((t: any) => ({ id: t.id, name: t.name, starts_at: t.starts_at })),
+      allUpcoming: (allUpcoming || []).map((t: any) => ({ id: t.id, name: t.name, starts_at: t.starts_at, min_players: t.min_players })),
+      otherStatuses: (allOther || []).map((t: any) => ({ id: t.id, name: t.name, starts_at: t.starts_at, status: t.status })),
+    };
+
     for (const tournament of toStart || []) {
       try {
         const { data: participants } = await admin
