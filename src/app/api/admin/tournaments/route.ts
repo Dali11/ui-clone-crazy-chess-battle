@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       .from("tournaments")
       .select(`
         id, name, description, type, status, time_control, initial_minutes, increment_seconds,
-        entry_fee_cents, prize_pool_cents, prize_distribution, pool_source, pool_source,
+        entry_fee_cents, prize_pool_cents, prize_distribution, pool_source,
         max_players, min_rating, max_rating, current_round, rounds, duration_minutes,
         starts_at, ends_at, created_at, created_by
       `)
