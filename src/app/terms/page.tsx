@@ -39,11 +39,11 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-ccb-text font-semibold text-lg mb-2">4. Wallet, Deposits, and Withdrawals</h2>
-            <p className="mb-2">CCB uses Paychangu to process mobile money and card payments for wallet deposits and withdrawals.</p>
+            <p className="mb-2">CCB uses Paychangu to process mobile money payments for wallet deposits and withdrawals.</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>Deposits are credited to your CCB wallet after payment confirmation.</li>
               <li>Entry fees for paid tournaments are debited from your wallet at registration.</li>
-              <li>Withdrawals are processed to your mobile money account within 24 hours of admin approval.</li>
+              <li>Withdrawals are processed to your mobile money account. Auto-approved withdrawals are sent instantly; manually reviewed withdrawals are processed within 30 minutes.</li>
               <li>Minimum withdrawal amount is MWK 10.</li>
               <li>CCB reserves the right to reject withdrawal requests suspected of fraud or violation of these Terms.</li>
             </ul>

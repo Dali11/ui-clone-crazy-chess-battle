@@ -331,7 +331,11 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
 
       // Optimistically update balance
       setBalance((prev) => prev - withdrawAmount * 100);
-      setSuccess(`Withdrawal request for MWK ${withdrawAmount.toLocaleString()} submitted. You'll receive it within 24 hours after admin approval.`);
+      if (data.status === "completed" || data.auto) {
+        setSuccess(`MWK ${withdrawAmount.toLocaleString()} has been sent to your phone. You should receive it shortly.`);
+      } else {
+        setSuccess(`Withdrawal request for MWK ${withdrawAmount.toLocaleString()} submitted. You'll receive it within 30 minutes after admin approval.`);
+      }
       router.refresh();
 
       // Refresh withdrawal list
