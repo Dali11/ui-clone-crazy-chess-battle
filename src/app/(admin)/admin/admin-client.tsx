@@ -695,8 +695,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       duration_minutes: t.duration_minutes || "",
       starts_at: t.starts_at ? utcToLocalInput(t.starts_at) : "",
       ends_at: t.ends_at ? utcToLocalInput(t.ends_at) : "",
-      entry_fee_cents: t.entry_fee_cents || 0,
-      prize_pool_cents: t.prize_pool_cents || 0,
+      entry_fee_cents: Math.floor((t.entry_fee_cents || 0) / 100),
+      prize_pool_cents: Math.floor((t.prize_pool_cents || 0) / 100),
       pool_source: t.pool_source || 'entry_fees',
     });
   };
@@ -710,6 +710,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
         if (v !== "" && v !== null) {
           if (k === "starts_at" || k === "ends_at") {
             body[k] = v ? localToUTC(v as string) : null;
+          } else if (k === "entry_fee_cents" || k === "prize_pool_cents") {
+            body[k] = v === "" ? null : Number(v) * 100;
           } else {
             body[k] = v === "" ? null : v;
           }
@@ -828,9 +830,9 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           durationMinutes: createForm.duration_minutes ? Number(createForm.duration_minutes) : null,
           startsAt: localToUTC(createForm.starts_at),
           endsAt: createForm.ends_at ? localToUTC(createForm.ends_at) : null,
-          entryFeeCents: Number(createForm.entry_fee_cents) || 0,
+          entryFeeCents: (Number(createForm.entry_fee_cents) || 0) * 100,
           creatorProfitPercent: Number(createForm.creator_profit_percent) || 0,
-          prizePoolCents: Number(createForm.prize_pool_cents) || 0,
+          prizePoolCents: (Number(createForm.prize_pool_cents) || 0) * 100,
           poolSource: createForm.pool_source || 'entry_fees',
           minRating: Number(createForm.min_rating) || 0,
           maxRating: createForm.max_rating ? Number(createForm.max_rating) : null,
@@ -1243,8 +1245,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
 
                         <ActionButton
                           onClick={() => {
-                            const val = prompt("Adjust wallet (positive=credit, negative=debit, in MWK cents):", "1000");
-                            if (val !== null) handleUserAction(u.id, "adjust_wallet", parseInt(val));
+                            const val = prompt("Adjust wallet (positive=credit, negative=debit, in MK):", "10");
+                            if (val !== null) handleUserAction(u.id, "adjust_wallet", parseInt(val) * 100);
                           }}
                           loading={actionLoading === `${u.id}_adjust_wallet`}
                           variant="default"
@@ -1922,7 +1924,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs font-medium text-ccb-muted">Entry Fee (MK cents)</label>
+                          <label className="text-xs font-medium text-ccb-muted">Entry Fee (MK)</label>
                           <input type="number" value={createForm.entry_fee_cents ?? 0} onChange={(e) => setCreateForm({ ...createForm, entry_fee_cents: e.target.value })} className="input-field mt-1 w-full" placeholder="0 = free" />
                         </div>
                         <div>
@@ -1958,8 +1960,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       {/* Fixed Prize Pool Amount (only shown when pool_source = 'fixed') */}
                       {createForm.pool_source === 'fixed' && (
                         <div>
-                          <label className="text-xs font-medium text-ccb-muted">Fixed Prize Pool (MK cents)</label>
-                          <input type="number" value={createForm.prize_pool_cents ?? 0} onChange={(e) => setCreateForm({ ...createForm, prize_pool_cents: e.target.value })} className="input-field mt-1 w-full" placeholder="e.g. 100000 = MK 1,000" />
+                          <label className="text-xs font-medium text-ccb-muted">Fixed Prize Pool (MK)</label>
+                          <input type="number" value={createForm.prize_pool_cents ?? 0} onChange={(e) => setCreateForm({ ...createForm, prize_pool_cents: e.target.value })} className="input-field mt-1 w-full" placeholder="e.g. 50000 = MK 50,000" />
                           <p className="text-[10px] text-ccb-muted mt-1">This amount is guaranteed by the platform regardless of player count.</p>
                         </div>
                       )}
@@ -2236,11 +2238,11 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs font-medium text-ccb-muted">Entry Fee (MK cents)</label>
+                          <label className="text-xs font-medium text-ccb-muted">Entry Fee (MK)</label>
                           <input type="number" value={editForm.entry_fee_cents ?? 0} onChange={(e) => setEditForm({ ...editForm, entry_fee_cents: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-ccb-muted">Prize Pool (MK cents)</label>
+                          <label className="text-xs font-medium text-ccb-muted">Prize Pool (MK)</label>
                           <input type="number" value={editForm.prize_pool_cents ?? 0} onChange={(e) => setEditForm({ ...editForm, prize_pool_cents: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                       </div>
@@ -2306,7 +2308,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       {prizeForm.payouts?.map((payout: any, i: number) => (
                         <div key={i} className="flex items-center gap-2">
                           <span className="text-xs text-ccb-muted w-8">#{payout.rank}</span>
-                          <input type="number" value={prizeForm.type === "flat" ? payout.amount_cents ?? 0 : payout.percentage ?? 0} onChange={(e) => updatePrizePayout(i, prizeForm.type === "flat" ? "amount_cents" : "percentage", Number(e.target.value))} className="input-field flex-1" placeholder={prizeForm.type === "flat" ? "Amount (cents)" : "Percentage (%)"} />
+                          <input type="number" value={prizeForm.type === "flat" ? Math.floor((payout.amount_cents ?? 0) / 100) : payout.percentage ?? 0} onChange={(e) => updatePrizePayout(i, prizeForm.type === "flat" ? "amount_cents" : "percentage", prizeForm.type === "flat" ? Number(e.target.value) * 100 : Number(e.target.value))} className="input-field flex-1" placeholder={prizeForm.type === "flat" ? "Amount (MK)" : "Percentage (%)"} />
                           {prizeForm.type === "percentage" && <span className="text-xs text-ccb-muted w-20 text-right">= {formatMWK(Math.floor((prizeEditTournament.prize_pool_cents * (payout.percentage || 0)) / 100))}</span>}
                           <button onClick={() => removePrizePayout(i)} className="text-ccb-danger hover:bg-ccb-danger/10 p-1 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
@@ -2895,7 +2897,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <span className="text-xs text-ccb-muted">{league.participant_count} players</span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <ConfigInput label="Prize Pool (cents)" value={leagueEdits[league.id]?.prize_pool_cents ?? league.prize_pool_cents} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], prize_pool_cents: v } }))} />
+                      <ConfigInput label="Prize Pool (MK)" value={leagueEdits[league.id]?.prize_pool_cents ?? Math.floor((league.prize_pool_cents || 0) / 100)} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], prize_pool_cents: Number(v) * 100 } }))} />
                       <ConfigInput label="League Size" value={leagueEdits[league.id]?.league_size ?? league.league_size} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], league_size: v } }))} />
                       <ConfigInput label="Promotes" value={leagueEdits[league.id]?.promotes_count ?? league.promotes_count} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], promotes_count: v } }))} />
                       <ConfigInput label="Relegates" value={leagueEdits[league.id]?.relegates_count ?? league.relegates_count} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], relegates_count: v } }))} />
