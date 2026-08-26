@@ -339,7 +339,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-24 sm:pb-6 max-w-2xl">
-      <div className="sticky top-0 z-10 -mx-4 px-4 sm:mx-0 sm:px-0 py-2 bg-ccb-bg/95 backdrop-blur-sm">
+      <div className="sticky top-0 z-10 -mx-4 px-4 sm:mx-0 sm:px-0 py-2 bg-ccb-dark/95 backdrop-blur-sm">
         <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
           {TABS.map((tab) => { const Icon = tab.icon; const isActive = activeTab === tab.id; return (
             <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSaved(false); setError(null); }}

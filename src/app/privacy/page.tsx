@@ -11,7 +11,7 @@ export const metadata = pageMetadata({
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-ccb-bg text-ccb-text">
+    <div className="min-h-screen bg-ccb-dark text-ccb-text">
       <div className="max-w-2xl mx-auto px-4 py-12">
         <div className="flex items-center gap-3 mb-8">
           <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-8 h-8 rounded-full" />

@@ -1146,14 +1146,31 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         )}
       </div>
 
+      {/* Dimming backdrop behind the mobile sheet — without this, the sheet's
+          card background sat directly on the board/countdown with no visual
+          separation, so it was unclear where the page ended and the chat
+          panel began. Tapping the dimmed area closes the sheet, same as the
+          menu dropdown below. */}
+      {activeSheet && activeSheet !== "menu" && (
+        <div
+          className="lg:hidden absolute inset-0 z-40 bg-black/50 animate-fade-in"
+          onClick={() => setActiveSheet(null)}
+        />
+      )}
+
       {/* Mobile bottom sheet (Chat + Theme) — GameChat stays mounted (just hidden)
           so its realtime channel subscribes as soon as the game loads, not only
           once the sheet is opened. Otherwise messages sent before both players
           have opened chat at least once are silently lost (broadcast has no
           persistence/history). */}
-      <div className={`lg:hidden absolute inset-x-2 bottom-16 z-20 max-h-[45%] rounded-xl border border-ccb-border bg-ccb-card shadow-2xl flex flex-col overflow-hidden ${activeSheet && activeSheet !== "menu" ? "animate-sheet-up" : "hidden"}`}>
+      <div className={`lg:hidden absolute inset-x-2 bottom-16 z-50 max-h-[45%] rounded-2xl border border-ccb-border bg-ccb-card shadow-2xl flex flex-col overflow-hidden ${activeSheet && activeSheet !== "menu" ? "animate-sheet-up" : "hidden"}`}>
+        {/* Drag-handle bar — standard bottom-sheet affordance, makes it read
+            unmistakably as a floating panel rather than part of the board */}
+        <div className="flex justify-center pt-2 pb-1 shrink-0">
+          <div className="w-9 h-1 rounded-full bg-ccb-border" />
+        </div>
         <div className="flex items-center justify-between px-3 py-2 border-b border-ccb-border shrink-0">
-          <span className="text-sm font-medium">
+          <span className="text-sm font-semibold text-ccb-text">
             {activeSheet === "chat" ? "Chat" : "Board Theme"}
           </span>
           <button onClick={() => setActiveSheet(null)} className="text-ccb-muted hover:text-ccb-primary p-1">

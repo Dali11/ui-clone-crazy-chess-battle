@@ -89,7 +89,7 @@ export default function PreGameCountdown({
       <div className="absolute inset-0 z-30 flex items-center justify-center rounded-lg overflow-hidden">
         {/* Strong solid backdrop — the board underneath should read as a
             faint texture, not a distracting, half-legible game of pieces. */}
-        <div className="absolute inset-0 bg-ccb-bg/92 backdrop-blur-md" />
+        <div className="absolute inset-0 bg-ccb-dark/95 backdrop-blur-md" />
         {/* Soft brand-colored glow behind the VS badge for depth */}
         <div className="absolute w-56 h-56 rounded-full bg-ccb-primary/10 blur-3xl" />
 
@@ -106,7 +106,7 @@ export default function PreGameCountdown({
 
           {/* Countdown timer */}
           <div className="mb-3">
-            <p className="text-xs text-ccb-muted mb-1 tracking-wide uppercase">Game starts in</p>
+            <p className="text-xs text-ccb-text/80 font-semibold mb-1 tracking-wide uppercase">Game starts in</p>
             <div
               className={`text-5xl font-bold tabular-nums ${
                 isUrgent ? "text-red-500 animate-pulse" : "text-ccb-primary"
