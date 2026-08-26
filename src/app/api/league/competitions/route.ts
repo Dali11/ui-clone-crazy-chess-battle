@@ -217,6 +217,7 @@ export async function GET(request: NextRequest) {
         rounds: tournament.rounds,
         startsAt: tournament.starts_at,
         timeControl: tournament.time_control,
+        thumbnailUrl: tournament.thumbnail_url,
         isRegistered,
         qualification: { canJoin, reason },
       });

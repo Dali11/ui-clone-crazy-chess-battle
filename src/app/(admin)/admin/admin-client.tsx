@@ -836,6 +836,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           poolSource: createForm.pool_source || 'entry_fees',
           minRating: Number(createForm.min_rating) || 0,
           maxRating: createForm.max_rating ? Number(createForm.max_rating) : null,
+          thumbnailDataUrl: createForm.thumbnail_data_url || null,
         }),
       });
       const data = await res.json();
@@ -1854,6 +1855,34 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <div>
                         <label className="text-xs font-medium text-ccb-muted">Description</label>
                         <textarea value={createForm.description || ""} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} className="input-field mt-1 w-full" rows={2} placeholder="Optional description" />
+                      </div>
+                      {/* THUMBNAIL */}
+                      <div>
+                        <label className="text-xs font-medium text-ccb-muted">Thumbnail Image (optional)</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => setCreateForm({ ...createForm, thumbnail_data_url: reader.result });
+                            reader.readAsDataURL(file);
+                            setCreateForm(prev => ({ ...prev, thumbnail_file_name: file.name }));
+                          }}
+                          className="input-field mt-1 w-full text-xs"
+                        />
+                        {createForm.thumbnail_data_url && (
+                          <div className="mt-2 relative rounded-xl overflow-hidden h-24">
+                            <img src={createForm.thumbnail_data_url} alt="Preview" className="w-full h-full object-cover" />
+                            <button
+                              onClick={() => setCreateForm({ ...createForm, thumbnail_data_url: null, thumbnail_file_name: null })}
+                              className="absolute top-1 right-1 bg-ccb-danger/90 text-white rounded-full p-1 hover:bg-ccb-danger"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>

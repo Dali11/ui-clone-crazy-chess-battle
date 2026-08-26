@@ -20,6 +20,7 @@ interface Competition {
   entryFee?: number;
   currency?: string;
   currencySymbol?: string;
+  thumbnailUrl?: string | null;
   isRegistered?: boolean;
   qualification: { canJoin: boolean; reason: string | null };
 }
@@ -182,12 +183,33 @@ export default function TournamentsTab() {
             const isParticipating = comp.isRegistered;
 
             return (
-              <div key={comp.id} className={`bg-ccb-card border rounded-2xl p-4 flex flex-col ${isLive ? 'border-ccb-success/30' : 'border-ccb-border'}`}>
+              <div key={comp.id} className={`bg-ccb-card border rounded-2xl flex flex-col overflow-hidden ${isLive ? 'border-ccb-success/30' : 'border-ccb-border'}`}>
+                {/* THUMBNAIL BANNER (only when thumbnail exists) */}
+                {comp.thumbnailUrl && (
+                  <div className="relative h-28 overflow-hidden">
+                    <img src={comp.thumbnailUrl} alt={comp.name} className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-ccb-card/90 via-ccb-card/30 to-transparent" />
+                    <div className="absolute top-2 right-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isPaid ? 'bg-ccb-primary/90 text-white border border-ccb-primary/50' : 'bg-ccb-success/90 text-white border border-ccb-success/50'}`}>
+                        {isPaid ? 'PAID' : 'FREE'}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-2 left-3">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${status.color}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                        {status.label}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <div className="p-4 flex flex-col flex-1">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3 min-w-0">
+                    {!comp.thumbnailUrl && (
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isLive ? 'bg-ccb-success/10 border border-ccb-success/30' : 'bg-ccb-accent/10 border border-ccb-accent/30'}`}>
                       <Swords className={`w-5 h-5 ${isLive ? 'text-ccb-success' : 'text-ccb-accent'}`} />
                     </div>
+                    )}
                     <div className="min-w-0">
                       <h3 className="font-bold text-sm truncate">{comp.name}</h3>
                       <div className="flex items-center gap-2 mt-0.5">
@@ -199,9 +221,11 @@ export default function TournamentsTab() {
                       </div>
                     </div>
                   </div>
+                  {!comp.thumbnailUrl && (
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isPaid ? 'bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30' : 'bg-ccb-success/10 text-ccb-success border border-ccb-success/30'}`}>
                     {isPaid ? 'PAID' : 'FREE'}
                   </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3 mb-3 text-xs text-ccb-muted flex-wrap">
@@ -250,6 +274,7 @@ export default function TournamentsTab() {
                 <Link href={`/tournament/${comp.id}`} className="mt-2 text-center text-xs text-ccb-muted hover:text-ccb-accent transition-colors">
                   Details &rarr;
                 </Link>
+                </div>
               </div>
             );
           })}

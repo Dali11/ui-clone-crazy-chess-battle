@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
       rounds, durationMinutes, startsAt, endsAt,
       entryFeeCents = 0, creatorProfitPercent = 0, minRating = 0, maxRating,
       prizePoolCents = 0, poolSource = "entry_fees",
+      thumbnailDataUrl = null,
     } = body;
 
     if (!name || !startsAt) {
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
         prize_distribution: { type: "percentage", payouts },
         min_rating: Number(minRating || 0),
         max_rating: maxRating ? Number(maxRating) : null,
+        thumbnail_url: thumbnailDataUrl || null,
         created_by: user.id,
         status: initialStatus,
       })

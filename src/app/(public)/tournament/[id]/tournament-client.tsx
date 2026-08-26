@@ -36,6 +36,7 @@ interface TournamentData {
     entry_fee_cents: number;
     prize_pool_cents: number;
     pool_source: string | null;
+    thumbnail_url: string | null;
     berry_prize_pool: number | null;
     prize_distribution: any;
     min_players: number;
@@ -288,19 +289,27 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   return (
     <div className="pb-20 sm:pb-8">
       {/* BACK LINK */}
-      <div className="px-5 sm:px-6 lg:px-8 mb-4">
+      <div className="px-3 sm:px-6 lg:px-8 mb-4">
         <Link href="/league" className="inline-flex items-center gap-1.5 text-sm text-ccb-muted hover:text-ccb-text transition-colors">
           <ArrowLeft className="w-4 h-4" /> Compete
         </Link>
       </div>
 
       {/* HERO HEADER */}
-      <div className="px-5 sm:px-6 lg:px-8 mb-5">
+      <div className="px-3 sm:px-6 lg:px-8 mb-5">
         <div className={`relative overflow-hidden rounded-2xl border ${isLive ? 'border-ccb-success/30' : 'border-ccb-border'} bg-gradient-to-br from-ccb-card via-ccb-card to-ccb-surface`}>
           {isLive && <div className="absolute -right-20 -top-20 w-64 h-64 bg-ccb-success/5 rounded-full blur-3xl pointer-events-none" />}
           {!isLive && hasPrizePool && <div className="absolute -right-20 -top-20 w-64 h-64 bg-ccb-accent/5 rounded-full blur-3xl pointer-events-none" />}
 
-          <div className="relative p-5 sm:p-6 space-y-4">
+          <div className="relative p-4 sm:p-6 space-y-4">
+            {/* THUMBNAIL */}
+            {t.thumbnail_url && (
+              <div className="relative -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-2 h-32 sm:h-40 overflow-hidden rounded-t-2xl">
+                <img src={t.thumbnail_url} alt={t.name} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-ccb-card via-ccb-card/50 to-transparent" />
+              </div>
+            )}
+
             {/* TITLE ROW */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -463,13 +472,13 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
       {/* PRIZE DISTRIBUTION */}
       {hasPrizePool && (
-        <div className="px-5 sm:px-6 lg:px-8 mb-4">
+        <div className="px-3 sm:px-6 lg:px-8 mb-4">
           <PrizeDistribution t={t} formatMoney={formatMoney} />
         </div>
       )}
 
       {/* TAB BAR */}
-      <div className="px-5 sm:px-6 lg:px-8 mb-4">
+      <div className="px-3 sm:px-6 lg:px-8 mb-4">
         <div className="flex gap-1.5 p-1 bg-ccb-surface rounded-xl border border-ccb-border">
           {(['standings', 'rounds', 'info'] as const).map(tab => (
             <button
@@ -491,7 +500,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       {/* TAB CONTENT */}
-      <div className="px-5 sm:px-6 lg:px-8">
+      <div className="px-3 sm:px-6 lg:px-8">
 
         {/* ========== STANDINGS ========== */}
         {activeTab === 'standings' && (
