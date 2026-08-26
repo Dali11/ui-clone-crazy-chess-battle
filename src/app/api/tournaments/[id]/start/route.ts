@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { generateKnockoutBracket, knockoutRoundCount, generateGroups, generateGroupRoundRobin } from "@/lib/tournament/knockout";
 
 // Allow enough time for large tournaments (100+ players) to seed + create games
 export const maxDuration = 60;
@@ -111,23 +112,112 @@ export async function POST(
       )
     );
 
-    // Generate Swiss pairings for Round 1
+    // Generate pairings based on tournament type
     const pairings: Array<{ white: string; black: string; bye?: string }> = [];
 
-    if (seeded.length === 1) {
-      pairings.push({ white: "", black: "", bye: seeded[0].player_id });
-    } else {
-      const mid = Math.ceil(seeded.length / 2);
-      const topHalf = seeded.slice(0, mid);
-      const bottomHalf = seeded.slice(mid);
+    if (tournament.type === "knockout") {
+      // ─── Knockout: single-elimination bracket ───
+      const knockoutFormat = tournament.knockout_format || "pure";
 
-      for (let i = 0; i < mid; i++) {
-        if (i < bottomHalf.length) {
-          const white = i % 2 === 0 ? topHalf[i].player_id : bottomHalf[i].player_id;
-          const black = i % 2 === 0 ? bottomHalf[i].player_id : topHalf[i].player_id;
-          pairings.push({ white, black });
-        } else {
-          pairings.push({ white: "", black: "", bye: topHalf[i].player_id });
+      if (knockoutFormat === "group_stage") {
+        // Group stage → knockout: start with round-robin groups
+        const groupSize = 4;
+        const groups = generateGroups(
+          seeded.map((s) => ({ player_id: s.player_id, rating: s.rating, seed: s.rating ? 0 : 0 })),
+          groupSize
+        );
+
+        // Actually use seed numbers (not 0)
+        const seedPlayers = seeded.map((s, i) => ({ player_id: s.player_id, rating: s.rating, seed: i + 1 }));
+        const assignments = generateGroups(seedPlayers, groupSize);
+
+        // Group players by group number
+        const groupMap = new Map<number, string[]>();
+        for (const a of assignments) {
+          if (!groupMap.has(a.group)) groupMap.set(a.group, []);
+          groupMap.get(a.group)!.push(a.player_id);
+        }
+
+        // Generate round-robin pairings for each group
+        // All groups play their round 1 simultaneously
+        for (const [groupNum, groupPlayers] of groupMap) {
+          const groupRounds = generateGroupRoundRobin(groupPlayers);
+          // Only take round 1 for now — subsequent group rounds will be generated
+          // Actually, we need to generate ALL group rounds at once for the group stage
+          // But our tournament structure uses tournament_rounds per round_number...
+          // For now, generate all group round pairings and store them as a group_stage_schedule
+          // Then each "round" in the tournament corresponds to one round of ALL groups simultaneously
+          for (let r = 0; r < groupRounds.length; r++) {
+            // We'll handle this via the scheduled pairings approach below
+          }
+        }
+
+        // Simpler approach: generate round 1 pairings across all groups
+        const numGroupRounds = Math.max(...Array.from(groupMap.values()).map(p => generateGroupRoundRobin(p).length));
+        // Store the full group schedule in tournament metadata
+        const groupSchedule: Array<{ round: number; pairings: Array<{ white: string; black: string; bye?: string; group: number }> }> = [];
+
+        for (let r = 0; r < numGroupRounds; r++) {
+          const roundPairings: Array<{ white: string; black: string; bye?: string; group: number }> = [];
+          for (const [groupNum, groupPlayers] of groupMap) {
+            const rr = generateGroupRoundRobin(groupPlayers);
+            if (rr[r]) {
+              for (const p of rr[r]) {
+                roundPairings.push({ ...p, group: groupNum });
+              }
+            }
+          }
+          groupSchedule.push({ round: r + 1, pairings: roundPairings });
+        }
+
+        // Save group schedule to tournament metadata for later rounds
+        await admin.from("tournaments").update({
+          group_schedule: groupSchedule,
+          total_rounds: groupSchedule.length + knockoutRoundCount(
+            Array.from(groupMap.values()).reduce((acc, g) => acc + Math.min(g.length, 2), 0)
+          ),
+        }).eq("id", tournamentId);
+
+        // Use group schedule round 1 pairings
+        const round1Pairings = groupSchedule[0]?.pairings || [];
+        for (const p of round1Pairings) {
+          pairings.push({ white: p.white, black: p.black, bye: p.bye });
+        }
+
+        // Set tournament rounds to total group rounds + knockout rounds
+        const totalRounds = groupSchedule.length + knockoutRoundCount(
+          Array.from(groupMap.values()).reduce((acc, g) => acc + Math.min(g.length, 2), 0)
+        );
+        await admin.from("tournaments").update({ rounds: totalRounds }).eq("id", tournamentId);
+
+      } else {
+        // Pure knockout
+        const seedPlayers = seeded.map((s, i) => ({ player_id: s.player_id, rating: s.rating, seed: i + 1 }));
+        const knockoutPairings = generateKnockoutBracket(seedPlayers);
+        pairings.push(...knockoutPairings);
+
+        // Auto-calculate rounds
+        const numRounds = knockoutRoundCount(seeded.length);
+        await admin.from("tournaments").update({ rounds: numRounds }).eq("id", tournamentId);
+      }
+
+    } else {
+      // ─── Swiss pairing (existing logic) ───
+      if (seeded.length === 1) {
+        pairings.push({ white: "", black: "", bye: seeded[0].player_id });
+      } else {
+        const mid = Math.ceil(seeded.length / 2);
+        const topHalf = seeded.slice(0, mid);
+        const bottomHalf = seeded.slice(mid);
+
+        for (let i = 0; i < mid; i++) {
+          if (i < bottomHalf.length) {
+            const white = i % 2 === 0 ? topHalf[i].player_id : bottomHalf[i].player_id;
+            const black = i % 2 === 0 ? bottomHalf[i].player_id : topHalf[i].player_id;
+            pairings.push({ white, black });
+          } else {
+            pairings.push({ white: "", black: "", bye: topHalf[i].player_id });
+          }
         }
       }
     }
@@ -137,18 +227,29 @@ export async function POST(
     const scheduledStart = new Date(Date.now() + countdownMinutes * 60 * 1000);
 
     // Create tournament round entry with scheduled start time
-    const { error: roundError } = await admin
-      .from("tournament_rounds")
-      .insert({
-        tournament_id: tournamentId,
-        round_number: 1,
-        pairings: pairings.map((p, i) => ({
+    const groupSchedulePairings = (tournament.type === "knockout" && (tournament.knockout_format === "group_stage"))
+      ? (pairings as any).map((p: any, i: number) => ({
           board: i + 1,
           white: p.white || null,
           black: p.black || null,
           bye: p.bye || null,
           result: null,
-        })),
+          group: p.group ?? null,
+        }))
+      : pairings.map((p, i) => ({
+          board: i + 1,
+          white: p.white || null,
+          black: p.black || null,
+          bye: p.bye || null,
+          result: null,
+        }));
+
+    const { error: roundError } = await admin
+      .from("tournament_rounds")
+      .insert({
+        tournament_id: tournamentId,
+        round_number: 1,
+        pairings: groupSchedulePairings,
         is_complete: false,
         starts_at: scheduledStart.toISOString(),
       });

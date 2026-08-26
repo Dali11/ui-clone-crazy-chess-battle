@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       entryFeeCents = 0, creatorProfitPercent = 0, minRating = 0, maxRating,
       prizePoolCents = 0, poolSource = "entry_fees",
       thumbnailDataUrl = null,
+      knockoutFormat = "pure",
     } = body;
 
     if (!name || !startsAt) {
@@ -91,6 +92,7 @@ export async function POST(req: NextRequest) {
         min_rating: Number(minRating || 0),
         max_rating: maxRating ? Number(maxRating) : null,
         thumbnail_url: thumbnailDataUrl || null,
+        knockout_format: knockoutFormat,
         created_by: user.id,
         status: initialStatus,
       })

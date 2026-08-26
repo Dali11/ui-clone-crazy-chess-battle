@@ -837,6 +837,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           minRating: Number(createForm.min_rating) || 0,
           maxRating: createForm.max_rating ? Number(createForm.max_rating) : null,
           thumbnailDataUrl: createForm.thumbnail_data_url || null,
+          knockoutFormat: createForm.knockout_format || "pure",
         }),
       });
       const data = await res.json();
@@ -1893,6 +1894,15 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                             <option value="knockout">Knockout</option>
                           </select>
                         </div>
+                        {(createForm.type === "knockout") && (
+                          <div>
+                            <label className="text-xs font-medium text-ccb-muted">Knockout Format</label>
+                            <select value={createForm.knockout_format || "pure"} onChange={(e) => setCreateForm({ ...createForm, knockout_format: e.target.value })} className="input-field mt-1 w-full">
+                              <option value="pure">Pure Knockout (single elimination)</option>
+                              <option value="group_stage">Group Stage → Knockout</option>
+                            </select>
+                          </div>
+                        )}
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Time Control</label>
                           <select value={createForm.time_control || "blitz"} onChange={(e) => setCreateForm({ ...createForm, time_control: e.target.value })} className="input-field mt-1 w-full">

@@ -127,15 +127,36 @@ export async function processTournamentGameResult(result: GameResult) {
     if (allDone) {
       const { data: tournament } = await admin
         .from("tournaments")
-        .select("current_round, rounds")
+        .select("current_round, rounds, type")
         .eq("id", tournamentId)
         .single();
 
-      if (tournament && tournament.current_round >= tournament.rounds) {
-        await admin
-          .from("tournaments")
-          .update({ status: "finished", ended_at: new Date().toISOString() })
-          .eq("id", tournamentId);
+      if (!tournament) return;
+
+      if (tournament.type === "knockout") {
+        // For knockout: check if only 1 player has a "win" in this round
+        // (i.e., only 1 winner = champion)
+        const roundWinners = updatedPairings.filter(
+          (p) => p.result === "white" || p.result === "black"
+        ).length;
+        const roundByes = updatedPairings.filter((p) => p.bye).length;
+
+        if (roundWinners + roundByes <= 1) {
+          // Tournament is over — we have a champion
+          await admin
+            .from("tournaments")
+            .update({ status: "finished", ended_at: new Date().toISOString() })
+            .eq("id", tournamentId);
+        }
+        // Otherwise, advance-round will be called to create the next bracket round
+      } else {
+        // Swiss/Arena: finish when all scheduled rounds are done
+        if (tournament.current_round >= tournament.rounds) {
+          await admin
+            .from("tournaments")
+            .update({ status: "finished", ended_at: new Date().toISOString() })
+            .eq("id", tournamentId);
+        }
       }
     }
   }
