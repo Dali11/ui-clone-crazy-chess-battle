@@ -406,7 +406,13 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
     const pollInterval = connectedRef.current ? 1500 : 500;
 
     pollRef.current = setInterval(() => {
-      if (gameStatusRef.current === "playing") {
+      // Poll during "waiting" too — this is the only fallback that can
+      // catch a dropped realtime event flipping waiting -> playing (e.g.
+      // pre-game countdown hitting 0:00 and never transitioning on flaky
+      // mobile connections). Without this, a missed single UPDATE event
+      // leaves the client frozen on the countdown screen forever, since
+      // nothing else re-checks game state while status stays "waiting".
+      if (gameStatusRef.current === "playing" || gameStatusRef.current === "waiting") {
         fetchGameState();
       }
     }, pollInterval);
