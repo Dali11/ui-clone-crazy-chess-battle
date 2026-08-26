@@ -89,7 +89,7 @@ export default function PreGameCountdown({
       <div className="absolute inset-0 z-30 flex items-center justify-center rounded-lg overflow-hidden">
         {/* Strong solid backdrop — the board underneath should read as a
             faint texture, not a distracting, half-legible game of pieces. */}
-        <div className="absolute inset-0 bg-ccb-dark/95 backdrop-blur-md" />
+        <div className="absolute inset-0 bg-ccb-surface/90 backdrop-blur-md" />
         {/* Soft brand-colored glow behind the VS badge for depth */}
         <div className="absolute w-56 h-56 rounded-full bg-ccb-primary/10 blur-3xl" />
 
