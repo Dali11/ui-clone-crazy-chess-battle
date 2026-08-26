@@ -79,12 +79,28 @@ export async function POST(
       );
     }
 
-    // Handle entry fee — debit wallet if fee > 0
     const entryFee = tournament.entry_fee_cents || 0;
     let paidEntryFee = false;
+    let didDebit = false; // tracks whether we actually charged the wallet this join
 
+    // Check if this player previously paid for this tournament (withdrew without refund)
     if (entryFee > 0) {
-      // Check wallet balance
+      const { data: priorPayment } = await admin
+        .from("deposits")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("reference", `tournament:${tournamentId}:entry`)
+        .eq("status", "success")
+        .limit(1);
+
+      if (priorPayment && priorPayment.length > 0) {
+        // Already paid before — rejoin for free
+        paidEntryFee = true;
+      }
+    }
+
+    if (entryFee > 0 && !paidEntryFee) {
+      // First-time payment — debit wallet
       const currentBalance = profile.wallet_balance_cents ?? 0;
       if (currentBalance < entryFee) {
         const feeMwk = Math.floor(entryFee / 100);
@@ -104,7 +120,6 @@ export async function POST(
 
       if (debitErr) {
         console.error("Entry fee debit failed:", debitErr);
-        // Check if it's an insufficient balance error (race condition)
         if (debitErr.message?.includes("Insufficient balance")) {
           return NextResponse.json(
             { error: "Insufficient wallet balance. Please deposit funds first." },
@@ -118,6 +133,7 @@ export async function POST(
       }
 
       paidEntryFee = true;
+      didDebit = true;
 
       // Add entry fee to prize pool ONLY if pool_source is 'entry_fees' (not 'fixed')
       if (tournament.pool_source !== 'fixed') {
@@ -134,7 +150,7 @@ export async function POST(
       // Record deposit entry for audit trail (non-fatal — must not block the join)
       const { error: depositErr } = await admin.from("deposits").insert({
         user_id: user.id,
-        amount_cents: -entryFee, // Negative to indicate a debit
+        amount_cents: -entryFee,
         status: "success",
         method: "tournament_entry",
         reference: `tournament:${tournamentId}:entry`,
@@ -153,25 +169,19 @@ export async function POST(
       });
 
     if (joinErr) {
-      if (joinErr.code === "23505") {
-        // Already joined — refund if we debited
-        if (paidEntryFee) {
-          await admin.rpc("credit_wallet", {
-            p_user_id: user.id,
-            p_amount_cents: entryFee,
-          });
-        }
-        return NextResponse.json(
-          { error: "Already registered for this tournament" },
-          { status: 400 }
-        );
-      }
-      // Refund on any other error
-      if (paidEntryFee) {
+      // If we actually debited the wallet this join, refund on failure
+      if (didDebit) {
         await admin.rpc("credit_wallet", {
           p_user_id: user.id,
           p_amount_cents: entryFee,
         });
+      }
+
+      if (joinErr.code === "23505") {
+        return NextResponse.json(
+          { error: "Already registered for this tournament" },
+          { status: 400 }
+        );
       }
       return NextResponse.json({ error: joinErr.message }, { status: 500 });
     }
