@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
+import { generateKnockoutBracket, knockoutRoundCount, advanceKnockoutRound, generateGroups, generateGroupRoundRobin, getGroupAdvancers, isKnockoutComplete } from "@/lib/tournament/knockout";
 
 // Combined tournament cron — does auto-start + auto-advance + start-scheduled in one call.
 // Triggered by Base44 workflow (every 5 min) or cron-job.org. No auth required.
@@ -24,7 +25,7 @@ async function handleTournamentCron(req: NextRequest) {
     // ── 1. AUTO-START: Start tournaments whose start time has passed ──
     const { data: toStart } = await admin
       .from("tournaments")
-      .select("id, name, starts_at, status, type, initial_minutes, increment_seconds, time_control, min_players, entry_fee_cents, max_players, rest_minutes, countdown_minutes")
+      .select("id, name, starts_at, status, type, knockout_format, group_schedule, initial_minutes, increment_seconds, time_control, min_players, entry_fee_cents, max_players, rest_minutes, countdown_minutes")
       .eq("status", "upcoming")
       .lte("starts_at", now);
 
@@ -62,19 +63,77 @@ async function handleTournamentCron(req: NextRequest) {
           )
         );
 
-        // Generate Round 1 pairings — proper Swiss: top half vs bottom half
-        const pairings: Array<{ white: string; black: string; bye?: string }> = [];
-        const mid = Math.ceil(seeded.length / 2);
-        const topHalf = seeded.slice(0, mid);
-        const bottomHalf = seeded.slice(mid);
+        // Generate Round 1 pairings based on tournament type
+        let pairings: Array<{ white: string; black: string; bye?: string; group?: number }> = [];
+        let totalRounds: number | null = null;
 
-        for (let i = 0; i < mid; i++) {
-          if (i < bottomHalf.length) {
-            const white = i % 2 === 0 ? topHalf[i].player_id : bottomHalf[i].player_id;
-            const black = i % 2 === 0 ? bottomHalf[i].player_id : topHalf[i].player_id;
-            pairings.push({ white, black });
+        if (tournament.type === "knockout") {
+          const seedPlayers = seeded.map((s: any, i: number) => ({ player_id: s.player_id, rating: s.rating, seed: i + 1 }));
+          const koFormat = tournament.knockout_format || "pure";
+
+          if (koFormat === "group_stage") {
+            // Group stage → knockout: generate round-robin groups
+            const groupSize = 4;
+            const assignments = generateGroups(seedPlayers, groupSize);
+            const groupMap = new Map<number, string[]>();
+            for (const a of assignments) {
+              if (!groupMap.has(a.group)) groupMap.set(a.group, []);
+              groupMap.get(a.group)!.push(a.player_id);
+            }
+
+            // Generate full group schedule
+            const numGroupRounds = Math.max(...Array.from(groupMap.values()).map(p => generateGroupRoundRobin(p).length));
+            const groupSchedule: Array<{ round: number; pairings: Array<any> }> = [];
+            for (let r = 0; r < numGroupRounds; r++) {
+              const roundPairings: Array<any> = [];
+              for (const [groupNum, groupPlayers] of groupMap) {
+                const rr = generateGroupRoundRobin(groupPlayers);
+                if (rr[r]) {
+                  for (const p of rr[r]) {
+                    roundPairings.push({ ...p, group: groupNum });
+                  }
+                }
+              }
+              groupSchedule.push({ round: r + 1, pairings: roundPairings });
+            }
+
+            // Save group schedule to tournament
+            const knockoutRounds = knockoutRoundCount(
+              Array.from(groupMap.values()).reduce((acc, g) => acc + Math.min(g.length, 2), 0)
+            );
+            totalRounds = groupSchedule.length + knockoutRounds;
+            await admin.from("tournaments").update({
+              group_schedule: groupSchedule,
+              rounds: totalRounds,
+            }).eq("id", tournament.id);
+
+            // Use round 1 pairings from group schedule
+            const round1 = groupSchedule[0]?.pairings || [];
+            for (const p of round1) {
+              pairings.push({ white: p.white, black: p.black, bye: p.bye, group: p.group });
+            }
           } else {
-            pairings.push({ white: "", black: "", bye: topHalf[i].player_id });
+            // Pure knockout
+            const bracket = generateKnockoutBracket(seedPlayers);
+            totalRounds = knockoutRoundCount(seeded.length);
+            for (const p of bracket) {
+              pairings.push({ white: p.white, black: p.black, bye: p.bye });
+            }
+            await admin.from("tournaments").update({ rounds: totalRounds }).eq("id", tournament.id);
+          }
+        } else {
+          // Swiss pairing: top half vs bottom half
+          const mid = Math.ceil(seeded.length / 2);
+          const topHalf = seeded.slice(0, mid);
+          const bottomHalf = seeded.slice(mid);
+          for (let i = 0; i < mid; i++) {
+            if (i < bottomHalf.length) {
+              const white = i % 2 === 0 ? topHalf[i].player_id : bottomHalf[i].player_id;
+              const black = i % 2 === 0 ? bottomHalf[i].player_id : topHalf[i].player_id;
+              pairings.push({ white, black });
+            } else {
+              pairings.push({ white: "", black: "", bye: topHalf[i].player_id });
+            }
           }
         }
 
@@ -91,6 +150,7 @@ async function handleTournamentCron(req: NextRequest) {
             black: p.black || null,
             bye: p.bye || null,
             result: null,
+            group: (p as any).group ?? null,
           })),
           is_complete: false,
           starts_at: r1Start.toISOString(),
@@ -171,7 +231,7 @@ async function handleTournamentCron(req: NextRequest) {
     // ── 2. AUTO-ADVANCE: Advance when current round is complete ──
     const { data: activeTournaments } = await admin
       .from("tournaments")
-      .select("id, name, current_round, rounds, type, time_control, initial_minutes, increment_seconds, rest_minutes, countdown_minutes")
+      .select("id, name, current_round, rounds, type, knockout_format, group_schedule, time_control, initial_minutes, increment_seconds, rest_minutes, countdown_minutes")
       .eq("status", "active");
 
     for (const tournament of activeTournaments || []) {
@@ -198,6 +258,275 @@ async function handleTournamentCron(req: NextRequest) {
 
         const nextRound = currentRound + 1;
 
+        // ─── Knockout tournament advancement ───────────────────────────
+        if (tournament.type === "knockout") {
+          const groupSchedule = tournament.group_schedule;
+          const koFormat = tournament.knockout_format || "pure";
+
+          // Get previous round pairings with results
+          const { data: prevRound } = await admin
+            .from("tournament_rounds")
+            .select("pairings")
+            .eq("tournament_id", tournament.id)
+            .eq("round_number", currentRound)
+            .single();
+
+          if (!prevRound?.pairings) continue;
+          const prevPairings = prevRound.pairings as Array<Record<string, any>>;
+
+          let koPairings: Array<{ white: string; black: string; bye?: string; group?: number }> = [];
+          let phase = "knockout";
+
+          if (groupSchedule && Array.isArray(groupSchedule) && koFormat === "group_stage") {
+            const numGroupRounds = groupSchedule.length;
+
+            if (nextRound <= numGroupRounds) {
+              // ── Still in group stage — use pre-generated schedule ──
+              phase = "group_stage";
+              const roundData = groupSchedule.find((r: any) => r.round === nextRound);
+              if (roundData) {
+                for (const p of roundData.pairings) {
+                  koPairings.push({ white: p.white || "", black: p.black || "", bye: p.bye, group: p.group });
+                }
+              }
+            } else if (nextRound === numGroupRounds + 1) {
+              // ── Transition: group stage → knockout bracket ──
+              const { data: allParts } = await admin
+                .from("tournament_participants")
+                .select("player_id, score, wins, seed")
+                .eq("tournament_id", tournament.id);
+
+              // Build group assignments from schedule
+              const groupAssignments = new Map<string, number>();
+              for (const round of groupSchedule as any[]) {
+                for (const p of round.pairings) {
+                  if (p.white) groupAssignments.set(p.white, p.group);
+                  if (p.black) groupAssignments.set(p.black, p.group);
+                  if (p.bye) groupAssignments.set(p.bye, p.group);
+                }
+              }
+
+              const standings = (allParts || []).map((p: any) => ({
+                ...p,
+                group: groupAssignments.get(p.player_id) ?? 0,
+              }));
+
+              const advancers = getGroupAdvancers(standings as any, 2);
+
+              // Fetch ratings for the advancers
+              const { data: advancerProfiles } = await admin
+                .from("profiles")
+                .select("id, rating")
+                .in("id", advancers);
+
+              const advRatingMap = new Map((advancerProfiles || []).map((p: any) => [p.id, p.rating || 1200]));
+              const seedPlayers = advancers.map((id, i) => ({
+                player_id: id,
+                rating: advRatingMap.get(id) || 1200,
+                seed: i + 1,
+              }));
+
+              const bracket = generateKnockoutBracket(seedPlayers);
+              for (const p of bracket) {
+                koPairings.push({ white: p.white, black: p.black, bye: p.bye });
+              }
+
+              // Update tournament rounds count to include knockout rounds
+              const koRounds = knockoutRoundCount(advancers.length);
+              await admin.from("tournaments").update({
+                rounds: numGroupRounds + koRounds,
+              }).eq("id", tournament.id);
+            } else {
+              // ── Pure knockout rounds after group stage ──
+              const { data: postGroupParts } = await admin
+                .from("tournament_participants")
+                .select("player_id, seed")
+                .eq("tournament_id", tournament.id);
+              const postGroupSeedLookup = new Map((postGroupParts || []).map((p: any) => [p.player_id, p.seed || 0]));
+
+              const winners: string[] = [];
+              const byes: string[] = [];
+              for (const p of prevPairings) {
+                if (p.bye) { byes.push(p.bye as string); }
+                else if (p.white && p.black && p.result) {
+                  if (p.result === "white") winners.push(p.white as string);
+                  else if (p.result === "black") winners.push(p.black as string);
+                  else if (p.result === "draw") {
+                    const wSeed = postGroupSeedLookup.get(p.white as string) || 0;
+                    const bSeed = postGroupSeedLookup.get(p.black as string) || 0;
+                    winners.push(wSeed <= bSeed ? (p.white as string) : (p.black as string));
+                  }
+                }
+              }
+              const nextPairings = advanceKnockoutRound(winners, byes);
+              for (const p of nextPairings) {
+                koPairings.push({ white: p.white, black: p.black, bye: p.bye });
+              }
+            }
+          } else {
+            // ── Pure knockout advancement ──
+            const winners: string[] = [];
+            const byes: string[] = [];
+
+            // Fetch all participants for seed lookup
+            const { data: allKoParts } = await admin
+              .from("tournament_participants")
+              .select("player_id, seed")
+              .eq("tournament_id", tournament.id);
+            const seedLookup = new Map((allKoParts || []).map((p: any) => [p.player_id, p.seed || 0]));
+
+            for (const p of prevPairings) {
+              if (p.bye) { byes.push(p.bye as string); }
+              else if (p.white && p.black && p.result) {
+                if (p.result === "white") winners.push(p.white as string);
+                else if (p.result === "black") winners.push(p.black as string);
+                else if (p.result === "draw") {
+                  const wSeed = seedLookup.get(p.white as string) || 0;
+                  const bSeed = seedLookup.get(p.black as string) || 0;
+                  winners.push(wSeed <= bSeed ? (p.white as string) : (p.black as string));
+                }
+              }
+            }
+
+            // Check if tournament is complete
+            if (isKnockoutComplete(winners.length + byes.length)) {
+              await admin.from("tournaments").update({
+                status: "finished",
+                ended_at: new Date().toISOString(),
+              }).eq("id", tournament.id);
+              results.finished++;
+              continue;
+            }
+
+            const nextPairings = advanceKnockoutRound(winners, byes);
+            for (const p of nextPairings) {
+              koPairings.push({ white: p.white, black: p.black, bye: p.bye });
+            }
+          }
+
+          if (koPairings.length === 0) continue;
+
+          // Create the next round
+          const restMin = tournament.rest_minutes || 5;
+          const koStart = new Date(Date.now() + restMin * 60 * 1000);
+
+          // Fetch ratings for game creation
+          const koPlayerIds = koPairings.flatMap((p) => [p.white, p.black].filter(Boolean));
+          const { data: koProfiles } = await admin.from("profiles").select("id, rating").in("id", koPlayerIds);
+          const koRatingMap = new Map((koProfiles || []).map((p: any) => [p.id, p.rating || 1200]));
+
+          await admin.from("tournament_rounds").insert({
+            tournament_id: tournament.id,
+            round_number: nextRound,
+            pairings: koPairings.map((p, i) => ({
+              board: i + 1,
+              white: p.white || null,
+              black: p.black || null,
+              bye: p.bye || null,
+              result: null,
+              group: p.group ?? null,
+            })),
+            is_complete: false,
+            starts_at: koStart.toISOString(),
+          });
+
+          // Create games
+          const koMatchPairings = koPairings.filter((p) => !p.bye && p.white && p.black);
+          const koByePairings = koPairings.filter((p) => p.bye);
+          const koInitialMs = (tournament.initial_minutes || 10) * 60 * 1000;
+
+          const koGameRows = koMatchPairings.map((pairing) => ({
+            white_player_id: pairing.white,
+            black_player_id: pairing.black,
+            white_rating: koRatingMap.get(pairing.white) || 1200,
+            black_rating: koRatingMap.get(pairing.black) || 1200,
+            status: "waiting",
+            time_control: tournament.time_control || "rapid",
+            initial_minutes: tournament.initial_minutes || 10,
+            increment_seconds: tournament.increment_seconds || 0,
+            rated: false,
+            tournament_id: tournament.id,
+            tournament_round: nextRound,
+            fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            turn: "white",
+            move_count: 0,
+            white_clock_ms: koInitialMs,
+            black_clock_ms: koInitialMs,
+            scheduled_start: koStart.toISOString(),
+          }));
+
+          let koGameIds: Record<string, string> = {};
+          if (koGameRows.length > 0) {
+            const { data: insertedKoGames } = await admin
+              .from("games")
+              .insert(koGameRows)
+              .select("id, white_player_id, black_player_id");
+            for (const g of insertedKoGames || []) {
+              koGameIds[`${g.white_player_id}|${g.black_player_id}`] = g.id;
+            }
+          }
+
+          // Update pairings with game IDs
+          const koPairingsWithIds = koPairings.map((p, i) => ({
+            board: i + 1,
+            white: p.white || null,
+            black: p.black || null,
+            bye: p.bye || null,
+            result: null,
+            group: p.group ?? null,
+            game_id: koGameIds[`${p.white}|${p.black}`] || null,
+          }));
+          await admin
+            .from("tournament_rounds")
+            .update({ pairings: koPairingsWithIds })
+            .eq("tournament_id", tournament.id)
+            .eq("round_number", nextRound);
+
+          // Handle byes
+          for (const p of koByePairings) {
+            const { data: byePart } = await admin
+              .from("tournament_participants")
+              .select("score, wins, games_played")
+              .eq("tournament_id", tournament.id)
+              .eq("player_id", p.bye!)
+              .single();
+            if (byePart) {
+              await admin.from("tournament_participants")
+                .update({
+                  score: byePart.score + 1,
+                  wins: byePart.wins + 1,
+                  games_played: byePart.games_played + 1,
+                })
+                .eq("player_id", p.bye!)
+                .eq("tournament_id", tournament.id);
+            }
+          }
+
+          await admin.from("tournaments").update({ current_round: nextRound }).eq("id", tournament.id);
+
+          // Notify participants
+          const { data: koParticipants } = await admin
+            .from("tournament_participants")
+            .select("player_id")
+            .eq("tournament_id", tournament.id);
+          for (const p of koParticipants || []) {
+            try {
+              await admin.from("notifications").insert({
+                user_id: (p as any).player_id,
+                type: "tournament_round",
+                title: `Round ${nextRound} of ${tournament.name}`,
+                body: `Your next game is ready! Round ${nextRound} has been paired.`,
+                data: { tournamentName: tournament.name, tournamentId: tournament.id, round: nextRound, phase },
+                read: false,
+              });
+            } catch {}
+          }
+
+          results.advanced++;
+          continue;
+        }
+
+        // ─── Swiss tournament advancement (existing logic) ──────────────
         const { data: participants } = await admin
           .from("tournament_participants")
           .select("player_id, score, seed, wins, losses, draws, games_played")

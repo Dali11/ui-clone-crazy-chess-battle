@@ -40,6 +40,8 @@ interface TournamentData {
     berry_prize_pool: number | null;
     prize_distribution: any;
     min_players: number;
+    knockout_format?: string;
+    group_schedule?: Array<{ round: number; pairings: Array<any> }>;
   };
   participants: Array<{
     player_id: string;
@@ -625,7 +627,53 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <span className="text-xs font-semibold text-ccb-muted">{rounds.length} {rounds.length === 1 ? 'Round' : 'Rounds'}</span>
                 </div>
 
-                {rounds.map((round) => (
+                {rounds.map((round) => {
+                  // Generate knockout-aware round label
+                  const tType = t.type;
+                  const tRoundCount = t.rounds || rounds.length;
+                  const tKoFormat = t.knockout_format || 'pure';
+                  const groupSchedule = (t as any).group_schedule;
+                  const numGroupRounds = Array.isArray(groupSchedule) ? groupSchedule.length : 0;
+                  let roundLabel = `Round ${round.round_number}`;
+                  let phaseLabel = '';
+
+                  if (tType === 'knockout') {
+                    if (tKoFormat === 'group_stage' && numGroupRounds > 0) {
+                      if (round.round_number <= numGroupRounds) {
+                        phaseLabel = 'Group Stage';
+                        roundLabel = `Group Round ${round.round_number}`;
+                      } else {
+                        const koRound = round.round_number - numGroupRounds;
+                        const totalKoRounds = tRoundCount - numGroupRounds;
+                        const remaining = Math.pow(2, totalKoRounds - koRound);
+                        if (remaining === 2) { roundLabel = 'Final'; phaseLabel = 'Knockout'; }
+                        else if (remaining === 4) { roundLabel = 'Semi-Finals'; phaseLabel = 'Knockout'; }
+                        else if (remaining === 8) { roundLabel = 'Quarter-Finals'; phaseLabel = 'Knockout'; }
+                        else if (remaining === 16) { roundLabel = 'Round of 16'; phaseLabel = 'Knockout'; }
+                        else { roundLabel = `Knockout Round ${koRound}`; phaseLabel = 'Knockout'; }
+                      }
+                    } else {
+                      const remaining = Math.pow(2, tRoundCount - round.round_number);
+                      if (remaining === 2) roundLabel = 'Final';
+                      else if (remaining === 4) roundLabel = 'Semi-Finals';
+                      else if (remaining === 8) roundLabel = 'Quarter-Finals';
+                      else if (remaining === 16) roundLabel = 'Round of 16';
+                      else roundLabel = `Round of ${remaining}`;
+                    }
+                  }
+
+                  // Group pairings by group number if group info is present
+                  const hasGroups = round.pairings?.some((p) => (p as any).group !== null && (p as any).group !== undefined);
+                  const groupMap = new Map<number, typeof round.pairings>();
+                  if (hasGroups) {
+                    for (const p of round.pairings) {
+                      const g = (p as any).group ?? 0;
+                      if (!groupMap.has(g)) groupMap.set(g, []);
+                      groupMap.get(g)!.push(p);
+                    }
+                  }
+
+                return (
                 <div key={round.id} className="bg-ccb-card border border-ccb-border rounded-2xl overflow-hidden">
                   {/* Round header */}
                   <div className="flex items-center justify-between px-5 py-3 border-b border-ccb-border">
@@ -633,7 +681,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       <div className="w-8 h-8 rounded-lg bg-ccb-primary/10 border border-ccb-primary/30 flex items-center justify-center">
                         <Swords className="w-4 h-4 text-ccb-primary" />
                       </div>
-                      <h4 className="text-sm font-bold">Round {round.round_number}</h4>
+                      <div>
+                        <h4 className="text-sm font-bold">{roundLabel}</h4>
+                        {phaseLabel && <span className="text-[10px] text-ccb-muted font-medium">{phaseLabel}</span>}
+                      </div>
                     </div>
                     {round.is_complete ? (
                       <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-ccb-success/10 text-ccb-success border border-ccb-success/30">COMPLETE</span>
@@ -719,7 +770,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     })}
                   </div>
                 </div>
-              ))}
+                );
+                })}
               </>
             )}
           </div>

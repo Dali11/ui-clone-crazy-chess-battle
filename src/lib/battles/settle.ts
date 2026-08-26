@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 
 /**
  * Core battle settlement logic — extracted so it can be called directly
@@ -86,6 +87,27 @@ export async function settleBattle(
         .from("battle_escrow")
         .update({ status: "refunded", released_at: new Date().toISOString() })
         .eq("battle_id", battleId);
+
+      // Notify both players of draw refund (fire-and-forget)
+      const { data: drawProfiles } = await admin
+        .from("profiles")
+        .select("email, display_name")
+        .in("id", [battle.white_player_id, battle.black_player_id]);
+      for (const p of drawProfiles || []) {
+        if (p.email) {
+          sendEmail({
+            to: p.email,
+            subject: `Battle ended in draw — MK ${Math.floor(battle.stake_cents / 100).toLocaleString()} refunded`,
+            template: "game_result",
+            data: {
+              result: "draw",
+              stakeCents: battle.stake_cents,
+              refundAmount: battle.stake_cents,
+              battleId,
+            },
+          }).catch(() => {});
+        }
+      }
 
       return { settled: true, result: "draw_refund" };
     }
@@ -195,6 +217,32 @@ export async function settleBattle(
     await admin.rpc("check_referral_activation", { p_user_id: battle.black_player_id, p_action: "battle" });
   } catch (e) {
     console.error("Referral activation failed:", e);
+  }
+
+  // Notify both players of the result (fire-and-forget)
+  const loserId = winnerId === battle.white_player_id ? battle.black_player_id : battle.white_player_id;
+  const { data: battleProfiles } = await admin
+    .from("profiles")
+    .select("id, email, display_name")
+    .in("id", [battle.white_player_id, battle.black_player_id]);
+  for (const p of battleProfiles || []) {
+    if (p.email) {
+      const isWinner = p.id === winnerId;
+      sendEmail({
+        to: p.email,
+        subject: isWinner
+          ? `You won MK ${Math.floor(payout / 100).toLocaleString()} — Battle complete!`
+          : `Battle result — You lost MK ${Math.floor(battle.stake_cents / 100).toLocaleString()}`,
+        template: "game_result",
+        data: {
+          result: isWinner ? "win" : "loss",
+          payoutCents: isWinner ? payout : 0,
+          stakeCents: battle.stake_cents,
+          battleId,
+          opponentName: battleProfiles?.find((pp: any) => pp.id !== p.id)?.display_name || "Opponent",
+        },
+      }).catch(() => {});
+    }
   }
 
   return { settled: true, winnerId, payout, result: result || "win" };

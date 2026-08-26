@@ -212,6 +212,31 @@ export async function POST(
       console.error("Berry award failed:", berryErr);
     }
 
+    // Send confirmation email (fire-and-forget)
+    const { data: tInfo } = await admin
+      .from("tournaments")
+      .select("name, starts_at, entry_fee_cents")
+      .eq("id", tournamentId)
+      .single();
+    const { data: userProfile } = await admin
+      .from("profiles")
+      .select("email, display_name, username")
+      .eq("id", user.id)
+      .single();
+    if (userProfile?.email && tInfo) {
+      sendEmail({
+        to: userProfile.email,
+        subject: `Registered for ${tInfo.name}`,
+        template: "tournament_registered",
+        data: {
+          tournamentName: tInfo.name,
+          startsAt: tInfo.starts_at,
+          entryFee: tInfo.entry_fee_cents || 0,
+          tournamentId,
+        },
+      }).catch(() => {});
+    }
+
     return NextResponse.json({ success: true, paidEntryFee, berriesAwarded: 50 });
   } catch (e: any) {
     console.error("Join tournament error:", e);

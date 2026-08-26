@@ -55,11 +55,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const amountMWK = Math.floor(withdrawal.amount_cents / 100);
     try {
       // Send branded email
+    const rejWProfile = await admin.from("profiles").select("email").eq("id", withdrawal.user_id).single();
+    const rejAmountMWK = Math.floor(withdrawal.amount_cents / 100);
     await sendEmail({
-      to: (await admin.from("profiles").select("email").eq("id", withdrawal.user_id).single()).data?.email || "",
-      subject: "Withdrawal update — Crazy Chess Battles",
+      to: rejWProfile.data?.email || "",
+      subject: `Withdrawal update — MK ${rejAmountMWK.toLocaleString()}`,
       template: "withdrawal_rejected",
-      data: { amount: (withdrawal.amount_cents / 100).toFixed(2), currency: "MWK", reason: adminNotes || "Could not be processed" },
+      data: { amount: `MK ${rejAmountMWK.toLocaleString()}`, currency: "MWK", reason: adminNotes || "Could not be processed" },
     }).catch(() => {});
 
     await admin.from("notifications").insert({

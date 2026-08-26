@@ -45,9 +45,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const rejProfile = await admin.from("profiles").select("email").eq("id", deposit.user_id).single();
     await sendEmail({
       to: rejProfile.data?.email || "",
-      subject: "Deposit update — Crazy Chess Battles",
-      template: "withdrawal_rejected",
-      data: { amount: (deposit.amount_cents / 100).toFixed(2), currency: "MWK", reason: notes || "Deposit could not be verified" },
+      subject: `Deposit update — MK ${amountMWK.toLocaleString()} could not be processed`,
+      template: "deposit_rejected",
+      data: { amount: `MK ${amountMWK.toLocaleString()}`, currency: "MWK", reason: notes || "Deposit could not be verified" },
     }).catch(() => {});
 
     await admin.from("notifications").insert({

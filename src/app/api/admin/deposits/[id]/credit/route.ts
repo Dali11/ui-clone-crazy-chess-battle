@@ -62,11 +62,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     try {
       // Send branded email
       const depProfile = await admin.from("profiles").select("email").eq("id", deposit.user_id).single();
+      // Fetch actual wallet balance after credit
+      const { data: depWallet } = await admin.from("profiles").select("wallet_balance_cents").eq("id", deposit.user_id).single();
+      const depBalanceMWK = depWallet?.wallet_balance_cents ? Math.floor(depWallet.wallet_balance_cents / 100).toLocaleString() : amountMWK.toLocaleString();
+
       await sendEmail({
         to: depProfile.data?.email || "",
-        subject: `Deposit confirmed — ${amountMWK.toLocaleString()} MWK`,
+        subject: `Deposit confirmed — MK ${amountMWK.toLocaleString()}`,
         template: "deposit_credited",
-        data: { amount: amountMWK.toLocaleString(), currency: "MWK", newBalance: amountMWK.toLocaleString(), method: deposit.method },
+        data: { amount: `MK ${amountMWK.toLocaleString()}`, currency: "MWK", newBalance: `MK ${depBalanceMWK}`, method: deposit.method },
       }).catch(() => {});
 
       await admin.from("notifications").insert({

@@ -68,11 +68,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         // Insert in-app notification directly (no self-HTTP fetch)
         try {
           // Send branded email
+          const wProfile = await admin.from("profiles").select("email").eq("id", withdrawal.user_id).single();
           await sendEmail({
-            to: (await admin.from("profiles").select("email").eq("id", withdrawal.user_id).single()).data?.email || "",
-            subject: `Withdrawal sent — ${withdrawal.amount} ${withdrawal.currency || "MWK"}`,
+            to: wProfile.data?.email || "",
+            subject: `Withdrawal sent — MK ${amountMWK.toLocaleString()}`,
             template: "withdrawal_approved",
-            data: { amount: withdrawal.amount, currency: withdrawal.currency || "MWK", method: withdrawal.method, reference: withdrawal.reference },
+            data: { amountCents: withdrawal.amount_cents, currency: "MWK", phone: withdrawal.phone, operator: withdrawal.operator_name, reference: chargeId },
           }).catch(() => {});
 
           await admin.from("notifications").insert({

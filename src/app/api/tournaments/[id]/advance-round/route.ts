@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { advanceKnockoutRound, knockoutRoundCount, generateKnockoutBracket, getGroupAdvancers, generateGroups, generateGroupRoundRobin } from "@/lib/tournament/knockout";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, sendBatchEmails } from "@/lib/email";
 
 // Allow enough time for large tournaments (100+ players / ~50 games per round)
 export const maxDuration = 60;
@@ -246,6 +246,11 @@ export async function POST(
             const restMinutes = tournament.rest_minutes || 5;
             const scheduledStart = new Date(Date.now() + restMinutes * 60 * 1000);
 
+            // Fetch actual ratings for game creation
+            const koPlayerIds = pairings.flatMap((p) => [p.white, p.black].filter(Boolean));
+            const { data: koProfiles } = await admin.from("profiles").select("id, rating").in("id", koPlayerIds);
+            const koRatingMap = new Map((koProfiles || []).map((p: any) => [p.id, p.rating || 1200]));
+
             await admin.from("tournament_rounds").insert({
               tournament_id: tournamentId,
               round_number: nextRound,
@@ -265,8 +270,8 @@ export async function POST(
             const gameRows = matchPairings.map((pairing) => ({
               white_player_id: pairing.white,
               black_player_id: pairing.black,
-              white_rating: 1200,
-              black_rating: 1200,
+              white_rating: koRatingMap.get(pairing.white) || 1200,
+              black_rating: koRatingMap.get(pairing.black) || 1200,
               status: "waiting",
               time_control: tournament.time_control,
               initial_minutes: tournament.initial_minutes,
@@ -343,11 +348,17 @@ export async function POST(
 
       const matchPairings = pairings.filter((p) => !p.bye);
       const initialMs = tournament.initial_minutes * 60 * 1000;
+
+      // Fetch actual ratings
+      const pureKoPlayerIds = matchPairings.flatMap((p) => [p.white, p.black].filter(Boolean));
+      const { data: pureKoProfiles } = await admin.from("profiles").select("id, rating").in("id", pureKoPlayerIds);
+      const pureKoRatingMap = new Map((pureKoProfiles || []).map((p: any) => [p.id, p.rating || 1200]));
+
       const gameRows = matchPairings.map((pairing) => ({
         white_player_id: pairing.white,
         black_player_id: pairing.black,
-        white_rating: 1200,
-        black_rating: 1200,
+        white_rating: pureKoRatingMap.get(pairing.white) || 1200,
+        black_rating: pureKoRatingMap.get(pairing.black) || 1200,
         status: "waiting",
         time_control: tournament.time_control,
         initial_minutes: tournament.initial_minutes,
@@ -536,6 +547,28 @@ export async function POST(
         }).then(() => {}, () => {})
       )
     );
+
+    // Send email notifications (fire-and-forget)
+    const { data: roundEmails } = await admin
+      .from("profiles")
+      .select("email, display_name")
+      .in("id", participants.map((p) => p.player_id));
+    const roundEmailList = (roundEmails || [])
+      .filter((p: any) => p.email)
+      .map((p: any) => ({
+        to: p.email,
+        subject: `Round ${nextRound} starting — ${tournament.name}`,
+        template: "tournament_round_live" as const,
+        data: {
+          tournamentName: tournament.name,
+          tournamentId,
+          round: nextRound,
+          startsIn: `${restMinutes} minutes`,
+        },
+      }));
+    if (roundEmailList.length > 0) {
+      sendBatchEmails(roundEmailList).catch(() => {});
+    }
 
     // Update tournament current round
     await admin

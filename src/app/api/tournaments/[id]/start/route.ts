@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateKnockoutBracket, knockoutRoundCount, generateGroups, generateGroupRoundRobin } from "@/lib/tournament/knockout";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, sendBatchEmails } from "@/lib/email";
 
 // Allow enough time for large tournaments (100+ players) to seed + create games
 export const maxDuration = 60;
@@ -179,10 +179,10 @@ export async function POST(
           ),
         }).eq("id", tournamentId);
 
-        // Use group schedule round 1 pairings
+        // Use group schedule round 1 pairings (preserve group info)
         const round1Pairings = groupSchedule[0]?.pairings || [];
         for (const p of round1Pairings) {
-          pairings.push({ white: p.white, black: p.black, bye: p.bye });
+          pairings.push({ white: p.white, black: p.black, bye: p.bye, group: p.group } as any);
         }
 
         // Set tournament rounds to total group rounds + knockout rounds
@@ -335,6 +335,27 @@ export async function POST(
         }).then(() => {}, () => {})
       )
     );
+
+    // Send email notifications (fire-and-forget)
+    const { data: startEmails } = await admin
+      .from("profiles")
+      .select("email, display_name")
+      .in("id", participants.map((p) => p.player_id));
+    const startEmailList = (startEmails || [])
+      .filter((p: any) => p.email)
+      .map((p: any) => ({
+        to: p.email,
+        subject: `${tournament.name} — Round 1 starts in ${countdownMinutes} minutes!`,
+        template: "tournament_starting_soon" as const,
+        data: {
+          tournamentName: tournament.name,
+          tournamentId,
+          startsIn: `${countdownMinutes} minutes`,
+        },
+      }));
+    if (startEmailList.length > 0) {
+      sendBatchEmails(startEmailList).catch(() => {});
+    }
 
     return NextResponse.json({
       success: true,

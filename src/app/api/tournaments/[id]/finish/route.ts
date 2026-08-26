@@ -182,6 +182,45 @@ export async function POST(
       }
     }
 
+    // Send tournament finished emails to all participants (fire-and-forget)
+    if (rankedParticipants && rankedParticipants.length > 0) {
+      const { data: allPartProfiles } = await admin
+        .from("tournament_participants")
+        .select("player_id")
+        .eq("tournament_id", tournamentId);
+      const partIds = (allPartProfiles || []).map((p: any) => p.player_id);
+      const { data: partEmails } = await admin
+        .from("profiles")
+        .select("id, email, display_name")
+        .in("id", partIds);
+      const emailMap = new Map((partEmails || []).map((p: any) => [p.id, p]));
+      const rankMap = new Map((rankedParticipants || []).map((p: any) => [p.player_id, p.final_rank ?? 0]));
+
+      const emails = partIds
+        .map((pid: string) => {
+          const prof = emailMap.get(pid);
+          if (!prof?.email) return null;
+          return {
+            to: prof.email,
+            subject: `${tournament.name} — Final Results`,
+            template: "tournament_finished" as const,
+            data: {
+              tournamentName: tournament.name,
+              tournamentId,
+              finalRank: rankMap.get(pid) || 0,
+              playerName: prof.display_name || "Player",
+            },
+          };
+        })
+        .filter(Boolean) as any[];
+
+      if (emails.length > 0) {
+        import("@/lib/email").then(({ sendBatchEmails }) => {
+          sendBatchEmails(emails).catch(() => {});
+        });
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Failed to finish tournament" }, { status: 500 });
