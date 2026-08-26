@@ -1,25 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-// Lightweight endpoint that returns the current game state.
-// Used as a polling fallback when Supabase realtime drops (common on mobile
-// networks). The client polls this every ~2s and ignores responses where the
-// move_count hasn't advanced, so it's a cheap single-row SELECT.
+/**
+ * Lightweight endpoint that returns the current game state.
+ * Used as a polling fallback when Supabase realtime drops (common on mobile
+ * networks). The client polls this frequently and ignores responses where the
+ * move_count hasn't advanced, so it's a cheap single-row SELECT.
+ *
+ * IMPORTANT: This endpoint must work for spectators too. If the user's auth
+ * session has expired (common on mobile), we fall back to the admin client
+ * to read the game — games are publicly viewable (RLS policy: USING TRUE),
+ * so this is safe.
+ */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const gameId = req.nextUrl.searchParams.get("gameId");
     if (!gameId) {
       return NextResponse.json({ error: "gameId required" }, { status: 400 });
     }
 
-    const { data: game, error } = await supabase
+    // Try user-scoped client first (respects RLS, uses user's session)
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      const { data: game, error } = await supabase
+        .from("games")
+        .select("id, fen, pgn, turn, status, winner, move_count, white_clock_ms, black_clock_ms, last_move_at, white_player_id, black_player_id, white_rating, black_rating, white_rating_change, black_rating_change, time_control, initial_minutes, increment_seconds, rated, created_at, scheduled_start, tournament_id")
+        .eq("id", gameId)
+        .single();
+
+      if (!error && game) return NextResponse.json(game);
+    }
+
+    // Fallback for spectators or expired sessions — games are publicly readable
+    const admin = createAdminClient();
+    const { data: game, error } = await admin
       .from("games")
       .select("id, fen, pgn, turn, status, winner, move_count, white_clock_ms, black_clock_ms, last_move_at, white_player_id, black_player_id, white_rating, black_rating, white_rating_change, black_rating_change, time_control, initial_minutes, increment_seconds, rated, created_at, scheduled_start, tournament_id")
       .eq("id", gameId)

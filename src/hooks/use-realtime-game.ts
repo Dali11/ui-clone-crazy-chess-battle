@@ -63,6 +63,13 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
   // Shared "last applied move" counter used by ALL handlers
   const lastAppliedMoveCount = useRef<number>(initialState.move_count ?? 0);
 
+  // Track when we last received ANY realtime event (postgres_changes, broadcast,
+  // or presence). If no event arrives within STALE_THRESHOLD, we downgrade to
+  // "reconnecting" mode to trigger aggressive polling — the WebSocket may have
+  // silently dropped without firing CHANNEL_ERROR (common on mobile networks).
+  const lastEventTimeRef = useRef<number>(Date.now());
+  const STALE_THRESHOLD_MS = 8000; // 8 seconds with no events = suspect connection
+
   // Reconnection counter — bumping this re-triggers the subscription effect
   const [reconnectTick, setReconnectTick] = useState(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -273,6 +280,8 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
           filter: `id=eq.${gameId}`,
         },
         (payload) => {
+          lastEventTimeRef.current = Date.now();
+          if (connectedRef.current !== true) updateConnectionQuality("online");
           const updated = payload.new as Partial<GameState>;
           if (
             typeof updated.move_count === "number" &&
@@ -290,12 +299,19 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
         }
       )
       .on("presence", { event: "sync" }, () => {
+        lastEventTimeRef.current = Date.now();
         updateConnectionQuality("online");
       })
       .on("presence", { event: "join" }, () => {
+        lastEventTimeRef.current = Date.now();
         updateConnectionQuality("online");
       })
+      .on("presence", { event: "leave" }, () => {
+        lastEventTimeRef.current = Date.now();
+      })
       .on("broadcast", { event: "move" }, (payload: any) => {
+        lastEventTimeRef.current = Date.now();
+        if (connectedRef.current !== true) updateConnectionQuality("online");
         const data = payload.payload as MoveBroadcast;
         if (data.moveCount > lastAppliedMoveCount.current) {
           lastAppliedMoveCount.current = data.moveCount;
@@ -332,8 +348,13 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
           setGame((prev) => ({ ...prev, status: "resign", winner: data.winner }));
         }
       })
-      .subscribe((status) => {
+      .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
+          // Track our presence so the channel's presence sync fires —
+          // without this, presence events never trigger and the only
+          // signal that the WebSocket is alive is the initial SUBSCRIBED.
+          await channel.track({ user_id: currentUserId, at: Date.now() });
+          lastEventTimeRef.current = Date.now();
           updateConnectionQuality("online");
           setError(null);
           fetchGameState();
@@ -356,7 +377,19 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
 
     channelRef.current = channel;
 
+    // Heartbeat: check if the connection has gone stale (no events for
+    // STALE_THRESHOLD_MS). If so, downgrade to "reconnecting" to trigger
+    // aggressive polling. The realtime channel may silently drop on mobile
+    // networks without firing CHANNEL_ERROR.
+    const heartbeat = setInterval(() => {
+      const staleFor = Date.now() - lastEventTimeRef.current;
+      if (staleFor > STALE_THRESHOLD_MS && connectedRef.current) {
+        updateConnectionQuality("reconnecting");
+      }
+    }, 3000);
+
     return () => {
+      clearInterval(heartbeat);
       supabase.removeChannel(channel);
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     };
@@ -364,13 +397,13 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
   }, [gameId, reconnectTick]);
 
   // ── Adaptive polling — fast when disconnected, slow when connected ────────
-  // When connected: poll every 3s (lightweight safety net alongside realtime)
-  // When disconnected: poll every 800ms (aggressive catch-up so we don't miss
+  // When connected: poll every 1.5s (safety net alongside realtime)
+  // When disconnected: poll every 500ms (aggressive catch-up so we don't miss
   // opponent moves when the realtime channel is dead)
   useEffect(() => {
     fetchGameState();
 
-    const pollInterval = connectedRef.current ? 3000 : 800;
+    const pollInterval = connectedRef.current ? 1500 : 500;
 
     pollRef.current = setInterval(() => {
       if (gameStatusRef.current === "playing") {
