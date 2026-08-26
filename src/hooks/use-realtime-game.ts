@@ -396,6 +396,33 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, reconnectTick]);
 
+  // ── Force resync on tab foreground ──────────────────────────────────────
+  // Mobile browsers commonly suspend/kill the WebSocket when the tab is
+  // backgrounded (screen off, app-switch, even briefly) WITHOUT firing
+  // CHANNEL_ERROR — so the heartbeat staleness check never catches it while
+  // backgrounded, and the connection can look "online" on resume even though
+  // events were silently dropped the whole time. If the one event that
+  // mattered (opponent's move) got dropped in that window, there was
+  // previously no trigger to ever recover — the board would sit frozen on
+  // stale state until the user manually hit refresh. Now, coming back to the
+  // foreground always forces an immediate fetch AND a full channel
+  // resubscribe (via reconnectTick), regardless of what the heuristics think.
+  useEffect(() => {
+    const resync = () => {
+      if (document.visibilityState === "visible") {
+        fetchGameState();
+        setReconnectTick((t) => t + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", resync);
+    window.addEventListener("focus", resync);
+    return () => {
+      document.removeEventListener("visibilitychange", resync);
+      window.removeEventListener("focus", resync);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchGameState]);
+
   // ── Adaptive polling — fast when disconnected, slow when connected ────────
   // When connected: poll every 1.5s (safety net alongside realtime)
   // When disconnected: poll every 500ms (aggressive catch-up so we don't miss
