@@ -5,7 +5,7 @@ import { detectOperator } from "@/lib/operator";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Wallet, Smartphone, CreditCard, Check, Loader2, ArrowDown, ArrowUp,
+  Wallet, Check, Loader2, ArrowDown, ArrowUp,
   Clock, Cherry, Gift, RefreshCw, History, TrendingUp, TrendingDown,
 } from "lucide-react";
 import Link from "next/link";
@@ -83,7 +83,6 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
   const [depositAmount, setDepositAmount] = useState(1000);
   const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount_cents: number; max_amount_cents: number; daily_limit_cents: number } | null>(null);
-  const [method, setMethod] = useState<"mobile_money" | "card">("mobile_money");
   const [phone, setPhone] = useState(savedPhone || "");
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -249,49 +248,31 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
     setSuccess(null);
 
     try {
-      if (method === "mobile_money") {
-        if (!phone || phone.length < 9) {
-          setError("Enter a valid Mobile Money number (Airtel or Mpamba, e.g., 0991234567)");
-          setLoading(false);
-          return;
-        }
-
-        const res = await fetch("/api/payments/deposit/mobile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amountCents: depositAmount * 100,
-            phone,
-            operatorRefId: detectOperator(phone),
-            email,
-          }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok || data.error) {
-          throw new Error(data.error || "Payment failed. Please try again.");
-        }
-
-        setPendingChargeId(data.chargeId);
-        setSuccess("Check your phone to authorize the payment. Waiting for confirmation...");
-      } else {
-        const res = await fetch("/api/payments/deposit/card", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amountCents: depositAmount * 100, email }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok || data.error) {
-          throw new Error(data.error || "Payment failed. Please try again.");
-        }
-
-        if (data.checkoutUrl) {
-          window.location.href = data.checkoutUrl;
-        }
+      if (!phone || phone.length < 9) {
+        setError("Enter a valid Mobile Money number (Airtel or Mpamba, e.g., 0991234567)");
+        setLoading(false);
+        return;
       }
+
+      const res = await fetch("/api/payments/deposit/mobile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amountCents: depositAmount * 100,
+          phone,
+          operatorRefId: detectOperator(phone),
+          email,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Payment failed. Please try again.");
+      }
+
+      setPendingChargeId(data.chargeId);
+      setSuccess("Check your phone to authorize the payment. Waiting for confirmation...");
     } catch (err: any) {
       setError(err.message && err.message.length < 200 ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -560,43 +541,15 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
           </div>
 
           <div>
-            <label className="text-sm font-medium text-ccb-muted mb-2 block">Payment Method</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setMethod("mobile_money")}
-                className={`flex-1 py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 border transition-colors ${
-                  method === "mobile_money" ? "border-ccb-primary bg-ccb-primary/10 text-ccb-primary" : "border-ccb-border text-ccb-muted"
-                }`}
-              >
-                <Smartphone className="w-4 h-4" />
-                Mobile Money
-              </button>
-              <button
-                onClick={() => setMethod("card")}
-                className={`flex-1 py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 border transition-colors ${
-                  method === "card" ? "border-ccb-primary bg-ccb-primary/10 text-ccb-primary" : "border-ccb-border text-ccb-muted"
-                }`}
-              >
-                <CreditCard className="w-4 h-4" />
-                Card
-              </button>
-            </div>
+            <label className="text-sm font-medium text-ccb-muted mb-2 block">Mobile Money Number (Airtel Money or Mpamba)</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="0991234567"
+              className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border"
+            />
           </div>
-
-          {method === "mobile_money" && (
-            <>
-              <div>
-                <label className="text-sm font-medium text-ccb-muted mb-2 block">Mobile Money Number (Airtel Money or Mpamba)</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="0991234567"
-                  className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border"
-                />
-              </div>
-            </>
-          )}
 
           <button
             onClick={handleDeposit}
