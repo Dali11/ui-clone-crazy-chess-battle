@@ -485,16 +485,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               {tab === 'rounds' && <Swords className="w-3.5 h-3.5" />}
               {tab === 'info' && <Settings className="w-3.5 h-3.5" />}
               {tab}
-              {tab === 'standings' && sortedParticipants.length > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === tab ? 'bg-white/20' : 'bg-ccb-border/40'}`}>
-                  {sortedParticipants.length}
-                </span>
-              )}
-              {tab === 'rounds' && rounds.length > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === tab ? 'bg-white/20' : 'bg-ccb-border/40'}`}>
-                  {rounds.length}
-                </span>
-              )}
             </button>
           ))}
         </div>
@@ -514,6 +504,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               </div>
             ) : (
               <>
+                {/* Player count */}
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-bold text-ccb-muted uppercase tracking-wider">Standings</span>
+                  <span className="text-xs font-semibold text-ccb-muted">{sortedParticipants.length} {sortedParticipants.length === 1 ? 'Player' : 'Players'}</span>
+                </div>
+
                 {/* PODIUM — Top 3 (only when finished) */}
                 {isFinished && top3.length >= 3 && (
                   <div className="grid grid-cols-3 gap-2.5">
@@ -613,7 +609,14 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 </p>
               </div>
             ) : (
-              rounds.map((round) => (
+              <>
+                {/* Round count */}
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-bold text-ccb-muted uppercase tracking-wider">Rounds</span>
+                  <span className="text-xs font-semibold text-ccb-muted">{rounds.length} {rounds.length === 1 ? 'Round' : 'Rounds'}</span>
+                </div>
+
+                {rounds.map((round) => (
                 <div key={round.id} className="bg-ccb-card border border-ccb-border rounded-2xl overflow-hidden">
                   {/* Round header */}
                   <div className="flex items-center justify-between px-5 py-3 border-b border-ccb-border">
@@ -707,7 +710,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     })}
                   </div>
                 </div>
-              ))
+              ))}
+              </>
             )}
           </div>
         )}
