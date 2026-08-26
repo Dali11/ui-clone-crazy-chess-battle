@@ -4,6 +4,7 @@ import { getAbortSeconds } from "@/lib/game/abort-config";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Chessboard } from "react-chessboard";
+import { customPieces } from "@/lib/game/piece-styles";
 import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
 import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Timer, Swords, RefreshCw } from "lucide-react";
@@ -907,6 +908,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         <div style={{ width: boardSize, height: boardSize }}>
           <Chessboard options={{
             position: displayFen,
+            pieces: customPieces,
             boardOrientation: isWhite || isSpectator ? "white" : "black",
             onPieceDrop: ({ sourceSquare, targetSquare }) => {
               if (!targetSquare) return false;

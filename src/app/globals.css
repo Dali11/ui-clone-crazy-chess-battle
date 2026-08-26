@@ -227,3 +227,12 @@
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* Prevent browser "smart dark mode" from inverting chess piece colors.
+   Some mobile browsers (Samsung Internet, UC, etc.) invert #ffffff fills
+   to dark colors, making white pieces look identical to black pieces.
+   color-scheme: dark tells them the page is already dark; the filter:none
+   is a belt-and-suspenders guard for any remaining inversion. */
+.chess-board, .chess-board svg, .chess-board svg * {
+  filter: none !important;
+}
