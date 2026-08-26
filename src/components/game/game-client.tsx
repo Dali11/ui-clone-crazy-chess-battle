@@ -873,23 +873,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         </div>
       </div>
 
-      {connectionQuality === "reconnecting" && (
-        <div className="shrink-0 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-500 px-4 py-1.5 text-xs text-center max-w-[600px] mx-auto w-full mt-1 flex items-center justify-center gap-2">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            Reconnecting… Your moves are queued.
-          </span>
-          <button
-            onClick={() => window.location.reload()}
-            className="underline font-medium shrink-0"
-          >
-            Refresh
-          </button>
-        </div>
-      )}
-
       {/* Horizontal move scroller — chess.com style, at the very top above the opponent bar */}
-      <div className="max-w-[600px] mx-auto w-full px-2 py-1">
+      <div className="relative max-w-[600px] mx-auto w-full px-2 py-1">
         {moveHistory.length >= 2 && (
           <div className="mb-1">
             <OpeningBadge moves={moveHistory} />
@@ -898,6 +883,21 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         <div className="rounded-lg bg-ccb-surface/50 border border-ccb-border/50 px-2 py-1.5">
           <MoveScroller moves={moveHistory} currentPly={viewPly} onPlyChange={setViewPly} />
         </div>
+
+        {connectionQuality === "reconnecting" && (
+          <div className="absolute inset-0 z-20 rounded-lg bg-amber-500/95 border border-amber-500 text-black px-4 flex items-center justify-center gap-2 text-xs text-center shadow-lg">
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+              Reconnecting… Your moves are queued.
+            </span>
+            <button
+              onClick={() => window.location.reload()}
+              className="underline font-semibold shrink-0"
+            >
+              Refresh
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Opponent bar */}
