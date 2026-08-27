@@ -10,6 +10,8 @@ export const metadata = pageMetadata({
   noIndex: true
 });
 
+export const dynamic = "force-dynamic";
+
 export default function ForgotPasswordPage() {
   return <ForgotPasswordClient />;
 }
