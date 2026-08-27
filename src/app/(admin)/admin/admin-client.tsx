@@ -1819,6 +1819,19 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           </button>
                         )}
 
+                        {/* Payout Prizes — finished tournaments with a prize pool (fixes tournaments that finished before prize distribution was wired up; safe to re-run, won't double-pay) */}
+                        {(t.status === "finished" || t.status === "completed") && (t.prize_pool_cents || 0) > 0 && (
+                          <button
+                            onClick={() => handleTournamentAction(t.id, "force_finish")}
+                            disabled={actionLoading === `${t.id}_force_finish`}
+                            title="Re-run prize distribution for this tournament. Safe to click even if prizes were already paid — it won't pay twice."
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-accent/90 text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                          >
+                            {actionLoading === `${t.id}_force_finish` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Gift className="w-3.5 h-3.5" />}
+                            Payout Prizes
+                          </button>
+                        )}
+
                         {/* Delete — upcoming, cancelled, or finished */}
                         {(t.status === "upcoming" || t.status === "cancelled" || t.status === "finished") && (
                           <button
@@ -2091,6 +2104,17 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         >
                           {actionLoading === "admin_force_finish" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                           Force Finish
+                        </button>
+                      )}
+                      {(managingTournament.status === "finished" || managingTournament.status === "completed") && (managingTournament.prize_pool_cents || 0) > 0 && (
+                        <button
+                          onClick={() => handleAdminTournamentAction("force_finish")}
+                          disabled={actionLoading === "admin_force_finish"}
+                          title="Re-run prize distribution for this tournament. Safe to click even if prizes were already paid — it won't pay twice."
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-accent/90 text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                        >
+                          {actionLoading === "admin_force_finish" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Gift className="w-3.5 h-3.5" />}
+                          Payout Prizes
                         </button>
                       )}
                       {(managingTournament.status === "upcoming" || managingTournament.status === "active") && (
