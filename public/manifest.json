@@ -9,6 +9,8 @@
   "orientation": "portrait-primary",
   "background_color": "#0a0a0f",
   "theme_color": "#0a0a0f",
+  "lang": "en",
+  "dir": "ltr",
   "categories": [
     "games",
     "sports"
@@ -85,6 +87,26 @@
           "sizes": "96x96"
         }
       ]
+    },
+    {
+      "name": "Tournaments",
+      "url": "/league/tournaments",
+      "icons": [
+        {
+          "src": "/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Leaderboard",
+      "url": "/leaderboard",
+      "icons": [
+        {
+          "src": "/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
     }
   ],
   "display_override": [
@@ -99,6 +121,27 @@
       "type": "image/png",
       "form_factor": "wide",
       "label": "Crazy Chess Battles Home"
+    },
+    {
+      "src": "/screenshot-narrow.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Crazy Chess Battles - Tournaments & Features"
+    },
+    {
+      "src": "/screenshot-game.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Crazy Chess Battles - Play & Compete"
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=live.crazychessbattles",
+      "id": "live.crazychessbattles"
     }
   ],
   "prefer_related_applications": false
