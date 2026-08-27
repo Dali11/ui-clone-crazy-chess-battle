@@ -48,14 +48,14 @@ function formatDate(dateStr?: string) {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-type FilterTab = 'all' | 'active' | 'upcoming' | 'completed';
+type FilterTab = 'active' | 'upcoming' | 'completed';
 
 export default function TournamentsTab() {
   const router = useRouter();
   const [tournaments, setTournaments] = useState<Competition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<FilterTab>('all');
+  const [filter, setFilter] = useState<FilterTab>('upcoming');
   const [joining, setJoining] = useState<string | null>(null);
   const [joinMsg, setJoinMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -100,7 +100,6 @@ export default function TournamentsTab() {
   };
 
   const filtered = tournaments.filter(t => {
-    if (filter === 'all') return true;
     if (filter === 'active') return t.status === 'active';
     if (filter === 'upcoming') return t.status === 'upcoming' || t.status === 'pending';
     if (filter === 'completed') return t.status === 'completed';
@@ -108,7 +107,6 @@ export default function TournamentsTab() {
   });
 
   const tabs: { id: FilterTab; label: string; count: number }[] = [
-    { id: 'all', label: 'All', count: tournaments.length },
     { id: 'active', label: 'Live', count: tournaments.filter(t => t.status === 'active').length },
     { id: 'upcoming', label: 'Upcoming', count: tournaments.filter(t => t.status === 'upcoming' || t.status === 'pending').length },
     { id: 'completed', label: 'Past', count: tournaments.filter(t => t.status === 'completed').length },

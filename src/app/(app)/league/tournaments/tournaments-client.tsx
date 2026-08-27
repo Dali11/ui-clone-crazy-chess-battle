@@ -54,7 +54,7 @@ function formatDate(dateStr?: string): string {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-type FilterTab = 'all' | 'active' | 'upcoming' | 'completed';
+type FilterTab = 'active' | 'upcoming' | 'completed';
 
 export default function TournamentsPage() {
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -62,7 +62,7 @@ export default function TournamentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState<string | null>(null);
   const [joinMessage, setJoinMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [filter, setFilter] = useState<FilterTab>('all');
+  const [filter, setFilter] = useState<FilterTab>('upcoming');
 
   const fetchTournaments = useCallback(async () => {
     setLoading(true);
@@ -107,7 +107,6 @@ export default function TournamentsPage() {
   const allTournaments = data?.tournaments || [];
 
   const filtered = allTournaments.filter(t => {
-    if (filter === 'all') return true;
     if (filter === 'active') return t.status === 'active';
     if (filter === 'upcoming') return t.status === 'upcoming' || t.status === 'pending';
     if (filter === 'completed') return t.status === 'completed';
@@ -119,7 +118,6 @@ export default function TournamentsPage() {
   const completedCount = allTournaments.filter(t => t.status === 'completed').length;
 
   const filterTabs: { id: FilterTab; label: string; count: number }[] = [
-    { id: 'all', label: 'All', count: allTournaments.length },
     { id: 'active', label: 'Live', count: activeCount },
     { id: 'upcoming', label: 'Upcoming', count: upcomingCount },
     { id: 'completed', label: 'Past', count: completedCount },
@@ -214,7 +212,7 @@ export default function TournamentsPage() {
           {/* TOURNAMENT GRID */}
           {filtered.length === 0 ? (
             <div className="card text-center py-10">
-              <p className="text-ccb-muted text-sm">No {filter === 'all' ? '' : filter} tournaments right now.</p>
+              <p className="text-ccb-muted text-sm">No {filter} tournaments right now.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
