@@ -91,6 +91,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [legalMoveSquares, setLegalMoveSquares] = useState<string[]>([]);
   const [premove, setPremove] = useState<{ from: string; to: string } | null>(null);
+  const premoveGuardRef = useRef(false);
   const [activeSheet, setActiveSheet] = useState<SheetType>(null);
   const [clockTick, setClockTick] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -610,36 +611,50 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     setSoundEnabled(newVal);
   };
 
-  // Auto-execute premove when it becomes our turn
+  // Auto-execute premove when it becomes our turn.
+  // CRITICAL: use game.fen (from the realtime hook) not local fen.
+  // When the opponent moves, game.fen is already updated in the same render
+  // that flips myTurn to true, but local fen won't sync until a separate
+  // effect runs on the NEXT render. Using local fen here means chess.js sees
+  // the position where it's still the opponent's turn → move() returns null →
+  // premove is silently discarded before fen ever catches up.
   useEffect(() => {
-    if (myTurn && premove && !gameEnded) {
+    if (myTurn && premove && !gameEnded && !premoveGuardRef.current) {
+      premoveGuardRef.current = true;
       try {
-        const game = new Chess(fen);
-        const move = game.move({ from: premove.from, to: premove.to, promotion: "q" });
+        const chess = new Chess(game.fen);
+        const move = chess.move({ from: premove.from, to: premove.to, promotion: "q" });
         if (move !== null) {
-          setFen(game.fen());
+          setFen(chess.fen());
           setMoveHistory((prev) => [...prev, move.san]);
           setViewPly((prev) => prev + 1);
           setLastMove({ from: premove.from, to: premove.to });
           playSound(detectMoveSound(move));
-          if (game.inCheck() && !game.isCheckmate()) {
+          if (chess.inCheck() && !chess.isCheckmate()) {
             setTimeout(() => playSound("check"), 100);
           }
           makeMove(premove.from, premove.to).then((res: any) => {
-          if (!res?.success) {
-            // Premove failed — board will auto-correct from server state
-          }
-        });
+            if (!res?.success) {
+              // Premove rejected by server — board will auto-correct from server state
+            }
+          });
         }
-      } catch {}
+        // If move === null, the premove is no longer legal on the new position
+        // (e.g. the piece was captured, or the move would be self-check).
+        // Silently cancel it — standard chess.com behavior.
+      } catch {
+        // Invalid position or move — cancel premove
+      }
       setPremove(null);
+      // Reset guard after state update so future premoves work
+      setTimeout(() => { premoveGuardRef.current = false; }, 0);
     }
     if (myTurn && premovePromotion && !gameEnded) {
       // Premove was a promotion — show the promotion dialog now that it's our turn
       setPendingPromotion({ from: premovePromotion.from, to: premovePromotion.to });
       setPremovePromotion(null);
     }
-  }, [myTurn, premove, premovePromotion, fen, gameEnded, isPromotionMove, makeMove]);
+  }, [myTurn, premove, premovePromotion, game.fen, gameEnded, makeMove]);
 
   useEffect(() => {
     playSound("gameStart");
