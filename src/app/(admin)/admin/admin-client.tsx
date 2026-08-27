@@ -1751,7 +1751,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                             <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{formatMWK(t.entry_fee)}</span>
                             <span className="flex items-center gap-1"><Gift className="w-3 h-3" />{formatMWK(t.prize_pool)}</span>
                             {(t.revenue || 0) > 0 && (
-                              <span className="flex items-center gap-1 text-emerald-500 font-medium"><TrendingUp className="w-3 h-3" />{formatMWK(t.revenue)} ({t.paid_count} paid)</span>
+                              <span className="flex items-center gap-1 text-emerald-500 font-medium"><TrendingUp className="w-3 h-3" />{formatMWK(t.revenue || 0)} ({t.paid_count || 0} paid)</span>
                             )}
                             {t.pool_source === 'fixed' && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-ccb-accent/10 text-ccb-accent border border-ccb-accent/30">FIXED</span>
