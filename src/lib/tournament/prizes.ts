@@ -89,8 +89,17 @@ export async function distributePrizes(
     }
   }
 
-  // Credit winners' wallets
+  // Credit winners' wallets (skip already-paid entries to prevent double-payout)
   for (const payout of payouts) {
+    const payoutRef = `tournament:${tournamentId}:rank:${payout.rank}`;
+    const { data: existing } = await admin
+      .from("deposits")
+      .select("id")
+      .eq("reference", payoutRef)
+      .eq("user_id", payout.player_id)
+      .single();
+    if (existing) continue; // already paid for this rank
+
     await admin.rpc("credit_wallet", {
       p_user_id: payout.player_id,
       p_amount_cents: payout.amount_cents,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { finishTournament } from "@/lib/tournament/finish";
 import { PRIZE_SPLITS_BY_TYPE, DEFAULT_PRIZE_SPLITS } from "@/lib/tournament/prizes";
 
 // GET — list all tournaments with participant counts
@@ -244,13 +245,8 @@ export async function PATCH(req: NextRequest) {
         }
       }
     } else if (action === "force_finish") {
-      // ── Force finish ──
-      const now = new Date().toISOString();
-      const { error } = await admin
-        .from("tournaments")
-        .update({ status: "finished", ended_at: now })
-        .eq("id", tournamentId);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      // ── Force finish + distribute prizes ──
+      await finishTournament(tournamentId);
     } else {
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }

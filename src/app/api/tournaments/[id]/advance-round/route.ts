@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { advanceKnockoutRound, knockoutRoundCount, generateKnockoutBracket, getGroupAdvancers, generateGroups, generateGroupRoundRobin } from "@/lib/tournament/knockout";
 import { sendEmail, sendBatchEmails } from "@/lib/email";
+import { finishTournament } from "@/lib/tournament/finish";
 
 // Allow enough time for large tournaments (100+ players / ~50 games per round)
 export const maxDuration = 60;
@@ -53,12 +54,8 @@ export async function POST(
     const nextRound = (tournament.current_round || 1) + 1;
 
     if (tournament.rounds && nextRound > tournament.rounds) {
-      // All rounds done — finish tournament
-      await admin
-        .from("tournaments")
-        .update({ status: "finished", ended_at: new Date().toISOString() })
-        .eq("id", tournamentId);
-
+      // All rounds done — finish tournament + distribute prizes
+      await finishTournament(tournamentId);
       return NextResponse.json({ success: true, finished: true });
     }
 
@@ -323,9 +320,7 @@ export async function POST(
 
       // Check if tournament is complete (1 player remaining)
       if (winners.length + byes.length <= 1) {
-        await admin.from("tournaments")
-          .update({ status: "finished", ended_at: new Date().toISOString() })
-          .eq("id", tournamentId);
+        await finishTournament(tournamentId);
         return NextResponse.json({ success: true, finished: true });
       }
 

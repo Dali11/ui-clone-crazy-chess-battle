@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { finishTournament } from "@/lib/tournament/finish";
 
 interface GameResult {
   gameId: string;
@@ -142,20 +143,14 @@ export async function processTournamentGameResult(result: GameResult) {
         const roundByes = updatedPairings.filter((p) => p.bye).length;
 
         if (roundWinners + roundByes <= 1) {
-          // Tournament is over — we have a champion
-          await admin
-            .from("tournaments")
-            .update({ status: "finished", ended_at: new Date().toISOString() })
-            .eq("id", tournamentId);
+          // Tournament is over — we have a champion — distribute prizes
+          await finishTournament(tournamentId);
         }
         // Otherwise, advance-round will be called to create the next bracket round
       } else {
         // Swiss/Arena: finish when all scheduled rounds are done
         if (tournament.current_round >= tournament.rounds) {
-          await admin
-            .from("tournaments")
-            .update({ status: "finished", ended_at: new Date().toISOString() })
-            .eq("id", tournamentId);
+          await finishTournament(tournamentId);
         }
       }
     }
