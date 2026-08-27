@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import {
-  Trophy, Swords, TrendingUp, Zap, Crown, ArrowRight, Check,
+  Trophy, Swords, TrendingUp, Zap, Crown, ArrowRight, Check, Download,
   Users, Smartphone, Shield, Star, Gamepad2, Disc3,
 } from "lucide-react";
 import HomeStats from "./home-stats";
@@ -64,6 +64,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <Link href="/league" className="btn-ghost text-sm hidden sm:inline-flex">Compete</Link>
             <Link href="/leaderboard" className="btn-ghost text-sm">Ranks</Link>
+            <Link href="/download" className="btn-ghost text-sm hidden sm:inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" />App</Link>
             <Link href="/how-it-works" className="btn-ghost text-sm hidden sm:inline-flex">How it Works</Link>
             <Link href={signupUrl} className="btn-primary text-sm px-3 sm:px-4">Sign up</Link>
           </div>
@@ -252,6 +253,8 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
             <Link href="/how-it-works" className="hover:text-ccb-text transition-colors">How it Works</Link>
             <Link href="/about" className="hover:text-ccb-text transition-colors">About</Link>
             <Link href="/faq" className="hover:text-ccb-text transition-colors">FAQ</Link>
+              <span>·</span>
+              <Link href="/download" className="hover:text-ccb-text transition-colors">Download App</Link>
           </div>
         </div>
       </footer>
