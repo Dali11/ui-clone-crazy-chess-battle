@@ -20,7 +20,7 @@
         },
         {
             "path": "/api/tournaments/reminder-check",
-            "schedule": "*/30 * * * *"
+            "schedule": "30 13 * * *"
         }
     ],
     "headers": [
