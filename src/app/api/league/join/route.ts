@@ -236,11 +236,14 @@ export async function POST(request: NextRequest) {
         }
         paidEntryFee = true;
 
-        // Add entry fee to prize pool ONLY if pool_source is not 'fixed'
+        // Add entry fee to prize pool ONLY if pool_source is not 'fixed'.
+        // Atomic RPC (single UPDATE) — avoids losing increments when several
+        // players join around the same time.
         if (tournament.pool_source !== 'fixed') {
-          await admin.from('tournaments')
-            .update({ prize_pool: (tournament.prize_pool || 0) + entryFee })
-            .eq('id', tournamentId);
+          await admin.rpc('increment_tournament_prize_pool', {
+            p_tournament_id: tournamentId,
+            p_amount: entryFee,
+          });
         }
 
         // Audit log

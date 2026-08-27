@@ -136,14 +136,14 @@ export async function POST(
       paidEntryFee = true;
       didDebit = true;
 
-      // Add entry fee to prize pool ONLY if pool_source is 'entry_fees' (not 'fixed')
+      // Add entry fee to prize pool ONLY if pool_source is 'entry_fees' (not 'fixed').
+      // Uses an atomic RPC (single UPDATE) instead of read-then-write, which
+      // silently lost increments when multiple players joined concurrently.
       if (tournament.pool_source !== 'fixed') {
-        const { error: poolErr } = await admin
-          .from("tournaments")
-          .update({
-            prize_pool: (tournament.prize_pool || 0) + entryFee,
-          })
-          .eq("id", tournamentId);
+        const { error: poolErr } = await admin.rpc("increment_tournament_prize_pool", {
+          p_tournament_id: tournamentId,
+          p_amount: entryFee,
+        });
 
         if (poolErr) console.error("Prize pool update failed:", poolErr);
       }
