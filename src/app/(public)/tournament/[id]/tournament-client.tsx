@@ -35,6 +35,7 @@ interface TournamentData {
     ends_at: string | null;
     entry_fee: number;
     prize_pool: number;
+    actual_prize_pool?: number;
     pool_source: string | null;
     thumbnail_url: string | null;
     berry_prize_pool: number | null;
@@ -343,7 +344,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const roundStartsIn = roundStartsAt ? Math.max(0, Math.floor((new Date(roundStartsAt).getTime() - Date.now()) / 1000)) : 0;
   const isRoundStartingSoon = roundStartsAt && roundStartsIn > 0;
   const hasEntryFee = (t.entry_fee || 0) > 0;
-  const hasPrizePool = (t.prize_pool || 0) > 0;
+  const displayPrizePool = t.actual_prize_pool ?? t.prize_pool ?? 0;
+  const hasPrizePool = displayPrizePool > 0;
   const hasBerryPrize = (t.berry_prize_pool || 0) > 0;
   const isLive = t.status === 'active';
 
@@ -461,7 +463,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               {hasPrizePool && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30">
                   <Trophy className="w-3.5 h-3.5 text-ccb-accent" />
-                  <span className="text-xs font-bold text-ccb-accent">{formatMoney(t.prize_pool)} Pool</span>
+                  <span className="text-xs font-bold text-ccb-accent">{formatMoney(displayPrizePool)} Pool</span>
                 </div>
               )}
               {hasBerryPrize && (
@@ -990,7 +992,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 <Trophy className="w-3.5 h-3.5" /> Prizes &amp; Entry
               </h4>
               <div className="space-y-3">
-                {hasPrizePool && <InfoRow icon={Trophy} label={t.pool_source === 'fixed' ? "Cash Prize Pool (Fixed)" : "Cash Prize Pool (Entry Fees)"} value={formatMoney(t.prize_pool)} />}
+                {hasPrizePool && <InfoRow icon={Trophy} label={t.pool_source === 'fixed' ? "Cash Prize Pool (Fixed)" : "Cash Prize Pool (Entry Fees)"} value={formatMoney(displayPrizePool)} />}
                 {hasBerryPrize && <InfoRow icon={Zap} label="Berry Prize Pool" value={`${t.berry_prize_pool} berries`} />}
                 {hasEntryFee ? (
                   <InfoRow icon={DollarSign} label="Entry Fee" value={formatMoney(t.entry_fee)} />
@@ -1033,7 +1035,7 @@ function PrizeDistribution({ t, formatMoney }: { t: any; formatMoney: (c: number
   const dist = t.prize_distribution;
   if (!dist || !dist.payouts || dist.payouts.length === 0) return null;
 
-  const pool = t.prize_pool || 0;
+  const pool = t.actual_prize_pool ?? t.prize_pool ?? 0;
   const isFixed = t.pool_source === 'fixed';
   const isFlat = dist.type === 'flat';
 

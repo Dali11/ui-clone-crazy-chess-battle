@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { distributePrizes } from "@/lib/tournament/prizes";
+import { computeTournamentEconomics, PLATFORM_CUT_PERCENT } from "@/lib/tournament/economics";
 
 /**
  * Shared tournament finish logic — marks the tournament as finished,
@@ -67,13 +68,15 @@ export async function finishTournament(tournamentId: string): Promise<void> {
       .eq("tournament_id", tournamentId);
   }
 
-  // Calculate prize distribution
-  const totalCollected = tournament.prize_pool || 0;
+  // Calculate prize distribution (shared with admin revenue view + public display)
+  const { totalCollected, platformCut, creatorProfit, actualPrizePool } =
+    computeTournamentEconomics(tournament);
   const creatorProfitPercent = tournament.creator_profit_percent || 0;
+  const isFixedPool = tournament.pool_source === "fixed";
 
   if (totalCollected > 0) {
-    if (tournament.pool_source === 'fixed') {
-      // Fixed pool: distribute the full amount to winners, no platform cut or creator profit
+    // Distribute the actual prize pool (post platform-cut / creator-profit) to winners
+    if (actualPrizePool > 0) {
       await distributePrizes(
         tournamentId,
         rankedParticipants.map((p) => ({
@@ -81,31 +84,12 @@ export async function finishTournament(tournamentId: string): Promise<void> {
           final_rank: p.final_rank ?? null,
           score: p.score ?? 0,
         })),
-        totalCollected,
+        actualPrizePool,
         tournament.prize_distribution || { type: "flat", payouts: [] }
       );
-    } else if (creatorProfitPercent > 0) {
-      // User-created paid tournament: 10% platform cut, creator profit, rest is prize pool
-      const PLATFORM_CUT_PERCENT = 10;
-      const platformCut = Math.floor(totalCollected * (PLATFORM_CUT_PERCENT / 100));
-      const remainder = totalCollected - platformCut;
-      const creatorProfit = Math.floor(remainder * (creatorProfitPercent / 100));
-      const actualPrizePool = remainder - creatorProfit;
+    }
 
-      // Distribute actual prize pool to winners
-      if (actualPrizePool > 0) {
-        await distributePrizes(
-          tournamentId,
-          rankedParticipants.map((p) => ({
-            player_id: p.player_id,
-            final_rank: p.final_rank ?? null,
-            score: p.score ?? 0,
-          })),
-          actualPrizePool,
-          tournament.prize_distribution || { type: "flat", payouts: [] }
-        );
-      }
-
+    if (!isFixedPool && creatorProfitPercent > 0) {
       // Credit creator profit to creator's wallet
       if (creatorProfit > 0 && tournament.created_by) {
         await admin.rpc("credit_wallet", {
@@ -152,18 +136,6 @@ export async function finishTournament(tournamentId: string): Promise<void> {
           },
         })
         .eq("id", tournamentId);
-    } else {
-      // Admin/legacy tournament or free tournament: distribute full prize pool
-      await distributePrizes(
-        tournamentId,
-        rankedParticipants.map((p) => ({
-          player_id: p.player_id,
-          final_rank: p.final_rank ?? null,
-          score: p.score ?? 0,
-        })),
-        totalCollected,
-        tournament.prize_distribution || { type: "flat", payouts: [] }
-      );
     }
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { computeTournamentEconomics } from '@/lib/tournament/economics';
 
 export async function GET(
   req: NextRequest,
@@ -159,6 +160,12 @@ export async function GET(
       canJoin = true;
     }
 
+    // The gross `prize_pool` collected from entry fees isn't what actually gets
+    // paid to winners — the platform takes a cut, and if the creator set a
+    // profit percentage, they take a cut of the remainder too. Surface the real
+    // payout amount so players see accurate numbers, not the inflated gross total.
+    const { actualPrizePool } = computeTournamentEconomics(tournament);
+
     return NextResponse.json({
       success: true,
       isAdmin,
@@ -166,7 +173,7 @@ export async function GET(
       currentPlayerId: user?.id || null,
       canJoin,
       joinReason,
-      tournament,
+      tournament: { ...tournament, actual_prize_pool: actualPrizePool },
       participants: participants || [],
       rounds: roundsWithGameIds,
       participantCount: participants?.length || 0,
