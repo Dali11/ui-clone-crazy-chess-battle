@@ -983,7 +983,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
       {/* Board */}
       <div ref={boardContainerRef} className="relative flex-1 min-h-0 flex items-center justify-center px-2 py-1">
-        <div style={{ width: boardSize, height: boardSize }} className="relative">
+        <div style={{ width: boardSize, height: boardSize, colorScheme: "light" }} className="relative">
           <Chessboard options={{
             position: displayFen,
             pieces: customPieces,

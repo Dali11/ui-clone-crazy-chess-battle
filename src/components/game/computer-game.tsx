@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Chessboard } from "react-chessboard";
+import { customPieces } from "@/lib/game/piece-styles";
 import { Chess } from "chess.js";
 import { Clock, Flag, ArrowLeft, Bot, Volume2, VolumeX, List, Palette, X, ChevronLeft, ChevronRight, MoreVertical, MessageCircle, RotateCcw, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -625,9 +626,10 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
 
           {/* Chessboard — flexible, fills remaining space, never forces scroll */}
           <div ref={boardContainerRef} className="flex-1 min-h-0 flex items-center justify-center px-2 py-1">
-            <div style={{ width: boardSize, height: boardSize }}>
+            <div style={{ width: boardSize, height: boardSize, colorScheme: "light" }}>
               <Chessboard options={{
                 position: displayFen,
+                pieces: customPieces,
                 boardOrientation: isPlayerWhite ? "white" : "black",
                 onPieceDrop: ({ sourceSquare, targetSquare }) => {
                   if (!targetSquare) return false;

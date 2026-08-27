@@ -229,10 +229,18 @@
 }
 
 /* Prevent browser "smart dark mode" from inverting chess piece colors.
-   Some mobile browsers (Samsung Internet, UC, etc.) invert #ffffff fills
-   to dark colors, making white pieces look identical to black pieces.
-   color-scheme: dark tells them the page is already dark; the filter:none
-   is a belt-and-suspenders guard for any remaining inversion. */
-.chess-board, .chess-board svg, .chess-board svg * {
+   Some mobile browsers (Samsung Internet, UC, etc.) have "force dark mode"
+   that inverts SVG fill colors — white pieces (#f8f8f8) become dark and
+   become indistinguishable from black pieces (#2a2a2a).
+
+   Two layers of defense:
+   1. color-scheme: light on the board container tells the browser this
+      element is already designed for light mode, so don't auto-darken it.
+   2. filter: none !important on SVG elements kills any remaining
+      browser-applied filter inversion. */
+.chess-board, .chess-board svg, .chess-board svg *,
+div[class*="react-chessboard"] svg, div[class*="react-chessboard"] svg *,
+div[style*="color-scheme"] svg, div[style*="color-scheme"] svg * {
   filter: none !important;
+  -webkit-filter: none !important;
 }
