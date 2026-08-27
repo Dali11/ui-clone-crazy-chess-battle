@@ -5,6 +5,7 @@ import {
   Users, Smartphone, Shield, Star, Gamepad2, Disc3,
 } from "lucide-react";
 import HomeStats from "./home-stats";
+import AppBanner from "@/components/layout/app-banner";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { detectCountry, detectCountryCode, formatMembershipPrice, type MarketConfig } from "@/lib/geo/country-detect";
@@ -258,6 +259,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           </div>
         </div>
       </footer>
+      <AppBanner />
     </div>
   );
 }
