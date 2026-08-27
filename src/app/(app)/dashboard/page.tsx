@@ -148,7 +148,7 @@ export default async function DashboardPage() {
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate">{t.name}</div>
                       <div className="text-xs text-ccb-muted">
-                        {new Date(t.starts_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                        {new Date(t.starts_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}, {new Date(t.starts_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
                         {t.entry_fee ? ` · MK ${t.entry_fee}` : " · Free"}
                       </div>
                     </div>

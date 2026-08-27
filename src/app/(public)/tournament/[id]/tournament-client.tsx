@@ -433,7 +433,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <StatTile icon={Clock} label="Time Control" value={`${t.initial_minutes}+${t.increment_seconds}`} />
               <StatTile icon={Users} label="Players" value={`${data.participantCount}${t.max_players ? `/${t.max_players}` : ''}`} />
-              <StatTile icon={Calendar} label="Starts" value={formatDate(t.starts_at)} />
+              <StatTile icon={Calendar} label="Starts" value={`${formatDate(t.starts_at)}, ${formatTime(t.starts_at)}`} />
               <StatTile icon={Award} label="Rounds" value={t.rounds || '—'} />
             </div>
 

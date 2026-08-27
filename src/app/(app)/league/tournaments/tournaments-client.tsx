@@ -51,7 +51,10 @@ function formatCurrency(cents: number, currencySymbol?: string, currencyCode?: s
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'TBD';
-  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const d = new Date(dateStr);
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return `${date}, ${time}`;
 }
 
 type FilterTab = 'active' | 'upcoming' | 'completed';
