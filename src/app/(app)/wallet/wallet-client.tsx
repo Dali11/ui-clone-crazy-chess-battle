@@ -170,7 +170,7 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
           });
           const data = await res.json();
           if (data.status === "success") {
-            const amt = data.toLocaleString();
+            const amt = (data.amount ?? 0).toLocaleString();
             setSuccess(`MWK ${amt} added to your wallet!`);
             setPolling(false);
             clearInterval(interval);
@@ -211,7 +211,7 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
         const data = await res.json();
 
         if (data.status === "success") {
-          const amt = data.toLocaleString();
+          const amt = (data.amount ?? 0).toLocaleString();
           setSuccess(`MWK ${amt} added to your wallet!`);
           setPolling(false);
           setPendingChargeId(null);
