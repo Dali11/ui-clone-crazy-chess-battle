@@ -99,6 +99,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const [armageddonGameId, setArmageddonGameId] = useState<string | null>(null);
   const [armageddonLoading, setArmageddonLoading] = useState(false);
   const [armageddonForfeiting, setArmageddonForfeiting] = useState(false);
+  const [armageddonError, setArmageddonError] = useState(false);
   const chatVisibleMobile = activeSheet === "chat";
   const chatVisibleDesktop = desktopTab === "chat";
   const lastFenRef = useRef(game.fen);
@@ -182,9 +183,19 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
     poll();
     const interval = setInterval(poll, 1500);
+    // Timeout after 30s — if backend hasn't created armageddon game, bail out
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        cancelled = true;
+        clearInterval(interval);
+        setArmageddonLoading(false);
+        setArmageddonError(true);
+      }
+    }, 30000);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      clearTimeout(timeout);
     };
   }, [isBattleDraw, battleInfo?.battleId, isSpectator, gameId]);
 
@@ -1293,6 +1304,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           playAgainLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "Play Again"}
           isArmageddonDraw={isBattleDraw}
           armageddonLoading={armageddonLoading}
+          armageddonError={armageddonError}
           armageddonForfeiting={armageddonForfeiting}
           onStartArmageddon={isBattleDraw && armageddonGameId ? handleStartArmageddon : undefined}
           onResignArmageddon={isBattleDraw && armageddonGameId ? handleResignArmageddon : undefined}

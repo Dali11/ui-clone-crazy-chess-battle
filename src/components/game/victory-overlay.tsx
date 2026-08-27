@@ -41,6 +41,7 @@ interface VictoryOverlayProps {
   // decider is required. These gate that flow behind an explicit choice.
   isArmageddonDraw?: boolean;
   armageddonLoading?: boolean;
+  armageddonError?: boolean;
   armageddonForfeiting?: boolean;
   onStartArmageddon?: () => void;
   onResignArmageddon?: () => void;
@@ -72,6 +73,7 @@ export default function VictoryOverlay({
   lobbyHref = "/play",
   isArmageddonDraw = false,
   armageddonLoading = false,
+  armageddonError = false,
   armageddonForfeiting = false,
   onStartArmageddon,
   onResignArmageddon,
@@ -299,10 +301,21 @@ export default function VictoryOverlay({
           )}
 
           {/* Battle draw → Armageddon action buttons */}
-          {isArmageddonDraw && armageddonLoading && !onStartArmageddon && (
+          {isArmageddonDraw && armageddonLoading && !armageddonError && !onStartArmageddon && (
             <div className="flex items-center justify-center gap-2 py-3 text-sm text-white/50">
               <Loader2 className="w-4 h-4 animate-spin" />
               Preparing armageddon...
+            </div>
+          )}
+          {isArmageddonDraw && armageddonError && (
+            <div className="mb-3 px-4 py-3 rounded-xl text-center" style={{ backgroundColor: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)" }}>
+              <p className="text-sm text-red-400 mb-2">Could not start Armageddon game.</p>
+              <button
+                onClick={() => onDismiss?.()}
+                className="text-xs text-white/50 hover:text-white/80 underline"
+              >
+                Back to battles
+              </button>
             </div>
           )}
           {onStartArmageddon && (

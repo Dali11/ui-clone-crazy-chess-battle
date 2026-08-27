@@ -60,25 +60,20 @@ export async function POST(req: NextRequest) {
       berries_awarded: berries,
     });
 
-    // Award berries
-    const description = streakBonus > 0
-      ? `Daily check-in (${newStreak} day streak) + streak bonus!`
-      : `Daily check-in (${newStreak} day streak)`;
-
+    // Award berries — base check-in
+    const baseAmount = config.berry_daily_login || 5;
     await admin.rpc("credit_berries", {
       p_user_id: user.id,
-      p_amount: berries,
-      p_description: description,
+      p_amount: baseAmount,
+      p_description: `Daily check-in (${newStreak} day streak)`,
     });
 
-    // Log streak bonus as separate transaction if applicable
+    // Award streak bonus as a separate transaction (if applicable)
     if (streakBonus > 0) {
-      await admin.from("berry_transactions").insert({
-        user_id: user.id,
-        type: "streak_bonus",
-        amount: streakBonus,
-        balance_after: 0, // will be filled by trigger if exists
-        description: `${newStreak}-day streak bonus!`,
+      await admin.rpc("credit_berries", {
+        p_user_id: user.id,
+        p_amount: streakBonus,
+        p_description: `${newStreak}-day streak bonus!`,
       });
     }
 
