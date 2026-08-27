@@ -3,23 +3,20 @@
  *
  * The `prize_pool` column on a tournament tracks the GROSS amount collected
  * from entry fees (100% of what players paid in). The amount actually paid
- * out to winners is smaller — the platform takes a cut, and if the creator
- * set a profit percentage during setup, they take a cut of the remainder too.
+ * out to winners may be smaller if the creator set a profit percentage.
  *
  * This must be computed the exact same way everywhere it's shown or paid out:
  *   - lib/tournament/finish.ts (actual payout at tournament end)
  *   - api/admin/tournaments/[id]/route.ts (admin revenue breakdown)
  *   - api/tournaments/[id]/route.ts (public tournament page display)
  *
- * Rules (mirrors the payout logic in finish.ts):
+ * Rules:
  *   - pool_source === 'fixed': no cut at all, full amount is the prize pool.
- *   - creator_profit_percent > 0: 10% platform cut off the top, then the
- *     creator's percentage of what's left, remainder is the real prize pool.
+ *   - creator_profit_percent > 0: creator takes their percentage of the total
+ *     collected, remainder is the real prize pool. No platform fee.
  *   - creator_profit_percent === 0 (admin/legacy/free tournaments): no cuts,
  *     the full collected amount is the prize pool.
  */
-
-export const PLATFORM_CUT_PERCENT = 10;
 
 export interface TournamentEconomicsInput {
   prize_pool: number | null;
@@ -30,7 +27,7 @@ export interface TournamentEconomicsInput {
 export interface TournamentEconomics {
   /** Gross amount collected (or fixed pool amount) — what's stored in prize_pool */
   totalCollected: number;
-  /** What the platform keeps */
+  /** What the platform keeps (always 0 — no platform fee) */
   platformCut: number;
   /** What the tournament creator keeps */
   creatorProfit: number;
@@ -54,11 +51,10 @@ export function computeTournamentEconomics(
   }
 
   if (creatorProfitPercent > 0) {
-    const platformCut = Math.floor(totalCollected * (PLATFORM_CUT_PERCENT / 100));
-    const remainder = totalCollected - platformCut;
-    const creatorProfit = Math.floor(remainder * (creatorProfitPercent / 100));
-    const actualPrizePool = remainder - creatorProfit;
-    return { totalCollected, platformCut, creatorProfit, actualPrizePool };
+    // Creator takes their percentage of the total, rest is the prize pool
+    const creatorProfit = Math.floor(totalCollected * (creatorProfitPercent / 100));
+    const actualPrizePool = totalCollected - creatorProfit;
+    return { totalCollected, platformCut: 0, creatorProfit, actualPrizePool };
   }
 
   // Admin/legacy/free tournament: no cuts, full pool goes to winners

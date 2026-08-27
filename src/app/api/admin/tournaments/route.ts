@@ -90,13 +90,13 @@ export async function PATCH(req: NextRequest) {
         "name", "description", "type", "time_control", "initial_minutes",
         "increment_seconds", "max_players", "min_rating", "max_rating",
         "rounds", "duration_minutes", "starts_at", "ends_at",
-        "entry_fee", "prize_pool", "pool_source"
+        "entry_fee", "prize_pool", "pool_source", "creator_profit_percent"
       ];
 
       for (const field of editableFields) {
         if (body[field] !== undefined) {
           // Convert numeric fields
-          if (["initial_minutes", "increment_seconds", "max_players", "min_rating", "max_rating", "rounds", "duration_minutes", "entry_fee", "prize_pool"].includes(field)) {
+          if (["initial_minutes", "increment_seconds", "max_players", "min_rating", "max_rating", "rounds", "duration_minutes", "entry_fee", "prize_pool", "creator_profit_percent"].includes(field)) {
             updates[field] = body[field] === null ? null : Number(body[field]);
           } else {
             updates[field] = body[field];

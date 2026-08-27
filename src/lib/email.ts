@@ -48,7 +48,8 @@ export type EmailTemplate =
   | "identity_verified"
   | "membership_activated"
   | "membership_expired"
-  | "knockout_eliminated";
+  | "knockout_eliminated"
+  | "new_tournament";
 
 // ─── Helper: Format MWK amounts ────────────────────────────────────
 
@@ -547,6 +548,27 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
           ${data.opponent ? infoBox("Eliminated by", data.opponent, "#9ca3af") : ""}
           <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">You can still watch the remaining rounds and join other tournaments.</p>
           ${button(`${BASE_URL}/league/tournaments`, "Find More Tournaments")}
+        `,
+      };
+    }
+
+    case "new_tournament": {
+      return {
+        subject: `\ud83c\udfc6 New tournament: ${data.tournamentName || "Tournament"} \u2014 90% Prize Pool!`,
+        title: "New Tournament",
+        preview: `${data.tournamentName || "A new tournament"} is open for registration`,
+        body: `
+          <h2 style="margin:0 0 16px;font-size:20px;color:#ffffff;">\u2694\ufe0f ${data.tournamentName || "New Tournament"} is Live!</h2>
+          <p style="margin:0 0 16px;font-size:15px;color:#9ca3af;line-height:1.6;">
+            A new tournament just opened for registration. 90% of every entry fee goes straight into the prize pool \u2014 the more players join, the bigger the pot!
+          </p>
+          ${infoBox("Tournament", data.tournamentName || "Tournament", "#7c3aed")}
+          ${infoBox("Starts", data.startTime || formatCAT(data.startsAt), "#f59e0b")}
+          ${infoBox("Entry Fee", formatMWK(data.entryFee || 0), "#9ca3af")}
+          ${infoBox("Players Registered", `${data.playerCount || 0} already in`, "#10b981")}
+          ${infoBox("Current Prize Pool", formatMWK(data.currentPrizePool || 0), "#f59e0b")}
+          ${button(`${BASE_URL}/tournament/${data.tournamentId}`, "Join Now")}
+          <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">MK500 entry \u2014 5-round Swiss, rapid 10+0. Register before it fills up!</p>
         `,
       };
     }

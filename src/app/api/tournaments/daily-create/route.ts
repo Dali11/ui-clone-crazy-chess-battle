@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PRIZE_SPLITS_BY_TYPE } from "@/lib/tournament/prizes";
+import { sendEmail } from "@/lib/email";
 
 /**
  * Cron endpoint: automatically creates the daily Crazy Chess Battles tournament.
@@ -13,7 +14,7 @@ import { PRIZE_SPLITS_BY_TYPE } from "@/lib/tournament/prizes";
  *   Thu — Thursday Showdown, Fri — Friday Night Battle,
  *   Sat — Weekend Warriors, Sun — Crazy Grand Prix
  *
- * Settings: MK500 entry, 5-round Swiss, blitz 5+0, min 6 players,
+ * Settings: MK500 entry, 5-round Swiss, rapid 10+0, min 6 players,
  * pool_source = entry_fees, creator_profit_percent = 10.
  *
  * Duplicate prevention: checks if a tournament with the same name already
@@ -110,10 +111,10 @@ async function handleCreate(req: NextRequest) {
       .from("tournaments")
       .insert({
         name: tournamentName,
-        description: `Daily ${tournamentName} — 5-round Swiss blitz. MK500 entry. Prize pool from entries.`,
+        description: `Daily ${tournamentName} — 5-round Swiss rapid. MK500 entry. Prize pool from entries.`,
         type: "swiss",
-        time_control: "blitz",
-        initial_minutes: 5,
+        time_control: "rapid",
+        initial_minutes: 10,
         increment_seconds: 0,
         max_players: 128,
         min_players: 6,
@@ -142,11 +143,46 @@ async function handleCreate(req: NextRequest) {
 
     console.log(`[daily-tournament] Created "${tournamentName}" starting at ${startsAt.toISOString()}`);
 
+    // ── Notify all registered users that a new tournament is open ──
+    let emailsSent = 0;
+    try {
+      const { data: allUsers } = await admin
+        .from("profiles")
+        .select("email")
+        .not("email", "is", null);
+
+      if (allUsers && allUsers.length > 0) {
+        const emails = allUsers
+          .map((u) => u.email)
+          .filter((e): e is string => !!e)
+          .map((to) =>
+            sendEmail({
+              to,
+              template: "new_tournament" as const,
+              data: {
+                tournamentName,
+                tournamentId: tournament.id,
+                startsAt: startsAt.toISOString(),
+                entryFee: 500,
+                playerCount: 0,
+                currentPrizePool: 0,
+              },
+            })
+          );
+        await Promise.allSettled(emails);
+        emailsSent = allUsers.length;
+        console.log(`[daily-tournament] Queued ${emailsSent} new-tournament emails`);
+      }
+    } catch (emailErr) {
+      console.error("[daily-tournament] Failed to send new-tournament emails:", emailErr);
+    }
+
     return NextResponse.json({
       success: true,
       tournament,
       name: tournamentName,
       startsAt: startsAt.toISOString(),
+      emailsSent,
     });
   } catch (e: any) {
     console.error("Daily tournament creation error:", e);

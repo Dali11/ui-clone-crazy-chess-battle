@@ -1,11 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { distributePrizes } from "@/lib/tournament/prizes";
-import { computeTournamentEconomics, PLATFORM_CUT_PERCENT } from "@/lib/tournament/economics";
+import { computeTournamentEconomics } from "@/lib/tournament/economics";
 
 /**
  * Shared tournament finish logic — marks the tournament as finished,
  * assigns final ranks with proper Swiss tiebreaks (Buchholz, Sonneborn-Berger),
- * distributes the prize pool to winners (with platform cut + creator profit if applicable),
+ * distributes the prize pool to winners (with creator profit if applicable),
  * and sends notification emails to all participants.
  *
  * Called from:
@@ -69,13 +69,13 @@ export async function finishTournament(tournamentId: string): Promise<void> {
   }
 
   // Calculate prize distribution (shared with admin revenue view + public display)
-  const { totalCollected, platformCut, creatorProfit, actualPrizePool } =
+  const { totalCollected, creatorProfit, actualPrizePool } =
     computeTournamentEconomics(tournament);
   const creatorProfitPercent = tournament.creator_profit_percent || 0;
   const isFixedPool = tournament.pool_source === "fixed";
 
   if (totalCollected > 0) {
-    // Distribute the actual prize pool (post platform-cut / creator-profit) to winners
+    // Distribute the actual prize pool to winners
     if (actualPrizePool > 0) {
       await distributePrizes(
         tournamentId,
@@ -107,17 +107,6 @@ export async function finishTournament(tournamentId: string): Promise<void> {
         });
       }
 
-      // Record platform cut (just audit — platform keeps it)
-      if (platformCut > 0) {
-        await admin.from("deposits").insert({
-          user_id: tournament.created_by,
-          amount: -platformCut,
-          status: "success",
-          method: "platform_cut",
-          reference: `tournament:${tournamentId}:platform_cut`,
-        });
-      }
-
       // Update tournament with the economics breakdown
       await admin
         .from("tournaments")
@@ -126,8 +115,7 @@ export async function finishTournament(tournamentId: string): Promise<void> {
             ...(tournament.prize_distribution || {}),
             economics: {
               totalCollected,
-              platformCut,
-              platformCutPercent: PLATFORM_CUT_PERCENT,
+              platformCut: 0,
               creatorProfit,
               creatorProfitPercent,
               actualPrizePool,

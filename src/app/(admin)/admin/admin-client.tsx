@@ -89,6 +89,7 @@ interface Tournament {
   entry_fee: number;
   prize_pool: number;
   pool_source: string | null;
+  creator_profit_percent: number | null;
   prize_distribution: any;
   max_players: number | null;
   min_rating: number;
@@ -700,6 +701,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       entry_fee: t.entry_fee || 0,
       prize_pool: t.prize_pool || 0,
       pool_source: t.pool_source || 'entry_fees',
+      creator_profit_percent: t.creator_profit_percent || 0,
     });
   };
 
@@ -2157,10 +2159,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                             {rev.creatorProfit > 0 && (
                               <>
                                 <div className="flex justify-between">
-                                  <span className="text-ccb-muted">Platform cut (10%)</span>
-                                  <span className="font-medium text-amber-500">{formatMWK(rev.platformRevenue)}</span>
-                                </div>
-                                <div className="flex justify-between">
                                   <span className="text-ccb-muted">Creator profit ({rev.creatorProfitPercent}%)</span>
                                   <span className="font-medium text-blue-400">{formatMWK(rev.creatorProfit)}</span>
                                 </div>
@@ -2473,6 +2471,16 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           {editForm.pool_source === 'fixed'
                             ? 'Fixed prize pool. Entry fees do NOT add to the pool.'
                             : 'Prize pool grows as players join and pay entry fees.'}
+                        </p>
+                      </div>
+                      {/* Creator Profit % */}
+                      <div>
+                        <label className="text-xs font-medium text-ccb-muted">Creator Profit (%)</label>
+                        <input type="number" min="0" max="100" value={editForm.creator_profit_percent ?? 0} onChange={(e) => setEditForm({ ...editForm, creator_profit_percent: e.target.value })} className="input-field mt-1 w-full" />
+                        <p className="text-[10px] text-ccb-muted mt-1">
+                          {Number(editForm.creator_profit_percent) > 0
+                            ? `Creator keeps ${editForm.creator_profit_percent}% of entry fees. Remaining ${100 - Number(editForm.creator_profit_percent)}% goes to the prize pool.`
+                            : 'No creator profit. 100% of entry fees go to the prize pool.'}
                         </p>
                       </div>
                     </div>
