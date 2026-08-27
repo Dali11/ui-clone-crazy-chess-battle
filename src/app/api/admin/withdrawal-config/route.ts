@@ -27,11 +27,11 @@ export async function GET() {
     const { data: config } = await admin.from("withdrawal_config").select("*").limit(1).single();
     return NextResponse.json(config || {
       auto_approve_enabled: false,
-      min_withdrawal: 1000,
-      max_withdrawal: 5000000,
+      min_withdrawal: 10000,
+      max_withdrawal: 500000,
       min_deposit: 500,
       processing_fee_pct: 0,
-      daily_withdrawal_limit: 1000000,
+      daily_withdrawal_limit: 100000,
       withdrawal_fee: 0,
       deposit_fee: 0,
     });

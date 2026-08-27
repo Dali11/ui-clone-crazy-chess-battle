@@ -15,8 +15,8 @@ export async function GET() {
 
     return NextResponse.json({
       enabled: wConfig.enabled !== false,
-      min_amount: wConfig.min_amount || 1_000_000,
-      max_amount: wConfig.max_amount || 50_000_000,
+      min_amount: wConfig.min_amount || 10_000,
+      max_amount: wConfig.max_amount || 500_000,
       daily_limit: wConfig.daily_limit || 0,
       withdrawal_fee: wConfig.withdrawal_fee || 0,
     });

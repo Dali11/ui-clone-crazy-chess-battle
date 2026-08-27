@@ -1337,7 +1337,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <label className="text-xs font-medium text-ccb-muted">Min Withdrawal (MK)</label>
                       <input
                         type="number"
-                        value={configEdit.min_withdrawal ?? (withdrawalConfig.min_withdrawal || 1000)}
+                        value={configEdit.min_withdrawal ?? (withdrawalConfig.min_withdrawal || 10000)}
                         onChange={(e) => setConfigEdit(prev => ({ ...prev, min_withdrawal: e.target.value }))}
                         className="input mt-1 w-full text-sm"
                         placeholder="10"
@@ -1348,7 +1348,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <label className="text-xs font-medium text-ccb-muted">Max Withdrawal (MK)</label>
                       <input
                         type="number"
-                        value={configEdit.max_withdrawal ?? (withdrawalConfig.max_withdrawal || 5000000)}
+                        value={configEdit.max_withdrawal ?? (withdrawalConfig.max_withdrawal || 500000)}
                         onChange={(e) => setConfigEdit(prev => ({ ...prev, max_withdrawal: e.target.value }))}
                         className="input mt-1 w-full text-sm"
                         placeholder="50000"
@@ -1370,7 +1370,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <label className="text-xs font-medium text-ccb-muted">Daily Withdrawal Limit (MK)</label>
                       <input
                         type="number"
-                        value={configEdit.daily_withdrawal_limit ?? (withdrawalConfig.daily_withdrawal_limit || 1000000)}
+                        value={configEdit.daily_withdrawal_limit ?? (withdrawalConfig.daily_withdrawal_limit || 100000)}
                         onChange={(e) => setConfigEdit(prev => ({ ...prev, daily_withdrawal_limit: e.target.value }))}
                         className="input mt-1 w-full text-sm"
                         placeholder="10000"

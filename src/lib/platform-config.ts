@@ -32,9 +32,9 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
   withdrawals: {
     enabled: true,
     auto_approve: false,
-    min_amount: 1_000_000,
-    max_amount: 5_000_000,
-    daily_limit: 1_000_000,
+    min_amount: 10_000,
+    max_amount: 500_000,
+    daily_limit: 100_000,
     processing_fee_pct: 0,
     withdrawal_fee: 0,
     show_kpi_cards: true,

@@ -21,14 +21,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Enforce minimum amount
-    const minAmount = wConfig.min_amount || 1_000_000;
+    const minAmount = wConfig.min_amount || 10_000;
     if (!amount || amount < minAmount) {
       const minDisplay = minAmount.toLocaleString();
       return NextResponse.json({ error: `Minimum withdrawal is MWK ${minDisplay}` }, { status: 400 });
     }
 
     // Enforce maximum amount
-    const maxAmount = wConfig.max_amount || 50_000_000;
+    const maxAmount = wConfig.max_amount || 500_000;
     if (amount > maxAmount) {
       const maxDisplay = maxAmount.toLocaleString();
       return NextResponse.json({ error: `Maximum withdrawal is MWK ${maxDisplay}` }, { status: 400 });
