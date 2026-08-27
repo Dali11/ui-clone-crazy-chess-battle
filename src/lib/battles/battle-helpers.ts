@@ -5,7 +5,7 @@
 
 export interface BattleConfig {
   enabled: boolean;
-  stake_levels: number[]; // in cents
+  stake_levels: number[]; // in MWK (actual kwacha)
   platform_fee_pct: number;
   rating_range: number;
   queue_timeout_s: number;
@@ -19,7 +19,7 @@ export interface BattleConfig {
 
 export const DEFAULT_CONFIG: BattleConfig = {
   enabled: true,
-  stake_levels: [50000, 100000, 250000, 500000, 1000000], // MK500, MK1K, MK2.5K, MK5K, MK10K
+  stake_levels: [500, 1000, 2500, 5000, 10000], // MK500, MK1K, MK2.5K, MK5K, MK10K
   platform_fee_pct: 5,
   rating_range: 200,
   queue_timeout_s: 120,

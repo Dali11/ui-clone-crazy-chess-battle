@@ -8,8 +8,8 @@ import {
   RefreshCw, XCircle, ChevronRight, Users, Target, Sparkles,
 } from "lucide-react";
 
-// Single fixed stake for matchmaking battles: MK 1,000 (100,000 cents)
-const BATTLE_STAKE = 100_000;
+// Single fixed stake for matchmaking battles: MK 1,000
+const BATTLE_STAKE = 1000;
 
 // Single fixed time control for all battles: Rapid 15+10
 const BATTLE_TIME_CONTROL = "rapid15";
@@ -30,13 +30,13 @@ function formatMKK(amount: number): string {
   return `MK ${Math.floor(amount).toLocaleString("en-US")}`;
 }
 
-function formatCurrency(cents: number, currencyCode: string, rate: number): string {
-  if (currencyCode === "MWK" || !rate || rate === 1) return formatMKK(cents);
-  const converted = Math.round(cents * rate);
+function formatCurrency(amount: number, currencyCode: string, rate: number): string {
+  if (currencyCode === "MWK" || !rate || rate === 1) return formatMKK(amount);
+  const converted = Math.round(amount * rate);
   try {
     return new Intl.NumberFormat("en", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(converted);
   } catch {
-    return formatMKK(cents);
+    return formatMKK(amount);
   }
 }
 

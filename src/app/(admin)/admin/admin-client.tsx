@@ -2717,7 +2717,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2">
                       <label className="text-xs text-ccb-muted mb-1 block">
-                        Stake Levels (MWK cents, comma-separated)
+                        Stake Levels (MWK, comma-separated)
                       </label>
                       <input
                         type="text"
@@ -2731,7 +2731,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         onChange={(e) =>
                           setBattleConfig({ ...battleConfig, stake_levels: e.target.value })
                         }
-                        placeholder="50000, 100000, 250000, 500000, 1000000"
+                        placeholder="500, 1000, 2500, 5000, 10000"
                         className="w-full px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm"
                       />
                     </div>
@@ -2898,7 +2898,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                   onChange={(v) => setBerryConfig({ ...berryConfig, berries_per_draw: v })}
                 />
                 <ConfigInput
-                  label="Berry Value (MWK cents per 100 berries)"
+                  label="Berry Value (MWK per 100 berries)"
                   value={berryConfig.berry_value ?? 1000}
                   onChange={(v) => setBerryConfig({ ...berryConfig, berry_value: v })}
                 />
@@ -3109,13 +3109,13 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       <div>
-                        <label className="text-xs text-ccb-muted mb-1 block">Monthly Price (cents)</label>
+                        <label className="text-xs text-ccb-muted mb-1 block">Monthly Price (MWK)</label>
                         <input
                           type="number"
                           value={marketEdits[config.country_code]?.membership_price ?? config.membership_price}
                           onChange={(e) => setMarketEdits((p: any) => ({ ...p, [config.country_code]: { ...p[config.country_code], membership_price: e.target.value } }))}
                           className="w-full px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm"
-                          placeholder="1000000"
+                          placeholder="10000"
                         />
                       </div>
                       <div>

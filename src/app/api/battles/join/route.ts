@@ -33,7 +33,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Chess Battles are currently disabled" }, { status: 403 });
     }
 
-    const allowedStakes = config.stake_levels as number[];
+    let allowedStakes = config.stake_levels as number[];
+    // Auto-migrate: if stake_levels still in cents (values >= 50000), convert to MWK
+    if (allowedStakes?.some((v: number) => v >= 50000)) {
+      allowedStakes = allowedStakes.map((v: number) => Math.round(v / 100));
+      // Also update the DB in the background (non-fatal)
+      admin.from("battle_config")
+        .update({ stake_levels: allowedStakes, updated_at: new Date().toISOString() })
+        .then(() => {}, () => {});
+    }
     if (!allowedStakes.includes(stake)) {
       return NextResponse.json({ error: "Invalid stake level" }, { status: 400 });
     }

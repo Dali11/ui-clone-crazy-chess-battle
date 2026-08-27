@@ -84,8 +84,8 @@ interface TournamentData {
   participantCount: number;
 }
 
-function formatMoney(cents: number) {
-  return `MK${cents.toLocaleString()}`;
+function formatMoney(amount: number) {
+  return `MK${amount.toLocaleString()}`;
 }
 
 function formatDate(dateStr: string) {
@@ -94,6 +94,74 @@ function formatDate(dateStr: string) {
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Compute Swiss tiebreaks (Buchholz Cut 1, Sonneborn-Berger) client-side
+ * from the rounds/pairings data. This mirrors the server-side calculateTiebreaks
+ * so live standings use the same ranking logic as the final results.
+ */
+function computeTiebreaks(
+  participants: Array<{ player_id: string; score: number; wins: number; seed: number }>,
+  rounds: Array<{ pairings: Array<{ white: string; black: string; result: string | null; bye: boolean }> }>,
+): Map<string, { buchholz_cut1: number; sonneborn_berger: number }> {
+  // Build score lookup
+  const scoreMap = new Map<string, number>();
+  for (const p of participants) {
+    scoreMap.set(p.player_id, p.score || 0);
+  }
+
+  // Build opponent map and Sonneborn-Berger contributions
+  const opponentMap = new Map<string, string[]>();
+  const sbMap = new Map<string, number>();
+
+  for (const p of participants) {
+    opponentMap.set(p.player_id, []);
+    sbMap.set(p.player_id, 0);
+  }
+
+  for (const round of rounds) {
+    for (const pairing of round.pairings) {
+      if (pairing.bye) continue;
+      const { white, black, result } = pairing;
+      if (!white || !black || !result) continue;
+
+      // Track opponents
+      opponentMap.get(white)?.push(black);
+      opponentMap.get(black)?.push(white);
+
+      // Sonneborn-Berger: win = opp score * 1, draw = opp score * 0.5
+      const whiteOppScore = scoreMap.get(black) || 0;
+      const blackOppScore = scoreMap.get(white) || 0;
+
+      if (result === "white") {
+        sbMap.set(white, (sbMap.get(white) || 0) + whiteOppScore);
+      } else if (result === "black") {
+        sbMap.set(black, (sbMap.get(black) || 0) + blackOppScore);
+      } else if (result === "draw") {
+        sbMap.set(white, (sbMap.get(white) || 0) + whiteOppScore * 0.5);
+        sbMap.set(black, (sbMap.get(black) || 0) + blackOppScore * 0.5);
+      }
+    }
+  }
+
+  // Calculate Buchholz Cut 1 for each player
+  const result = new Map<string, { buchholz_cut1: number; sonneborn_berger: number }>();
+  for (const p of participants) {
+    const opponents = opponentMap.get(p.player_id) || [];
+    const oppScores = opponents.map((id) => scoreMap.get(id) || 0).sort((a, b) => a - b);
+    const buchholz_total = oppScores.reduce((sum, s) => sum + s, 0);
+    const buchholz_cut1 = oppScores.length > 1
+      ? oppScores.slice(1).reduce((sum, s) => sum + s, 0)
+      : buchholz_total;
+
+    result.set(p.player_id, {
+      buchholz_cut1,
+      sonneborn_berger: sbMap.get(p.player_id) || 0,
+    });
+  }
+
+  return result;
 }
 
 export default function TournamentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -279,17 +347,23 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     completed: { label: 'COMPLETED', color: 'text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30', dot: 'bg-ccb-muted' },
   }[t.status] || { label: t.status?.toUpperCase(), color: 'text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30', dot: 'bg-ccb-muted' };
 
-  // Once a tournament is finished, `final_rank` is the authoritative ranking
-  // (computed server-side with full Swiss tiebreaks: score → Buchholz Cut 1 →
-  // Sonneborn-Berger → wins → seed). Sort by it so the podium, table order, and
-  // the "#" rank number all agree. While the tournament is still in progress,
-  // final_rank isn't set yet, so fall back to the simpler live sort.
+  // Compute Swiss tiebreaks client-side so live standings use the same
+  // ranking logic as the final results (score → Buchholz Cut 1 →
+  // Sonneborn-Berger → wins → seed). This prevents confusing rank jumps
+  // when the tournament finishes and server-side tiebreaks kick in.
   const allHaveFinalRank = participants.length > 0 && participants.every((p) => p.final_rank != null);
+  const tiebreaks = computeTiebreaks(participants, rounds);
+
   const sortedParticipants = [...participants].sort((a, b) => {
     if (allHaveFinalRank) {
       return (a.final_rank || 0) - (b.final_rank || 0);
     }
+    // Same tiebreak order as server-side calculateTiebreaks
     if (b.score !== a.score) return b.score - a.score;
+    const ta = tiebreaks.get(a.player_id) || { buchholz_cut1: 0, sonneborn_berger: 0 };
+    const tb = tiebreaks.get(b.player_id) || { buchholz_cut1: 0, sonneborn_berger: 0 };
+    if (tb.buchholz_cut1 !== ta.buchholz_cut1) return tb.buchholz_cut1 - ta.buchholz_cut1;
+    if (tb.sonneborn_berger !== ta.sonneborn_berger) return tb.sonneborn_berger - ta.sonneborn_berger;
     if (b.wins !== a.wins) return b.wins - a.wins;
     return (a.seed || 0) - (b.seed || 0);
   });
@@ -542,6 +616,16 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       <Medal className="w-6 h-6 text-ccb-muted mx-auto mb-1" />
                       <div className="text-xs font-bold truncate">{top3[1].profile?.display_name || top3[1].profile?.username || '—'}</div>
                       <div className="text-[10px] text-ccb-muted">{(top3[1].score ?? 0).toFixed(1)} pts</div>
+                      {top3[0].score === top3[1].score && (() => {
+                        const tb0 = tiebreaks.get(top3[0].player_id) || { buchholz_cut1: 0, sonneborn_berger: 0 };
+                        const tb1 = tiebreaks.get(top3[1].player_id) || { buchholz_cut1: 0, sonneborn_berger: 0 };
+                        return (
+                          <div className="text-[9px] text-ccb-muted/70 mt-0.5">
+                            TB: {tb1.buchholz_cut1.toFixed(1)} / {tb1.sonneborn_berger.toFixed(1)}
+                            {tb1.buchholz_cut1 < tb0.buchholz_cut1 && ' (weaker opp.)'}
+                          </div>
+                        );
+                      })()}
                       <div className="text-[10px] font-bold text-ccb-muted mt-1">2nd</div>
                     </div>
                     {/* 1st */}
@@ -549,6 +633,16 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       <Crown className="w-7 h-7 text-ccb-accent mx-auto mb-1" />
                       <div className="text-xs font-bold truncate">{top3[0].profile?.display_name || top3[0].profile?.username || '—'}</div>
                       <div className="text-[10px] text-ccb-accent font-semibold">{(top3[0].score ?? 0).toFixed(1)} pts</div>
+                      {top3.length > 1 && top3[0].score === top3[1].score && (() => {
+                        const tb0 = tiebreaks.get(top3[0].player_id) || { buchholz_cut1: 0, sonneborn_berger: 0 };
+                        const tb1 = tiebreaks.get(top3[1].player_id) || { buchholz_cut1: 0, sonneborn_berger: 0 };
+                        return (
+                          <div className="text-[9px] text-ccb-accent/70 mt-0.5">
+                            TB: {tb0.buchholz_cut1.toFixed(1)} / {tb0.sonneborn_berger.toFixed(1)}
+                            {tb0.buchholz_cut1 > tb1.buchholz_cut1 && ' (stronger opp.)'}
+                          </div>
+                        );
+                      })()}
                       <div className="text-[10px] font-bold text-ccb-accent mt-1">CHAMPION</div>
                     </div>
                     {/* 3rd */}
@@ -556,20 +650,46 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       <Award className="w-6 h-6 text-amber-600 dark:text-amber-400 mx-auto mb-1" />
                       <div className="text-xs font-bold truncate">{top3[2].profile?.display_name || top3[2].profile?.username || '—'}</div>
                       <div className="text-[10px] text-ccb-muted">{(top3[2].score ?? 0).toFixed(1)} pts</div>
+                      {top3.length > 2 && top3[1].score === top3[2].score && (() => {
+                        const tb1 = tiebreaks.get(top3[1].player_id) || { buchholz_cut1: 0, sonneborn_berger: 0 };
+                        const tb2 = tiebreaks.get(top3[2].player_id) || { buchholz_cut1: 0, sonneborn_berger: 0 };
+                        return (
+                          <div className="text-[9px] text-ccb-muted/70 mt-0.5">
+                            TB: {tb2.buchholz_cut1.toFixed(1)} / {tb2.sonneborn_berger.toFixed(1)}
+                            {tb2.buchholz_cut1 < tb1.buchholz_cut1 && ' (weaker opp.)'}
+                          </div>
+                        );
+                      })()}
                       <div className="text-[10px] font-bold text-ccb-muted mt-1">3rd</div>
                     </div>
                   </div>
                 )}
 
+                {/* TIEBREAK INFO NOTE */}
+                {(() => {
+                  // Show a note when there are tied scores
+                  const tiedScores = new Set(sortedParticipants.filter((p, i) =>
+                    i > 0 && p.score === sortedParticipants[i - 1].score
+                  ).map(p => p.score));
+                  return tiedScores.size > 0 ? (
+                    <div className="flex items-center gap-1.5 px-1 text-[10px] text-ccb-muted">
+                      <AlertCircle className="w-3 h-3" />
+                      <span>Tied scores are broken by Buchholz Cut 1, then Sonneborn-Berger (shown in columns below).</span>
+                    </div>
+                  ) : null;
+                })()}
+
                 {/* STANDINGS TABLE */}
-                <div className="bg-ccb-card border border-ccb-border rounded-2xl overflow-hidden">
+                <div className="bg-ccb-card border border-ccb-border rounded-2xl overflow-hidden overflow-x-auto">
                   {/* Header */}
-                  <div className="grid grid-cols-12 gap-2 px-5 py-2.5 bg-ccb-surface border-b border-ccb-border text-[10px] uppercase tracking-wider text-ccb-muted font-semibold">
+                  <div className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-5 py-2.5 bg-ccb-surface border-b border-ccb-border text-[10px] uppercase tracking-wider text-ccb-muted font-semibold min-w-[600px] sm:min-w-0">
                     <div className="col-span-1 text-center">#</div>
-                    <div className="col-span-6 sm:col-span-5">Player</div>
+                    <div className="col-span-5 sm:col-span-4">Player</div>
                     <div className="col-span-2 text-center">Score</div>
                     <div className="col-span-2 text-center hidden sm:block">W/L/D</div>
-                    <div className="col-span-3 sm:col-span-2 text-center">Played</div>
+                    <div className="col-span-1 text-center hidden sm:block" title="Buchholz Cut 1 — sum of opponents' scores minus worst opponent">BH-C1</div>
+                    <div className="col-span-1 text-center hidden sm:block" title="Sonneborn-Berger — weighted sum of results vs opponents' scores">SB</div>
+                    <div className="col-span-2 text-center">Played</div>
                   </div>
 
                   {/* Rows */}
@@ -577,18 +697,20 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     const rank = allHaveFinalRank ? (p.final_rank as number) : (i + 1);
                     const isTop3 = rank <= 3;
                     const medalColor = rank === 1 ? 'text-ccb-accent' : rank === 2 ? 'text-ccb-muted' : rank === 3 ? 'text-amber-600 dark:text-amber-400' : '';
+                    const tb = tiebreaks.get(p.player_id) || { buchholz_cut1: 0, sonneborn_berger: 0 };
+                    const tiedWithNext = i < sortedParticipants.length - 1 && p.score === sortedParticipants[i + 1].score;
                     return (
                       <Link
                         key={p.player_id}
                         href={`/profile/${p.profile?.username}`}
-                        className={`grid grid-cols-12 gap-2 px-5 py-3 hover:bg-ccb-surface transition-colors items-center border-b border-ccb-border/50 last:border-0 ${
+                        className={`grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-5 py-3 hover:bg-ccb-surface transition-colors items-center border-b border-ccb-border/50 last:border-0 min-w-[600px] sm:min-w-0 ${
                           isTop3 ? 'bg-ccb-surface/30' : ''
                         }`}
                       >
                         <div className={`col-span-1 text-center text-sm font-bold ${medalColor || 'text-ccb-muted'}`}>
                           {isTop3 && rank === 1 ? <Crown className="w-4 h-4 mx-auto" /> : rank}
                         </div>
-                        <div className="col-span-6 sm:col-span-5 flex items-center gap-2.5 min-w-0">
+                        <div className="col-span-5 sm:col-span-4 flex items-center gap-2.5 min-w-0">
                           {p.profile?.avatar_url ? (
                             <img src={p.profile.avatar_url} alt="" className="w-7 h-7 rounded-full shrink-0 border border-ccb-border" />
                           ) : (
@@ -609,7 +731,13 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                           <span className="text-ccb-danger">{p.losses}</span>/
                           <span>{p.draws}</span>
                         </div>
-                        <div className="col-span-3 sm:col-span-2 text-center text-xs text-ccb-muted">
+                        <div className={`col-span-1 text-center text-xs hidden sm:block ${tiedWithNext ? 'text-ccb-text font-semibold' : 'text-ccb-muted'}`}>
+                          {tb.buchholz_cut1.toFixed(1)}
+                        </div>
+                        <div className={`col-span-1 text-center text-xs hidden sm:block ${tiedWithNext ? 'text-ccb-text font-semibold' : 'text-ccb-muted'}`}>
+                          {tb.sonneborn_berger.toFixed(1)}
+                        </div>
+                        <div className="col-span-2 text-center text-xs text-ccb-muted">
                           {p.games_played}
                         </div>
                       </Link>
