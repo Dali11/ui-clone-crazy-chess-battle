@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect, use, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Trophy, Users, Calendar, Clock, DollarSign, RefreshCw, AlertCircle,
   Crown, Star, Swords, ChevronRight, ArrowLeft, Zap, Award, Medal,
-  CheckCircle, XCircle, Play, Settings, Target, Gamepad2,
+  CheckCircle, XCircle, Play, Settings, Target, Gamepad2, LogIn, UserPlus,
 } from 'lucide-react';
 
 interface TournamentData {
@@ -173,7 +173,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [activeTab, setActiveTab] = useState<'standings' | 'rounds' | 'info'>('standings');
   const [redirecting, setRedirecting] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const redirectedRef = useRef<string | null>(null);
+  const autoJoinAttemptedRef = useRef(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -246,6 +248,23 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       setActionLoading(false);
     }
   };
+
+  // If the visitor was bounced through Signup/Login with ?action=join (e.g. they
+  // clicked "Join Tournament" while logged out), automatically complete the join
+  // once they land back here authenticated — no need to click twice.
+  useEffect(() => {
+    if (!data || autoJoinAttemptedRef.current) return;
+    if (searchParams.get('action') !== 'join') return;
+    autoJoinAttemptedRef.current = true;
+
+    // Strip the query param regardless of outcome so a refresh doesn't re-trigger it
+    const cleanUrl = `/tournament/${resolvedParams.id}`;
+    window.history.replaceState(null, '', cleanUrl);
+
+    if (data.canJoin && !data.isRegistered) {
+      handleJoin();
+    }
+  }, [data, searchParams, resolvedParams.id]);
 
   const handleLeave = async () => {
     setActionLoading(true);
@@ -499,11 +518,27 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                         <p className="text-center text-xs text-ccb-muted mt-1">You'll be paired in the next round</p>
                       )}
                     </>
+                  ) : joinReason === 'not_authenticated' ? (
+                    <div className="space-y-2">
+                      <Link
+                        href={`/signup?redirect=${encodeURIComponent(`/tournament/${resolvedParams.id}`)}&action=join`}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20 flex items-center justify-center gap-2"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        {hasEntryFee ? `Sign Up to Join — ${formatMoney(t.entry_fee)}` : 'Sign Up to Join Tournament'}
+                      </Link>
+                      <Link
+                        href={`/login?redirect=${encodeURIComponent(`/tournament/${resolvedParams.id}`)}&action=join`}
+                        className="w-full py-2.5 rounded-xl bg-ccb-surface border border-ccb-border text-ccb-text font-bold text-sm hover:bg-ccb-primary/10 hover:border-ccb-primary/30 transition-all flex items-center justify-center gap-2"
+                      >
+                        <LogIn className="w-4 h-4" />
+                        Already have an account? Log In
+                      </Link>
+                    </div>
                   ) : (
                     <div className="w-full py-3 rounded-xl bg-ccb-surface border border-ccb-border text-center">
                       <p className="text-sm text-ccb-muted">
-                        {joinReason === 'not_authenticated' ? 'Sign in to join this tournament' :
-                         joinReason === 'already_registered' ? 'Already registered' :
+                        {joinReason === 'already_registered' ? 'Already registered' :
                          joinReason === 'full' ? 'Tournament is full' :
                          joinReason === 'rating_too_low' ? `Requires rating ${t.min_rating}+` :
                          joinReason === 'rating_too_high' ? `Max rating ${t.max_rating}` :

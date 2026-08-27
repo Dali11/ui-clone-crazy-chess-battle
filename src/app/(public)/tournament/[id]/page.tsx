@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import TournamentClient from "./tournament-client";
 
+// TournamentClient reads ?action=join via useSearchParams to auto-complete
+// a join after a logged-out visitor is bounced through Signup/Login and back.
+// Force dynamic rendering so that works without a Suspense boundary.
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({
   params,
 }: { params: Promise<{ id: string }> }): Promise<Metadata> {
