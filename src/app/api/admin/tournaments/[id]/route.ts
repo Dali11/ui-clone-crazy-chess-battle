@@ -81,6 +81,33 @@ export async function GET(
       creator = creatorProfile;
     }
 
+    // Calculate revenue breakdown
+    const paidCount = (participants || []).filter(p => p.paid_entry_fee).length;
+    const entryFee = tournament.entry_fee || 0;
+    const totalCollected = paidCount * entryFee;
+    const prizePool = tournament.prize_pool || 0;
+    const creatorProfitPercent = tournament.creator_profit_percent || 0;
+    const poolSource = tournament.pool_source || 'entry_fees';
+
+    let platformRevenue = 0;
+    let creatorProfit = 0;
+    let actualPrizePool = prizePool;
+
+    if (poolSource === 'fixed') {
+      // Fixed pool: platform/creator keeps (collected - prize_pool)
+      platformRevenue = Math.max(0, totalCollected - prizePool);
+      actualPrizePool = prizePool;
+    } else if (creatorProfitPercent > 0) {
+      // User-created paid tournament: 10% platform cut, creator profit %, rest is prize pool
+      const platformCut = Math.floor(prizePool * 0.10);
+      const remainder = prizePool - platformCut;
+      creatorProfit = Math.floor(remainder * (creatorProfitPercent / 100));
+      actualPrizePool = remainder - creatorProfit;
+      platformRevenue = platformCut;
+    }
+    // For admin-created entry_fees tournaments without creator_profit_percent:
+    // all collected goes to prize pool, platform revenue = 0
+
     return NextResponse.json({
       success: true,
       tournament: { ...tournament, creator },
@@ -89,6 +116,17 @@ export async function GET(
         profile: profileMap[p.player_id] || null,
       })),
       rounds: enrichedRounds,
+      revenue: {
+        entryFee,
+        paidParticipants: paidCount,
+        totalCollected,
+        prizePool,
+        actualPrizePool,
+        platformRevenue,
+        creatorProfit,
+        poolSource,
+        creatorProfitPercent,
+      },
     });
   } catch (e: any) {
     console.error("Admin tournament detail error:", e);

@@ -29,16 +29,20 @@ export async function GET(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Get participant counts
+    // Get participant counts (total + paid)
     const tournamentIds = tournaments?.map(t => t.id) || [];
     let participantCounts: Record<string, number> = {};
+    let paidCounts: Record<string, number> = {};
     if (tournamentIds.length > 0) {
       const { data: participants } = await admin
         .from("tournament_participants")
-        .select("tournament_id")
+        .select("tournament_id, paid_entry_fee")
         .in("tournament_id", tournamentIds);
       for (const p of participants || []) {
         participantCounts[p.tournament_id] = (participantCounts[p.tournament_id] || 0) + 1;
+        if (p.paid_entry_fee) {
+          paidCounts[p.tournament_id] = (paidCounts[p.tournament_id] || 0) + 1;
+        }
       }
     }
 
@@ -46,6 +50,8 @@ export async function GET(req: NextRequest) {
       tournaments: tournaments?.map(t => ({
         ...t,
         participant_count: participantCounts[t.id] || 0,
+        paid_count: paidCounts[t.id] || 0,
+        revenue: ((paidCounts[t.id] || 0) * (t.entry_fee || 0)),
       })) || [],
     });
   } catch (e: any) {

@@ -100,6 +100,8 @@ interface Tournament {
   ends_at: string | null;
   created_at: string;
   participant_count: number;
+  paid_count?: number;
+  revenue?: number;
 }
 
 interface GameInfo {
@@ -1697,6 +1699,26 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                 </button>
               </div>
 
+              {/* REVENUE SUMMARY */}
+              {tournaments.length > 0 && (() => {
+                const totalRevenue = tournaments.reduce((sum, t) => sum + (t.revenue || 0), 0);
+                const totalPrizePool = tournaments.reduce((sum, t) => sum + (t.prize_pool || 0), 0);
+                const totalPaid = tournaments.reduce((sum, t) => sum + (t.paid_count || 0), 0);
+                if (totalRevenue === 0) return null;
+                return (
+                  <div className="flex items-center gap-4 px-3 py-2 mb-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs">
+                    <span className="flex items-center gap-1.5 font-medium text-emerald-500">
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      Total Revenue: {formatMWK(totalRevenue)}
+                    </span>
+                    <span className="text-ccb-muted">·</span>
+                    <span className="text-ccb-muted">{totalPaid} paid entries</span>
+                    <span className="text-ccb-muted">·</span>
+                    <span className="text-ccb-muted">Prize pools: {formatMWK(totalPrizePool)}</span>
+                  </div>
+                );
+              })()}
+
               {/* TOURNAMENT LIST */}
               {filteredTournaments.length === 0 ? (
                 <div className="text-center py-12 text-ccb-muted text-sm">
@@ -1728,6 +1750,9 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                             {t.rounds && <span className="flex items-center gap-1"><Trophy className="w-3 h-3" />R{t.current_round}/{t.rounds}</span>}
                             <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{formatMWK(t.entry_fee)}</span>
                             <span className="flex items-center gap-1"><Gift className="w-3 h-3" />{formatMWK(t.prize_pool)}</span>
+                            {(t.revenue || 0) > 0 && (
+                              <span className="flex items-center gap-1 text-emerald-500 font-medium"><TrendingUp className="w-3 h-3" />{formatMWK(t.revenue)} ({t.paid_count} paid)</span>
+                            )}
                             {t.pool_source === 'fixed' && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-ccb-accent/10 text-ccb-accent border border-ccb-accent/30">FIXED</span>
                             )}
@@ -2095,6 +2120,60 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         <div className="font-bold">{formatMWK(managingTournament.entry_fee)}</div>
                       </div>
                     </div>
+
+                    {/* Revenue Breakdown */}
+                    {(() => {
+                      const rev = tournamentDetail?.revenue;
+                      if (!rev || (rev.totalCollected || 0) === 0) return null;
+                      return (
+                        <div className="bg-ccb-surface rounded-lg p-3 space-y-2 border border-ccb-border">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-ccb-fg">
+                            <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                            Revenue Breakdown
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-ccb-muted">Entry fee</span>
+                              <span className="font-medium">{formatMWK(rev.entryFee)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-ccb-muted">Paid players</span>
+                              <span className="font-medium">{rev.paidParticipants}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-ccb-muted">Total collected</span>
+                              <span className="font-medium text-emerald-500">{formatMWK(rev.totalCollected)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-ccb-muted">Prize pool</span>
+                              <span className="font-medium">{formatMWK(rev.prizePool)}</span>
+                            </div>
+                            {rev.poolSource === 'fixed' && rev.platformRevenue > 0 && (
+                              <div className="flex justify-between col-span-2 pt-1 border-t border-ccb-border">
+                                <span className="text-ccb-muted">Platform revenue (fixed pool surplus)</span>
+                                <span className="font-bold text-emerald-500">{formatMWK(rev.platformRevenue)}</span>
+                              </div>
+                            )}
+                            {rev.creatorProfit > 0 && (
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-ccb-muted">Platform cut (10%)</span>
+                                  <span className="font-medium text-amber-500">{formatMWK(rev.platformRevenue)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-ccb-muted">Creator profit ({rev.creatorProfitPercent}%)</span>
+                                  <span className="font-medium text-blue-400">{formatMWK(rev.creatorProfit)}</span>
+                                </div>
+                                <div className="flex justify-between col-span-2 pt-1 border-t border-ccb-border">
+                                  <span className="text-ccb-muted">Actual prizes distributed</span>
+                                  <span className="font-bold">{formatMWK(rev.actualPrizePool)}</span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Admin Action Buttons */}
                     <div className="flex flex-wrap gap-2 pb-2 border-b border-ccb-border">
