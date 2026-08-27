@@ -84,7 +84,7 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
   const [tab, setTab] = useState<"deposit" | "withdraw" | "history">("deposit");
   const [depositAmount, setDepositAmount] = useState(1000);
   const [withdrawAmount, setWithdrawAmount] = useState(0);
-  const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number; withdrawal_fee: number; processing_fee_pct: number } | null>(null);
+  const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number; processing_fee_pct: number } | null>(null);
   const [phone, setPhone] = useState(savedPhone || "");
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -622,10 +622,9 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
 
           {/* Fee breakdown */}
           {(() => {
-            const fixedFee = withdrawConfig?.withdrawal_fee || 0;
             const pctFee = withdrawConfig?.processing_fee_pct || 0;
             const processingFee = Math.floor(withdrawAmount * (pctFee / 100));
-            const totalFees = fixedFee + processingFee;
+            const totalFees = processingFee;
             const netAmount = Math.max(0, withdrawAmount - totalFees);
             if (totalFees === 0) return null;
             return (
@@ -638,12 +637,6 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
                   <div className="flex justify-between text-sm">
                     <span className="text-ccb-muted">Processing fee ({pctFee}%)</span>
                     <span className="text-ccb-muted">−{formatMWK(processingFee)}</span>
-                  </div>
-                )}
-                {fixedFee > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-ccb-muted">Withdrawal fee</span>
-                    <span className="text-ccb-muted">−{formatMWK(fixedFee)}</span>
                   </div>
                 )}
                 <div className="border-t border-ccb-border pt-1.5 flex justify-between text-sm font-semibold">
