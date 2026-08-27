@@ -433,7 +433,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <StatTile icon={Clock} label="Time Control" value={`${t.initial_minutes}+${t.increment_seconds}`} />
               <StatTile icon={Users} label="Players" value={`${data.participantCount}${t.max_players ? `/${t.max_players}` : ''}`} />
-              <StatTile icon={Calendar} label="Starts" value={`${formatDate(t.starts_at)}, ${formatTime(t.starts_at)}`} />
+              <StatTile icon={Calendar} label="Starts" value={formatDate(t.starts_at)} sub={formatTime(t.starts_at)} />
               <StatTile icon={Award} label="Rounds" value={t.rounds || '—'} />
             </div>
 
@@ -982,13 +982,14 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   );
 }
 
-function StatTile({ icon: Icon, label, value }: { icon: any; label: string; value: string | number }) {
+function StatTile({ icon: Icon, label, value, sub }: { icon: any; label: string; value: string | number; sub?: string }) {
   return (
     <div className="bg-ccb-surface/50 rounded-xl px-3 py-2.5 border border-ccb-border/50">
       <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-ccb-muted font-semibold mb-1">
         <Icon className="w-3 h-3" /> {label}
       </div>
       <div className="text-sm font-bold truncate">{value}</div>
+      {sub && <div className="text-[11px] text-ccb-muted font-medium truncate">{sub}</div>}
     </div>
   );
 }
