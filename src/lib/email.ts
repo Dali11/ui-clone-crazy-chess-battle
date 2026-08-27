@@ -18,8 +18,8 @@ const FROM_EMAIL = "Crazy Chess Battles <noreply@crazychessbattles.live>";
 const BASE_URL = "https://crazychessbattles.live";
 const LOGO_URL = `${BASE_URL}/logo-badge.png`;
 
-// All test emails go here during development
-const TEST_EMAIL_OVERRIDE = "geniuspulse22@gmail.com";
+// Set to a valid email to force ALL sends there (dev/testing only). Leave null for real sending.
+const TEST_EMAIL_OVERRIDE: string | null = null;
 
 export interface EmailData {
   to: string;
@@ -612,9 +612,9 @@ export async function sendEmail(email: EmailData): Promise<boolean> {
   // Use the subject passed at the call site if provided, otherwise fall back to template default
   const finalSubject = email.subject && email.subject.trim() ? email.subject : rendered.subject;
 
-  // Override recipient for test mode
-  const to = TEST_EMAIL_OVERRIDE;
-  const isOverridden = email.to !== TEST_EMAIL_OVERRIDE;
+  // Override recipient only if TEST_EMAIL_OVERRIDE is explicitly set
+  const to = TEST_EMAIL_OVERRIDE || email.to;
+  const isOverridden = !!TEST_EMAIL_OVERRIDE && email.to !== TEST_EMAIL_OVERRIDE;
 
   const html = wrapContent(rendered.title, rendered.body, rendered.preview);
 
