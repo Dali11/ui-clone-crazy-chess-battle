@@ -311,7 +311,6 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
           </p>
           ${infoBox("Tournament", data.tournamentName || "Tournament", "#7c3aed")}
           ${infoBox("Start Time", data.startTime || formatCAT(data.startsAt), "#f59e0b")}
-          ${infoBox("Players", `${data.playerCount || 0} registered`, "#9ca3af")}
           ${button(`${BASE_URL}/tournament/${data.tournamentId}`, "Open Tournament")}
           <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Be online when the tournament starts \u2014 no-shows may be eliminated.</p>
         `,
@@ -387,7 +386,6 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
           ${infoBox("Tournament", data.tournamentName || "Tournament", "#7c3aed")}
           ${infoBox("Start Time", data.startTime || formatCAT(data.startsAt), "#f59e0b")}
           ${infoBox("Entry Fee", data.entryFee ? formatMWK(data.entryFee) : "Free", "#9ca3af")}
-          ${infoBox("Players", `${data.playerCount || 0} registered`, "#9ca3af")}
           ${button(`${BASE_URL}/tournament/${data.tournamentId}`, "View Tournament")}
         `,
       };
@@ -565,7 +563,6 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
           ${infoBox("Tournament", data.tournamentName || "Tournament", "#7c3aed")}
           ${infoBox("Starts", data.startTime || formatCAT(data.startsAt), "#f59e0b")}
           ${infoBox("Entry Fee", formatMWK(data.entryFee || 0), "#9ca3af")}
-          ${infoBox("Players Registered", `${data.playerCount || 0} already in`, "#10b981")}
           ${infoBox("Current Prize Pool", formatMWK(data.currentPrizePool || 0), "#f59e0b")}
           ${button(`${BASE_URL}/tournament/${data.tournamentId}`, "Join Now")}
           <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">MK500 entry \u2014 5-round Swiss, rapid 10+0. Register before it fills up!</p>

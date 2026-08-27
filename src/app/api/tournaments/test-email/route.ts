@@ -16,10 +16,11 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const tournamentId = searchParams.get("tournamentId");
+  const admin = createAdminClient();
+
+  let tournament: any = null;
 
   if (!tournamentId) {
-    // Find the most recent upcoming tournament
-    const admin = createAdminClient();
     const { data: latest } = await admin
       .from("tournaments")
       .select("id, name, starts_at, entry_fee, prize_pool, creator_profit_percent")
@@ -27,37 +28,25 @@ export async function GET(req: NextRequest) {
       .order("starts_at", { ascending: false })
       .limit(1)
       .single();
-
-    if (!latest) {
-      return NextResponse.json({ error: "No upcoming tournament found" }, { status: 404 });
-    }
-
-    const result = await sendEmail({
-      to: "geniuspulse22@gmail.com",
-      template: "new_tournament",
-      data: {
-        tournamentName: latest.name,
-        tournamentId: latest.id,
-        startsAt: latest.starts_at,
-        entryFee: latest.entry_fee || 500,
-        playerCount: 0,
-        currentPrizePool: latest.prize_pool || 0,
-      },
-    });
-
-    return NextResponse.json({ success: result, tournament: latest.name, id: latest.id });
+    tournament = latest;
+  } else {
+    const { data: t } = await admin
+      .from("tournaments")
+      .select("id, name, starts_at, entry_fee, prize_pool, creator_profit_percent")
+      .eq("id", tournamentId)
+      .single();
+    tournament = t;
   }
 
-  const admin = createAdminClient();
-  const { data: tournament, error } = await admin
-    .from("tournaments")
-    .select("id, name, starts_at, entry_fee, prize_pool, creator_profit_percent")
-    .eq("id", tournamentId)
-    .single();
-
-  if (error || !tournament) {
+  if (!tournament) {
     return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
   }
+
+  // Query real participant count
+  const { count } = await admin
+    .from("tournament_participants")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournament.id);
 
   const result = await sendEmail({
     to: "geniuspulse22@gmail.com",
@@ -67,10 +56,10 @@ export async function GET(req: NextRequest) {
       tournamentId: tournament.id,
       startsAt: tournament.starts_at,
       entryFee: tournament.entry_fee || 500,
-      playerCount: 0,
+      playerCount: count || 0,
       currentPrizePool: tournament.prize_pool || 0,
     },
   });
 
-  return NextResponse.json({ success: result, tournament: tournament.name });
+  return NextResponse.json({ success: result, tournament: tournament.name, id: tournament.id, playerCount: count || 0 });
 }
