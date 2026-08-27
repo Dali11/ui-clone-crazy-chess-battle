@@ -735,7 +735,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   };
 
   const handleTournamentDelete = async (tournamentId: string) => {
-    if (!confirm("Permanently delete this tournament and all associated data (games, rounds, participants)? For upcoming tournaments, paid entry fees will be refunded. For finished tournaments, data is removed but no refunds are issued (prizes already distributed). This cannot be undone.")) return;
+    if (!confirm("Permanently delete this tournament and all associated data (games, rounds, participants)? For upcoming/active tournaments, paid entry fees will be refunded. For finished tournaments, data is removed but no refunds are issued (prizes already distributed). This cannot be undone.")) return;
     setActionLoading(`${tournamentId}_delete`);
     try {
       const res = await fetch(`/api/admin/tournaments?id=${tournamentId}`, { method: "DELETE" });
@@ -1753,8 +1753,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           </>
                         )}
 
-                        {/* Edit — only for upcoming */}
-                        {t.status === "upcoming" && (
+                        {/* Edit — upcoming or active */}
+                        {(t.status === "upcoming" || t.status === "active") && (
                           <button
                             onClick={() => handleTournamentEdit(t)}
                             disabled={actionLoading === `${t.id}_edit`}
@@ -1832,8 +1832,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           </button>
                         )}
 
-                        {/* Delete — upcoming, cancelled, or finished */}
-                        {(t.status === "upcoming" || t.status === "cancelled" || t.status === "finished") && (
+                        {/* Delete — any status (active tournaments get entry fees refunded) */}
+                        {(t.status === "upcoming" || t.status === "cancelled" || t.status === "finished" || t.status === "active") && (
                           <button
                             onClick={() => handleTournamentDelete(t.id)}
                             disabled={actionLoading === `${t.id}_delete`}
@@ -2127,9 +2127,49 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           Cancel & Refund
                         </button>
                       )}
+                      {(managingTournament.status === "upcoming" || managingTournament.status === "active") && (
+                        <button
+                          onClick={() => { handleTournamentEdit(managingTournament); setManagingTournament(null); setTournamentDetail(null); }}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-primary text-sm font-medium hover:bg-ccb-accent/10"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" /> Edit
+                        </button>
+                      )}
+                      {(managingTournament.status === "upcoming" || managingTournament.status === "active") && (
+                        <button
+                          onClick={() => { handlePrizeEdit(managingTournament); setManagingTournament(null); setTournamentDetail(null); }}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-accent text-sm font-medium hover:bg-ccb-accent/10"
+                        >
+                          <Gift className="w-3.5 h-3.5" /> Prizes
+                        </button>
+                      )}
+                      <button
+                        onClick={() => { handleTournamentDuplicate(managingTournament.id); setManagingTournament(null); setTournamentDetail(null); }}
+                        disabled={actionLoading === `${managingTournament.id}_duplicate`}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted text-sm font-medium hover:bg-ccb-muted/10 disabled:opacity-50"
+                      >
+                        {actionLoading === `${managingTournament.id}_duplicate` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
+                        Duplicate
+                      </button>
+                      <button
+                        onClick={() => handleTournamentShare(managingTournament)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted text-sm font-medium hover:bg-ccb-muted/10"
+                      >
+                        <Share2 className="w-3.5 h-3.5" /> Share
+                      </button>
                       <Link href={`/tournament/${managingTournament.id}`} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-primary text-sm font-medium hover:bg-ccb-primary/10">
                         <Swords className="w-3.5 h-3.5" /> View Page
                       </Link>
+                      {(managingTournament.status === "upcoming" || managingTournament.status === "cancelled" || managingTournament.status === "finished" || managingTournament.status === "active") && (
+                        <button
+                          onClick={() => { handleTournamentDelete(managingTournament.id); setManagingTournament(null); setTournamentDetail(null); }}
+                          disabled={actionLoading === `${managingTournament.id}_delete`}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-ccb-danger/10 text-ccb-danger border border-ccb-danger/30 text-sm font-medium hover:bg-ccb-danger/20 disabled:opacity-50"
+                        >
+                          {actionLoading === `${managingTournament.id}_delete` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          Delete
+                        </button>
+                      )}
                     </div>
 
                     {/* Detail Content */}

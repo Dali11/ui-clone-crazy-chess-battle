@@ -286,21 +286,20 @@ export async function DELETE(req: NextRequest) {
       .from("tournaments").select("status, entry_fee_cents").eq("id", tournamentId).single();
     if (!tournament) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
 
-    if (!["upcoming", "cancelled", "finished"].includes(tournament.status)) {
+    if (!["upcoming", "cancelled", "finished", "active"].includes(tournament.status)) {
       return NextResponse.json({
-        error: "Can only delete upcoming, cancelled, or finished tournaments. Use Cancel first for active ones.",
+        error: "Can only delete upcoming, active, cancelled, or finished tournaments.",
       }, { status: 400 });
     }
 
-    // For finished tournaments, delete associated games first (they're over)
-    if (tournament.status === "finished") {
+    // For finished or active tournaments, delete associated games first
+    if (tournament.status === "finished" || tournament.status === "active") {
       const { count: gameCount } = await admin
         .from("games")
         .select("id", { count: "exact", head: true })
         .eq("tournament_id", tournamentId);
 
       if (gameCount && gameCount > 0) {
-        // Delete all games linked to this finished tournament
         await admin.from("games").delete().eq("tournament_id", tournamentId);
       }
     } else {
@@ -317,8 +316,8 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
-    // Refund any paid participants before deleting (only for upcoming, not finished)
-    if (tournament.entry_fee_cents > 0 && tournament.status === "upcoming") {
+    // Refund any paid participants before deleting (upcoming or active, not finished — prizes already distributed)
+    if (tournament.entry_fee_cents > 0 && (tournament.status === "upcoming" || tournament.status === "active")) {
       const { data: participants } = await admin
         .from("tournament_participants")
         .select("player_id, paid_entry_fee")
