@@ -25,16 +25,15 @@ export async function GET(req: NextRequest) {
     const admin = createAdminClient();
     const now = new Date();
     const fiveHoursFromNow = new Date(now.getTime() + 5 * 60 * 60 * 1000);
-    const windowStart = new Date(fiveHoursFromNow.getTime() - 30 * 60 * 1000); // 4.5h
-    const windowEnd = new Date(fiveHoursFromNow.getTime() + 30 * 60 * 1000);  // 5.5h
 
-    // Find upcoming tournaments in the 5-hour window that haven't had a reminder sent
+    // Find all upcoming tournaments starting at or before 5 hours from now
+    // that haven't had a reminder sent yet. The reminder_sent_at flag ensures
+    // each tournament only triggers one reminder, regardless of cron frequency.
     const { data: tournaments, error } = await admin
       .from("tournaments")
       .select("id, name, starts_at, entry_fee, prize_pool")
       .eq("status", "upcoming")
-      .gte("starts_at", windowStart.toISOString())
-      .lte("starts_at", windowEnd.toISOString())
+      .lte("starts_at", fiveHoursFromNow.toISOString())
       .is("reminder_sent_at", null);
 
     if (error) {
