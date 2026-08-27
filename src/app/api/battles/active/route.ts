@@ -132,7 +132,7 @@ export async function GET() {
         battleId: battle.id,
         status: "pending",
         stuck: true,
-        stakeCents: battle.stake_cents,
+        stake: battle.stake,
         createdAt: battle.created_at,
       });
     }

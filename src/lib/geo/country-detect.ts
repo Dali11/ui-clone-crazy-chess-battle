@@ -90,7 +90,7 @@ export async function detectCountry(request: NextRequest): Promise<MarketConfig>
           countryName: defaultData.country_name,
           currency: defaultData.currency_code,
           currencySymbol: defaultData.currency_symbol || defaultData.currency_code,
-          membershipPrice: defaultData.membership_price_cents,
+          membershipPrice: defaultData.membership_price,
           membershipCurrency: defaultData.membership_currency,
           membershipActive: defaultData.membership_active,
         };
@@ -103,7 +103,7 @@ export async function detectCountry(request: NextRequest): Promise<MarketConfig>
       countryName: data.country_name,
       currency: data.currency_code,
       currencySymbol: data.currency_symbol || data.currency_code,
-      membershipPrice: data.membership_price_cents,
+      membershipPrice: data.membership_price,
       membershipCurrency: data.membership_currency,
       membershipActive: data.membership_active,
     };
@@ -116,7 +116,7 @@ export async function detectCountry(request: NextRequest): Promise<MarketConfig>
  * Format a membership price for display.
  * For currencies with no minor units (like MWK), shows whole numbers.
  */
-export function formatMembershipPrice(priceCents: number, symbol: string): string {
-  const wholeUnits = Math.floor(priceCents / 100);
-  return `${symbol}${wholeUnits.toLocaleString()}/month`;
+export function formatMembershipPrice(price: number, symbol: string): string {
+  const wholeAmount = price;
+  return `${symbol}${wholeAmount.toLocaleString()}/month`;
 }

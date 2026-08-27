@@ -43,35 +43,35 @@ export async function GET() {
     // Total volume & revenue from completed battles
     const { data: revenueData } = await admin
       .from("battles")
-      .select("pot_cents, platform_fee_cents")
+      .select("pot, platform_fee")
       .eq("status", "completed")
       .eq("settled", true);
 
-    const totalVolume = revenueData?.reduce((sum, b) => sum + (b.pot_cents || 0), 0) ?? 0;
-    const totalRevenue = revenueData?.reduce((sum, b) => sum + (b.platform_fee_cents || 0), 0) ?? 0;
+    const totalVolume = revenueData?.reduce((sum, b) => sum + (b.pot || 0), 0) ?? 0;
+    const totalRevenue = revenueData?.reduce((sum, b) => sum + (b.platform_fee || 0), 0) ?? 0;
 
     // Locked funds (escrow)
     const { data: escrowData } = await admin
       .from("battle_escrow")
-      .select("amount_cents")
+      .select("amount")
       .eq("status", "locked");
-    const lockedFunds = escrowData?.reduce((sum, e) => sum + (e.amount_cents || 0), 0) ?? 0;
+    const lockedFunds = escrowData?.reduce((sum, e) => sum + (e.amount || 0), 0) ?? 0;
 
     // Queue by stake level
     const { data: queueByStake } = await admin
       .from("battle_queue")
-      .select("stake_cents")
+      .select("stake")
       .eq("status", "waiting");
     const queueCounts: Record<number, number> = {};
     for (const q of queueByStake ?? []) {
-      queueCounts[q.stake_cents] = (queueCounts[q.stake_cents] || 0) + 1;
+      queueCounts[q.stake] = (queueCounts[q.stake] || 0) + 1;
     }
 
     // Recent battles
     const { data: recentBattles } = await admin
       .from("battles")
       .select(`
-        id, status, stake_cents, pot_cents, winner_payout_cents,
+        id, status, stake, pot, winner_payout,
         white_player_id, black_player_id, winner_id,
         white_rating, black_rating, created_at, completed_at,
         result, armageddon_round

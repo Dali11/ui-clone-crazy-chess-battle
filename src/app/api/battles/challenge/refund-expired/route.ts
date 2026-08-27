@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     // Fetch the challenge
     const { data: challenge, error } = await admin
       .from("battle_challenges")
-      .select("id, challenger_id, stake_cents, status, expires_at")
+      .select("id, challenger_id, stake, status, expires_at")
       .eq("id", challengeId)
       .single();
 
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       .update({ status: "expired" })
       .eq("id", challengeId)
       .eq("status", "pending")
-      .select("id, challenger_id, stake_cents")
+      .select("id, challenger_id, stake")
       .single();
 
     if (claimError || !claimed) {
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     // Refund the escrowed stake
     const { error: creditErr } = await admin.rpc("credit_wallet", {
       p_user_id: claimed.challenger_id,
-      p_amount_cents: claimed.stake_cents,
+      p_amount: claimed.stake,
     });
 
     if (creditErr) {
@@ -77,14 +77,14 @@ export async function POST(req: NextRequest) {
     // Record the refund in deposits for audit
     const { error: depErr } = await admin.from("deposits").insert({
       user_id: claimed.challenger_id,
-      amount_cents: claimed.stake_cents,
+      amount: claimed.stake,
       status: "success",
       method: "battle_refund",
       reference: `expired_challenge:${challengeId}`,
     });
     if (depErr) console.error("Refund audit log failed:", depErr);
 
-    return NextResponse.json({ success: true, refunded: claimed.stake_cents });
+    return NextResponse.json({ success: true, refunded: claimed.stake });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
   }

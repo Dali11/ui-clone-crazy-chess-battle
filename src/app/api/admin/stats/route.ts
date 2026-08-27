@@ -55,31 +55,31 @@ export async function GET(req: NextRequest) {
 
     // Total deposits — real money entering the platform (method IN ('mobile_money', 'card'))
     const { data: depositsData } = await admin
-      .from("deposits").select("amount_cents")
+      .from("deposits").select("amount")
       .eq("status", "success")
       .in("method", ["mobile_money", "card"]);
-    const totalDeposits = depositsData?.reduce((sum, d) => sum + (d.amount_cents || 0), 0) || 0;
+    const totalDeposits = depositsData?.reduce((sum, d) => sum + (d.amount || 0), 0) || 0;
 
     // Total withdrawals (only completed — approved is transient during payout)
     const { data: withdrawalsData } = await admin
-      .from("withdrawals").select("amount_cents")
+      .from("withdrawals").select("amount")
       .eq("status", "completed");
-    const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + (w.amount_cents || 0), 0) || 0;
+    const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0;
 
     // Completed + settled battles stats
     const { data: completedBattles } = await admin
       .from("battles")
-      .select("pot_cents, platform_fee_cents")
+      .select("pot, platform_fee")
       .eq("status", "completed")
       .eq("settled", true);
 
-    const totalBattleVolume = completedBattles?.reduce((sum, b) => sum + (b.pot_cents || 0), 0) || 0;
-    const battleRevenue = completedBattles?.reduce((sum, b) => sum + (b.platform_fee_cents || 0), 0) || 0;
+    const totalBattleVolume = completedBattles?.reduce((sum, b) => sum + (b.pot || 0), 0) || 0;
+    const battleRevenue = completedBattles?.reduce((sum, b) => sum + (b.platform_fee || 0), 0) || 0;
 
     // Platform revenue from finished tournaments (10% of entry fees)
     const { data: finishedTournaments } = await admin
       .from("tournaments")
-      .select("id, entry_fee_cents")
+      .select("id, entry_fee")
       .eq("status", "finished");
 
     let tournamentEntryFees = 0;
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
         .select("tournament_id")
         .in("tournament_id", finishedIds);
 
-      const feeMap = new Map(finishedTournaments.map((t) => [t.id, t.entry_fee_cents || 0]));
+      const feeMap = new Map(finishedTournaments.map((t) => [t.id, t.entry_fee || 0]));
       for (const p of participants || []) {
         tournamentEntryFees += feeMap.get(p.tournament_id) || 0;
       }
@@ -100,11 +100,11 @@ export async function GET(req: NextRequest) {
 
     // Total prize pools (non-cancelled tournaments)
     const { data: tournamentsData } = await admin
-      .from("tournaments").select("prize_pool_cents")
+      .from("tournaments").select("prize_pool")
       .neq("status", "cancelled");
     let totalPrizePools = 0;
     for (const t of tournamentsData || []) {
-      totalPrizePools += t.prize_pool_cents || 0;
+      totalPrizePools += t.prize_pool || 0;
     }
 
     // Wallet liquidity — net money in the wallet system

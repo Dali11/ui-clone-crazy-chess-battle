@@ -15,10 +15,10 @@ export async function GET() {
 
     return NextResponse.json({
       enabled: wConfig.enabled !== false,
-      min_amount_cents: wConfig.min_amount_cents || 1_000_000,
-      max_amount_cents: wConfig.max_amount_cents || 50_000_000,
-      daily_limit_cents: wConfig.daily_limit_cents || 0,
-      withdrawal_fee_cents: wConfig.withdrawal_fee_cents || 0,
+      min_amount: wConfig.min_amount || 1_000_000,
+      max_amount: wConfig.max_amount || 50_000_000,
+      daily_limit: wConfig.daily_limit || 0,
+      withdrawal_fee: wConfig.withdrawal_fee || 0,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

@@ -55,7 +55,7 @@ export default async function DashboardPage() {
       .limit(5),
     supabase
       .from("tournaments")
-      .select("id, name, type, status, starts_at, entry_fee_cents")
+      .select("id, name, type, status, starts_at, entry_fee")
       .eq("status", "upcoming")
       .order("starts_at", { ascending: true })
       .limit(3),
@@ -68,8 +68,8 @@ export default async function DashboardPage() {
     ? Math.round(((profile.wins ?? 0) / profile.games_played) * 100)
     : 0;
 
-  const walletBalance = profile?.wallet_balance_cents
-    ? `MK ${Math.floor(profile.wallet_balance_cents / 100).toLocaleString("en-US")}`
+  const walletBalance = profile?.wallet_balance
+    ? `MK ${profile.wallet_balance.toLocaleString("en-US")}`
     : "MK 0";
   const berryBalance = profile?.berry_balance ?? 0;
 
@@ -149,7 +149,7 @@ export default async function DashboardPage() {
                       <div className="text-sm font-medium truncate">{t.name}</div>
                       <div className="text-xs text-ccb-muted">
                         {new Date(t.starts_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                        {t.entry_fee_cents ? ` · MK ${t.entry_fee_cents / 100}` : " · Free"}
+                        {t.entry_fee ? ` · MK ${t.entry_fee}` : " · Free"}
                       </div>
                     </div>
                   </div>

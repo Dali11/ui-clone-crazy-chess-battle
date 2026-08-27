@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Fetch deposit
     const { data: deposit } = await admin
       .from("deposits")
-      .select("id, user_id, amount_cents, status, method, charge_id, tx_ref")
+      .select("id, user_id, amount, status, method, charge_id, tx_ref")
       .eq("id", id)
       .single();
 
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (claimed && claimed.length > 0) {
         await admin.rpc("credit_wallet", {
           p_user_id: deposit.user_id,
-          p_amount_cents: deposit.amount_cents,
+          p_amount: deposit.amount,
         });
 
         await admin.from("deposits")
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           await admin.rpc("check_referral_activation", { p_user_id: deposit.user_id, p_action: "deposit" });
         } catch {}
 
-        const amountMWK = Math.floor(deposit.amount_cents / 100);
+        const amountMWK = deposit.amount;
         try {
           await admin.from("notifications").insert({
             user_id: deposit.user_id,
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           });
         } catch {}
 
-        return NextResponse.json({ status: "success", message: "Deposit verified and credited", amount: deposit.amount_cents });
+        return NextResponse.json({ status: "success", message: "Deposit verified and credited", amount: deposit.amount });
       }
 
       return NextResponse.json({ status: "success", message: "Already being processed" });

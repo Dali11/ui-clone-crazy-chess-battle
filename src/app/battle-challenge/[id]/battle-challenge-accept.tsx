@@ -6,8 +6,8 @@ import { Swords, Loader2, Wallet, Smartphone, Check, AlertCircle, Clock } from "
 import { createClient } from "@/lib/supabase/client";
 import { detectOperator } from "@/lib/operator";
 
-function formatMKK(cents: number): string {
-  return `MK ${Math.floor(cents / 100).toLocaleString("en-US")}`;
+function formatMKK(amount: number): string {
+  return `MK ${Math.floor(amount).toLocaleString("en-US")}`;
 }
 
 const TIME_CONTROL_LABELS: Record<string, string> = {
@@ -23,10 +23,10 @@ interface Props {
   challengeId: string;
   challengerName: string;
   challengerRating: number;
-  stakeCents: number;
+  stake: number;
   timeControl: string;
   feePct: number;
-  initialBalanceCents: number;
+  initialBalance: number;
   email: string;
   phone: string;
 }
@@ -35,28 +35,28 @@ export default function BattleChallengeAccept({
   challengeId,
   challengerName,
   challengerRating,
-  stakeCents,
+  stake,
   timeControl,
   feePct,
-  initialBalanceCents,
+  initialBalance,
   email,
   phone: savedPhone,
 }: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const [balance, setBalance] = useState(initialBalanceCents);
+  const [balance, setBalance] = useState(initialBalance);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const shortfall = Math.max(0, stakeCents - balance);
+  const shortfall = Math.max(0, stake - balance);
   const canAfford = shortfall === 0;
 
-  const pot = stakeCents * 2;
+  const pot = stake * 2;
   const fee = Math.round(pot * (feePct / 100));
   const payout = pot - fee;
 
   // Deposit widget state
-  const [depositAmount, setDepositAmount] = useState(Math.max(500, Math.ceil(shortfall / 100)));
+  const [depositAmount, setDepositAmount] = useState(Math.max(500, Math.ceil(shortfall)));
   const [phone, setPhone] = useState(savedPhone || "");
   const [depositing, setDepositing] = useState(false);
   const [pendingChargeId, setPendingChargeId] = useState<string | null>(null);
@@ -68,10 +68,10 @@ export default function BattleChallengeAccept({
     if (!user) return;
     const { data: profile } = await supabase
       .from("profiles")
-      .select("wallet_balance_cents")
+      .select("wallet_balance")
       .eq("id", user.id)
       .single();
-    if (profile) setBalance(profile.wallet_balance_cents ?? 0);
+    if (profile) setBalance(profile.wallet_balance ?? 0);
   }, [supabase]);
 
   // Poll deposit verification once a mobile money payment is initiated
@@ -125,8 +125,8 @@ export default function BattleChallengeAccept({
         setDepositing(false);
         return;
       }
-      if (depositAmount * 100 < shortfall) {
-        setDepositErr(`Deposit at least MK ${Math.ceil(shortfall / 100).toLocaleString()} to cover the stake.`);
+      if (depositAmount < shortfall) {
+        setDepositErr(`Deposit at least MK ${Math.ceil(shortfall).toLocaleString()} to cover the stake.`);
         setDepositing(false);
         return;
       }
@@ -135,7 +135,7 @@ export default function BattleChallengeAccept({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amountCents: depositAmount * 100,
+          amount: depositAmount,
           phone,
           operatorRefId: detectOperator(phone),
           email,
@@ -169,7 +169,7 @@ export default function BattleChallengeAccept({
 
       if (!res.ok || data.error) {
         if (data.insufficientFunds) {
-          setBalance(data.balanceCents ?? balance);
+          setBalance(data.balance ?? balance);
         }
         throw new Error(data.error || "Failed to accept challenge");
       }
@@ -214,14 +214,14 @@ export default function BattleChallengeAccept({
           <h1 className="text-xl font-bold">You've Been Challenged to a Battle!</h1>
           <p className="text-sm text-ccb-muted">
             <span className="font-semibold text-foreground">{challengerName}</span> ({challengerRating}) staked{" "}
-            <span className="font-semibold text-foreground">{formatMKK(stakeCents)}</span> and wants to battle
+            <span className="font-semibold text-foreground">{formatMKK(stake)}</span> and wants to battle
           </p>
         </div>
 
         <div className="p-4 rounded-xl bg-ccb-surface border border-ccb-border">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Stake (each)</span>
-            <span className="font-semibold text-ccb-text">{formatMKK(stakeCents)}</span>
+            <span className="font-semibold text-ccb-text">{formatMKK(stake)}</span>
           </div>
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Time control</span>
@@ -264,7 +264,7 @@ export default function BattleChallengeAccept({
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(Number(e.target.value))}
                 className="input-field w-full"
-                min={Math.ceil(shortfall / 100)}
+                min={Math.ceil(shortfall)}
               />
             </div>
 

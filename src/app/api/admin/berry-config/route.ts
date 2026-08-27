@@ -36,12 +36,12 @@ export async function PATCH(req: NextRequest) {
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const body = await req.json();
-    const { berries_per_win, berries_per_draw, berry_value_cents, min_redemption, enabled } = body;
+    const { berries_per_win, berries_per_draw, berry_value, min_redemption, enabled } = body;
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (berries_per_win !== undefined) updates.berries_per_win = berries_per_win;
     if (berries_per_draw !== undefined) updates.berries_per_draw = berries_per_draw;
-    if (berry_value_cents !== undefined) updates.berry_value_cents = berry_value_cents;
+    if (berry_value !== undefined) updates.berry_value = berry_value;
     if (min_redemption !== undefined) updates.min_redemption = min_redemption;
     if (enabled !== undefined) updates.enabled = enabled;
 

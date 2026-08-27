@@ -50,7 +50,7 @@ async function handleCleanup(req: NextRequest) {
     // === 1. BATTLE CHALLENGES (with escrow) ===
     const { data: expiredBattles, error: battleError } = await admin
       .from("battle_challenges")
-      .select("id, challenger_id, stake_cents")
+      .select("id, challenger_id, stake")
       .eq("status", "pending")
       .lt("expires_at", now);
 
@@ -71,7 +71,7 @@ async function handleCleanup(req: NextRequest) {
           .update({ status: "expired" })
           .eq("id", challenge.id)
           .eq("status", "pending")
-          .select("id, challenger_id, stake_cents")
+          .select("id, challenger_id, stake")
           .single();
 
         if (claimError || !claimed) {
@@ -84,7 +84,7 @@ async function handleCleanup(req: NextRequest) {
         // Refund the stake
         const { error: creditErr } = await admin.rpc("credit_wallet", {
           p_user_id: claimed.challenger_id,
-          p_amount_cents: claimed.stake_cents,
+          p_amount: claimed.stake,
         });
 
         if (creditErr) {
@@ -101,7 +101,7 @@ async function handleCleanup(req: NextRequest) {
         // Record the refund in deposits for audit
         const { error: depErr } = await admin.from("deposits").insert({
           user_id: claimed.challenger_id,
-          amount_cents: claimed.stake_cents,
+          amount: claimed.stake,
           status: "success",
           method: "battle_refund",
           reference: `cleanup_expired:${claimed.id}`,

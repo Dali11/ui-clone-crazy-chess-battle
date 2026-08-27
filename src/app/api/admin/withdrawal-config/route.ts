@@ -6,11 +6,11 @@ import { getPlatformConfig } from "@/lib/platform-config";
 // Map withdrawal_config field names → platform_settings.withdrawals field names
 const FIELD_MAP: Record<string, string> = {
   auto_approve_enabled: "auto_approve",
-  min_withdrawal_cents: "min_amount_cents",
-  max_withdrawal_cents: "max_amount_cents",
-  daily_withdrawal_limit_cents: "daily_limit_cents",
+  min_withdrawal: "min_amount",
+  max_withdrawal: "max_amount",
+  daily_withdrawal_limit: "daily_limit",
   processing_fee_pct: "processing_fee_pct",
-  withdrawal_fee_cents: "withdrawal_fee_cents",
+  withdrawal_fee: "withdrawal_fee",
 };
 
 // GET — fetch withdrawal/deposit config
@@ -27,13 +27,13 @@ export async function GET() {
     const { data: config } = await admin.from("withdrawal_config").select("*").limit(1).single();
     return NextResponse.json(config || {
       auto_approve_enabled: false,
-      min_withdrawal_cents: 1000,
-      max_withdrawal_cents: 5000000,
-      min_deposit_cents: 500,
+      min_withdrawal: 1000,
+      max_withdrawal: 5000000,
+      min_deposit: 500,
       processing_fee_pct: 0,
-      daily_withdrawal_limit_cents: 1000000,
-      withdrawal_fee_cents: 0,
-      deposit_fee_cents: 0,
+      daily_withdrawal_limit: 1000000,
+      withdrawal_fee: 0,
+      deposit_fee: 0,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -98,13 +98,13 @@ export async function PATCH(req: NextRequest) {
     // Whitelist fields
     const allowedFields = [
       "auto_approve_enabled",
-      "min_withdrawal_cents",
-      "max_withdrawal_cents",
-      "min_deposit_cents",
+      "min_withdrawal",
+      "max_withdrawal",
+      "min_deposit",
       "processing_fee_pct",
-      "daily_withdrawal_limit_cents",
-      "withdrawal_fee_cents",
-      "deposit_fee_cents",
+      "daily_withdrawal_limit",
+      "withdrawal_fee",
+      "deposit_fee",
     ];
 
     const cleanUpdates: Record<string, unknown> = {

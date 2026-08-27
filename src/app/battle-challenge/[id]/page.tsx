@@ -9,8 +9,8 @@ import BattleChallengeAccept from "./battle-challenge-accept";
 import ChallengeTaken from "@/app/challenge/[id]/challenge-taken";
 import BattleChallengeWaiting from "./battle-challenge-waiting";
 
-function formatMKK(cents: number): string {
-  return `MK ${Math.floor(cents / 100).toLocaleString("en-US")}`;
+function formatMKK(amount: number): string {
+  return `MK ${Math.floor(amount).toLocaleString("en-US")}`;
 }
 
 
@@ -137,7 +137,7 @@ export default async function BattleChallengePage({
       <BattleChallengeWaiting
         challengeId={id}
         url={url}
-        stakeLabel={formatMKK(challenge.stake_cents)}
+        stakeLabel={formatMKK(challenge.stake)}
         expiresAt={challenge.expires_at}
       />
     );
@@ -154,13 +154,13 @@ export default async function BattleChallengePage({
 
     const { error: creditErr } = await admin.rpc("credit_wallet", {
       p_user_id: challenge.challenger_id,
-      p_amount_cents: challenge.stake_cents,
+      p_amount: challenge.stake,
     });
 
     if (!creditErr) {
       await admin.from("deposits").insert({
         user_id: challenge.challenger_id,
-        amount_cents: challenge.stake_cents,
+        amount: challenge.stake,
         status: "success",
         method: "battle_refund",
         reference: `expired_challenge:${id}`,
@@ -175,7 +175,7 @@ export default async function BattleChallengePage({
             <h1 className="text-2xl font-bold">Challenge Expired</h1>
             <p className="text-ccb-muted">
               Your challenge was not accepted in time. Your stake of{" "}
-              <span className="font-semibold text-ccb-text">{formatMKK(challenge.stake_cents)}</span>{" "}
+              <span className="font-semibold text-ccb-text">{formatMKK(challenge.stake)}</span>{" "}
               has been refunded to your wallet.
             </p>
             <a href="/wallet" className="btn-primary inline-block mr-2">View Wallet</a>
@@ -205,7 +205,7 @@ export default async function BattleChallengePage({
 
   const { data: myProfile } = await admin
     .from("profiles")
-    .select("wallet_balance_cents, email, phone")
+    .select("wallet_balance, email, phone")
     .eq("id", user.id)
     .single();
 
@@ -217,10 +217,10 @@ export default async function BattleChallengePage({
       challengeId={id}
       challengerName={challengerProfile?.display_name || challengerProfile?.username || "Player"}
       challengerRating={challengerProfile?.rating || 1200}
-      stakeCents={challenge.stake_cents}
+      stake={challenge.stake}
       timeControl={challenge.time_control || "rapid15"}
       feePct={feePct}
-      initialBalanceCents={myProfile?.wallet_balance_cents ?? 0}
+      initialBalance={myProfile?.wallet_balance ?? 0}
       email={myProfile?.email || user.email || ""}
       phone={myProfile?.phone || ""}
     />

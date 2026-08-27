@@ -25,7 +25,7 @@ async function handleTournamentCron(req: NextRequest) {
     // ── 1. AUTO-START: Start tournaments whose start time has passed ──
     const { data: toStart } = await admin
       .from("tournaments")
-      .select("id, name, starts_at, status, type, knockout_format, group_schedule, initial_minutes, increment_seconds, time_control, min_players, entry_fee_cents, max_players, rest_minutes, countdown_minutes")
+      .select("id, name, starts_at, status, type, knockout_format, group_schedule, initial_minutes, increment_seconds, time_control, min_players, entry_fee, max_players, rest_minutes, countdown_minutes")
       .eq("status", "upcoming")
       .lte("starts_at", now);
 

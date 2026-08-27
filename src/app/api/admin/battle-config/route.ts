@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest) {
 
     // Whitelist fields that can be updated
     const allowedFields = [
-      "stake_cents", "platform_fee_pct", "rating_range",
+      "stake", "platform_fee_pct", "rating_range",
       "initial_minutes", "increment_seconds", "armageddon_pct",
       "max_armageddon_rounds", "queue_timeout_s",
       "stake_levels", "enabled", "min_games_for_battles"

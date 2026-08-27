@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (challenge.expires_at && new Date(challenge.expires_at) < new Date()) {
       await admin.from("battle_challenges").update({ status: "expired" }).eq("id", challengeId);
       // Refund challenger
-      await admin.rpc("credit_wallet", { p_user_id: challenge.challenger_id, p_amount_cents: challenge.stake_cents });
+      await admin.rpc("credit_wallet", { p_user_id: challenge.challenger_id, p_amount: challenge.stake });
       return NextResponse.json({ error: "Challenge has expired" }, { status: 400 });
     }
 
@@ -54,20 +54,20 @@ export async function POST(req: NextRequest) {
     // Check acceptor balance BEFORE claiming (so we don't lock a challenge we can't fulfill)
     const { data: acceptorProfile } = await admin
       .from("profiles")
-      .select("rating, wallet_balance_cents")
+      .select("rating, wallet_balance")
       .eq("id", user.id)
       .single();
 
     if (!acceptorProfile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
-    const balance = acceptorProfile.wallet_balance_cents ?? 0;
-    if (balance < challenge.stake_cents) {
+    const balance = acceptorProfile.wallet_balance ?? 0;
+    if (balance < challenge.stake) {
       return NextResponse.json(
         {
-          error: `Insufficient balance. You need MK ${(challenge.stake_cents / 100).toLocaleString()}.`,
+          error: `Insufficient balance. You need MK ${challenge.stake.toLocaleString()}.`,
           insufficientFunds: true,
-          requiredCents: challenge.stake_cents,
-          balanceCents: balance,
+          requiredAmount: challenge.stake,
+          balance: balance,
         },
         { status: 402 }
       );
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     // Debit acceptor's stake
     const { error: debitErr } = await admin.rpc("debit_wallet", {
       p_user_id: user.id,
-      p_amount_cents: challenge.stake_cents,
+      p_amount: challenge.stake,
     });
 
     if (debitErr) {
@@ -100,15 +100,15 @@ export async function POST(req: NextRequest) {
 
     await admin.from("deposits").insert({
       user_id: user.id,
-      amount_cents: challenge.stake_cents,
+      amount: challenge.stake,
       status: "success",
       method: "battle_escrow",
-      reference: `battle_challenge_accept:${user.id}:${challenge.stake_cents}`,
+      reference: `battle_challenge_accept:${user.id}:${challenge.stake}`,
     });
 
     const { data: configRow } = await admin.from("battle_config").select("*").limit(1).single();
     const config = { ...DEFAULT_CONFIG, ...configRow };
-    const { pot, fee, payout } = calcPayout(challenge.stake_cents, config.platform_fee_pct);
+    const { pot, fee, payout } = calcPayout(challenge.stake, config.platform_fee_pct);
 
     // Random color assignment
     let whitePlayer = challenge.challenger_id;
@@ -132,10 +132,10 @@ export async function POST(req: NextRequest) {
       .insert({
         white_player_id: whitePlayer,
         black_player_id: blackPlayer,
-        stake_cents: challenge.stake_cents,
-        pot_cents: pot,
-        platform_fee_cents: fee,
-        winner_payout_cents: payout,
+        stake: challenge.stake,
+        pot: pot,
+        platform_fee: fee,
+        winner_payout: payout,
         status: "pending",
         white_rating: whitePlayer === user.id ? acceptorProfile.rating ?? 1200 : challengerProfile?.rating ?? 1200,
         black_rating: blackPlayer === user.id ? acceptorProfile.rating ?? 1200 : challengerProfile?.rating ?? 1200,
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
 
     if (battleErr || !battle) {
       // Refund both stakes and revert claim
-      await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount_cents: challenge.stake_cents });
+      await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: challenge.stake });
       await admin.from("battle_challenges").update({ status: "pending", acceptor_id: null }).eq("id", challengeId);
       return NextResponse.json({ error: "Failed to create battle" }, { status: 500 });
     }
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
     // screen anymore. The in-app ActiveBattleWatcher will catch it live if
     // they're anywhere in the app; this email is the backup if they're fully
     // gone. Fire-and-forget — never block the acceptor on this.
-    notifyChallengerAccepted(admin, challenge.challenger_id, user.id, challenge.stake_cents).catch(() => {});
+    notifyChallengerAccepted(admin, challenge.challenger_id, user.id, challenge.stake).catch(() => {});
 
     return NextResponse.json({ battleId: battle.id });
   } catch (e: any) {
@@ -169,7 +169,7 @@ async function notifyChallengerAccepted(
   admin: ReturnType<typeof createAdminClient>,
   challengerId: string,
   acceptorId: string,
-  stakeCents: number
+  stake: number
 ) {
   const { data: challengerProfile } = await admin
     .from("profiles")
@@ -186,7 +186,7 @@ async function notifyChallengerAccepted(
   if (!challengerProfile?.email) return;
 
   const acceptorName = acceptorProfile?.display_name || acceptorProfile?.username || "An opponent";
-  const stakeLabel = `MK ${Math.floor(stakeCents / 100).toLocaleString()}`;
+  const stakeLabel = `MK ${stake.toLocaleString()}`;
 
   try {
     await sendEmail({
@@ -195,7 +195,7 @@ async function notifyChallengerAccepted(
       template: "challenge_received",
       data: {
         challengerName: acceptorName,
-        stakeCents: stakeCents,
+        stake: stake,
         acceptorName,
         acceptorRating: acceptorProfile?.rating ?? 0,
       },

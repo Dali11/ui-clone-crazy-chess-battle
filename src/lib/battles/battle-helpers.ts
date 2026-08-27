@@ -31,12 +31,12 @@ export const DEFAULT_CONFIG: BattleConfig = {
   min_games_for_battles: 5,
 };
 
-export function formatMKK(cents: number): string {
-  return `MK ${Math.floor(cents / 100).toLocaleString("en-US")}`;
+export function formatMKK(amount: number): string {
+  return `MK ${Math.floor(amount).toLocaleString("en-US")}`;
 }
 
-export function calcPayout(stakeCents: number, feePct: number): { pot: number; fee: number; payout: number } {
-  const pot = stakeCents * 2;
+export function calcPayout(stake: number, feePct: number): { pot: number; fee: number; payout: number } {
+  const pot = stake * 2;
   const fee = Math.round(pot * (feePct / 100));
   const payout = pot - fee;
   return { pot, fee, payout };

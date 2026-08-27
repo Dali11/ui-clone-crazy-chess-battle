@@ -10,7 +10,7 @@ export async function generateMetadata({
 
   const { data: tournament } = await admin
     .from("tournaments")
-    .select("name, type, time_control, status, starts_at, entry_fee_cents, max_players")
+    .select("name, type, time_control, status, starts_at, entry_fee, max_players")
     .eq("id", id)
     .single();
 
@@ -26,7 +26,7 @@ export async function generateMetadata({
     tournament.status === "upcoming" ? "Upcoming" :
     tournament.status === "active" ? "Live Now" :
     tournament.status === "finished" ? "Results" : tournament.status;
-  const description = `${statusText} ${tournament.time_control} chess tournament. ${tournament.type === "swiss" ? "Swiss-system" : tournament.type} format. ${tournament.entry_fee_cents ? "Paid entry" : "Free entry"}. View participants, pairings, and results on Crazy Chess Battles.`;
+  const description = `${statusText} ${tournament.time_control} chess tournament. ${tournament.type === "swiss" ? "Swiss-system" : tournament.type} format. ${tournament.entry_fee ? "Paid entry" : "Free entry"}. View participants, pairings, and results on Crazy Chess Battles.`;
 
   return {
     title,

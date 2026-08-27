@@ -52,8 +52,8 @@ export type EmailTemplate =
 
 // ─── Helper: Format MWK amounts ────────────────────────────────────
 
-function formatMWK(cents: number): string {
-  return `MK ${(cents / 100).toLocaleString()}`;
+function formatMWK(amount: number): string {
+  return `MK ${amount.toLocaleString()}`;
 }
 
 // ─── Helper: Convert ISO time to CAT display ───────────────────────
@@ -217,7 +217,7 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
     }
 
     case "deposit_credited": {
-      const amount = data.amount || formatMWK(data.amountCents || 0);
+      const amount = data.amount || formatMWK(data.amount || 0);
       const currency = data.currency || "MWK";
       const balance = data.newBalance || data.walletBalance || "\u2014";
       return {
@@ -238,7 +238,7 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
     }
 
     case "deposit_rejected": {
-      const amount = data.amount || formatMWK(data.amountCents || 0);
+      const amount = data.amount || formatMWK(data.amount || 0);
       const currency = data.currency || "MWK";
       return {
         subject: `Deposit update \u2014 ${amount} ${currency} could not be processed`,
@@ -258,7 +258,7 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
     }
 
     case "withdrawal_approved": {
-      const amount = data.amount || formatMWK(data.amountCents || 0);
+      const amount = data.amount || formatMWK(data.amount || 0);
       const currency = data.currency || "MWK";
       return {
         subject: `Withdrawal sent \u2014 ${amount} ${currency}`,
@@ -279,7 +279,7 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
     }
 
     case "withdrawal_rejected": {
-      const amount = data.amount || formatMWK(data.amountCents || 0);
+      const amount = data.amount || formatMWK(data.amount || 0);
       const currency = data.currency || "MWK";
       return {
         subject: `Withdrawal update \u2014 ${amount} ${currency}`,
@@ -433,7 +433,7 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
     }
 
     case "prize_payout": {
-      const amount = data.amount || formatMWK(data.amountCents || 0);
+      const amount = data.amount || formatMWK(data.amount || 0);
       const currency = data.currency || "MWK";
       return {
         subject: `\ud83d\udcb0 Prize money received \u2014 ${amount} ${currency}`,

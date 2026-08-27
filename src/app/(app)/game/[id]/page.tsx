@@ -80,7 +80,7 @@ export default async function GamePage({
   // Check if this game is linked to a battle
   const { data: battle } = await supabase
     .from("battles")
-    .select("id, stake_cents, winner_payout_cents, status, winner_id, white_player_id, black_player_id, armageddon_game_id, armageddon_round")
+    .select("id, stake, winner_payout, status, winner_id, white_player_id, black_player_id, armageddon_game_id, armageddon_round")
     .or(`game_id.eq.${id},armageddon_game_id.eq.${id}`)
     .limit(1)
     .single();
@@ -115,8 +115,8 @@ export default async function GamePage({
   const battleInfo = battle ? {
     isBattle: true,
     battleId: battle.id,
-    stakeCents: battle.stake_cents,
-    winnerPayoutCents: battle.winner_payout_cents,
+    stake: battle.stake,
+    winnerPayout: battle.winner_payout,
     winnerId: battle.winner_id,
     isArmageddon: battle.armageddon_game_id === id,
   } : null;

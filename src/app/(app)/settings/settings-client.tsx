@@ -35,7 +35,7 @@ interface Profile {
   draws: number | null;
   tournaments_played: number | null;
   tournaments_won: number | null;
-  wallet_balance_cents: number | null;
+  wallet_balance: number | null;
   is_admin: boolean | null;
 }
 
@@ -328,7 +328,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push("/"); router.refresh(); };
 
-  const walletBalance = profile?.wallet_balance_cents ? `MK ${Math.floor(profile.wallet_balance_cents/100).toLocaleString("en-US")}` : "MK 0";
+  const walletBalance = profile?.wallet_balance ? `MK ${Math.floor(profile.wallet_balance/100).toLocaleString("en-US")}` : "MK 0";
   const winRate = profile?.games_played && profile.games_played > 0 ? Math.round(((profile.wins||0)/profile.games_played)*100) : 0;
 
 

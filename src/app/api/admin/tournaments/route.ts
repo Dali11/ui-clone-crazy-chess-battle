@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       .from("tournaments")
       .select(`
         id, name, description, type, status, time_control, initial_minutes, increment_seconds,
-        entry_fee_cents, prize_pool_cents, prize_distribution, pool_source,
+        entry_fee, prize_pool, prize_distribution, pool_source,
         max_players, min_rating, max_rating, current_round, rounds, duration_minutes,
         starts_at, ends_at, created_at, created_by
       `)
@@ -84,13 +84,13 @@ export async function PATCH(req: NextRequest) {
         "name", "description", "type", "time_control", "initial_minutes",
         "increment_seconds", "max_players", "min_rating", "max_rating",
         "rounds", "duration_minutes", "starts_at", "ends_at",
-        "entry_fee_cents", "prize_pool_cents", "pool_source"
+        "entry_fee", "prize_pool", "pool_source"
       ];
 
       for (const field of editableFields) {
         if (body[field] !== undefined) {
           // Convert numeric fields
-          if (["initial_minutes", "increment_seconds", "max_players", "min_rating", "max_rating", "rounds", "duration_minutes", "entry_fee_cents", "prize_pool_cents"].includes(field)) {
+          if (["initial_minutes", "increment_seconds", "max_players", "min_rating", "max_rating", "rounds", "duration_minutes", "entry_fee", "prize_pool"].includes(field)) {
             updates[field] = body[field] === null ? null : Number(body[field]);
           } else {
             updates[field] = body[field];
@@ -184,7 +184,7 @@ export async function PATCH(req: NextRequest) {
     // ── Reject pending tournament ──
     if (action === "reject") {
       const { data: tournament } = await admin
-        .from("tournaments").select("status, entry_fee_cents").eq("id", tournamentId).single();
+        .from("tournaments").select("status, entry_fee").eq("id", tournamentId).single();
       if (!tournament) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
       if (tournament.status !== "pending_approval") {
         return NextResponse.json({ error: "Tournament is not pending approval" }, { status: 400 });
@@ -197,7 +197,7 @@ export async function PATCH(req: NextRequest) {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
       // Refund any paid participants
-      const entryFee = tournament.entry_fee_cents || 0;
+      const entryFee = tournament.entry_fee || 0;
       if (entryFee > 0) {
         const { data: participants } = await admin
           .from("tournament_participants")
@@ -206,7 +206,7 @@ export async function PATCH(req: NextRequest) {
           .eq("paid_entry_fee", true);
 
         for (const p of participants || []) {
-          await admin.rpc("credit_wallet", { p_user_id: p.player_id, p_amount_cents: entryFee });
+          await admin.rpc("credit_wallet", { p_user_id: p.player_id, p_amount: entryFee });
         }
       }
 
@@ -230,8 +230,8 @@ export async function PATCH(req: NextRequest) {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
       const { data: tournament } = await admin
-        .from("tournaments").select("entry_fee_cents").eq("id", tournamentId).single();
-      const entryFee = tournament?.entry_fee_cents || 0;
+        .from("tournaments").select("entry_fee").eq("id", tournamentId).single();
+      const entryFee = tournament?.entry_fee || 0;
 
       if (entryFee > 0) {
         const { data: participants } = await admin
@@ -241,7 +241,7 @@ export async function PATCH(req: NextRequest) {
           .eq("paid_entry_fee", true);
 
         for (const p of participants || []) {
-          await admin.rpc("credit_wallet", { p_user_id: p.player_id, p_amount_cents: entryFee });
+          await admin.rpc("credit_wallet", { p_user_id: p.player_id, p_amount: entryFee });
         }
       }
     } else if (action === "force_finish") {
@@ -283,7 +283,7 @@ export async function DELETE(req: NextRequest) {
 
     // Check tournament status — only allow deleting upcoming or cancelled tournaments
     const { data: tournament } = await admin
-      .from("tournaments").select("status, entry_fee_cents").eq("id", tournamentId).single();
+      .from("tournaments").select("status, entry_fee").eq("id", tournamentId).single();
     if (!tournament) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
 
     if (!["upcoming", "cancelled", "finished", "active"].includes(tournament.status)) {
@@ -317,7 +317,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Refund any paid participants before deleting (upcoming or active, not finished — prizes already distributed)
-    if (tournament.entry_fee_cents > 0 && (tournament.status === "upcoming" || tournament.status === "active")) {
+    if (tournament.entry_fee > 0 && (tournament.status === "upcoming" || tournament.status === "active")) {
       const { data: participants } = await admin
         .from("tournament_participants")
         .select("player_id, paid_entry_fee")
@@ -325,7 +325,7 @@ export async function DELETE(req: NextRequest) {
         .eq("paid_entry_fee", true);
 
       for (const p of participants || []) {
-        await admin.rpc("credit_wallet", { p_user_id: p.player_id, p_amount_cents: tournament.entry_fee_cents });
+        await admin.rpc("credit_wallet", { p_user_id: p.player_id, p_amount: tournament.entry_fee });
       }
     }
 
@@ -369,7 +369,7 @@ export async function POST(req: NextRequest) {
       .select(`
         name, description, type, time_control, initial_minutes, increment_seconds,
         max_players, min_rating, max_rating, rounds, duration_minutes,
-        entry_fee_cents, prize_pool_cents, prize_distribution, pool_source
+        entry_fee, prize_pool, prize_distribution, pool_source
       `)
       .eq("id", tournamentId)
       .single();
@@ -394,8 +394,8 @@ export async function POST(req: NextRequest) {
         rounds: source.rounds,
         duration_minutes: source.duration_minutes,
         starts_at: sevenDaysLater,
-        entry_fee_cents: source.entry_fee_cents,
-        prize_pool_cents: source.prize_pool_cents,
+        entry_fee: source.entry_fee,
+        prize_pool: source.prize_pool,
         pool_source: source.pool_source || 'entry_fees',
         prize_distribution: source.prize_distribution || {
           type: "percentage",

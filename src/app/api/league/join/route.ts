@@ -207,26 +207,26 @@ export async function POST(request: NextRequest) {
       }
 
       // Enforce entry fee — debit wallet if fee > 0
-      const entryFee = tournament.entry_fee_cents || 0;
+      const entryFee = tournament.entry_fee || 0;
       let paidEntryFee = false;
 
       if (entryFee > 0) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('wallet_balance_cents')
+          .select('wallet_balance')
           .eq('id', user.id)
           .single();
-        const currentBalance = profile?.wallet_balance_cents ?? 0;
+        const currentBalance = profile?.wallet_balance ?? 0;
         if (currentBalance < entryFee) {
-          const feeMwk = Math.floor(entryFee / 100);
+          const feeMwk = entryFee;
           return NextResponse.json({
-            error: `Insufficient wallet balance. Entry fee is MK ${feeMwk.toLocaleString()}. You have MK ${Math.floor(currentBalance / 100).toLocaleString()}. Please deposit funds first.`,
+            error: `Insufficient wallet balance. Entry fee is MK ${feeMwk.toLocaleString()}. You have MK ${currentBalance.toLocaleString()}. Please deposit funds first.`,
           }, { status: 402 });
         }
 
         const { error: debitErr } = await admin.rpc('debit_wallet', {
           p_user_id: user.id,
-          p_amount_cents: entryFee,
+          p_amount: entryFee,
         });
         if (debitErr) {
           if (debitErr.message?.includes('Insufficient balance')) {
@@ -239,14 +239,14 @@ export async function POST(request: NextRequest) {
         // Add entry fee to prize pool ONLY if pool_source is not 'fixed'
         if (tournament.pool_source !== 'fixed') {
           await admin.from('tournaments')
-            .update({ prize_pool_cents: (tournament.prize_pool_cents || 0) + entryFee })
+            .update({ prize_pool: (tournament.prize_pool || 0) + entryFee })
             .eq('id', tournamentId);
         }
 
         // Audit log
         await admin.from('deposits').insert({
           user_id: user.id,
-          amount_cents: -entryFee,
+          amount: -entryFee,
           status: 'success',
           method: 'tournament_entry',
           reference: `tournament:${tournamentId}:entry`,
@@ -268,7 +268,7 @@ export async function POST(request: NextRequest) {
       if (partError) {
         // Refund if debited
         if (paidEntryFee) {
-          await admin.rpc('credit_wallet', { p_user_id: user.id, p_amount_cents: entryFee });
+          await admin.rpc('credit_wallet', { p_user_id: user.id, p_amount: entryFee });
         }
         throw partError;
       }

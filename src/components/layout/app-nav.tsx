@@ -12,7 +12,7 @@ interface Profile {
   rating: number | null;
   avatar_url: string | null;
   is_admin: boolean | null;
-  wallet_balance_cents: number | null;
+  wallet_balance: number | null;
 }
 
 export default function AppNav({ profile }: { profile: Profile | null }) {
@@ -42,7 +42,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
 
   const formatBalance = (cents: number | null | undefined) => {
     const value = cents ?? 0;
-    const kwacha = Math.floor(value / 100);
+    const kwacha = Math.floor(value);
     return `MK ${kwacha.toLocaleString()}`;
   };
 
@@ -90,7 +90,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-sm hover:bg-ccb-accent/10 transition-colors"
             >
               <Wallet className="w-4 h-4 text-ccb-accent" />
-              <span className="font-bold text-ccb-text">{formatBalance(profile?.wallet_balance_cents)}</span>
+              <span className="font-bold text-ccb-text">{formatBalance(profile?.wallet_balance)}</span>
             </Link>
             <Link
               href="/settings"
@@ -129,7 +129,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
               className="flex items-center gap-1 px-2 py-1 rounded-md bg-ccb-surface border border-ccb-border"
             >
               <Wallet className="w-3.5 h-3.5 text-ccb-accent" />
-              <span className="text-xs font-bold text-ccb-text">{formatBalance(profile?.wallet_balance_cents)}</span>
+              <span className="text-xs font-bold text-ccb-text">{formatBalance(profile?.wallet_balance)}</span>
             </Link>
             <Link href="/settings" className="flex items-center gap-2 text-ccb-muted">
               <div className="w-7 h-7 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">

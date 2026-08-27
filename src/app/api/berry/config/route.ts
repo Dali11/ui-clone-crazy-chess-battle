@@ -18,12 +18,12 @@ export async function GET() {
     const admin = createAdminClient();
     const { data: config } = await admin
       .from("berry_config")
-      .select("berry_value_cents, min_redemption, enabled, berries_per_win, berries_per_draw")
+      .select("berry_value, min_redemption, enabled, berries_per_win, berries_per_draw")
       .limit(1)
       .single();
 
     return NextResponse.json(config || {
-      berry_value_cents: 5000,
+      berry_value: 5000,
       min_redemption: 10000,
       enabled: true,
       berries_per_win: 10,
@@ -31,7 +31,7 @@ export async function GET() {
     });
   } catch {
     return NextResponse.json({
-      berry_value_cents: 5000,
+      berry_value: 5000,
       min_redemption: 10000,
       enabled: true,
       berries_per_win: 10,

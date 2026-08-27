@@ -15,7 +15,7 @@ import PlatformSettingsPanel from "./platform-settings-panel";
 
 interface Withdrawal {
   id: string;
-  amount_cents: number;
+  amount: number;
   phone: string;
   operator_name: string;
   status: string;
@@ -51,7 +51,7 @@ interface UserInfo {
   wins: number;
   losses: number;
   draws: number;
-  wallet_balance_cents: number;
+  wallet_balance: number;
   is_admin: boolean;
   is_banned: boolean;
   phone: string | null;
@@ -62,7 +62,7 @@ interface UserInfo {
 interface Deposit {
   id: string;
   user_id: string;
-  amount_cents: number;
+  amount: number;
   status: string;
   method: string;
   charge_id: string | null;
@@ -86,8 +86,8 @@ interface Tournament {
   time_control: string;
   initial_minutes: number;
   increment_seconds: number;
-  entry_fee_cents: number;
-  prize_pool_cents: number;
+  entry_fee: number;
+  prize_pool: number;
   pool_source: string | null;
   prize_distribution: any;
   max_players: number | null;
@@ -296,7 +296,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       setAdminLeagues(data);
       const edits: Record<string, any> = {};
       data.forEach((l: any) => {
-        edits[l.id] = { prize_pool_cents: l.prize_pool_cents, league_size: l.league_size, promotes_count: l.promotes_count, relegates_count: l.relegates_count, qualifying_positions: l.qualifying_positions, status: l.status };
+        edits[l.id] = { prize_pool: l.prize_pool, league_size: l.league_size, promotes_count: l.promotes_count, relegates_count: l.relegates_count, qualifying_positions: l.qualifying_positions, status: l.status };
       });
       setLeagueEdits(edits);
     }
@@ -359,7 +359,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       setMarketConfigs(data);
       const edits: Record<string, any> = {};
       data.forEach((c: any) => {
-        edits[c.country_code] = { membership_price_cents: c.membership_price_cents, membership_currency: c.membership_currency, membership_active: c.membership_active };
+        edits[c.country_code] = { membership_price: c.membership_price, membership_currency: c.membership_currency, membership_active: c.membership_active };
       });
       setMarketEdits(edits);
     }
@@ -695,8 +695,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       duration_minutes: t.duration_minutes || "",
       starts_at: t.starts_at ? utcToLocalInput(t.starts_at) : "",
       ends_at: t.ends_at ? utcToLocalInput(t.ends_at) : "",
-      entry_fee_cents: Math.floor((t.entry_fee_cents || 0) / 100),
-      prize_pool_cents: Math.floor((t.prize_pool_cents || 0) / 100),
+      entry_fee: t.entry_fee || 0,
+      prize_pool: t.prize_pool || 0,
       pool_source: t.pool_source || 'entry_fees',
     });
   };
@@ -710,8 +710,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
         if (v !== "" && v !== null) {
           if (k === "starts_at" || k === "ends_at") {
             body[k] = v ? localToUTC(v as string) : null;
-          } else if (k === "entry_fee_cents" || k === "prize_pool_cents") {
-            body[k] = v === "" ? null : Number(v) * 100;
+          } else if (k === "entry_fee" || k === "prize_pool") {
+            body[k] = v === "" ? null : Number(v);
           } else {
             body[k] = v === "" ? null : v;
           }
@@ -830,9 +830,9 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           durationMinutes: createForm.duration_minutes ? Number(createForm.duration_minutes) : null,
           startsAt: localToUTC(createForm.starts_at),
           endsAt: createForm.ends_at ? localToUTC(createForm.ends_at) : null,
-          entryFeeCents: (Number(createForm.entry_fee_cents) || 0) * 100,
+          entryFee: (Number(createForm.entry_fee) || 0),
           creatorProfitPercent: Number(createForm.creator_profit_percent) || 0,
-          prizePoolCents: (Number(createForm.prize_pool_cents) || 0) * 100,
+          prizePool: (Number(createForm.prize_pool) || 0),
           poolSource: createForm.pool_source || 'entry_fees',
           minRating: Number(createForm.min_rating) || 0,
           maxRating: createForm.max_rating ? Number(createForm.max_rating) : null,
@@ -975,7 +975,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     }
   };
 
-  const formatMWK = (cents: number) => `MWK ${Math.floor((cents || 0) / 100).toLocaleString()}`;
+  const formatMWK = (amount: number) => `MWK ${Math.floor((amount || 0)).toLocaleString()}`;
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
   const filteredUsers = users.filter((u) => {
@@ -1220,7 +1220,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm font-medium">{formatMWK(u.wallet_balance_cents)}</div>
+                          <div className="text-sm font-medium">{formatMWK(u.wallet_balance)}</div>
                           <div className="text-xs text-ccb-muted flex items-center gap-1 justify-end">
                             <Cherry className="w-3 h-3 text-red-500" /> {u.berry_balance || 0}
                           </div>
@@ -1248,7 +1248,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         <ActionButton
                           onClick={() => {
                             const val = prompt("Adjust wallet (positive=credit, negative=debit, in MK):", "10");
-                            if (val !== null) handleUserAction(u.id, "adjust_wallet", parseInt(val) * 100);
+                            if (val !== null) handleUserAction(u.id, "adjust_wallet", parseInt(val));
                           }}
                           loading={actionLoading === `${u.id}_adjust_wallet`}
                           variant="default"
@@ -1337,8 +1337,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <label className="text-xs font-medium text-ccb-muted">Min Withdrawal (MK)</label>
                       <input
                         type="number"
-                        value={configEdit.min_withdrawal_cents ?? Math.floor((withdrawalConfig.min_withdrawal_cents || 1000) / 100)}
-                        onChange={(e) => setConfigEdit(prev => ({ ...prev, min_withdrawal_cents: e.target.value }))}
+                        value={configEdit.min_withdrawal ?? (withdrawalConfig.min_withdrawal || 1000)}
+                        onChange={(e) => setConfigEdit(prev => ({ ...prev, min_withdrawal: e.target.value }))}
                         className="input mt-1 w-full text-sm"
                         placeholder="10"
                       />
@@ -1348,8 +1348,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <label className="text-xs font-medium text-ccb-muted">Max Withdrawal (MK)</label>
                       <input
                         type="number"
-                        value={configEdit.max_withdrawal_cents ?? Math.floor((withdrawalConfig.max_withdrawal_cents || 5000000) / 100)}
-                        onChange={(e) => setConfigEdit(prev => ({ ...prev, max_withdrawal_cents: e.target.value }))}
+                        value={configEdit.max_withdrawal ?? (withdrawalConfig.max_withdrawal || 5000000)}
+                        onChange={(e) => setConfigEdit(prev => ({ ...prev, max_withdrawal: e.target.value }))}
                         className="input mt-1 w-full text-sm"
                         placeholder="50000"
                       />
@@ -1359,8 +1359,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <label className="text-xs font-medium text-ccb-muted">Min Deposit (MK)</label>
                       <input
                         type="number"
-                        value={configEdit.min_deposit_cents ?? Math.floor((withdrawalConfig.min_deposit_cents || 500) / 100)}
-                        onChange={(e) => setConfigEdit(prev => ({ ...prev, min_deposit_cents: e.target.value }))}
+                        value={configEdit.min_deposit ?? (withdrawalConfig.min_deposit || 500)}
+                        onChange={(e) => setConfigEdit(prev => ({ ...prev, min_deposit: e.target.value }))}
                         className="input mt-1 w-full text-sm"
                         placeholder="5"
                       />
@@ -1370,8 +1370,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <label className="text-xs font-medium text-ccb-muted">Daily Withdrawal Limit (MK)</label>
                       <input
                         type="number"
-                        value={configEdit.daily_withdrawal_limit_cents ?? Math.floor((withdrawalConfig.daily_withdrawal_limit_cents || 1000000) / 100)}
-                        onChange={(e) => setConfigEdit(prev => ({ ...prev, daily_withdrawal_limit_cents: e.target.value }))}
+                        value={configEdit.daily_withdrawal_limit ?? (withdrawalConfig.daily_withdrawal_limit || 1000000)}
+                        onChange={(e) => setConfigEdit(prev => ({ ...prev, daily_withdrawal_limit: e.target.value }))}
                         className="input mt-1 w-full text-sm"
                         placeholder="10000"
                       />
@@ -1381,8 +1381,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <label className="text-xs font-medium text-ccb-muted">Withdrawal Fee (MK)</label>
                       <input
                         type="number"
-                        value={configEdit.withdrawal_fee_cents ?? Math.floor((withdrawalConfig.withdrawal_fee_cents || 0) / 100)}
-                        onChange={(e) => setConfigEdit(prev => ({ ...prev, withdrawal_fee_cents: e.target.value }))}
+                        value={configEdit.withdrawal_fee ?? (withdrawalConfig.withdrawal_fee || 0)}
+                        onChange={(e) => setConfigEdit(prev => ({ ...prev, withdrawal_fee: e.target.value }))}
                         className="input mt-1 w-full text-sm"
                         placeholder="0"
                       />
@@ -1404,16 +1404,16 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                   <button
                     onClick={() => {
                       const updates: Record<string, number> = {};
-                      if (configEdit.min_withdrawal_cents !== undefined)
-                        updates.min_withdrawal_cents = Number(configEdit.min_withdrawal_cents) * 100;
-                      if (configEdit.max_withdrawal_cents !== undefined)
-                        updates.max_withdrawal_cents = Number(configEdit.max_withdrawal_cents) * 100;
-                      if (configEdit.min_deposit_cents !== undefined)
-                        updates.min_deposit_cents = Number(configEdit.min_deposit_cents) * 100;
-                      if (configEdit.daily_withdrawal_limit_cents !== undefined)
-                        updates.daily_withdrawal_limit_cents = Number(configEdit.daily_withdrawal_limit_cents) * 100;
-                      if (configEdit.withdrawal_fee_cents !== undefined)
-                        updates.withdrawal_fee_cents = Number(configEdit.withdrawal_fee_cents) * 100;
+                      if (configEdit.min_withdrawal !== undefined)
+                        updates.min_withdrawal = Number(configEdit.min_withdrawal);
+                      if (configEdit.max_withdrawal !== undefined)
+                        updates.max_withdrawal = Number(configEdit.max_withdrawal);
+                      if (configEdit.min_deposit !== undefined)
+                        updates.min_deposit = Number(configEdit.min_deposit);
+                      if (configEdit.daily_withdrawal_limit !== undefined)
+                        updates.daily_withdrawal_limit = Number(configEdit.daily_withdrawal_limit);
+                      if (configEdit.withdrawal_fee !== undefined)
+                        updates.withdrawal_fee = Number(configEdit.withdrawal_fee);
                       if (configEdit.processing_fee_pct !== undefined)
                         updates.processing_fee_pct = Number(configEdit.processing_fee_pct);
                       if (Object.keys(updates).length > 0) handleSaveFinanceConfig(updates);
@@ -1431,7 +1431,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                 <div className="card text-center">
                   <p className="text-xs text-ccb-muted">Total Paid Out</p>
                   <p className="text-lg font-bold mt-1">
-                    {formatMWK(withdrawals.reduce((s, w) => s + (w.status === "completed" ? w.amount_cents : 0), 0))}
+                    {formatMWK(withdrawals.reduce((s, w) => s + (w.status === "completed" ? w.amount : 0), 0))}
                   </p>
                 </div>
                 <div className="card text-center">
@@ -1480,7 +1480,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                   if (withdrawalSearch) {
                     const q = withdrawalSearch.toLowerCase();
                     const name = (w.profiles?.display_name || w.profiles?.username || "").toLowerCase();
-                    return name.includes(q) || w.phone.includes(q) || String(w.amount_cents).includes(q);
+                    return name.includes(q) || w.phone.includes(q) || String(w.amount).includes(q);
                   }
                   return true;
                 });
@@ -1501,7 +1501,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold">{formatMWK(w.amount_cents)}</span>
+                              <span className="text-sm font-bold">{formatMWK(w.amount)}</span>
                               <span className={`text-xs px-2 py-0.5 rounded ${
                                 w.status === "completed" ? "bg-ccb-success/10 text-ccb-success" :
                                 w.status === "pending" ? "bg-ccb-accent/10 text-ccb-accent" :
@@ -1661,9 +1661,9 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       duration_minutes: "",
                       starts_at: "",
                       ends_at: "",
-                      entry_fee_cents: 0,
+                      entry_fee: 0,
                       creator_profit_percent: 0,
-                      prize_pool_cents: 0,
+                      prize_pool: 0,
                       pool_source: 'entry_fees',
                       min_rating: 0,
                       max_rating: "",
@@ -1704,8 +1704,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                             <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{t.time_control} · {t.initial_minutes}+{t.increment_seconds}</span>
                             <span className="flex items-center gap-1"><Users className="w-3 h-3" />{t.participant_count}/{t.max_players ?? "\u221e"}</span>
                             {t.rounds && <span className="flex items-center gap-1"><Trophy className="w-3 h-3" />R{t.current_round}/{t.rounds}</span>}
-                            <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{formatMWK(t.entry_fee_cents)}</span>
-                            <span className="flex items-center gap-1"><Gift className="w-3 h-3" />{formatMWK(t.prize_pool_cents)}</span>
+                            <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{formatMWK(t.entry_fee)}</span>
+                            <span className="flex items-center gap-1"><Gift className="w-3 h-3" />{formatMWK(t.prize_pool)}</span>
                             {t.pool_source === 'fixed' && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-ccb-accent/10 text-ccb-accent border border-ccb-accent/30">FIXED</span>
                             )}
@@ -1820,7 +1820,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         )}
 
                         {/* Payout Prizes — finished tournaments with a prize pool (fixes tournaments that finished before prize distribution was wired up; safe to re-run, won't double-pay) */}
-                        {(t.status === "finished" || t.status === "completed") && (t.prize_pool_cents || 0) > 0 && (
+                        {(t.status === "finished" || t.status === "completed") && (t.prize_pool || 0) > 0 && (
                           <button
                             onClick={() => handleTournamentAction(t.id, "force_finish")}
                             disabled={actionLoading === `${t.id}_force_finish`}
@@ -1977,7 +1977,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Entry Fee (MK)</label>
-                          <input type="number" value={createForm.entry_fee_cents ?? 0} onChange={(e) => setCreateForm({ ...createForm, entry_fee_cents: e.target.value })} className="input-field mt-1 w-full" placeholder="0 = free" />
+                          <input type="number" value={createForm.entry_fee ?? 0} onChange={(e) => setCreateForm({ ...createForm, entry_fee: e.target.value })} className="input-field mt-1 w-full" placeholder="0 = free" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Creator Profit %</label>
@@ -2013,7 +2013,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       {createForm.pool_source === 'fixed' && (
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Fixed Prize Pool (MK)</label>
-                          <input type="number" value={createForm.prize_pool_cents ?? 0} onChange={(e) => setCreateForm({ ...createForm, prize_pool_cents: e.target.value })} className="input-field mt-1 w-full" placeholder="e.g. 50000 = MK 50,000" />
+                          <input type="number" value={createForm.prize_pool ?? 0} onChange={(e) => setCreateForm({ ...createForm, prize_pool: e.target.value })} className="input-field mt-1 w-full" placeholder="e.g. 50000 = MK 50,000" />
                           <p className="text-[10px] text-ccb-muted mt-1">This amount is guaranteed by the platform regardless of player count.</p>
                         </div>
                       )}
@@ -2070,7 +2070,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       </div>
                       <div className="bg-ccb-surface rounded-lg p-2.5">
                         <div className="text-[10px] uppercase text-ccb-muted">Entry</div>
-                        <div className="font-bold">{formatMWK(managingTournament.entry_fee_cents)}</div>
+                        <div className="font-bold">{formatMWK(managingTournament.entry_fee)}</div>
                       </div>
                     </div>
 
@@ -2106,7 +2106,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           Force Finish
                         </button>
                       )}
-                      {(managingTournament.status === "finished" || managingTournament.status === "completed") && (managingTournament.prize_pool_cents || 0) > 0 && (
+                      {(managingTournament.status === "finished" || managingTournament.status === "completed") && (managingTournament.prize_pool || 0) > 0 && (
                         <button
                           onClick={() => handleAdminTournamentAction("force_finish")}
                           disabled={actionLoading === "admin_force_finish"}
@@ -2342,11 +2342,11 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Entry Fee (MK)</label>
-                          <input type="number" value={editForm.entry_fee_cents ?? 0} onChange={(e) => setEditForm({ ...editForm, entry_fee_cents: e.target.value })} className="input-field mt-1 w-full" />
+                          <input type="number" value={editForm.entry_fee ?? 0} onChange={(e) => setEditForm({ ...editForm, entry_fee: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Prize Pool (MK)</label>
-                          <input type="number" value={editForm.prize_pool_cents ?? 0} onChange={(e) => setEditForm({ ...editForm, prize_pool_cents: e.target.value })} className="input-field mt-1 w-full" />
+                          <input type="number" value={editForm.prize_pool ?? 0} onChange={(e) => setEditForm({ ...editForm, prize_pool: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                       </div>
                       {/* Prize Pool Source */}
@@ -2398,7 +2398,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         <X className="w-5 h-5" />
                       </button>
                     </div>
-                    <p className="text-xs text-ccb-muted">Prize pool: {formatMWK(prizeEditTournament.prize_pool_cents)}</p>
+                    <p className="text-xs text-ccb-muted">Prize pool: {formatMWK(prizeEditTournament.prize_pool)}</p>
                     <div>
                       <label className="text-xs font-medium text-ccb-muted">Distribution Type</label>
                       <select value={prizeForm.type || "percentage"} onChange={(e) => setPrizeForm({ ...prizeForm, type: e.target.value })} className="input-field mt-1 w-full">
@@ -2411,8 +2411,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       {prizeForm.payouts?.map((payout: any, i: number) => (
                         <div key={i} className="flex items-center gap-2">
                           <span className="text-xs text-ccb-muted w-8">#{payout.rank}</span>
-                          <input type="number" value={prizeForm.type === "flat" ? Math.floor((payout.amount_cents ?? 0) / 100) : payout.percentage ?? 0} onChange={(e) => updatePrizePayout(i, prizeForm.type === "flat" ? "amount_cents" : "percentage", prizeForm.type === "flat" ? Number(e.target.value) * 100 : Number(e.target.value))} className="input-field flex-1" placeholder={prizeForm.type === "flat" ? "Amount (MK)" : "Percentage (%)"} />
-                          {prizeForm.type === "percentage" && <span className="text-xs text-ccb-muted w-20 text-right">= {formatMWK(Math.floor((prizeEditTournament.prize_pool_cents * (payout.percentage || 0)) / 100))}</span>}
+                          <input type="number" value={prizeForm.type === "flat" ? (payout.amount ?? 0) : payout.percentage ?? 0} onChange={(e) => updatePrizePayout(i, prizeForm.type === "flat" ? "amount" : "percentage", prizeForm.type === "flat" ? Number(e.target.value) : Number(e.target.value))} className="input-field flex-1" placeholder={prizeForm.type === "flat" ? "Amount (MK)" : "Percentage (%)"} />
+                          {prizeForm.type === "percentage" && <span className="text-xs text-ccb-muted w-20 text-right">= {formatMWK(Math.floor(prizeEditTournament.prize_pool * (payout.percentage || 0) / 100))}</span>}
                           <button onClick={() => removePrizePayout(i)} className="text-ccb-danger hover:bg-ccb-danger/10 p-1 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       ))}
@@ -2508,7 +2508,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                 <div className="card text-center">
                   <p className="text-xs text-ccb-muted">Total Credited</p>
                   <p className="text-base font-bold mt-1">
-                    {formatMWK(deposits.reduce((s, d) => s + (d.status === "success" ? d.amount_cents : 0), 0))}
+                    {formatMWK(deposits.reduce((s, d) => s + (d.status === "success" ? d.amount : 0), 0))}
                   </p>
                 </div>
                 <div className="card text-center">
@@ -2567,7 +2567,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       (d.phone || "").includes(q) ||
                       (d.tx_ref || "").toLowerCase().includes(q) ||
                       (d.charge_id || "").toLowerCase().includes(q) ||
-                      String(d.amount_cents).includes(q);
+                      String(d.amount).includes(q);
                   }
                   return true;
                 });
@@ -2588,7 +2588,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">{formatMWK(d.amount_cents)}</span>
+                              <span className="text-sm font-medium">{formatMWK(d.amount)}</span>
                               <span className={`text-xs px-2 py-0.5 rounded ${
                                 d.status === "success" ? "bg-ccb-success/10 text-ccb-success" :
                                 d.status === "pending" ? "bg-ccb-accent/10 text-ccb-accent" :
@@ -2861,7 +2861,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           )}
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="font-medium">{formatMWK(b.stake_cents)}</span>
+                          <span className="font-medium">{formatMWK(b.stake)}</span>
                           <span className={`text-xs px-2 py-1 rounded ${
                             b.status === "completed" ? "bg-ccb-success/10 text-ccb-success" :
                             b.status === "playing" || b.status === "draw_armageddon" ? "bg-ccb-accent/10 text-ccb-accent" :
@@ -2899,10 +2899,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                 />
                 <ConfigInput
                   label="Berry Value (MWK cents per 100 berries)"
-                  value={berryConfig.berry_value_cents ?? 1000}
-                  onChange={(v) => setBerryConfig({ ...berryConfig, berry_value_cents: v })}
+                  value={berryConfig.berry_value ?? 1000}
+                  onChange={(v) => setBerryConfig({ ...berryConfig, berry_value: v })}
                 />
-                <p className="text-xs text-ccb-muted">100 berries = MWK {(berryConfig.berry_value_cents ?? 1000) / 100}</p>
+                <p className="text-xs text-ccb-muted">100 berries = MWK {(berryConfig.berry_value ?? 10)}</p>
                 <ConfigInput
                   label="Minimum Redemption (berries)"
                   value={berryConfig.min_redemption ?? 1000}
@@ -3000,7 +3000,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <span className="text-xs text-ccb-muted">{league.participant_count} players</span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <ConfigInput label="Prize Pool (MK)" value={leagueEdits[league.id]?.prize_pool_cents ?? Math.floor((league.prize_pool_cents || 0) / 100)} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], prize_pool_cents: Number(v) * 100 } }))} />
+                      <ConfigInput label="Prize Pool (MK)" value={leagueEdits[league.id]?.prize_pool ?? (league.prize_pool || 0)} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], prize_pool: Number(v) } }))} />
                       <ConfigInput label="League Size" value={leagueEdits[league.id]?.league_size ?? league.league_size} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], league_size: v } }))} />
                       <ConfigInput label="Promotes" value={leagueEdits[league.id]?.promotes_count ?? league.promotes_count} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], promotes_count: v } }))} />
                       <ConfigInput label="Relegates" value={leagueEdits[league.id]?.relegates_count ?? league.relegates_count} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], relegates_count: v } }))} />
@@ -3112,8 +3112,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         <label className="text-xs text-ccb-muted mb-1 block">Monthly Price (cents)</label>
                         <input
                           type="number"
-                          value={marketEdits[config.country_code]?.membership_price_cents ?? config.membership_price_cents}
-                          onChange={(e) => setMarketEdits((p: any) => ({ ...p, [config.country_code]: { ...p[config.country_code], membership_price_cents: e.target.value } }))}
+                          value={marketEdits[config.country_code]?.membership_price ?? config.membership_price}
+                          onChange={(e) => setMarketEdits((p: any) => ({ ...p, [config.country_code]: { ...p[config.country_code], membership_price: e.target.value } }))}
                           className="w-full px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm"
                           placeholder="1000000"
                         />
@@ -3143,7 +3143,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-ccb-muted">
                         Display: <span className="text-ccb-text font-medium">
-                          {Math.floor((marketEdits[config.country_code]?.membership_price_cents ?? config.membership_price_cents) / 100).toLocaleString()}
+                          {Math.floor(marketEdits[config.country_code]?.membership_price ?? config.membership_price).toLocaleString()}
                           {" "}{marketEdits[config.country_code]?.membership_currency ?? config.membership_currency}/month
                         </span>
                       </span>

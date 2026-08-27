@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 interface PrizeDistribution {
   type: "flat" | "percentage" | "tiered";
-  payouts: Array<{ rank: number; amount_cents?: number; percentage?: number }>;
+  payouts: Array<{ rank: number; amount?: number; percentage?: number }>;
 }
 
 interface ParticipantResult {
@@ -48,21 +48,21 @@ export const DEFAULT_PRIZE_SPLITS = PRIZE_SPLITS_BY_TYPE.swiss;
 export async function distributePrizes(
   tournamentId: string,
   participants: ParticipantResult[],
-  prizePoolCents: number,
+  prizePool: number,
   prizeDistribution: PrizeDistribution
 ) {
-  if (!prizePoolCents || prizePoolCents <= 0) return;
+  if (!prizePool || prizePool <= 0) return;
   if (!participants.length) return;
 
   const admin = createAdminClient();
-  const payouts: Array<{ player_id: string; amount_cents: number; rank: number }> = [];
+  const payouts: Array<{ player_id: string; amount: number; rank: number }> = [];
 
   if (prizeDistribution.type === "flat" && prizeDistribution.payouts.length > 0) {
     // Fixed amounts per rank
     for (const payout of prizeDistribution.payouts) {
       const winner = participants.find((p) => p.final_rank === payout.rank);
-      if (winner && payout.amount_cents) {
-        payouts.push({ player_id: winner.player_id, amount_cents: payout.amount_cents, rank: payout.rank });
+      if (winner && payout.amount) {
+        payouts.push({ player_id: winner.player_id, amount: payout.amount, rank: payout.rank });
       }
     }
   } else if (prizeDistribution.type === "percentage" && prizeDistribution.payouts.length > 0) {
@@ -70,9 +70,9 @@ export async function distributePrizes(
     for (const payout of prizeDistribution.payouts) {
       const winner = participants.find((p) => p.final_rank === payout.rank);
       if (winner && payout.percentage) {
-        const amount = Math.floor(prizePoolCents * (payout.percentage / 100));
+        const amount = Math.floor(prizePool * (payout.percentage / 100));
         if (amount > 0) {
-          payouts.push({ player_id: winner.player_id, amount_cents: amount, rank: payout.rank });
+          payouts.push({ player_id: winner.player_id, amount: amount, rank: payout.rank });
         }
       }
     }
@@ -81,9 +81,9 @@ export async function distributePrizes(
     for (const split of DEFAULT_PRIZE_SPLITS) {
       const winner = participants.find((p) => p.final_rank === split.rank);
       if (winner) {
-        const amount = Math.floor(prizePoolCents * (split.percentage / 100));
+        const amount = Math.floor(prizePool * (split.percentage / 100));
         if (amount > 0) {
-          payouts.push({ player_id: winner.player_id, amount_cents: amount, rank: split.rank });
+          payouts.push({ player_id: winner.player_id, amount: amount, rank: split.rank });
         }
       }
     }
@@ -102,13 +102,13 @@ export async function distributePrizes(
 
     await admin.rpc("credit_wallet", {
       p_user_id: payout.player_id,
-      p_amount_cents: payout.amount_cents,
+      p_amount: payout.amount,
     });
 
     // Record the payout as a deposit entry for audit trail
     const { error: _depErr } = await admin.from("deposits").insert({
       user_id: payout.player_id,
-      amount_cents: payout.amount_cents,
+      amount: payout.amount,
       status: "success",
       method: "tournament_payout",
       reference: `tournament:${tournamentId}:rank:${payout.rank}`,
@@ -124,7 +124,7 @@ export async function distributePrizes(
         ...prizeDistribution,
         actual_payouts: payouts.map((p) => ({
           player_id: p.player_id,
-          amount_cents: p.amount_cents,
+          amount: p.amount,
           rank: p.rank,
         })),
       },

@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
     const { data: users, error } = await admin
       .from("profiles")
-      .select("id, username, display_name, email, rating, games_played, wins, losses, draws, wallet_balance_cents, is_admin, is_banned, phone, berry_balance, created_at")
+      .select("id, username, display_name, email, rating, games_played, wins, losses, draws, wallet_balance, is_admin, is_banned, phone, berry_balance, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
 
@@ -77,13 +77,13 @@ export async function PATCH(req: NextRequest) {
         if (value > 0) {
           const { error } = await admin.rpc("credit_wallet", {
             p_user_id: userId,
-            p_amount_cents: value,
+            p_amount: value,
           });
           if (error) return NextResponse.json({ error: error.message }, { status: 500 });
         } else if (value < 0) {
           const { error } = await admin.rpc("debit_wallet", {
             p_user_id: userId,
-            p_amount_cents: Math.abs(value),
+            p_amount: Math.abs(value),
           });
           if (error) return NextResponse.json({ error: error.message }, { status: 500 });
         }
@@ -148,7 +148,7 @@ export async function DELETE(req: NextRequest) {
     // Get the user's profile for logging
     const { data: targetProfile } = await admin
       .from("profiles")
-      .select("username, email, wallet_balance_cents, berry_balance")
+      .select("username, email, wallet_balance, berry_balance")
       .eq("id", userId)
       .single();
 
@@ -181,14 +181,14 @@ export async function DELETE(req: NextRequest) {
         if (p.paid) {
           const { data: tournament } = await admin
             .from("tournaments")
-            .select("entry_fee_cents, creator_id")
+            .select("entry_fee, creator_id")
             .eq("id", p.tournament_id)
             .single();
           
-          if (tournament && tournament.entry_fee_cents > 0) {
+          if (tournament && tournament.entry_fee > 0) {
             await admin.rpc("credit_wallet", {
               p_user_id: tournament.creator_id,
-              p_amount_cents: tournament.entry_fee_cents,
+              p_amount: tournament.entry_fee,
             });
           }
         }
@@ -256,7 +256,7 @@ export async function DELETE(req: NextRequest) {
         details: { 
           deleted_username: targetProfile.username,
           deleted_email: targetProfile.email,
-          wallet_balance: targetProfile.wallet_balance_cents,
+          wallet_balance: targetProfile.wallet_balance,
           berry_balance: targetProfile.berry_balance,
         },
       });

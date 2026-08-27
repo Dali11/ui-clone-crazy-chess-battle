@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { amountCents, phone, operatorRefId, operatorName } = await req.json();
+    const { amount, phone, operatorRefId, operatorName } = await req.json();
 
     // ─── Load platform config ──────────────────────────────────────────
     const admin = createAdminClient();
@@ -21,34 +21,34 @@ export async function POST(req: NextRequest) {
     }
 
     // Enforce minimum amount
-    const minAmount = wConfig.min_amount_cents || 1_000_000;
-    if (!amountCents || amountCents < minAmount) {
-      const minDisplay = Math.floor(minAmount / 100).toLocaleString();
+    const minAmount = wConfig.min_amount || 1_000_000;
+    if (!amount || amount < minAmount) {
+      const minDisplay = minAmount.toLocaleString();
       return NextResponse.json({ error: `Minimum withdrawal is MWK ${minDisplay}` }, { status: 400 });
     }
 
     // Enforce maximum amount
-    const maxAmount = wConfig.max_amount_cents || 50_000_000;
-    if (amountCents > maxAmount) {
-      const maxDisplay = Math.floor(maxAmount / 100).toLocaleString();
+    const maxAmount = wConfig.max_amount || 50_000_000;
+    if (amount > maxAmount) {
+      const maxDisplay = maxAmount.toLocaleString();
       return NextResponse.json({ error: `Maximum withdrawal is MWK ${maxDisplay}` }, { status: 400 });
     }
 
     // Enforce daily limit
-    const dailyLimit = wConfig.daily_limit_cents || 0;
+    const dailyLimit = wConfig.daily_limit || 0;
     if (dailyLimit > 0) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const { data: todayWithdrawals } = await admin
         .from("withdrawals")
-        .select("amount_cents")
+        .select("amount")
         .eq("user_id", user.id)
         .gte("created_at", today.toISOString())
         .in("status", ["pending", "approved", "completed"]);
 
-      const todayTotal = (todayWithdrawals || []).reduce((sum, w) => sum + w.amount_cents, 0);
-      if (todayTotal + amountCents > dailyLimit) {
-        const remaining = Math.max(0, Math.floor((dailyLimit - todayTotal) / 100)).toLocaleString();
+      const todayTotal = (todayWithdrawals || []).reduce((sum, w) => sum + w.amount, 0);
+      if (todayTotal + amount > dailyLimit) {
+        const remaining = Math.max(0, dailyLimit - todayTotal).toLocaleString();
         return NextResponse.json({ error: `Daily withdrawal limit reached. Remaining: MWK ${remaining}` }, { status: 400 });
       }
     }
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     // Check for existing pending withdrawal (prevent spam)
     const { data: existingPending } = await admin
       .from("withdrawals")
-      .select("id, amount_cents")
+      .select("id, amount")
       .eq("user_id", user.id)
       .eq("status", "pending")
       .limit(1);
@@ -76,16 +76,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Apply withdrawal fee + processing fee
-    const withdrawalFee = wConfig.withdrawal_fee_cents || 0;
+    const withdrawalFee = wConfig.withdrawal_fee || 0;
     const processingFeePct = wConfig.processing_fee_pct || 0;
-    const processingFee = Math.floor(amountCents * (processingFeePct / 100));
+    const processingFee = Math.floor(amount * (processingFeePct / 100));
     const totalFees = withdrawalFee + processingFee;
-    const netAmount = amountCents - totalFees;
+    const netAmount = amount - totalFees;
 
     // Call the atomic request_withdrawal RPC (debits wallet)
     const { data: withdrawalId, error } = await admin.rpc("request_withdrawal", {
       p_user_id: user.id,
-      p_amount_cents: amountCents,
+      p_amount: amount,
       p_phone: phone,
       p_operator_ref_id: operatorRefId,
       p_operator_name: operatorName,
@@ -100,8 +100,8 @@ export async function POST(req: NextRequest) {
       await admin
         .from("withdrawals")
         .update({
-          fee_cents: totalFees,
-          net_amount_cents: netAmount,
+          fee: totalFees,
+          net_amount: netAmount,
         })
         .eq("id", withdrawalId);
     }
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
 
         // Initiate Paychangu payout (net amount after fees)
         const chargeId = `wd_${withdrawal.id.slice(0, 8)}_${Date.now()}`;
-        const amountMWK = Math.floor((netAmount || withdrawal.amount_cents) / 100);
+        const amountMWK = (netAmount || withdrawal.amount);
         let payoutSucceeded = false;
 
         try {

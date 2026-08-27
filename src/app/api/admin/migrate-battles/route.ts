@@ -29,23 +29,23 @@ INSERT INTO battle_config (id) VALUES (gen_random_uuid()) ON CONFLICT DO NOTHING
 CREATE TABLE IF NOT EXISTS battle_queue (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   player_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  stake_cents     INT NOT NULL,
+  stake     INT NOT NULL,
   rating          INT NOT NULL DEFAULT 1200,
   status          TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'matched', 'expired', 'left')),
   battle_id       UUID,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   matched_at       TIMESTAMPTZ,
-  UNIQUE (player_id, stake_cents, status)
+  UNIQUE (player_id, stake, status)
 );
 
 CREATE TABLE IF NOT EXISTS battles (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   white_player_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   black_player_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  stake_cents     INT NOT NULL,
-  pot_cents       INT NOT NULL,
-  platform_fee_cents INT NOT NULL DEFAULT 0,
-  winner_payout_cents INT NOT NULL DEFAULT 0,
+  stake     INT NOT NULL,
+  pot       INT NOT NULL,
+  platform_fee INT NOT NULL DEFAULT 0,
+  winner_payout INT NOT NULL DEFAULT 0,
   status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'playing', 'completed', 'draw_armageddon', 'cancelled', 'disputed')),
   game_id         UUID REFERENCES games(id),
   armageddon_game_id UUID REFERENCES games(id),
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS battles (
   notes           TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_battle_queue_stake ON battle_queue(stake_cents, status);
+CREATE INDEX IF NOT EXISTS idx_battle_queue_stake ON battle_queue(stake, status);
 CREATE INDEX IF NOT EXISTS idx_battle_queue_player ON battle_queue(player_id);
 CREATE INDEX IF NOT EXISTS idx_battles_status ON battles(status);
 CREATE INDEX IF NOT EXISTS idx_battles_players ON battles(white_player_id, black_player_id);
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS battle_escrow (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   battle_id       UUID REFERENCES battles(id) ON DELETE CASCADE,
   player_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  amount_cents    INT NOT NULL,
+  amount    INT NOT NULL,
   status          TEXT NOT NULL DEFAULT 'locked' CHECK (status IN ('locked', 'released', 'refunded')),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   released_at     TIMESTAMPTZ
@@ -93,28 +93,28 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'profiles' AND column_name = 'wallet_balance_cents'
+    WHERE table_name = 'profiles' AND column_name = 'wallet_balance'
   ) THEN
-    ALTER TABLE profiles ADD COLUMN wallet_balance_cents INT NOT NULL DEFAULT 0;
+    ALTER TABLE profiles ADD COLUMN wallet_balance INT NOT NULL DEFAULT 0;
   END IF;
 END $$;
 
-CREATE OR REPLACE FUNCTION public.credit_wallet(p_user_id UUID, p_amount_cents INT)
+CREATE OR REPLACE FUNCTION public.credit_wallet(p_user_id UUID, p_amount INT)
 RETURNS VOID AS $$
 BEGIN
-  UPDATE profiles SET wallet_balance_cents = wallet_balance_cents + p_amount_cents WHERE id = p_user_id;
+  UPDATE profiles SET wallet_balance = wallet_balance + p_amount WHERE id = p_user_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION public.debit_wallet(p_user_id UUID, p_amount_cents INT)
+CREATE OR REPLACE FUNCTION public.debit_wallet(p_user_id UUID, p_amount INT)
 RETURNS VOID AS $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM profiles WHERE id = p_user_id AND wallet_balance_cents >= p_amount_cents
+    SELECT 1 FROM profiles WHERE id = p_user_id AND wallet_balance >= p_amount
   ) THEN
     RAISE EXCEPTION 'Insufficient balance';
   END IF;
-  UPDATE profiles SET wallet_balance_cents = wallet_balance_cents - p_amount_cents WHERE id = p_user_id;
+  UPDATE profiles SET wallet_balance = wallet_balance - p_amount WHERE id = p_user_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -124,7 +124,7 @@ GRANT EXECUTE ON FUNCTION public.debit_wallet(UUID, INT) TO authenticated;
 CREATE TABLE IF NOT EXISTS withdrawals (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  amount_cents    INT NOT NULL,
+  amount    INT NOT NULL,
   phone           TEXT NOT NULL,
   operator_name   TEXT NOT NULL,
   operator_ref_id TEXT,

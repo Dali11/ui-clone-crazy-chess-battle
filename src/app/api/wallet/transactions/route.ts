@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     type Txn = {
       id: string;
       type: "deposit" | "withdrawal" | "battle_payout" | "battle_stake" | "berry_redeem" | "tournament_entry" | "tournament_prize";
-      amount_cents: number;
+      amount: number;
       status: string;
       description: string;
       created_at: string;
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     try {
       const { data: deposits } = await admin
         .from("deposits")
-        .select("id, amount_cents, status, method, created_at, reference")
+        .select("id, amount, status, method, created_at, reference")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
         transactions.push({
           id: d.id,
           type: "deposit",
-          amount_cents: d.amount_cents,
+          amount: d.amount,
           status: d.status,
           description: d.method === "mobile_money" ? "Mobile Money deposit" : d.method === "card" ? "Card deposit" : `Deposit (${d.method || "unknown"})`,
           created_at: d.created_at,
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     try {
       const { data: withdrawals } = await admin
         .from("withdrawals")
-        .select("id, amount_cents, status, operator_name, created_at")
+        .select("id, amount, status, operator_name, created_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
         transactions.push({
           id: w.id,
           type: "withdrawal",
-          amount_cents: -w.amount_cents,
+          amount: -w.amount,
           status: w.status,
           description: `Withdrawal via ${w.operator_name || "mobile money"}`,
           created_at: w.created_at,
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
     try {
       const { data: battlePayouts } = await admin
         .from("deposits")
-        .select("id, amount_cents, status, reference, created_at")
+        .select("id, amount, status, reference, created_at")
         .eq("user_id", user.id)
         .eq("method", "battle_payout")
         .order("created_at", { ascending: false })
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
         transactions.push({
           id: b.id,
           type: "battle_payout",
-          amount_cents: b.amount_cents,
+          amount: b.amount,
           status: b.status,
           description: b.reference || "Battle winnings",
           created_at: b.created_at,
@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
     try {
       const { data: berryRedemptions } = await admin
         .from("deposits")
-        .select("id, amount_cents, status, reference, created_at")
+        .select("id, amount, status, reference, created_at")
         .eq("user_id", user.id)
         .eq("method", "berry_redemption")
         .order("created_at", { ascending: false })
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
         transactions.push({
           id: b.id,
           type: "berry_redeem",
-          amount_cents: b.amount_cents,
+          amount: b.amount,
           status: b.status,
           description: b.reference || "Berry redemption",
           created_at: b.created_at,

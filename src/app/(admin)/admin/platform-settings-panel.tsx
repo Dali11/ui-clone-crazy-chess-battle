@@ -23,9 +23,9 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
   deposits: [
     { key: "enabled", label: "Deposits Enabled", type: "toggle", group: "control", help: "Allow new deposit requests" },
     { key: "auto_credit", label: "Auto-Credit", type: "toggle", group: "control", help: "Automatically credit approved deposits" },
-    { key: "min_amount_cents", label: "Minimum Deposit", type: "number", group: "control", unit: "MWK" },
-    { key: "max_amount_cents", label: "Maximum Deposit", type: "number", group: "control", unit: "MWK" },
-    { key: "require_approval_above_cents", label: "Approval Threshold", type: "number", group: "control", unit: "MWK", help: "Deposits above this require manual approval" },
+    { key: "min_amount", label: "Minimum Deposit", type: "number", group: "control", unit: "MWK" },
+    { key: "max_amount", label: "Maximum Deposit", type: "number", group: "control", unit: "MWK" },
+    { key: "require_approval_above", label: "Approval Threshold", type: "number", group: "control", unit: "MWK", help: "Deposits above this require manual approval" },
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
     { key: "default_filter", label: "Default Filter", type: "select", group: "display", options: [
       { value: "all", label: "All" }, { value: "pending", label: "Pending" },
@@ -36,11 +36,11 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
   withdrawals: [
     { key: "enabled", label: "Withdrawals Enabled", type: "toggle", group: "control", help: "Allow new withdrawal requests" },
     { key: "auto_approve", label: "Auto-Approve", type: "toggle", group: "control", help: "Automatically approve and process withdrawals" },
-    { key: "min_amount_cents", label: "Minimum Withdrawal", type: "number", group: "control", unit: "MWK" },
-    { key: "max_amount_cents", label: "Maximum Withdrawal", type: "number", group: "control", unit: "MWK" },
-    { key: "daily_limit_cents", label: "Daily Limit", type: "number", group: "control", unit: "MWK", help: "Max total withdrawals per user per day" },
+    { key: "min_amount", label: "Minimum Withdrawal", type: "number", group: "control", unit: "MWK" },
+    { key: "max_amount", label: "Maximum Withdrawal", type: "number", group: "control", unit: "MWK" },
+    { key: "daily_limit", label: "Daily Limit", type: "number", group: "control", unit: "MWK", help: "Max total withdrawals per user per day" },
     { key: "processing_fee_pct", label: "Processing Fee", type: "number", group: "control", unit: "%" },
-    { key: "withdrawal_fee_cents", label: "Withdrawal Fee", type: "number", group: "control", unit: "MWK", help: "Flat fee per withdrawal" },
+    { key: "withdrawal_fee", label: "Withdrawal Fee", type: "number", group: "control", unit: "MWK", help: "Flat fee per withdrawal" },
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
     { key: "default_filter", label: "Default Filter", type: "select", group: "display", options: [
       { value: "all", label: "All" }, { value: "pending", label: "Pending" },
@@ -50,8 +50,8 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
   ],
   battles: [
     { key: "enabled", label: "Battles Enabled", type: "toggle", group: "control", help: "Allow staked battles" },
-    { key: "min_stake_cents", label: "Min Stake", type: "number", group: "control", unit: "MWK" },
-    { key: "max_stake_cents", label: "Max Stake", type: "number", group: "control", unit: "MWK" },
+    { key: "min_stake", label: "Min Stake", type: "number", group: "control", unit: "MWK" },
+    { key: "max_stake", label: "Max Stake", type: "number", group: "control", unit: "MWK" },
     { key: "platform_fee_pct", label: "Platform Fee", type: "number", group: "control", unit: "%", help: "Platform cut of each battle" },
     { key: "auto_cancel_minutes", label: "Auto-Cancel", type: "number", group: "control", unit: "min", help: "Cancel unmatched battles after N minutes" },
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
@@ -128,7 +128,7 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
 // ─── Display helpers ──────────────────────────────────────────────────────
 
 function formatValue(value: any, unit?: string): string {
-  if (unit === "MWK") return `MWK ${(value / 100).toLocaleString()}`;
+  if (unit === "MWK") return `MWK ${value.toLocaleString()}`;
   if (unit === "%") return `${value}%`;
   if (unit === "days") return `${value} day${value !== 1 ? "s" : ""}`;
   if (unit === "weeks") return `${value} week${value !== 1 ? "s" : ""}`;
@@ -212,13 +212,13 @@ export default function PlatformSettingsPanel({ section }: { section: string }) 
   const getDisplayValue = (field: SettingField): any => {
     const raw = config[field.key];
     if (raw === undefined || raw === null) return "";
-    if (field.unit === "MWK") return Math.floor(raw / 100);
+    if (field.unit === "MWK") return Math.floor(raw);
     return raw;
   };
 
   const setFieldValue = (field: SettingField, value: any) => {
     if (field.unit === "MWK") {
-      updateField(field.key, Number(value) * 100);
+      updateField(field.key, Number(value));
     } else {
       updateField(field.key, value);
     }

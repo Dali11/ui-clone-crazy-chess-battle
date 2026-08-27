@@ -23,7 +23,7 @@ export async function GET() {
       .from('premium_competitions')
       .select(`
         id, name, type, description, sponsor_name, sponsor_logo_url,
-        format, qualification_config, prize_pool_cents, prize_currency,
+        format, qualification_config, prize_pool, prize_currency,
         status, starts_at, ends_at, requires_membership, min_rating, max_rating,
         eligibility_config, created_at
       `)
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { name, type, description, sponsor_name, sponsor_logo_url, format,
-      qualification_config, prize_pool_cents, prize_currency, status,
+      qualification_config, prize_pool, prize_currency, status,
       starts_at, ends_at, requires_membership, min_rating, max_rating } = body;
 
     if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 });
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
         sponsor_logo_url: sponsor_logo_url || null,
         format: format || {},
         qualification_config: qualification_config || {},
-        prize_pool_cents: prize_pool_cents || 0,
+        prize_pool: prize_pool || 0,
         prize_currency: prize_currency || 'MWK',
         status: status || 'upcoming',
         starts_at: starts_at || null,
@@ -126,7 +126,7 @@ export async function PATCH(req: NextRequest) {
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
     const allowedFields = ['name', 'type', 'description', 'sponsor_name', 'sponsor_logo_url',
-      'format', 'qualification_config', 'prize_pool_cents', 'prize_currency', 'status',
+      'format', 'qualification_config', 'prize_pool', 'prize_currency', 'status',
       'starts_at', 'ends_at', 'requires_membership', 'min_rating', 'max_rating', 'eligibility_config'];
     const cleanUpdates: Record<string, any> = {};
     for (const key of allowedFields) {

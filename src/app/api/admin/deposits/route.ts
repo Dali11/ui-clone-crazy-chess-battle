@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     let query = admin
       .from("deposits")
       .select(`
-        id, user_id, amount_cents, status, method, charge_id, tx_ref,
+        id, user_id, amount, status, method, charge_id, tx_ref,
         paychangu_ref, phone, operator, reference, created_at, updated_at,
         profiles!deposits_user_id_profiles_fkey(username, display_name, email)
       `)

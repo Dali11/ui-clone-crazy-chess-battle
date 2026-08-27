@@ -33,8 +33,8 @@ interface TournamentData {
     duration_minutes: number | null;
     starts_at: string;
     ends_at: string | null;
-    entry_fee_cents: number;
-    prize_pool_cents: number;
+    entry_fee: number;
+    prize_pool: number;
     pool_source: string | null;
     thumbnail_url: string | null;
     berry_prize_pool: number | null;
@@ -85,7 +85,7 @@ interface TournamentData {
 }
 
 function formatMoney(cents: number) {
-  return `MK${(cents / 100).toLocaleString()}`;
+  return `MK${cents.toLocaleString()}`;
 }
 
 function formatDate(dateStr: string) {
@@ -255,8 +255,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const roundStartsAt = currentRoundData?.starts_at;
   const roundStartsIn = roundStartsAt ? Math.max(0, Math.floor((new Date(roundStartsAt).getTime() - Date.now()) / 1000)) : 0;
   const isRoundStartingSoon = roundStartsAt && roundStartsIn > 0;
-  const hasEntryFee = (t.entry_fee_cents || 0) > 0;
-  const hasPrizePool = (t.prize_pool_cents || 0) > 0;
+  const hasEntryFee = (t.entry_fee || 0) > 0;
+  const hasPrizePool = (t.prize_pool || 0) > 0;
   const hasBerryPrize = (t.berry_prize_pool || 0) > 0;
   const isLive = t.status === 'active';
 
@@ -359,7 +359,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               {hasPrizePool && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30">
                   <Trophy className="w-3.5 h-3.5 text-ccb-accent" />
-                  <span className="text-xs font-bold text-ccb-accent">{formatMoney(t.prize_pool_cents)} Pool</span>
+                  <span className="text-xs font-bold text-ccb-accent">{formatMoney(t.prize_pool)} Pool</span>
                 </div>
               )}
               {hasBerryPrize && (
@@ -371,7 +371,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               {hasEntryFee ? (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ccb-surface border border-ccb-border">
                   <DollarSign className="w-3.5 h-3.5 text-ccb-muted" />
-                  <span className="text-xs font-bold">{formatMoney(t.entry_fee_cents)} Entry</span>
+                  <span className="text-xs font-bold">{formatMoney(t.entry_fee)} Entry</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ccb-success/10 border border-ccb-success/30">
@@ -389,7 +389,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
             {/* ACTION BAR */}
             <div className="pt-3 border-t border-ccb-border">
-              {t.status === 'upcoming' && (
+              {((t.status === "upcoming" || t.status === "active") && (
                 <>
                   {isRegistered ? (
                     <button
@@ -401,16 +401,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       Withdraw
                     </button>
                   ) : canJoin ? (
-                    <button
-                      onClick={handleJoin}
-                      disabled={actionLoading}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20 flex items-center justify-center gap-2"
-                    >
-                      {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> :
-                        hasEntryFee ? <><DollarSign className="w-4 h-4" /> Join — {formatMoney(t.entry_fee_cents)}</> :
-                        <><Swords className="w-4 h-4" /> Join Tournament</>
-                      }
-                    </button>
+                    <>
+                      <button
+                        onClick={handleJoin}
+                        disabled={actionLoading}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20 flex items-center justify-center gap-2"
+                      >
+                        {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> :
+                          hasEntryFee ? <><DollarSign className="w-4 h-4" /> Join — {formatMoney(t.entry_fee)}</> :
+                          <><Swords className="w-4 h-4" /> Join Tournament</>
+                        }
+                      </button>
+                      {isLive && (
+                        <p className="text-center text-xs text-ccb-muted mt-1">You'll be paired in the next round</p>
+                      )}
+                    </>
                   ) : (
                     <div className="w-full py-3 rounded-xl bg-ccb-surface border border-ccb-border text-center">
                       <p className="text-sm text-ccb-muted">
@@ -435,7 +440,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     </button>
                   )}
                 </>
-              )}
+              ))}
 
               {isLive && (
                 <div className="flex items-center justify-between gap-3">
@@ -813,15 +818,15 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 <Trophy className="w-3.5 h-3.5" /> Prizes &amp; Entry
               </h4>
               <div className="space-y-3">
-                {hasPrizePool && <InfoRow icon={Trophy} label={t.pool_source === 'fixed' ? "Cash Prize Pool (Fixed)" : "Cash Prize Pool (Entry Fees)"} value={formatMoney(t.prize_pool_cents)} />}
+                {hasPrizePool && <InfoRow icon={Trophy} label={t.pool_source === 'fixed' ? "Cash Prize Pool (Fixed)" : "Cash Prize Pool (Entry Fees)"} value={formatMoney(t.prize_pool)} />}
                 {hasBerryPrize && <InfoRow icon={Zap} label="Berry Prize Pool" value={`${t.berry_prize_pool} berries`} />}
                 {hasEntryFee ? (
-                  <InfoRow icon={DollarSign} label="Entry Fee" value={formatMoney(t.entry_fee_cents)} />
+                  <InfoRow icon={DollarSign} label="Entry Fee" value={formatMoney(t.entry_fee)} />
                 ) : (
                   <InfoRow icon={CheckCircle} label="Entry Fee" value="Free" />
                 )}
                 {!hasPrizePool && !hasBerryPrize && (
-                  <p className="text-xs text-ccb-muted">{t.entry_fee_cents > 0 ? "Prize pool grows as players join." : "No prize pool for this tournament."}</p>
+                  <p className="text-xs text-ccb-muted">{t.entry_fee > 0 ? "Prize pool grows as players join." : "No prize pool for this tournament."}</p>
                 )}
               </div>
             </div>
@@ -855,7 +860,7 @@ function PrizeDistribution({ t, formatMoney }: { t: any; formatMoney: (c: number
   const dist = t.prize_distribution;
   if (!dist || !dist.payouts || dist.payouts.length === 0) return null;
 
-  const pool = t.prize_pool_cents || 0;
+  const pool = t.prize_pool || 0;
   const isFixed = t.pool_source === 'fixed';
   const isFlat = dist.type === 'flat';
 
@@ -867,7 +872,7 @@ function PrizeDistribution({ t, formatMoney }: { t: any; formatMoney: (c: number
       <div className="space-y-2">
         {dist.payouts.map((payout: any) => {
           const amount = isFlat
-            ? payout.amount_cents
+            ? payout.amount
             : pool > 0 ? Math.floor(pool * (payout.percentage / 100)) : 0;
           const rankLabel = payout.rank === 1 ? '1st' : payout.rank === 2 ? '2nd' : payout.rank === 3 ? '3rd' : `${payout.rank}th`;
           const medalIcon = payout.rank === 1 ? <Crown className="w-4 h-4 text-ccb-accent" /> :

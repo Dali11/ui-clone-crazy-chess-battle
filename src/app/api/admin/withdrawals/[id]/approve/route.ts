@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Initiate Paychangu mobile money payout
     const chargeId = `wd_${withdrawal.id.slice(0, 8)}_${Date.now()}`;
-    const amountMWK = Math.floor(withdrawal.amount_cents / 100);
+    const amountMWK = withdrawal.amount;
 
     let payoutSucceeded = false;
 
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             to: wProfile.data?.email || "",
             subject: `Withdrawal sent — MK ${amountMWK.toLocaleString()}`,
             template: "withdrawal_approved",
-            data: { amountCents: withdrawal.amount_cents, currency: "MWK", phone: withdrawal.phone, operator: withdrawal.operator_name, reference: chargeId },
+            data: { amount: withdrawal.amount, currency: "MWK", phone: withdrawal.phone, operator: withdrawal.operator_name, reference: chargeId },
           }).catch(() => {});
 
           await admin.from("notifications").insert({

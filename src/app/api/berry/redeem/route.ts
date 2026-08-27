@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     // Get berry config
     const { data: config } = await admin
       .from("berry_config")
-      .select("berry_value_cents, min_redemption, enabled")
+      .select("berry_value, min_redemption, enabled")
       .limit(1)
       .single();
 
@@ -34,17 +34,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Minimum redemption is ${config.min_redemption} berries` }, { status: 400 });
     }
 
-    // Calculate cash value: 100 berries = berry_value_cents
-    const cashCents = Math.round((berries / 100) * config.berry_value_cents);
+    // Calculate cash value: 100 berries = berry_value
+    const cashAmount = Math.round((berries / 100) * config.berry_value);
 
-    if (cashCents < 100) {
+    if (cashAmount < 100) {
       return NextResponse.json({ error: "Redemption amount too small" }, { status: 400 });
     }
 
     // Get user's current berry balance
     const { data: profile } = await admin
       .from("profiles")
-      .select("berry_balance, wallet_balance_cents")
+      .select("berry_balance, wallet_balance")
       .eq("id", user.id)
       .single();
 
@@ -60,22 +60,22 @@ export async function POST(req: NextRequest) {
     await admin.rpc("debit_berries", {
       p_user_id: user.id,
       p_amount: berries,
-      p_description: `Redeemed ${berries} berries for MWK ${(cashCents / 100).toLocaleString()}`,
+      p_description: `Redeemed ${berries} berries for MWK ${cashAmount.toLocaleString()}`,
     });
 
     // Credit wallet
     await admin.rpc("credit_wallet", {
       p_user_id: user.id,
-      p_amount_cents: cashCents,
+      p_amount: cashAmount,
     });
 
     return NextResponse.json({
       success: true,
       berriesRedeemed: berries,
-      cashCents,
-      cashFormatted: `MWK ${(cashCents / 100).toLocaleString()}`,
+      cashAmount,
+      cashFormatted: `MWK ${cashAmount.toLocaleString()}`,
       newBerryBalance: profile.berry_balance - berries,
-      newWalletBalance: profile.wallet_balance_cents + cashCents,
+      newWalletBalance: profile.wallet_balance + cashAmount,
     });
   } catch (e: any) {
     console.error("Berry redeem error:", e);

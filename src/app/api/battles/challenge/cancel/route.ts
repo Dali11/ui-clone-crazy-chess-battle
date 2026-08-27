@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     const { data: challenge, error } = await admin
       .from("battle_challenges")
-      .select("id, challenger_id, stake_cents, status")
+      .select("id, challenger_id, stake, status")
       .eq("id", challengeId)
       .single();
 
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       .update({ status: "cancelled" })
       .eq("id", challengeId)
       .eq("status", "pending")
-      .select("id, challenger_id, stake_cents")
+      .select("id, challenger_id, stake")
       .single();
 
     if (claimError || !claimed) {
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     // Refund the escrowed stake
     const { error: creditErr } = await admin.rpc("credit_wallet", {
       p_user_id: claimed.challenger_id,
-      p_amount_cents: claimed.stake_cents,
+      p_amount: claimed.stake,
     });
 
     if (creditErr) {
@@ -65,13 +65,13 @@ export async function POST(req: NextRequest) {
     // Audit log
     await admin.from("deposits").insert({
       user_id: claimed.challenger_id,
-      amount_cents: claimed.stake_cents,
+      amount: claimed.stake,
       status: "success",
       method: "battle_challenge_cancel",
       reference: `cancel:${challengeId}`,
     });
 
-    return NextResponse.json({ success: true, refunded: claimed.stake_cents });
+    return NextResponse.json({ success: true, refunded: claimed.stake });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
   }

@@ -20,10 +20,10 @@ export async function POST(req: NextRequest) {
 
     const results: any[] = [];
 
-    // 1. Double all existing leagues' prize_pool_cents
+    // 1. Double all existing leagues' prize_pool
     try {
       const { rowCount } = await client.query(
-        `UPDATE premier_leagues SET prize_pool_cents = prize_pool_cents * 2 WHERE prize_pool_cents > 0`
+        `UPDATE premier_leagues SET prize_pool = prize_pool * 2 WHERE prize_pool > 0`
       );
       results.push({ ok: true, sql: `Doubled prize pools for ${rowCount} leagues` });
     } catch (e: any) {
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         const { rows: menLeagues } = await client.query(
           `SELECT name, status, country, league_size, tier, entry_type,
                   promotes_count, relegates_count, qualifying_positions,
-                  prize_pool_cents, prize_currency, season_duration_weeks, payout_config
+                  prize_pool, prize_currency, season_duration_weeks, payout_config
            FROM premier_leagues WHERE gender_restriction = 'male' ORDER BY tier`
         );
 
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
             `INSERT INTO premier_leagues
                (name, status, country, league_size, tier, gender_restriction, entry_type,
                 promotes_count, relegates_count, qualifying_positions,
-                prize_pool_cents, prize_currency, season_duration_weeks, payout_config)
+                prize_pool, prize_currency, season_duration_weeks, payout_config)
              VALUES ($1, $2, $3, $4, $5, 'female', $6, $7, $8, $9, $10, $11, $12, $13)`,
             [
               womenName,
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
               ml.promotes_count,
               ml.relegates_count,
               ml.qualifying_positions,
-              ml.prize_pool_cents, // already doubled in step 1
+              ml.prize_pool, // already doubled in step 1
               ml.prize_currency,
               ml.season_duration_weeks,
               JSON.stringify(ml.payout_config),
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     // 4. Verify final state
     try {
       const { rows } = await client.query(
-        `SELECT tier, name, gender_restriction, prize_pool_cents, entry_type, status
+        `SELECT tier, name, gender_restriction, prize_pool, entry_type, status
          FROM premier_leagues ORDER BY gender_restriction, tier`
       );
       results.push({ ok: true, sql: "Verification", data: rows });

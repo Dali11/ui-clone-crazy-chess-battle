@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Fetch withdrawal info before refunding
     const { data: withdrawal } = await admin
       .from("withdrawals")
-      .select("user_id, amount_cents, phone, operator_name, status")
+      .select("user_id, amount, phone, operator_name, status")
       .eq("id", id)
       .single();
 
@@ -52,11 +52,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .eq("id", id);
 
     // Insert in-app notification directly (no self-HTTP fetch)
-    const amountMWK = Math.floor(withdrawal.amount_cents / 100);
+    const amountMWK = withdrawal.amount;
     try {
       // Send branded email
     const rejWProfile = await admin.from("profiles").select("email").eq("id", withdrawal.user_id).single();
-    const rejAmountMWK = Math.floor(withdrawal.amount_cents / 100);
+    const rejAmountMWK = withdrawal.amount;
     await sendEmail({
       to: rejWProfile.data?.email || "",
       subject: `Withdrawal update — MK ${rejAmountMWK.toLocaleString()}`,

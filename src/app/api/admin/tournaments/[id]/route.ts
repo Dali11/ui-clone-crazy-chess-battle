@@ -402,7 +402,7 @@ export async function PATCH(
         .eq("id", tournamentId);
 
       // Refund paid participants
-      const entryFee = tournament.entry_fee_cents || 0;
+      const entryFee = tournament.entry_fee || 0;
       if (entryFee > 0) {
         const { data: paidParticipants } = await admin
           .from("tournament_participants")
@@ -410,7 +410,7 @@ export async function PATCH(
           .eq("tournament_id", tournamentId)
           .eq("paid_entry_fee", true);
         for (const p of paidParticipants || []) {
-          await admin.rpc("credit_wallet", { p_user_id: p.player_id, p_amount_cents: entryFee });
+          await admin.rpc("credit_wallet", { p_user_id: p.player_id, p_amount: entryFee });
         }
       }
 

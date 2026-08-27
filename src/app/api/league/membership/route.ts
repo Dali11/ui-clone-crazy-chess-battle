@@ -27,8 +27,7 @@ export async function GET(request: NextRequest) {
     const membershipConfig = {
       country: market.countryCode,
       currency: market.membershipCurrency || market.currencyCode,
-      price: Math.floor(market.membershipPriceCents / 100), // Convert cents to whole currency
-      priceCents: market.membershipPriceCents,
+      price: market.membershipPrice,
       billingCycle: 'monthly',
       active: market.membershipActive,
       benefits: [
@@ -123,9 +122,9 @@ export async function POST(request: NextRequest) {
 
     const market = await getMarketConfig(profile?.country || 'MW');
 
-    const monthlyPriceCents = market.membershipPriceCents;
-    const yearlyPriceCents = monthlyPriceCents * 10; // 10 months (2 months free)
-    const priceCents = billingCycle === 'yearly' ? yearlyPriceCents : monthlyPriceCents;
+    const monthlyPrice = market.membershipPrice;
+    const yearlyPrice = monthlyPrice * 10; // 10 months (2 months free)
+    const price = billingCycle === 'yearly' ? yearlyPrice : monthlyPrice;
     const currency = market.membershipCurrency || market.currencyCode;
     const country = market.countryCode;
 
@@ -150,7 +149,7 @@ export async function POST(request: NextRequest) {
       .from('deposits')
       .insert({
         user_id: user.id,
-        amount_cents: priceCents,
+        amount: price,
         method: 'mobile_money',
         status: 'pending',
         charge_id: chargeId,
@@ -166,7 +165,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Initiate PayChangu mobile money payment
-    const amount = Math.floor(priceCents / 100).toString();
+    const amount = price.toString();
     const res = await fetch('https://api.paychangu.com/mobile-money/payments/initialize', {
       method: 'POST',
       headers: {

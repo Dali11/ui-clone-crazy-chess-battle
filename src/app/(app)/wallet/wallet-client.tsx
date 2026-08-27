@@ -12,7 +12,7 @@ import Link from "next/link";
 
 interface Deposit {
   id: string;
-  amount_cents: number;
+  amount: number;
   method: string;
   status: string;
   created_at: string;
@@ -21,7 +21,7 @@ interface Deposit {
 
 interface Withdrawal {
   id: string;
-  amount_cents: number;
+  amount: number;
   phone: string;
   operator_name: string;
   status: string;
@@ -32,14 +32,14 @@ interface Withdrawal {
 interface Transaction {
   id: string;
   type: string;
-  amount_cents: number;
+  amount: number;
   status: string;
   description: string;
   created_at: string;
 }
 
 interface BerryConfig {
-  berry_value_cents: number;
+  berry_value: number;
   min_redemption: number;
   enabled: boolean;
   berries_per_win: number;
@@ -47,7 +47,7 @@ interface BerryConfig {
 }
 
 interface WalletClientProps {
-  balanceCents: number;
+  balance: number;
   berryBalance: number;
   email: string;
   deposits: Deposit[];
@@ -76,13 +76,13 @@ const TXN_COLORS: Record<string, string> = {
   tournament_prize: "text-ccb-success",
 };
 
-export default function WalletClient({ balanceCents, berryBalance, email, deposits, phone: savedPhone }: WalletClientProps) {
+export default function WalletClient({ balance, berryBalance, email, deposits, phone: savedPhone }: WalletClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<"deposit" | "withdraw" | "history">("deposit");
   const [depositAmount, setDepositAmount] = useState(1000);
   const [withdrawAmount, setWithdrawAmount] = useState(0);
-  const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount_cents: number; max_amount_cents: number; daily_limit_cents: number } | null>(null);
+  const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number } | null>(null);
   const [phone, setPhone] = useState(savedPhone || "");
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -94,9 +94,9 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
   const [redeemAmount, setRedeemAmount] = useState(10000);
   const [redeemLoading, setRedeemLoading] = useState(false);
   const [berries, setBerries] = useState(berryBalance);
-  const [balance, setBalance] = useState(balanceCents);
+  const [walletBal, setWalletBal] = useState(balance);
   const [berryConfig, setBerryConfig] = useState<BerryConfig>({
-    berry_value_cents: 5000,
+    berry_value: 5000,
     min_redemption: 10000,
     enabled: true,
     berries_per_win: 10,
@@ -110,7 +110,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
     fetch("/api/berry/config")
       .then((res) => res.json())
       .then((data) => {
-        if (data.berry_value_cents) setBerryConfig(data);
+        if (data.berry_value) setBerryConfig(data);
         if (data.min_redemption) setRedeemAmount(data.min_redemption);
       })
       .catch(() => {});
@@ -121,9 +121,9 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
     fetch("/api/withdrawals/limits")
       .then((res) => res.json())
       .then((data) => {
-        if (data.min_amount_cents) {
+        if (data.min_amount) {
           setWithdrawConfig(data);
-          setWithdrawAmount(Math.floor(data.min_amount_cents / 100)); // default to min in MWK
+          setWithdrawAmount(data.min_amount); // default to min in MWK
         }
       })
       .catch(() => {});
@@ -170,11 +170,11 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
           });
           const data = await res.json();
           if (data.status === "success") {
-            const amt = Math.floor(data.amount / 100).toLocaleString();
+            const amt = data.toLocaleString();
             setSuccess(`MWK ${amt} added to your wallet!`);
             setPolling(false);
             clearInterval(interval);
-            setBalance((prev) => prev + data.amount);
+            setWalletBal((prev) => prev + data.amount);
             router.refresh();
           } else if (data.status === "failed") {
             setError("Payment failed. Please try again.");
@@ -211,12 +211,12 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
         const data = await res.json();
 
         if (data.status === "success") {
-          const amt = Math.floor(data.amount / 100).toLocaleString();
+          const amt = data.toLocaleString();
           setSuccess(`MWK ${amt} added to your wallet!`);
           setPolling(false);
           setPendingChargeId(null);
           clearInterval(interval);
-          setBalance((prev) => prev + data.amount);
+          setWalletBal((prev) => prev + data.amount);
           router.refresh();
         } else if (data.status === "failed") {
           setError("Payment failed or timed out. Please try again.");
@@ -258,7 +258,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amountCents: depositAmount * 100,
+          amount: depositAmount,
           phone,
           operatorRefId: detectOperator(phone),
           email,
@@ -291,8 +291,8 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
         setWithdrawLoading(false);
         return;
       }
-      const minMWK = withdrawConfig ? Math.floor(withdrawConfig.min_amount_cents / 100) : 10000;
-      const maxMWK = withdrawConfig ? Math.floor(withdrawConfig.max_amount_cents / 100) : 500000;
+      const minMWK = withdrawConfig ? withdrawConfig.min_amount : 10000;
+      const maxMWK = withdrawConfig ? withdrawConfig.max_amount : 500000;
       if (withdrawAmount < minMWK) {
         setError(`Minimum withdrawal is MWK ${minMWK.toLocaleString()}`);
         setWithdrawLoading(false);
@@ -303,7 +303,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
         setWithdrawLoading(false);
         return;
       }
-      if (withdrawAmount * 100 > balance) {
+      if (withdrawAmount > walletBal) {
         setError("Insufficient balance");
         setWithdrawLoading(false);
         return;
@@ -316,7 +316,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amountCents: withdrawAmount * 100,
+          amount: withdrawAmount,
           phone,
           operatorRefId,
           operatorName: opName,
@@ -330,7 +330,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
       }
 
       // Optimistically update balance
-      setBalance((prev) => prev - withdrawAmount * 100);
+      setWalletBal((prev) => prev - withdrawAmount);
       if (data.status === "completed" || data.auto) {
         setSuccess(`MWK ${withdrawAmount.toLocaleString()} has been sent to your phone. You should receive it shortly.`);
       } else {
@@ -379,7 +379,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
       }
 
       setBerries(data.newBerryBalance);
-      setBalance((prev) => prev + data.cashCents);
+      setWalletBal((prev) => prev + data.cashAmount);
       setSuccess(`Redeemed ${data.berriesRedeemed} berries for ${data.cashFormatted}! Added to your wallet.`);
       router.refresh();
     } catch (err: any) {
@@ -389,8 +389,8 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
     }
   };
 
-  const redeemCashValue = Math.round((redeemAmount / 100) * berryConfig.berry_value_cents);
-  const formatMWK = (cents: number) => `MWK ${Math.floor((cents || 0) / 100).toLocaleString()}`;
+  const redeemCashValue = Math.round((redeemAmount / 100) * berryConfig.berry_value);
+  const formatMWK = (amount: number) => `MWK ${Math.floor((amount || 0)).toLocaleString()}`;
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
   return (
@@ -412,7 +412,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
               <RefreshCw className="w-4 h-4" />
             </button>
           </div>
-          <p className="text-3xl font-bold">{formatMWK(balance)}</p>
+          <p className="text-3xl font-bold">{formatMWK(walletBal)}</p>
 
           {/* Berry balance */}
           <div className="mt-3 pt-3 border-t border-ccb-border flex items-center justify-between">
@@ -566,7 +566,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
                 {polling ? "Waiting for payment..." : "Processing..."}
               </>
             ) : (
-              <>Deposit {formatMWK(depositAmount * 100)}</>
+              <>Deposit {formatMWK(depositAmount)}</>
             )}
           </button>
         </div>
@@ -580,13 +580,13 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
             <input
               type="number"
               value={withdrawAmount}
-              onChange={(e) => setWithdrawAmount(Math.max(withdrawConfig ? Math.floor(withdrawConfig.min_amount_cents / 100) : 10000, parseInt(e.target.value) || 0))}
+              onChange={(e) => setWithdrawAmount(Math.max(withdrawConfig ? withdrawConfig.min_amount : 10000, parseInt(e.target.value) || 0))}
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
             />
             <div className="flex gap-2 mt-2 flex-wrap">
               {(() => {
-                const minW = withdrawConfig ? Math.floor(withdrawConfig.min_amount_cents / 100) : 10000;
-                const maxW = withdrawConfig ? Math.floor(withdrawConfig.max_amount_cents / 100) : 500000;
+                const minW = withdrawConfig ? withdrawConfig.min_amount : 10000;
+                const maxW = withdrawConfig ? withdrawConfig.max_amount : 500000;
                 const amounts = [minW, minW * 2, minW * 5, Math.min(minW * 10, maxW), Math.min(minW * 20, maxW)];
                 const unique = [...new Set(amounts)].filter(a => a <= maxW);
                 return unique.map((amt) => (
@@ -603,7 +603,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
               })()}
             </div>
             <p className="text-xs text-ccb-muted mt-2">
-              Available: {formatMWK(balance)} · Min: MWK {(withdrawConfig ? Math.floor(withdrawConfig.min_amount_cents / 100) : 10000).toLocaleString()}
+              Available: {formatMWK(walletBal)} · Min: MWK {(withdrawConfig ? withdrawConfig.min_amount : 10000).toLocaleString()}
             </p>
           </div>
 
@@ -629,7 +629,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
                 Processing...
               </>
             ) : (
-              <>Withdraw {formatMWK(withdrawAmount * 100)}</>
+              <>Withdraw {formatMWK(withdrawAmount)}</>
             )}
           </button>
 
@@ -640,7 +640,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
                 {withdrawals.slice(0, 5).map((w) => (
                   <div key={w.id} className="flex items-center justify-between p-3 rounded-lg bg-ccb-surface border border-ccb-border">
                     <div>
-                      <p className="text-sm font-medium">{formatMWK(w.amount_cents)}</p>
+                      <p className="text-sm font-medium">{formatMWK(w.amount)}</p>
                       <p className="text-xs text-ccb-muted">{w.operator_name} · {formatDate(w.created_at)}</p>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${
@@ -676,7 +676,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
               {transactions.map((txn) => {
                 const Icon = TXN_ICONS[txn.type] || Clock;
                 const color = TXN_COLORS[txn.type] || "text-ccb-muted";
-                const isPositive = txn.amount_cents > 0;
+                const isPositive = txn.amount > 0;
                 return (
                   <div key={txn.id} className="flex items-center justify-between p-3 rounded-lg bg-ccb-surface border border-ccb-border">
                     <div className="flex items-center gap-3">
@@ -690,7 +690,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
                     </div>
                     <div className="text-right">
                       <p className={`text-sm font-semibold ${isPositive ? "text-ccb-success" : "text-ccb-danger"}`}>
-                        {isPositive ? "+" : ""}{formatMWK(txn.amount_cents)}
+                        {isPositive ? "+" : ""}{formatMWK(txn.amount)}
                       </p>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${
                         txn.status === "success" || txn.status === "completed" || txn.status === "approved" ? "bg-green-500/10 text-green-600" :
@@ -715,7 +715,7 @@ export default function WalletClient({ balanceCents, berryBalance, email, deposi
                 {deposits.slice(0, 8).map((d) => (
                   <div key={d.id} className="flex items-center justify-between p-3 rounded-lg bg-ccb-surface border border-ccb-border">
                     <div>
-                      <p className="text-sm font-medium">{formatMWK(d.amount_cents)}</p>
+                      <p className="text-sm font-medium">{formatMWK(d.amount)}</p>
                       <p className="text-xs text-ccb-muted">{d.method === "mobile_money" ? "Mobile Money" : "Card"} · {formatDate(d.created_at)}</p>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${

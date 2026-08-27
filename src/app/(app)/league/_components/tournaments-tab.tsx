@@ -37,7 +37,7 @@ function getStatusInfo(status: string) {
 }
 
 function formatCurrency(cents: number, symbol?: string, code?: string) {
-  const amount = (cents / 100).toLocaleString();
+  const amount = cents.toLocaleString();
   if (symbol) return `${symbol}${amount}`;
   if (code) return `${amount} ${code}`;
   return amount;

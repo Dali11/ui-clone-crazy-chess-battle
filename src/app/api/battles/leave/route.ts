@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     // Find the player's waiting queue entry
     const { data: queueEntry } = await admin
       .from("battle_queue")
-      .select("id, stake_cents")
+      .select("id, stake")
       .eq("player_id", user.id)
       .eq("status", "waiting")
       .order("created_at", { ascending: false })
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     // Refund the locked stake
     const { error: creditErr } = await admin.rpc("credit_wallet", {
       p_user_id: user.id,
-      p_amount_cents: queueEntry.stake_cents,
+      p_amount: queueEntry.stake,
     });
 
     if (creditErr) {
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     // Record refund
     const { error: _depErr } = await admin.from("deposits").insert({
       user_id: user.id,
-      amount_cents: queueEntry.stake_cents,
+      amount: queueEntry.stake,
       status: "success",
       method: "battle_refund",
       reference: `battle_queue_refund:${queueEntry.id}`,
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       .update({ status: "left" })
       .eq("id", queueEntry.id);
 
-    return NextResponse.json({ success: true, refunded: queueEntry.stake_cents });
+    return NextResponse.json({ success: true, refunded: queueEntry.stake });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Failed to leave queue" }, { status: 500 });
   }

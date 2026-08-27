@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     const admin = createAdminClient();
     const { data: battle } = await admin
       .from("battles")
-      .select("white_player_id, black_player_id, white_rating, black_rating, status, game_id, stake_cents, winner_payout_cents, armageddon_game_id, armageddon_round")
+      .select("white_player_id, black_player_id, white_rating, black_rating, status, game_id, stake, winner_payout, armageddon_game_id, armageddon_round")
       .eq("id", battleId)
       .single();
 
@@ -54,8 +54,8 @@ export async function GET(req: NextRequest) {
             rating: opponentRating ?? opponent.rating ?? 1200,
           }
         : null,
-      stakeCents: battle.stake_cents,
-      payoutCents: battle.winner_payout_cents,
+      stake: battle.stake,
+      payout: battle.winner_payout,
     });
   } catch {
     return NextResponse.json({ error: "Failed to fetch battle status" }, { status: 500 });

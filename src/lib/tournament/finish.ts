@@ -25,9 +25,9 @@ export async function finishTournament(tournamentId: string): Promise<void> {
     .select(`
       id,
       name,
-      prize_pool_cents,
+      prize_pool,
       prize_distribution,
-      entry_fee_cents,
+      entry_fee,
       creator_profit_percent,
       created_by,
       pool_source,
@@ -68,7 +68,7 @@ export async function finishTournament(tournamentId: string): Promise<void> {
   }
 
   // Calculate prize distribution
-  const totalCollected = tournament.prize_pool_cents || 0;
+  const totalCollected = tournament.prize_pool || 0;
   const creatorProfitPercent = tournament.creator_profit_percent || 0;
 
   if (totalCollected > 0) {
@@ -110,13 +110,13 @@ export async function finishTournament(tournamentId: string): Promise<void> {
       if (creatorProfit > 0 && tournament.created_by) {
         await admin.rpc("credit_wallet", {
           p_user_id: tournament.created_by,
-          p_amount_cents: creatorProfit,
+          p_amount: creatorProfit,
         });
 
         // Record creator profit payout for audit trail
         await admin.from("deposits").insert({
           user_id: tournament.created_by,
-          amount_cents: creatorProfit,
+          amount: creatorProfit,
           status: "success",
           method: "tournament_creator_profit",
           reference: `tournament:${tournamentId}:creator_profit`,
@@ -127,7 +127,7 @@ export async function finishTournament(tournamentId: string): Promise<void> {
       if (platformCut > 0) {
         await admin.from("deposits").insert({
           user_id: tournament.created_by,
-          amount_cents: -platformCut,
+          amount: -platformCut,
           status: "success",
           method: "platform_cut",
           reference: `tournament:${tournamentId}:platform_cut`,

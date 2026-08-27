@@ -67,11 +67,11 @@ export async function settleBattle(
       // We won the race — safe to refund
       await admin.rpc("credit_wallet", {
         p_user_id: battle.white_player_id,
-        p_amount_cents: battle.stake_cents,
+        p_amount: battle.stake,
       });
       await admin.rpc("credit_wallet", {
         p_user_id: battle.black_player_id,
-        p_amount_cents: battle.stake_cents,
+        p_amount: battle.stake,
       });
 
       // Trigger referral activation for both players (non-fatal)
@@ -97,12 +97,12 @@ export async function settleBattle(
         if (p.email) {
           sendEmail({
             to: p.email,
-            subject: `Battle ended in draw — MK ${Math.floor(battle.stake_cents / 100).toLocaleString()} refunded`,
+            subject: `Battle ended in draw — MK ${battle.stake.toLocaleString()} refunded`,
             template: "game_result",
             data: {
               result: "draw",
-              stakeCents: battle.stake_cents,
-              refundAmount: battle.stake_cents,
+              stake: battle.stake,
+              refundAmount: battle.stake,
               battleId,
             },
           }).catch(() => {});
@@ -180,10 +180,10 @@ export async function settleBattle(
   }
 
   // We won the race — battle is now marked as settled. Safe to pay the winner.
-  const payout = battle.winner_payout_cents;
+  const payout = battle.winner_payout;
   const { error: creditErr } = await admin.rpc("credit_wallet", {
     p_user_id: winnerId,
-    p_amount_cents: payout,
+    p_amount: payout,
   });
 
   if (creditErr) {
@@ -198,7 +198,7 @@ export async function settleBattle(
   // Record payout (non-fatal audit trail)
   const { error: _depErr } = await admin.from("deposits").insert({
     user_id: winnerId,
-    amount_cents: payout,
+    amount: payout,
     status: "success",
     method: "battle_payout",
     reference: `battle:${battleId}:payout`,
@@ -231,13 +231,13 @@ export async function settleBattle(
       sendEmail({
         to: p.email,
         subject: isWinner
-          ? `You won MK ${Math.floor(payout / 100).toLocaleString()} — Battle complete!`
-          : `Battle result — You lost MK ${Math.floor(battle.stake_cents / 100).toLocaleString()}`,
+          ? `You won MK ${payout.toLocaleString()} — Battle complete!`
+          : `Battle result — You lost MK ${battle.stake.toLocaleString()}`,
         template: "game_result",
         data: {
           result: isWinner ? "win" : "loss",
-          payoutCents: isWinner ? payout : 0,
-          stakeCents: battle.stake_cents,
+          payout: isWinner ? payout : 0,
+          stake: battle.stake,
           battleId,
           opponentName: battleProfiles?.find((pp: any) => pp.id !== p.id)?.display_name || "Opponent",
         },

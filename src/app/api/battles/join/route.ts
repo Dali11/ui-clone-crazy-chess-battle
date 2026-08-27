@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { stakeCents, timeControl } = await req.json();
-    if (!stakeCents || stakeCents <= 0) {
+    const { stake, timeControl } = await req.json();
+    if (!stake || stake <= 0) {
       return NextResponse.json({ error: "Invalid stake amount" }, { status: 400 });
     }
 
@@ -34,13 +34,13 @@ export async function POST(req: NextRequest) {
     }
 
     const allowedStakes = config.stake_levels as number[];
-    if (!allowedStakes.includes(stakeCents)) {
+    if (!allowedStakes.includes(stake)) {
       return NextResponse.json({ error: "Invalid stake level" }, { status: 400 });
     }
 
     const { data: existing } = await admin
       .from("battle_queue")
-      .select("id, stake_cents")
+      .select("id, stake")
       .eq("player_id", user.id)
       .eq("status", "waiting");
 
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await admin
       .from("profiles")
-      .select("rating, wallet_balance_cents, games_played")
+      .select("rating, wallet_balance, games_played")
       .eq("id", user.id)
       .single();
 
@@ -87,17 +87,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const balance = profile.wallet_balance_cents ?? 0;
-    if (balance < stakeCents) {
+    const balance = profile.wallet_balance ?? 0;
+    if (balance < stake) {
       return NextResponse.json(
-        { error: `Insufficient balance. You need at least MK ${(stakeCents / 100).toLocaleString()}.` },
+        { error: `Insufficient balance. You need at least MK ${stake.toLocaleString()}.` },
         { status: 402 }
       );
     }
 
     const { error: debitErr } = await admin.rpc("debit_wallet", {
       p_user_id: user.id,
-      p_amount_cents: stakeCents,
+      p_amount: stake,
     });
 
     if (debitErr) {
@@ -107,17 +107,17 @@ export async function POST(req: NextRequest) {
 
     const { error: _depErr } = await admin.from("deposits").insert({
       user_id: user.id,
-      amount_cents: stakeCents,
+      amount: stake,
       status: "success",
       method: "battle_escrow",
-      reference: `battle_queue:${user.id}:${stakeCents}`,
+      reference: `battle_queue:${user.id}:${stake}`,
     });
     if (_depErr) console.error("Deposit audit log failed:", _depErr);
 
     // Insert queue entry — try with time_control, fall back without if column doesn't exist
     const insertData: any = {
       player_id: user.id,
-      stake_cents: stakeCents,
+      stake: stake,
       rating: profile.rating ?? 1200,
       status: "waiting",
     };
@@ -141,14 +141,14 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (retryErr) {
-        await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount_cents: stakeCents });
+        await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake });
         return NextResponse.json({ error: "Failed to join queue" }, { status: 500 });
       }
 
-      const matchResult = await tryMatch(admin, user.id, stakeCents, profile.rating ?? 1200, config, timeControl);
+      const matchResult = await tryMatch(admin, user.id, stake, profile.rating ?? 1200, config, timeControl);
       return NextResponse.json({
         queueId: retryEntry.id,
-        stakeCents,
+        stake,
         timeControl,
         matched: matchResult?.matched ?? false,
         battleId: matchResult?.battleId ?? null,
@@ -156,15 +156,15 @@ export async function POST(req: NextRequest) {
     }
 
     if (queueErr) {
-      await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount_cents: stakeCents });
+      await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake });
       return NextResponse.json({ error: "Failed to join queue" }, { status: 500 });
     }
 
-    const matchResult = await tryMatch(admin, user.id, stakeCents, profile.rating ?? 1200, config, timeControl);
+    const matchResult = await tryMatch(admin, user.id, stake, profile.rating ?? 1200, config, timeControl);
 
     return NextResponse.json({
       queueId: queueEntry.id,
-      stakeCents,
+      stake,
       timeControl,
       matched: matchResult?.matched ?? false,
       battleId: matchResult?.battleId ?? null,

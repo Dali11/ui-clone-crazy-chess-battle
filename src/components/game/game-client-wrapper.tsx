@@ -17,8 +17,8 @@ const GameClient = dynamic(
 
 export interface BattleInfo {
   isBattle: boolean;
-  stakeCents: number;
-  winnerPayoutCents: number;
+  stake: number;
+  winnerPayout: number;
   winnerId: string | null;
 }
 

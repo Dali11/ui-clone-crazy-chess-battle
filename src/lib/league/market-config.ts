@@ -10,7 +10,7 @@ export interface MarketConfig {
   currencyCode: string;
   currencySymbol: string;
   membershipActive: boolean;
-  membershipPriceCents: number;
+  membershipPrice: number;
   membershipCurrency: string;
 }
 
@@ -20,7 +20,7 @@ const DEFAULT_CONFIG: MarketConfig = {
   currencyCode: 'MWK',
   currencySymbol: 'MK',
   membershipActive: true,
-  membershipPriceCents: 1000000, // MK10,000 in cents
+  membershipPrice: 1000000, // MK10,000 in cents
   membershipCurrency: 'MWK',
 };
 
@@ -46,7 +46,7 @@ export async function getMarketConfig(countryCode?: string | null): Promise<Mark
         currencyCode: data.currency_code,
         currencySymbol: data.currency_symbol || data.currency_code,
         membershipActive: data.membership_active,
-        membershipPriceCents: data.membership_price_cents,
+        membershipPrice: data.membership_price,
         membershipCurrency: data.membership_currency,
       };
     }
@@ -66,7 +66,7 @@ export async function getMarketConfig(countryCode?: string | null): Promise<Mark
       currencyCode: defaultRow.currency_code,
       currencySymbol: defaultRow.currency_symbol || defaultRow.currency_code,
       membershipActive: defaultRow.membership_active,
-      membershipPriceCents: defaultRow.membership_price_cents,
+      membershipPrice: defaultRow.membership_price,
       membershipCurrency: defaultRow.membership_currency,
     };
   }

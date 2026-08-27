@@ -43,7 +43,7 @@ function getStatusLabel(status: string): { label: string; color: string; dot: st
 }
 
 function formatCurrency(cents: number, currencySymbol?: string, currencyCode?: string): string {
-  const amount = (cents / 100).toLocaleString();
+  const amount = cents.toLocaleString();
   if (currencySymbol) return `${currencySymbol}${amount}`;
   if (currencyCode) return `${amount} ${currencyCode}`;
   return amount;

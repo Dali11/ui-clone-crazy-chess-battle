@@ -49,20 +49,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "This battle isn't stuck anymore." }, { status: 400 });
     }
 
-    await admin.rpc("credit_wallet", { p_user_id: battle.white_player_id, p_amount_cents: battle.stake_cents });
-    await admin.rpc("credit_wallet", { p_user_id: battle.black_player_id, p_amount_cents: battle.stake_cents });
+    await admin.rpc("credit_wallet", { p_user_id: battle.white_player_id, p_amount: battle.stake });
+    await admin.rpc("credit_wallet", { p_user_id: battle.black_player_id, p_amount: battle.stake });
 
     await admin.from("deposits").insert([
       {
         user_id: battle.white_player_id,
-        amount_cents: battle.stake_cents,
+        amount: battle.stake,
         status: "success",
         method: "battle_refund",
         reference: `battle_cancel:${battleId}:white`,
       },
       {
         user_id: battle.black_player_id,
-        amount_cents: battle.stake_cents,
+        amount: battle.stake,
         status: "success",
         method: "battle_refund",
         reference: `battle_cancel:${battleId}:black`,

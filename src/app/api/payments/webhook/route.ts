@@ -47,14 +47,14 @@ export async function POST(req: NextRequest) {
     // Fetch the deposit (charge_id for mobile money, tx_ref for card/standard checkout)
     let { data: deposit } = await admin
       .from("deposits")
-      .select("id, user_id, amount_cents, status, reference")
+      .select("id, user_id, amount, status, reference")
       .eq("charge_id", chargeId)
       .single();
 
     if (!deposit) {
       const { data: txDeposit } = await admin
         .from("deposits")
-        .select("id, user_id, amount_cents, status, reference")
+        .select("id, user_id, amount, status, reference")
         .eq("tx_ref", chargeId)
         .single();
       deposit = txDeposit;
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       // Normal deposit — credit wallet
       await admin.rpc('credit_wallet', {
         p_user_id: deposit.user_id,
-        p_amount_cents: deposit.amount_cents,
+        p_amount: deposit.amount,
       });
 
       await admin

@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     // Find the deposit record
     const { data: deposit } = await admin
       .from('deposits')
-      .select('id, user_id, amount_cents, status, reference, phone, operator')
+      .select('id, user_id, amount, status, reference, phone, operator')
       .eq('charge_id', chargeId)
       .single();
 

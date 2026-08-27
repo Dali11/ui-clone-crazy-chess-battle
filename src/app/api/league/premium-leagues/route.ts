@@ -30,7 +30,7 @@ export async function GET(req: Request) {
       .select(`
         id, name, status, country, league_size, tier, gender_restriction,
         entry_type, promotes_count, relegates_count, qualifying_positions,
-        prize_pool_cents, prize_currency, season_duration_weeks, payout_config,
+        prize_pool, prize_currency, season_duration_weeks, payout_config,
         current_matchday, total_matchdays, player_ids,
         sponsor_name, sponsor_logo_url, description, banner_url,
         min_rating, max_rating, min_games_played, min_account_age_days,
@@ -170,7 +170,7 @@ export async function GET(req: Request) {
       market: {
         currencyCode: market.currencyCode,
         currencySymbol: market.currencySymbol,
-        membershipPrice: market.membershipPriceCents,
+        membershipPrice: market.membershipPrice,
         membershipActive: market.membershipActive,
       },
       leagues: leaguesWithStandings,

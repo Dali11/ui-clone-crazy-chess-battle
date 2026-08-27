@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
           currency_code TEXT NOT NULL,
           currency_symbol TEXT NOT NULL DEFAULT '',
           membership_active BOOLEAN NOT NULL DEFAULT true,
-          membership_price_cents INT NOT NULL DEFAULT 0,
+          membership_price INT NOT NULL DEFAULT 0,
           membership_currency TEXT NOT NULL,
           is_default BOOLEAN NOT NULL DEFAULT false,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
     // Seed default market: Malawi / MWK (config, not competitive-entity seed data)
     try {
       await client.query(`
-        INSERT INTO market_config (country_code, country_name, currency_code, currency_symbol, membership_active, membership_price_cents, membership_currency, is_default)
+        INSERT INTO market_config (country_code, country_name, currency_code, currency_symbol, membership_active, membership_price, membership_currency, is_default)
         VALUES ('MW', 'Malawi', 'MWK', 'MK', true, 1000000, 'MWK', true)
         ON CONFLICT (country_code) DO NOTHING
       `);
@@ -304,7 +304,7 @@ export async function POST(req: NextRequest) {
     // Migration 032: Premium league prize pools + premium competitions
     // ============================================================
     const migration032AlterStatements = [
-      `ALTER TABLE premier_leagues ADD COLUMN IF NOT EXISTS prize_pool_cents INT NOT NULL DEFAULT 0`,
+      `ALTER TABLE premier_leagues ADD COLUMN IF NOT EXISTS prize_pool INT NOT NULL DEFAULT 0`,
       `ALTER TABLE premier_leagues ADD COLUMN IF NOT EXISTS prize_currency TEXT NOT NULL DEFAULT 'MWK'`,
       `ALTER TABLE premier_leagues ADD COLUMN IF NOT EXISTS qualifying_positions INT NOT NULL DEFAULT 10`,
       `ALTER TABLE premier_leagues ADD COLUMN IF NOT EXISTS payout_config JSONB DEFAULT NULL`,
@@ -332,7 +332,7 @@ export async function POST(req: NextRequest) {
           sponsor_logo_url TEXT,
           format JSONB NOT NULL DEFAULT '{}'::jsonb,
           qualification_config JSONB NOT NULL DEFAULT '{}'::jsonb,
-          prize_pool_cents INT NOT NULL DEFAULT 0,
+          prize_pool INT NOT NULL DEFAULT 0,
           prize_currency TEXT NOT NULL DEFAULT 'MWK',
           status TEXT NOT NULL DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'registration', 'group_stage', 'knockouts', 'semi_finals', 'final', 'completed', 'cancelled')),
           starts_at TIMESTAMPTZ,
@@ -484,7 +484,7 @@ export async function POST(req: NextRequest) {
           INSERT INTO premier_leagues
             (name, status, country, league_size, tier, gender_restriction, entry_type,
              promotes_count, relegates_count, qualifying_positions,
-             prize_pool_cents, prize_currency, season_duration_weeks, payout_config)
+             prize_pool, prize_currency, season_duration_weeks, payout_config)
           VALUES
             ('CrazyChess Premier League', 'upcoming', 'MW', 100, 1, 'open', 'membership', 0, 5, 10, 50000000, 'MWK', 12, '{"1": 0.40, "2": 0.25, "3": 0.15, "4": 0.12, "5": 0.08}'::jsonb),
             ('CrazyChess Championship', 'upcoming', 'MW', 100, 2, 'open', 'membership', 5, 5, 10, 40000000, 'MWK', 12, '{"1": 0.40, "2": 0.25, "3": 0.15, "4": 0.12, "5": 0.08}'::jsonb),
@@ -502,13 +502,13 @@ export async function POST(req: NextRequest) {
 
     // Migration 036: Expand withdrawal_config into full platform finance config
     const migration036Statements = [
-      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS min_withdrawal_cents INT NOT NULL DEFAULT 1000`,
-      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS max_withdrawal_cents INT NOT NULL DEFAULT 5000000`,
-      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS min_deposit_cents INT NOT NULL DEFAULT 500`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS min_withdrawal INT NOT NULL DEFAULT 1000`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS max_withdrawal INT NOT NULL DEFAULT 5000000`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS min_deposit INT NOT NULL DEFAULT 500`,
       `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS processing_fee_pct NUMERIC(5,2) NOT NULL DEFAULT 0.00`,
-      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS daily_withdrawal_limit_cents INT NOT NULL DEFAULT 1000000`,
-      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS withdrawal_fee_cents INT NOT NULL DEFAULT 0`,
-      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS deposit_fee_cents INT NOT NULL DEFAULT 0`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS daily_withdrawal_limit INT NOT NULL DEFAULT 1000000`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS withdrawal_fee INT NOT NULL DEFAULT 0`,
+      `ALTER TABLE public.withdrawal_config ADD COLUMN IF NOT EXISTS deposit_fee INT NOT NULL DEFAULT 0`,
       `ALTER TABLE public.deposits ADD COLUMN IF NOT EXISTS admin_notes TEXT`,
       `ALTER TABLE public.deposits ADD COLUMN IF NOT EXISTS credited_by UUID REFERENCES public.profiles(id)`,
       `ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS rejection_reason TEXT`,
@@ -528,9 +528,9 @@ export async function POST(req: NextRequest) {
       `ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY`,
       `DROP POLICY IF EXISTS "Admins manage platform settings" ON public.platform_settings`,
       `CREATE POLICY "Admins manage platform settings" ON public.platform_settings FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true)) WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true))`,
-      `INSERT INTO public.platform_settings (section, config) VALUES ('deposits', '{"enabled": true, "auto_credit": false, "min_amount_cents": 500, "max_amount_cents": 10000000, "allowed_methods": ["mpesa", "airtel", "card"], "require_approval_above_cents": 50000, "show_kpi_cards": true, "default_filter": "pending", "page_size": 20}'::jsonb) ON CONFLICT (section) DO NOTHING`,
-      `INSERT INTO public.platform_settings (section, config) VALUES ('withdrawals', '{"enabled": true, "auto_approve": false, "min_amount_cents": 1000, "max_amount_cents": 5000000, "daily_limit_cents": 1000000, "processing_fee_pct": 0, "withdrawal_fee_cents": 0, "show_kpi_cards": true, "default_filter": "pending", "page_size": 20}'::jsonb) ON CONFLICT (section) DO NOTHING`,
-      `INSERT INTO public.platform_settings (section, config) VALUES ('battles', '{"enabled": true, "min_stake_cents": 100, "max_stake_cents": 1000000, "platform_fee_pct": 10, "auto_cancel_minutes": 10, "show_kpi_cards": true, "page_size": 20}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('deposits', '{"enabled": true, "auto_credit": false, "min_amount": 500, "max_amount": 10000000, "allowed_methods": ["mpesa", "airtel", "card"], "require_approval_above": 50000, "show_kpi_cards": true, "default_filter": "pending", "page_size": 20}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('withdrawals', '{"enabled": true, "auto_approve": false, "min_amount": 1000, "max_amount": 5000000, "daily_limit": 1000000, "processing_fee_pct": 0, "withdrawal_fee": 0, "show_kpi_cards": true, "default_filter": "pending", "page_size": 20}'::jsonb) ON CONFLICT (section) DO NOTHING`,
+      `INSERT INTO public.platform_settings (section, config) VALUES ('battles', '{"enabled": true, "min_stake": 100, "max_stake": 1000000, "platform_fee_pct": 10, "auto_cancel_minutes": 10, "show_kpi_cards": true, "page_size": 20}'::jsonb) ON CONFLICT (section) DO NOTHING`,
       `INSERT INTO public.platform_settings (section, config) VALUES ('games', '{"show_kpi_cards": true, "default_filter": "all", "page_size": 20, "allow_spectators": true, "max_concurrent_games": 5}'::jsonb) ON CONFLICT (section) DO NOTHING`,
       `INSERT INTO public.platform_settings (section, config) VALUES ('users', '{"allow_signup": true, "require_email_verification": false, "default_is_admin": false, "page_size": 20, "show_kpi_cards": true}'::jsonb) ON CONFLICT (section) DO NOTHING`,
       `INSERT INTO public.platform_settings (section, config) VALUES ('tournaments', '{"require_approval": true, "auto_approve_below_players": 0, "max_players": 128, "page_size": 20, "show_kpi_cards": true}'::jsonb) ON CONFLICT (section) DO NOTHING`,

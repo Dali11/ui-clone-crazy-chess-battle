@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { stakeCents, timeControl } = await req.json();
-    if (!stakeCents || stakeCents <= 0) {
+    const { stake, timeControl } = await req.json();
+    if (!stake || stake <= 0) {
       return NextResponse.json({ error: "Invalid stake amount" }, { status: 400 });
     }
 
@@ -42,18 +42,18 @@ export async function POST(req: NextRequest) {
     // Check wallet balance
     const { data: profile } = await admin
       .from("profiles")
-      .select("wallet_balance_cents")
+      .select("wallet_balance")
       .eq("id", user.id)
       .single();
 
-    if ((profile?.wallet_balance_cents || 0) < stakeCents) {
+    if ((profile?.wallet_balance || 0) < stake) {
       return NextResponse.json({ error: "Insufficient wallet balance" }, { status: 400 });
     }
 
     // Debit the challenger's stake into escrow
     const { error: debitErr } = await admin.rpc("debit_wallet", {
       p_user_id: user.id,
-      p_amount_cents: stakeCents,
+      p_amount: stake,
     });
 
     if (debitErr) {
@@ -62,10 +62,10 @@ export async function POST(req: NextRequest) {
 
     await admin.from("deposits").insert({
       user_id: user.id,
-      amount_cents: stakeCents,
+      amount: stake,
       status: "success",
       method: "battle_challenge_escrow",
-      reference: `battle_challenge_create:${user.id}:${stakeCents}`,
+      reference: `battle_challenge_create:${user.id}:${stake}`,
     });
 
     // Create the challenge record (expires in 24 hours). We do NOT create a
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       .from("battle_challenges")
       .insert({
         challenger_id: user.id,
-        stake_cents: stakeCents,
+        stake: stake,
         time_control: timeControl || "rapid15",
         status: "pending",
         expires_at: expiresAt,
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     if (challengeErr || !challenge) {
       // Refund the debit
-      await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount_cents: stakeCents });
+      await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake });
       return NextResponse.json({ error: "Failed to create challenge" }, { status: 500 });
     }
 

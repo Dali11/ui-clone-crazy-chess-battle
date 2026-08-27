@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 // Single fixed stake for matchmaking battles: MK 1,000 (100,000 cents)
-const BATTLE_STAKE_CENTS = 100_000;
+const BATTLE_STAKE = 100_000;
 
 // Single fixed time control for all battles: Rapid 15+10
 const BATTLE_TIME_CONTROL = "rapid15";
@@ -26,13 +26,13 @@ const CHALLENGE_TIME_CONTROLS = [
   { id: "classical", label: "Classical", desc: "30+0" },
 ];
 
-function formatMKK(cents: number): string {
-  return `MK ${Math.floor(cents / 100).toLocaleString("en-US")}`;
+function formatMKK(amount: number): string {
+  return `MK ${Math.floor(amount).toLocaleString("en-US")}`;
 }
 
 function formatCurrency(cents: number, currencyCode: string, rate: number): string {
   if (currencyCode === "MWK" || !rate || rate === 1) return formatMKK(cents);
-  const converted = Math.round((cents / 100) * rate);
+  const converted = Math.round(cents * rate);
   try {
     return new Intl.NumberFormat("en", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(converted);
   } catch {
@@ -80,7 +80,7 @@ export default function BattlesPage() {
     gameId?: string;
     status: string;
     stuck?: boolean;
-    stakeCents?: number;
+    stake?: number;
   } | null>(null);
   const [cancellingStuck, setCancellingStuck] = useState(false);
 
@@ -117,12 +117,12 @@ export default function BattlesPage() {
     if (!user) return;
     const { data: profile } = await supabase
       .from("profiles")
-      .select("rating, wallet_balance_cents, games_played")
+      .select("rating, wallet_balance, games_played")
       .eq("id", user.id)
       .single();
     if (profile) {
       setMyRating(profile.rating ?? 1200);
-      setBalance(profile.wallet_balance_cents ?? 0);
+      setBalance(profile.wallet_balance ?? 0);
       setGamesPlayed(profile.games_played ?? 0);
     }
     setProfileLoaded(true);
@@ -219,7 +219,7 @@ export default function BattlesPage() {
             timeControl: BATTLE_TIME_CONTROL,
             rated: true,
             context: "battle",
-            stake: BATTLE_STAKE_CENTS,
+            stake: BATTLE_STAKE,
           }),
         });
         setAdminNotified(true);
@@ -236,8 +236,8 @@ export default function BattlesPage() {
   const handleEnterBattle = async () => {
     setError(null);
 
-    if (balance < BATTLE_STAKE_CENTS) {
-      setError(`Insufficient balance. You need ${formatMKK(BATTLE_STAKE_CENTS)} (${formatCurrency(BATTLE_STAKE_CENTS, currencyCode, fxRate)}). Deposit funds first.`);
+    if (balance < BATTLE_STAKE) {
+      setError(`Insufficient balance. You need ${formatMKK(BATTLE_STAKE)} (${formatCurrency(BATTLE_STAKE, currencyCode, fxRate)}). Deposit funds first.`);
       return;
     }
 
@@ -245,7 +245,7 @@ export default function BattlesPage() {
       const res = await fetch("/api/battles/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stakeCents: BATTLE_STAKE_CENTS, timeControl: BATTLE_TIME_CONTROL }),
+        body: JSON.stringify({ stake: BATTLE_STAKE, timeControl: BATTLE_TIME_CONTROL }),
       });
 
       const data = await res.json();
@@ -277,9 +277,9 @@ export default function BattlesPage() {
       return;
     }
 
-    const stakeCents = stakeValue * 100; // user enters in MWK
+    const stake = stakeValue; // user enters in MWK
 
-    if (balance < stakeCents) {
+    if (balance < stake) {
       setStakeError(`Insufficient balance. You need MK ${stakeValue.toLocaleString()}.`);
       return;
     }
@@ -291,7 +291,7 @@ export default function BattlesPage() {
       const res = await fetch("/api/battles/challenge/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stakeCents, timeControl: selectedChallengeTC }),
+        body: JSON.stringify({ stake, timeControl: selectedChallengeTC }),
       });
       const data = await res.json();
 
@@ -325,7 +325,7 @@ export default function BattlesPage() {
   };
 
   const feePct = config?.platform_fee_pct ?? 10;
-  const payout = BATTLE_STAKE_CENTS * 2 - Math.round(BATTLE_STAKE_CENTS * 2 * (feePct / 100));
+  const payout = BATTLE_STAKE * 2 - Math.round(BATTLE_STAKE * 2 * (feePct / 100));
 
   // Disabled state
   if (!config?.enabled && config !== null) {
@@ -440,7 +440,7 @@ export default function BattlesPage() {
         </div>
 
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-1">{formatMKK(BATTLE_STAKE_CENTS)} Battle</h2>
+          <h2 className="text-2xl font-bold mb-1">{formatMKK(BATTLE_STAKE)} Battle</h2>
           <p className="text-sm text-ccb-muted">
             {BATTLE_TC_DESC} · Searching for opponent...
           </p>
@@ -457,12 +457,12 @@ export default function BattlesPage() {
         <div className="w-full max-w-xs p-4 rounded-xl bg-ccb-card border border-ccb-border">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Your stake locked</span>
-            <span className="font-semibold">{formatMKK(BATTLE_STAKE_CENTS)}</span>
+            <span className="font-semibold">{formatMKK(BATTLE_STAKE)}</span>
           </div>
           {currencyCode !== "MWK" && (
             <div className="flex items-center justify-between text-xs text-ccb-muted mb-2">
               <span>≈ in your currency</span>
-              <span>{formatCurrency(BATTLE_STAKE_CENTS, currencyCode, fxRate)}</span>
+              <span>{formatCurrency(BATTLE_STAKE, currencyCode, fxRate)}</span>
             </div>
           )}
           <div className="flex items-center justify-between text-sm">
@@ -517,12 +517,12 @@ export default function BattlesPage() {
         <div className="p-4 rounded-xl bg-ccb-card border border-ccb-border max-w-xs mx-auto">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Stake</span>
-            <span className="font-semibold">{formatMKK(BATTLE_STAKE_CENTS)} each</span>
+            <span className="font-semibold">{formatMKK(BATTLE_STAKE)} each</span>
           </div>
           {currencyCode !== "MWK" && (
             <div className="flex items-center justify-between text-xs text-ccb-muted mb-2">
               <span>≈ in your currency</span>
-              <span>{formatCurrency(BATTLE_STAKE_CENTS, currencyCode, fxRate)}</span>
+              <span>{formatCurrency(BATTLE_STAKE, currencyCode, fxRate)}</span>
             </div>
           )}
           <div className="flex items-center justify-between text-sm">
@@ -616,7 +616,7 @@ export default function BattlesPage() {
               {currencyCode !== "MWK" && (
                 <div className="flex items-center justify-between text-xs text-ccb-muted mb-2">
                   <span>≈ in your currency</span>
-                  <span>{formatCurrency(parseInt(customStake) * 100, currencyCode, fxRate)}</span>
+                  <span>{formatCurrency(parseInt(customStake), currencyCode, fxRate)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between text-sm mb-2">
@@ -691,9 +691,9 @@ export default function BattlesPage() {
           </div>
           <div className="flex-1">
             <p className="text-xs text-ccb-muted">Stake</p>
-            <p className="text-sm font-semibold">{formatMKK(BATTLE_STAKE_CENTS)}</p>
+            <p className="text-sm font-semibold">{formatMKK(BATTLE_STAKE)}</p>
             {currencyCode !== "MWK" && (
-              <p className="text-xs text-ccb-muted mt-0.5">≈ {formatCurrency(BATTLE_STAKE_CENTS, currencyCode, fxRate)}</p>
+              <p className="text-xs text-ccb-muted mt-0.5">≈ {formatCurrency(BATTLE_STAKE, currencyCode, fxRate)}</p>
             )}
           </div>
         </div>
@@ -702,11 +702,11 @@ export default function BattlesPage() {
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-ccb-muted">Total pot</span>
-            <span className="font-semibold">{formatMKK(BATTLE_STAKE_CENTS * 2)}</span>
+            <span className="font-semibold">{formatMKK(BATTLE_STAKE * 2)}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-ccb-muted">Platform fee ({feePct}%)</span>
-            <span className="font-semibold text-red-400">−{formatMKK(Math.round(BATTLE_STAKE_CENTS * 2 * (feePct / 100)))}</span>
+            <span className="font-semibold text-red-400">−{formatMKK(Math.round(BATTLE_STAKE * 2 * (feePct / 100)))}</span>
           </div>
           <div className="flex items-center justify-between text-sm pt-2 border-t border-ccb-border">
             <span className="text-ccb-muted">Winner receives</span>
@@ -718,10 +718,10 @@ export default function BattlesPage() {
       </div>
 
       {/* Insufficient balance warning */}
-      {balance < BATTLE_STAKE_CENTS && (
+      {balance < BATTLE_STAKE && (
         <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>Insufficient balance. You need {formatMKK(BATTLE_STAKE_CENTS)}.
+          <span>Insufficient balance. You need {formatMKK(BATTLE_STAKE)}.
             <a href="/wallet" className="underline font-medium ml-1">Deposit funds →</a>
           </span>
         </div>
@@ -730,9 +730,9 @@ export default function BattlesPage() {
       {/* Big battle button */}
       <button
         onClick={handleEnterBattle}
-        disabled={balance < BATTLE_STAKE_CENTS}
+        disabled={balance < BATTLE_STAKE}
         className="btn-primary w-full text-base py-4 disabled:opacity-50 disabled:cursor-not-allowed">
-        <Swords className="w-5 h-5 mr-2" /> Find Battle · {formatMKK(BATTLE_STAKE_CENTS)}
+        <Swords className="w-5 h-5 mr-2" /> Find Battle · {formatMKK(BATTLE_STAKE)}
       </button>
 
       {/* Challenge a friend */}
@@ -750,7 +750,7 @@ export default function BattlesPage() {
         <ol className="space-y-2 text-xs text-ccb-muted">
           <li className="flex gap-2">
             <span className="font-semibold text-ccb-text">1.</span>
-            <span>Both players lock {formatMKK(BATTLE_STAKE_CENTS)} in escrow</span>
+            <span>Both players lock {formatMKK(BATTLE_STAKE)} in escrow</span>
           </li>
           <li className="flex gap-2">
             <span className="font-semibold text-ccb-text">2.</span>

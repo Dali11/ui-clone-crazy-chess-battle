@@ -15,14 +15,14 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient();
     let { data: deposit } = await admin
       .from("deposits")
-      .select("id, user_id, amount_cents, status, method")
+      .select("id, user_id, amount, status, method")
       .eq("charge_id", chargeId)
       .single();
 
     if (!deposit) {
       const { data: txDeposit } = await admin
         .from("deposits")
-        .select("id, user_id, amount_cents, status, method")
+        .select("id, user_id, amount, status, method")
         .eq("tx_ref", chargeId)
         .single();
       deposit = txDeposit;
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     // Already successfully processed — return immediately (idempotent)
     if (deposit.status === "success") {
-      return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount_cents });
+      return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount });
     }
 
     // Already being processed by another request — return pending
@@ -71,13 +71,13 @@ export async function POST(req: NextRequest) {
 
       if (claimErr || !claimed || claimed.length === 0) {
         // Another request is already processing or has processed this deposit
-        return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount_cents });
+        return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount });
       }
 
       // We won the race — safe to credit the wallet
       await admin.rpc("credit_wallet", {
         p_user_id: user.id,
-        p_amount_cents: deposit.amount_cents,
+        p_amount: deposit.amount,
       });
 
       // Mark as success
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
       } catch {}
 
       // Notify user
-      const amountMWK = Math.floor(deposit.amount_cents / 100);
+      const amountMWK = deposit.amount;
       try {
         await admin.from("notifications").insert({
           user_id: user.id,
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
         });
       } catch {}
 
-      return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount_cents });
+      return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount });
     }
 
     if (remoteStatus === "failed" || remoteStatus === "cancelled") {

@@ -49,7 +49,7 @@ interface League {
   tier: number;
   gender_restriction: string;
   league_size: number;
-  prize_pool_cents: number;
+  prize_pool: number;
   prize_currency: string;
   promotes_count: number;
   relegates_count: number;
@@ -91,7 +91,7 @@ interface PremiumCompetition {
   sponsor_name: string | null;
   sponsor_logo_url: string | null;
   format: { stages?: string[]; groupStage?: boolean; knockoutRounds?: boolean };
-  prize_pool_cents: number;
+  prize_pool: number;
   prize_currency: string;
   status: string;
   starts_at: string | null;
@@ -113,7 +113,7 @@ function getLeagueMeta(tier: number) {
 }
 
 function formatMoney(cents: number, symbol: string, rate: number = 1) {
-  const converted = Math.round((cents / 100) * rate);
+  const converted = Math.round(cents * rate);
   return `${symbol}${converted.toLocaleString()}`;
 }
 
@@ -289,7 +289,7 @@ export default function PremiumLeaguesTab() {
             const meta = getLeagueMeta(league.tier);
             const Icon = meta.icon;
             const isExpanded = expandedLeague === league.tier;
-            const prizeFormatted = formatMoney(league.prize_pool_cents, fxRate !== 1 ? symbol : (league.prize_currency || symbol), fxRate !== 1 ? fxRate : 1);
+            const prizeFormatted = formatMoney(league.prize_pool, fxRate !== 1 ? symbol : (league.prize_currency || symbol), fxRate !== 1 ? fxRate : 1);
             const standings = league.standings || [];
             const capacity = league.league_size || 0;
             const qual = league.qualification;
@@ -351,7 +351,7 @@ export default function PremiumLeaguesTab() {
                       </h4>
                       <div className="space-y-1.5">
                         {[1, 2, 3, 4, 5].map(pos => {
-                          const payout = getPayout(league.prize_pool_cents, pos, league.payout_config);
+                          const payout = getPayout(league.prize_pool, pos, league.payout_config);
                           return (
                             <div key={pos} className="flex items-center justify-between bg-ccb-surface rounded-lg px-3 py-2">
                               <div className="flex items-center gap-2">
@@ -572,9 +572,9 @@ export default function PremiumLeaguesTab() {
                   ) : null}
                   <div className="flex items-center gap-2 mt-3 flex-wrap">
                     <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted capitalize">{comp.status.replace('_', ' ')}</span>
-                    {comp.prize_pool_cents > 0 && (
+                    {comp.prize_pool > 0 && (
                       <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">
-                        {formatMoney(comp.prize_pool_cents, fxRate !== 1 ? symbol : (comp.prize_currency === 'MWK' ? 'MK' : comp.prize_currency), fxRate !== 1 ? fxRate : 1)} prize
+                        {formatMoney(comp.prize_pool, fxRate !== 1 ? symbol : (comp.prize_currency === 'MWK' ? 'MK' : comp.prize_currency), fxRate !== 1 ? fxRate : 1)} prize
                       </span>
                     )}
                   </div>

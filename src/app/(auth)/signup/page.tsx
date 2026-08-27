@@ -4,8 +4,8 @@ import SignupClient from "./signup-client";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-function formatMKK(cents: number): string {
-  return `MK ${Math.floor(cents / 100).toLocaleString("en-US")}`;
+function formatMKK(amount: number): string {
+  return `MK ${Math.floor(amount).toLocaleString("en-US")}`;
 }
 
 const TC_LABELS: Record<string, string> = {
@@ -42,7 +42,7 @@ export async function generateMetadata({
       if (battleMatch) {
         const { data: challenge } = await admin
           .from("battle_challenges")
-          .select("challenger_id, stake_cents, status")
+          .select("challenger_id, stake, status")
           .eq("id", battleMatch[1])
           .single();
 
@@ -54,7 +54,7 @@ export async function generateMetadata({
             .single();
 
           const name = profile?.display_name || profile?.username || "A player";
-          const stake = formatMKK(challenge.stake_cents);
+          const stake = formatMKK(challenge.stake);
 
           return pageMetadata({
             title: `⚔️ ${name} challenged you to a ${stake} chess battle!`,

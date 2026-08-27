@@ -8,7 +8,7 @@ import { DEFAULT_CONFIG } from "@/lib/battles/battle-helpers";
 export async function tryMatch(
   admin: ReturnType<typeof createAdminClient>,
   playerId: string,
-  stakeCents: number,
+  stake: number,
   playerRating: number,
   config: typeof DEFAULT_CONFIG,
   timeControl?: string
@@ -17,7 +17,7 @@ export async function tryMatch(
   let query = admin
     .from("battle_queue")
     .select("id, player_id, rating, created_at")
-    .eq("stake_cents", stakeCents)
+    .eq("stake", stake)
     .eq("status", "waiting")
     .neq("player_id", playerId)
     .order("created_at", { ascending: true });
@@ -34,22 +34,22 @@ export async function tryMatch(
     const { data: fallback } = await admin
       .from("battle_queue")
       .select("id, player_id, rating, created_at")
-      .eq("stake_cents", stakeCents)
+      .eq("stake", stake)
       .eq("status", "waiting")
       .neq("player_id", playerId)
       .order("created_at", { ascending: true });
 
-    return attemptMatch(admin, fallback, playerId, stakeCents, playerRating, config);
+    return attemptMatch(admin, fallback, playerId, stake, playerRating, config);
   }
 
-  return attemptMatch(admin, candidates, playerId, stakeCents, playerRating, config);
+  return attemptMatch(admin, candidates, playerId, stake, playerRating, config);
 }
 
 async function attemptMatch(
   admin: ReturnType<typeof createAdminClient>,
   candidates: any[] | null,
   playerId: string,
-  stakeCents: number,
+  stake: number,
   playerRating: number,
   config: typeof DEFAULT_CONFIG
 ): Promise<{ matched: boolean; battleId?: string } | null> {
@@ -78,7 +78,7 @@ async function attemptMatch(
 
     if (claimErr || !claimed) continue;
 
-    const pot = stakeCents * 2;
+    const pot = stake * 2;
     const fee = Math.round(pot * (config.platform_fee_pct / 100));
     const payout = pot - fee;
 
@@ -87,10 +87,10 @@ async function attemptMatch(
       .insert({
         white_player_id: playerId,
         black_player_id: opponent.player_id,
-        stake_cents: stakeCents,
-        pot_cents: pot,
-        platform_fee_cents: fee,
-        winner_payout_cents: payout,
+        stake: stake,
+        pot: pot,
+        platform_fee: fee,
+        winner_payout: payout,
         status: "pending",
         white_rating: playerRating,
         black_rating: opponent.rating,
@@ -113,8 +113,8 @@ async function attemptMatch(
       .eq("id", opponent.id);
 
     await admin.from("battle_escrow").insert([
-      { battle_id: battle.id, player_id: playerId, amount_cents: stakeCents, status: "locked" },
-      { battle_id: battle.id, player_id: opponent.player_id, amount_cents: stakeCents, status: "locked" },
+      { battle_id: battle.id, player_id: playerId, amount: stake, status: "locked" },
+      { battle_id: battle.id, player_id: opponent.player_id, amount: stake, status: "locked" },
     ]);
 
     const { data: playerQueue } = await admin

@@ -32,7 +32,7 @@ export default async function WalletPage() {
 
   const depositsPromise = supabase
     .from("deposits")
-    .select("id, amount_cents, method, status, created_at, charge_id")
+    .select("id, amount, method, status, created_at, charge_id")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(20);
@@ -55,7 +55,7 @@ export default async function WalletPage() {
 
   return (
     <WalletClient
-      balanceCents={profile?.wallet_balance_cents || 0}
+      balance={profile?.wallet_balance || 0}
       berryBalance={profile?.berry_balance || 0}
       email={user.email || ""}
       deposits={deposits}

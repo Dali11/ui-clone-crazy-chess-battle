@@ -22,7 +22,7 @@ export async function PATCH(
 
     const body = await req.json();
     const allowed = [
-      "prize_pool_cents",
+      "prize_pool",
       "league_size",
       "promotes_count",
       "relegates_count",
@@ -37,7 +37,7 @@ export async function PATCH(
       if (body[key] !== undefined) {
         if (
           [
-            "prize_pool_cents",
+            "prize_pool",
             "league_size",
             "promotes_count",
             "relegates_count",

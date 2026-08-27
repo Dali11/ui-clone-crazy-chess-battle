@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const admin = createAdminClient();
     const { data: challenge, error } = await admin
       .from("battle_challenges")
-      .select("id, challenger_id, acceptor_id, status, battle_id, stake_cents")
+      .select("id, challenger_id, acceptor_id, status, battle_id, stake")
       .eq("id", challengeId)
       .single();
 
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       status: challenge.status,
       battleId: challenge.battle_id,
-      stakeCents: challenge.stake_cents,
+      stake: challenge.stake,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });

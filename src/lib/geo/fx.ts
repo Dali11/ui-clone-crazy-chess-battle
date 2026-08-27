@@ -34,7 +34,7 @@ export async function getExchangeRate(base: string, target: string): Promise<num
 /**
  * Convert an amount in minor units (cents) from one currency to another.
  */
-export async function convertCents(cents: number, base: string, target: string): Promise<number> {
+export async function convertAmount(cents: number, base: string, target: string): Promise<number> {
   const rate = await getExchangeRate(base, target);
   return Math.round(cents * rate);
 }

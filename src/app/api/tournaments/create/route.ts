@@ -18,8 +18,8 @@ export async function POST(req: NextRequest) {
       name, description, type = "swiss", timeControl = "blitz",
       initialMinutes = 5, incrementSeconds = 0, maxPlayers, minPlayers = 2,
       rounds, durationMinutes, startsAt, endsAt,
-      entryFeeCents = 0, creatorProfitPercent = 0, minRating = 0, maxRating,
-      prizePoolCents = 0, poolSource = "entry_fees",
+      entryFee = 0, creatorProfitPercent = 0, minRating = 0, maxRating,
+      prizePool = 0, poolSource = "entry_fees",
       thumbnailDataUrl = null,
       knockoutFormat = "pure",
     } = body;
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     const profitPercent = Math.max(0, Math.min(100, Number(creatorProfitPercent) || 0));
-    const isPaid = Number(entryFeeCents) > 0;
+    const isPaid = Number(entryFee) > 0;
 
     const dbType = ["arena", "swiss", "knockout"].includes(type) ? type : "swiss";
     const GAME_TIME_CONTROL_MAP: Record<string, string> = {
@@ -84,8 +84,8 @@ export async function POST(req: NextRequest) {
         rounds: rounds ? Number(rounds) : null,
         duration_minutes: durationMinutes ? Number(durationMinutes) : null,
         starts_at: startsAt, ends_at: endsAt || null,
-        entry_fee_cents: Number(entryFeeCents || 0),
-        prize_pool_cents: poolSource === 'fixed' ? (Number(prizePoolCents) || 0) : (isPaid ? 0 : Number(entryFeeCents || 0)),
+        entry_fee: Number(entryFee || 0),
+        prize_pool: poolSource === 'fixed' ? (Number(prizePool) || 0) : (isPaid ? 0 : Number(entryFee || 0)),
         pool_source: poolSource === 'fixed' ? 'fixed' : 'entry_fees',
         creator_profit_percent: isPaid ? profitPercent : 0,
         prize_distribution: { type: "percentage", payouts },

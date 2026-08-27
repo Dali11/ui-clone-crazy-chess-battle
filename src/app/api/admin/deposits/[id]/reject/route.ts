@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Fetch deposit
     const { data: deposit } = await admin
       .from("deposits")
-      .select("id, user_id, amount_cents, status, method")
+      .select("id, user_id, amount, status, method")
       .eq("id", id)
       .single();
 
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .eq("id", id);
 
     // Notify user
-    const amountMWK = Math.floor(deposit.amount_cents / 100);
+    const amountMWK = deposit.amount;
     try {
       // Send branded email
     const rejProfile = await admin.from("profiles").select("email").eq("id", deposit.user_id).single();

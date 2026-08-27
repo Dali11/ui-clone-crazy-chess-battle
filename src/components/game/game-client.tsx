@@ -26,8 +26,8 @@ import PlayerProfilePreview from "./player-profile-preview";
 interface BattleInfo {
   isBattle: boolean;
   battleId?: string;
-  stakeCents: number;
-  winnerPayoutCents: number;
+  stake: number;
+  winnerPayout: number;
   winnerId: string | null;
   isArmageddon?: boolean;
 }
@@ -151,7 +151,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const didIWin = game.winner === (isWhite ? "white" : "black");
   const isBattleGame = battleInfo?.isBattle === true;
   const isTournamentGame = !!tournamentId;
-  const moneyEarned = isBattleGame && didIWin ? (battleInfo?.winnerPayoutCents ?? 0) / 100 : undefined;
+  const moneyEarned = isBattleGame && didIWin ? (battleInfo?.winnerPayout ?? 0) / 100 : undefined;
   // For battles, berries are not awarded (they have their own reward system)
   // For non-battle games, berries are awarded as before
   const berriesEarned = !isBattleGame && didIWin ? (game.rated ? 10 : 15) : 0;
@@ -652,12 +652,12 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   const handlePlayAgain = async () => {
     // For battle games, re-join the battle queue with same stake + time control
-    if (isBattleGame && battleInfo?.stakeCents) {
+    if (isBattleGame && battleInfo?.stake) {
       try {
         const res = await fetch("/api/battles/join", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stakeCents: battleInfo.stakeCents, timeControl: tcIdFromGame }),
+          body: JSON.stringify({ stake: battleInfo.stake, timeControl: tcIdFromGame }),
         });
         const data = await res.json();
         if (data.matched && data.battleId) {

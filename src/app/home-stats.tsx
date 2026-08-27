@@ -24,7 +24,7 @@ function formatNumber(n: number): string {
 
 function formatMoney(cents: number, currencyCode: string): string {
   const symbol = getCurrencySymbol(currencyCode);
-  const units = Math.floor(cents / 100);
+  const units = Math.floor(cents);
   if (units >= 1_000_000) return `${symbol} ${(units / 1_000_000).toFixed(1)}M`;
   if (units >= 1_000) return `${symbol} ${(units / 1_000).toFixed(0)}K`;
   return `${symbol} ${units.toLocaleString("en-US")}`;
@@ -46,14 +46,14 @@ export default function HomeStats() {
         const [playersRes, gamesRes, tournamentsRes, currencyRes] = await Promise.all([
           supabase.from("profiles").select("id", { count: "exact", head: true }),
           supabase.from("games").select("id", { count: "exact", head: true }).gte("created_at", todayISO),
-          supabase.from("tournaments").select("prize_pool_cents, status").in("status", ["upcoming", "active"]),
+          supabase.from("tournaments").select("prize_pool, status").in("status", ["upcoming", "active"]),
           // Detect visitor's currency + live MWK exchange rate so the prize
           // pool displays converted to whatever currency they use locally.
           fetch("/api/currency").then((r) => (r.ok ? r.json() : null)).catch(() => null),
         ]);
 
         const totalPrizePool = (tournamentsRes.data || []).reduce(
-          (sum, t) => sum + (t.prize_pool_cents || 0),
+          (sum, t) => sum + (t.prize_pool || 0),
           0
         );
 
@@ -96,7 +96,7 @@ export default function HomeStats() {
 
   if (!stats) return null;
 
-  const convertedPrizePoolCents = Math.round(stats.totalPrizePool * currency.rate);
+  const convertedPrizePool = Math.round(stats.totalPrizePool * currency.rate);
 
   const items = [
     { value: formatNumber(stats.activePlayers), label: "Players" },
@@ -104,8 +104,8 @@ export default function HomeStats() {
     { value: formatNumber(stats.liveTournaments), label: "Live Tournaments" },
     {
       value:
-        convertedPrizePoolCents > 0
-          ? formatMoney(convertedPrizePoolCents, currency.currencyCode)
+        convertedPrizePool > 0
+          ? formatMoney(convertedPrizePool, currency.currencyCode)
           : `${getCurrencySymbol(currency.currencyCode)} 0`,
       label: "Prize Pool",
     },

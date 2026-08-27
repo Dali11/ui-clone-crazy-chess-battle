@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Fetch deposit
     const { data: deposit } = await admin
       .from("deposits")
-      .select("id, user_id, amount_cents, status, method, charge_id")
+      .select("id, user_id, amount, status, method, charge_id")
       .eq("id", id)
       .single();
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Now safe to credit wallet — no concurrent request can reach this point
     await admin.rpc("credit_wallet", {
       p_user_id: deposit.user_id,
-      p_amount_cents: deposit.amount_cents,
+      p_amount: deposit.amount,
     });
 
     // Trigger referral activation
@@ -58,13 +58,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     } catch {}
 
     // Notify user
-    const amountMWK = Math.floor(deposit.amount_cents / 100);
+    const amountMWK = deposit.amount;
     try {
       // Send branded email
       const depProfile = await admin.from("profiles").select("email").eq("id", deposit.user_id).single();
       // Fetch actual wallet balance after credit
-      const { data: depWallet } = await admin.from("profiles").select("wallet_balance_cents").eq("id", deposit.user_id).single();
-      const depBalanceMWK = depWallet?.wallet_balance_cents ? Math.floor(depWallet.wallet_balance_cents / 100).toLocaleString() : amountMWK.toLocaleString();
+      const { data: depWallet } = await admin.from("profiles").select("wallet_balance").eq("id", deposit.user_id).single();
+      const depBalanceMWK = depWallet?.wallet_balance ? depWallet.wallet_balance.toLocaleString() : amountMWK.toLocaleString();
 
       await sendEmail({
         to: depProfile.data?.email || "",
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       });
     } catch {}
 
-    return NextResponse.json({ status: "success", amount: deposit.amount_cents });
+    return NextResponse.json({ status: "success", amount: deposit.amount });
   } catch {
     return NextResponse.json({ error: "Failed to credit deposit" }, { status: 500 });
   }

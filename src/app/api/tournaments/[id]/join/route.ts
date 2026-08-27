@@ -25,7 +25,7 @@ export async function POST(
     // Verify tournament exists and is upcoming
     const { data: tournament, error: tErr } = await admin
       .from("tournaments")
-      .select("id, status, max_players, min_rating, max_rating, entry_fee_cents, prize_pool_cents, pool_source")
+      .select("id, status, max_players, min_rating, max_rating, entry_fee, prize_pool, pool_source")
       .eq("id", tournamentId)
       .single();
 
@@ -33,7 +33,7 @@ export async function POST(
       return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
     }
 
-    if (tournament.status !== "upcoming") {
+    if (tournament.status !== "upcoming" && tournament.status !== "active") {
       return NextResponse.json(
         { error: "Tournament is not accepting new participants" },
         { status: 400 }
@@ -55,7 +55,7 @@ export async function POST(
     // Get profile using admin client (avoids RLS issues)
     const { data: profile, error: pErr } = await admin
       .from("profiles")
-      .select("rating, wallet_balance_cents")
+      .select("rating, wallet_balance")
       .eq("id", user.id)
       .single();
 
@@ -80,7 +80,7 @@ export async function POST(
       );
     }
 
-    const entryFee = tournament.entry_fee_cents || 0;
+    const entryFee = tournament.entry_fee || 0;
     let paidEntryFee = false;
     let didDebit = false; // tracks whether we actually charged the wallet this join
 
@@ -102,12 +102,12 @@ export async function POST(
 
     if (entryFee > 0 && !paidEntryFee) {
       // First-time payment — debit wallet
-      const currentBalance = profile.wallet_balance_cents ?? 0;
+      const currentBalance = profile.wallet_balance ?? 0;
       if (currentBalance < entryFee) {
-        const feeMwk = Math.floor(entryFee / 100);
+        const feeMwk = entryFee;
         return NextResponse.json(
           {
-            error: `Insufficient wallet balance. Entry fee is MWK ${feeMwk.toLocaleString()}. You have MWK ${Math.floor(currentBalance / 100).toLocaleString()}. Please deposit funds first.`,
+            error: `Insufficient wallet balance. Entry fee is MWK ${feeMwk.toLocaleString()}. You have MWK ${currentBalance.toLocaleString()}. Please deposit funds first.`,
           },
           { status: 402 }
         );
@@ -116,7 +116,7 @@ export async function POST(
       // Debit wallet atomically
       const { error: debitErr } = await admin.rpc("debit_wallet", {
         p_user_id: user.id,
-        p_amount_cents: entryFee,
+        p_amount: entryFee,
       });
 
       if (debitErr) {
@@ -141,7 +141,7 @@ export async function POST(
         const { error: poolErr } = await admin
           .from("tournaments")
           .update({
-            prize_pool_cents: (tournament.prize_pool_cents || 0) + entryFee,
+            prize_pool: (tournament.prize_pool || 0) + entryFee,
           })
           .eq("id", tournamentId);
 
@@ -151,7 +151,7 @@ export async function POST(
       // Record deposit entry for audit trail (non-fatal — must not block the join)
       const { error: depositErr } = await admin.from("deposits").insert({
         user_id: user.id,
-        amount_cents: -entryFee,
+        amount: -entryFee,
         status: "success",
         method: "tournament_entry",
         reference: `tournament:${tournamentId}:entry`,
@@ -174,7 +174,7 @@ export async function POST(
       if (didDebit) {
         await admin.rpc("credit_wallet", {
           p_user_id: user.id,
-          p_amount_cents: entryFee,
+          p_amount: entryFee,
         });
       }
 
@@ -215,7 +215,7 @@ export async function POST(
     // Send confirmation email (fire-and-forget)
     const { data: tInfo } = await admin
       .from("tournaments")
-      .select("name, starts_at, entry_fee_cents")
+      .select("name, starts_at, entry_fee")
       .eq("id", tournamentId)
       .single();
     const { data: userProfile } = await admin
@@ -231,7 +231,7 @@ export async function POST(
         data: {
           tournamentName: tInfo.name,
           startsAt: tInfo.starts_at,
-          entryFee: tInfo.entry_fee_cents || 0,
+          entryFee: tInfo.entry_fee || 0,
           tournamentId,
         },
       }).catch(() => {});

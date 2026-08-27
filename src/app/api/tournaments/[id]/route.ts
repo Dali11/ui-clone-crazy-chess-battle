@@ -137,9 +137,9 @@ export async function GET(
     let canJoin = false;
     let joinReason = null;
 
-    if (tournament.status !== 'upcoming') {
+    if (tournament.status !== 'upcoming' && tournament.status !== 'active') {
       canJoin = false;
-      joinReason = tournament.status === 'active' ? 'already_started' : tournament.status === 'completed' ? 'completed' : 'not_joinable';
+      joinReason = tournament.status === 'completed' ? 'completed' : 'not_joinable';
     } else if (!user) {
       canJoin = false;
       joinReason = 'not_authenticated';

@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { amountCents, phone, operatorRefId, email, firstName, lastName } = await req.json();
+    const { amount, phone, operatorRefId, email, firstName, lastName } = await req.json();
 
     // ─── Load platform config ──────────────────────────────────────────
     const admin = createAdminClient();
@@ -22,16 +22,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Enforce minimum amount
-    const minAmount = dConfig.min_amount_cents || 1000;
-    if (!amountCents || amountCents < minAmount) {
-      const minDisplay = Math.floor(minAmount / 100).toLocaleString();
+    const minAmount = dConfig.min_amount || 1000;
+    if (!amount || amount < minAmount) {
+      const minDisplay = minAmount.toLocaleString();
       return NextResponse.json({ error: `Minimum deposit is MWK ${minDisplay}` }, { status: 400 });
     }
 
     // Enforce maximum amount
-    const maxAmount = dConfig.max_amount_cents || 10_000_000;
-    if (amountCents > maxAmount) {
-      const maxDisplay = Math.floor(maxAmount / 100).toLocaleString();
+    const maxAmount = dConfig.max_amount || 10_000_000;
+    if (amount > maxAmount) {
+      const maxDisplay = maxAmount.toLocaleString();
       return NextResponse.json({ error: `Maximum deposit is MWK ${maxDisplay}` }, { status: 400 });
     }
 
@@ -42,14 +42,14 @@ export async function POST(req: NextRequest) {
     const chargeId = `ccb_${Date.now()}_${user.id.slice(0, 8)}`;
 
     // Determine if this deposit needs manual approval
-    const approvalThreshold = dConfig.require_approval_above_cents || 0;
-    const requiresApproval = approvalThreshold > 0 && amountCents > approvalThreshold;
+    const approvalThreshold = dConfig.require_approval_above || 0;
+    const requiresApproval = approvalThreshold > 0 && amount > approvalThreshold;
 
     const { data: deposit, error: depositError } = await admin
       .from("deposits")
       .insert({
         user_id: user.id,
-        amount_cents: amountCents,
+        amount: amount,
         method: "mobile_money",
         status: "pending",
         charge_id: chargeId,
@@ -63,7 +63,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to create deposit record" }, { status: 500 });
     }
 
-    const amount = Math.floor(amountCents / 100).toString();
     const res = await fetch("https://api.paychangu.com/mobile-money/payments/initialize", {
       method: "POST",
       headers: {

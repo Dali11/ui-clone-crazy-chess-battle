@@ -28,7 +28,7 @@ async function handleAutoStart(req: NextRequest) {
     // Find upcoming tournaments whose start time has passed
     const { data: tournaments } = await admin
       .from("tournaments")
-      .select("id, name, starts_at, status, type, knockout_format, group_schedule, initial_minutes, increment_seconds, time_control, min_players, entry_fee_cents, countdown_minutes, rest_minutes")
+      .select("id, name, starts_at, status, type, knockout_format, group_schedule, initial_minutes, increment_seconds, time_control, min_players, entry_fee, countdown_minutes, rest_minutes")
       .eq("status", "upcoming")
       .lte("starts_at", now);
 
@@ -59,18 +59,18 @@ async function handleAutoStart(req: NextRequest) {
             .eq("id", tournament.id);
 
           // Refund entry fees to all paid participants
-          if (tournament.entry_fee_cents && tournament.entry_fee_cents > 0) {
+          if (tournament.entry_fee && tournament.entry_fee > 0) {
             for (const p of participants || []) {
               if (p.paid_entry_fee) {
                 await admin.rpc("credit_wallet", {
                   p_user_id: p.player_id,
-                  p_amount_cents: tournament.entry_fee_cents,
+                  p_amount: tournament.entry_fee,
                 });
 
                 // Record refund for audit trail
                 await admin.from("deposits").insert({
                   user_id: p.player_id,
-                  amount_cents: tournament.entry_fee_cents,
+                  amount: tournament.entry_fee,
                   status: "success",
                   method: "tournament_refund",
                   reference: `tournament:${tournament.id}:refund:min_players_not_met`,
@@ -102,7 +102,7 @@ async function handleAutoStart(req: NextRequest) {
                 user_id: p.player_id,
                 type: "tournament_cancelled",
                 title: `${tournament.name} was cancelled`,
-                body: `The tournament didn't meet the minimum of ${minRequired} players. ${tournament.entry_fee_cents > 0 ? "Your entry fee has been refunded." : ""}`,
+                body: `The tournament didn't meet the minimum of ${minRequired} players. ${tournament.entry_fee > 0 ? "Your entry fee has been refunded." : ""}`,
                 data: { tournamentName: tournament.name, tournamentId: tournament.id },
                 read: false,
               });

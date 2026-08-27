@@ -46,7 +46,7 @@ export async function PATCH(req: NextRequest) {
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const body = await req.json();
-    const { country_code, membership_active, membership_price_cents, membership_currency } = body;
+    const { country_code, membership_active, membership_price, membership_currency } = body;
 
     if (!country_code) {
       return NextResponse.json({ error: "country_code is required" }, { status: 400 });
@@ -55,8 +55,8 @@ export async function PATCH(req: NextRequest) {
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
 
     if (membership_active !== undefined) updates.membership_active = membership_active;
-    if (membership_price_cents !== undefined) {
-      updates.membership_price_cents = membership_price_cents === null || membership_price_cents === "" ? null : Number(membership_price_cents);
+    if (membership_price !== undefined) {
+      updates.membership_price = membership_price === null || membership_price === "" ? null : Number(membership_price);
     }
     if (membership_currency !== undefined) updates.membership_currency = membership_currency;
 
