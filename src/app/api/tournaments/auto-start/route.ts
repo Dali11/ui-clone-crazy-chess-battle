@@ -185,6 +185,9 @@ async function handleAutoStart(req: NextRequest) {
               pairings.push({ white: "", black: "", bye: topHalf[i].player_id });
             }
           }
+          // Set total rounds for Swiss: ceil(log2(N)) ensures enough rounds for a clear winner, min 3
+          const swissRounds = Math.max(3, Math.ceil(Math.log2(seeded.length)));
+          await admin.from("tournaments").update({ rounds: swissRounds }).eq("id", tournament.id);
         }
 
         // Create round entry

@@ -82,6 +82,7 @@ async function handleAutoAdvance(req: NextRequest) {
         }
 
         if (!tournament.rounds) continue; // Arena tournaments don't use rounds
+        if (tournament.type === "knockout") continue; // Knockout tournaments need bracket advancement, not Swiss pairing
 
         // ── Generate next round Swiss pairings ──
         const { data: participants } = await admin

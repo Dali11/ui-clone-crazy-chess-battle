@@ -532,21 +532,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     <div className="bg-ccb-card border border-ccb-border rounded-2xl p-3 text-center flex flex-col justify-end" style={{ minHeight: '110px' }}>
                       <Medal className="w-6 h-6 text-ccb-muted mx-auto mb-1" />
                       <div className="text-xs font-bold truncate">{top3[1].profile?.display_name || top3[1].profile?.username || '—'}</div>
-                      <div className="text-[10px] text-ccb-muted">{top3[1].score.toFixed(1)} pts</div>
+                      <div className="text-[10px] text-ccb-muted">{(top3[1].score ?? 0).toFixed(1)} pts</div>
                       <div className="text-[10px] font-bold text-ccb-muted mt-1">2nd</div>
                     </div>
                     {/* 1st */}
                     <div className="bg-gradient-to-b from-ccb-accent/10 to-ccb-card border border-ccb-accent/30 rounded-2xl p-3 text-center flex flex-col justify-start" style={{ minHeight: '130px' }}>
                       <Crown className="w-7 h-7 text-ccb-accent mx-auto mb-1" />
                       <div className="text-xs font-bold truncate">{top3[0].profile?.display_name || top3[0].profile?.username || '—'}</div>
-                      <div className="text-[10px] text-ccb-accent font-semibold">{top3[0].score.toFixed(1)} pts</div>
+                      <div className="text-[10px] text-ccb-accent font-semibold">{(top3[0].score ?? 0).toFixed(1)} pts</div>
                       <div className="text-[10px] font-bold text-ccb-accent mt-1">CHAMPION</div>
                     </div>
                     {/* 3rd */}
                     <div className="bg-ccb-card border border-ccb-border rounded-2xl p-3 text-center flex flex-col justify-end" style={{ minHeight: '100px' }}>
                       <Award className="w-6 h-6 text-amber-600 dark:text-amber-400 mx-auto mb-1" />
                       <div className="text-xs font-bold truncate">{top3[2].profile?.display_name || top3[2].profile?.username || '—'}</div>
-                      <div className="text-[10px] text-ccb-muted">{top3[2].score.toFixed(1)} pts</div>
+                      <div className="text-[10px] text-ccb-muted">{(top3[2].score ?? 0).toFixed(1)} pts</div>
                       <div className="text-[10px] font-bold text-ccb-muted mt-1">3rd</div>
                     </div>
                   </div>
@@ -593,7 +593,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                           </div>
                         </div>
                         <div className="col-span-2 text-center">
-                          <span className="text-sm font-bold">{p.score.toFixed(1)}</span>
+                          <span className="text-sm font-bold">{(p.score ?? 0).toFixed(1)}</span>
                         </div>
                         <div className="col-span-2 text-center text-xs text-ccb-muted hidden sm:block">
                           <span className="text-ccb-success font-medium">{p.wins}</span>/
