@@ -27,6 +27,8 @@ interface Withdrawal {
   status: string;
   admin_notes: string | null;
   created_at: string;
+  fee?: number | null;
+  net_amount?: number | null;
 }
 
 interface Transaction {
@@ -82,7 +84,7 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
   const [tab, setTab] = useState<"deposit" | "withdraw" | "history">("deposit");
   const [depositAmount, setDepositAmount] = useState(1000);
   const [withdrawAmount, setWithdrawAmount] = useState(0);
-  const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number } | null>(null);
+  const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number; withdrawal_fee: number; processing_fee_pct: number } | null>(null);
   const [phone, setPhone] = useState(savedPhone || "");
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -332,7 +334,7 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
       // Optimistically update balance
       setWalletBal((prev) => prev - withdrawAmount);
       if (data.status === "completed" || data.auto) {
-        setSuccess(`MWK ${withdrawAmount.toLocaleString()} has been sent to your phone. You should receive it shortly.`);
+        setSuccess(`MWK ${withdrawAmount.toLocaleString()} withdrawal sent! Fees deducted — check your phone for the amount received.`);
       } else {
         setSuccess(`Withdrawal request for MWK ${withdrawAmount.toLocaleString()} submitted. You'll receive it within 30 minutes after admin approval.`);
       }
@@ -618,6 +620,40 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
             />
           </div>
 
+          {/* Fee breakdown */}
+          {(() => {
+            const fixedFee = withdrawConfig?.withdrawal_fee || 0;
+            const pctFee = withdrawConfig?.processing_fee_pct || 0;
+            const processingFee = Math.floor(withdrawAmount * (pctFee / 100));
+            const totalFees = fixedFee + processingFee;
+            const netAmount = Math.max(0, withdrawAmount - totalFees);
+            if (totalFees === 0) return null;
+            return (
+              <div className="space-y-1.5 p-3.5 rounded-xl bg-ccb-surface border border-ccb-border">
+                <div className="flex justify-between text-sm">
+                  <span className="text-ccb-muted">Withdrawal amount</span>
+                  <span className="font-medium">{formatMWK(withdrawAmount)}</span>
+                </div>
+                {pctFee > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-ccb-muted">Processing fee ({pctFee}%)</span>
+                    <span className="text-ccb-muted">−{formatMWK(processingFee)}</span>
+                  </div>
+                )}
+                {fixedFee > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-ccb-muted">Withdrawal fee</span>
+                    <span className="text-ccb-muted">−{formatMWK(fixedFee)}</span>
+                  </div>
+                )}
+                <div className="border-t border-ccb-border pt-1.5 flex justify-between text-sm font-semibold">
+                  <span>You receive</span>
+                  <span className="text-ccb-primary">{formatMWK(netAmount)}</span>
+                </div>
+              </div>
+            );
+          })()}
+
           <button
             onClick={handleWithdraw}
             disabled={withdrawLoading}
@@ -641,6 +677,9 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
                   <div key={w.id} className="flex items-center justify-between p-3 rounded-lg bg-ccb-surface border border-ccb-border">
                     <div>
                       <p className="text-sm font-medium">{formatMWK(w.amount)}</p>
+                      {w.fee != null && w.fee > 0 && w.net_amount != null && (
+                        <p className="text-xs text-ccb-muted">Fee: {formatMWK(w.fee)} · Net: {formatMWK(w.net_amount)}</p>
+                      )}
                       <p className="text-xs text-ccb-muted">{w.operator_name} · {formatDate(w.created_at)}</p>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${

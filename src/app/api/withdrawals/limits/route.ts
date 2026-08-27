@@ -19,6 +19,7 @@ export async function GET() {
       max_amount: wConfig.max_amount || 500_000,
       daily_limit: wConfig.daily_limit || 0,
       withdrawal_fee: wConfig.withdrawal_fee || 0,
+      processing_fee_pct: wConfig.processing_fee_pct || 0,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
