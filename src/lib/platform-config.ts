@@ -43,8 +43,8 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
   },
   battles: {
     enabled: true,
-    min_stake: 50_000,
-    max_stake: 1_000_000,
+    min_stake: 1_000,
+    max_stake: 100_000,
     platform_fee_pct: 10,
     auto_cancel_minutes: 10,
     show_kpi_cards: true,

@@ -279,7 +279,16 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     completed: { label: 'COMPLETED', color: 'text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30', dot: 'bg-ccb-muted' },
   }[t.status] || { label: t.status?.toUpperCase(), color: 'text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30', dot: 'bg-ccb-muted' };
 
+  // Once a tournament is finished, `final_rank` is the authoritative ranking
+  // (computed server-side with full Swiss tiebreaks: score → Buchholz Cut 1 →
+  // Sonneborn-Berger → wins → seed). Sort by it so the podium, table order, and
+  // the "#" rank number all agree. While the tournament is still in progress,
+  // final_rank isn't set yet, so fall back to the simpler live sort.
+  const allHaveFinalRank = participants.length > 0 && participants.every((p) => p.final_rank != null);
   const sortedParticipants = [...participants].sort((a, b) => {
+    if (allHaveFinalRank) {
+      return (a.final_rank || 0) - (b.final_rank || 0);
+    }
     if (b.score !== a.score) return b.score - a.score;
     if (b.wins !== a.wins) return b.wins - a.wins;
     return (a.seed || 0) - (b.seed || 0);
@@ -565,7 +574,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
                   {/* Rows */}
                   {sortedParticipants.map((p, i) => {
-                    const rank = p.final_rank || (i + 1);
+                    const rank = allHaveFinalRank ? (p.final_rank as number) : (i + 1);
                     const isTop3 = rank <= 3;
                     const medalColor = rank === 1 ? 'text-ccb-accent' : rank === 2 ? 'text-ccb-muted' : rank === 3 ? 'text-amber-600 dark:text-amber-400' : '';
                     return (
