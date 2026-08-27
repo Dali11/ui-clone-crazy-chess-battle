@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PRIZE_SPLITS_BY_TYPE, DEFAULT_PRIZE_SPLITS } from "@/lib/tournament/prizes";
 import { getPlatformConfig } from "@/lib/platform-config";
+import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -102,10 +103,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // ── Send announcement emails to all users if tournament is live ──
+    let emailsSent = 0;
+    if (initialStatus === "upcoming") {
+      try {
+        const { data: allUsers } = await admin
+          .from("profiles")
+          .select("email")
+          .not("email", "is", null);
+
+        if (allUsers && allUsers.length > 0) {
+          const emailPromises = allUsers
+            .map((u) => u.email)
+            .filter((e): e is string => !!e)
+            .map((to) =>
+              sendEmail({
+                to,
+                template: "new_tournament" as const,
+                data: {
+                  tournamentName: name,
+                  tournamentId: tournament.id,
+                  startsAt,
+                  entryFee: Number(entryFee || 0),
+                  playerCount: 0,
+                  currentPrizePool: poolSource === "fixed" ? Number(prizePool || 0) : 0,
+                },
+              })
+            );
+          await Promise.allSettled(emailPromises);
+          emailsSent = allUsers.length;
+        }
+      } catch (emailErr) {
+        console.error("[tournament-create] Failed to send announcement emails:", emailErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       tournament,
       pendingApproval: initialStatus === "pending_approval",
+      emailsSent,
       message: initialStatus === "pending_approval"
         ? "Tournament created! It's pending admin approval. You'll be notified once it's approved."
         : undefined,

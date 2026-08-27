@@ -49,7 +49,8 @@ export type EmailTemplate =
   | "membership_activated"
   | "membership_expired"
   | "knockout_eliminated"
-  | "new_tournament";
+  | "new_tournament"
+  | "tournament_reminder";
 
 // ─── Helper: Format MWK amounts ────────────────────────────────────
 
@@ -566,6 +567,26 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
           ${infoBox("Current Prize Pool", formatMWK(data.currentPrizePool || 0), "#f59e0b")}
           ${button(`${BASE_URL}/tournament/${data.tournamentId}`, "Join Now")}
           <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">MK500 entry \u2014 5-round Swiss, rapid 10+0. Register before it fills up!</p>
+        `,
+      };
+    }
+
+    case "tournament_reminder": {
+      return {
+        subject: `\u23f0 ${data.tournamentName || "Tournament"} starts in 5 hours \u2014 join now!`,
+        title: "Tournament Starting Soon",
+        preview: `${data.tournamentName || "Tournament"} starts in 5 hours \u2014 you haven\u2019t joined yet`,
+        body: `
+          <h2 style="margin:0 0 16px;font-size:20px;color:#ffffff;">\u23f0 ${data.tournamentName || "Tournament"} starts in 5 hours</h2>
+          <p style="margin:0 0 16px;font-size:15px;color:#9ca3af;line-height:1.6;">
+            A tournament is starting soon and you haven\u2019t joined yet. 90% of every entry fee goes straight into the prize pool \u2014 the more players, the bigger the pot!
+          </p>
+          ${infoBox("Tournament", data.tournamentName || "Tournament", "#7c3aed")}
+          ${infoBox("Starts", data.startTime || formatCAT(data.startsAt), "#f59e0b")}
+          ${infoBox("Entry Fee", formatMWK(data.entryFee || 0), "#9ca3af")}
+          ${infoBox("Current Prize Pool", formatMWK(data.currentPrizePool || 0), "#f59e0b")}
+          ${button(`${BASE_URL}/tournament/${data.tournamentId}`, "Join Now")}
+          <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">MK500 entry \u2014 5-round Swiss, rapid 10+0. Don\u2019t miss out!</p>
         `,
       };
     }

@@ -1,0 +1,125 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
+
+/**
+ * Cron endpoint: sends "tournament_reminder" emails to users who haven't
+ * joined a tournament that starts in ~5 hours.
+ *
+ * Runs every 30 minutes. For each upcoming tournament whose starts_at falls
+ * within the next 5 hours (4.5h–5.5h window), it finds all registered users
+ * who are NOT already participants and sends them a reminder email.
+ *
+ * Idempotency: uses a `reminder_sent_at` timestamp on the tournament to
+ * ensure we only send once per tournament.
+ *
+ * Auth: CRON_SECRET header.
+ */
+export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const admin = createAdminClient();
+    const now = new Date();
+    const fiveHoursFromNow = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+    const windowStart = new Date(fiveHoursFromNow.getTime() - 30 * 60 * 1000); // 4.5h
+    const windowEnd = new Date(fiveHoursFromNow.getTime() + 30 * 60 * 1000);  // 5.5h
+
+    // Find upcoming tournaments in the 5-hour window that haven't had a reminder sent
+    const { data: tournaments, error } = await admin
+      .from("tournaments")
+      .select("id, name, starts_at, entry_fee, prize_pool")
+      .eq("status", "upcoming")
+      .gte("starts_at", windowStart.toISOString())
+      .lte("starts_at", windowEnd.toISOString())
+      .is("reminder_sent_at", null);
+
+    if (error) {
+      console.error("[reminder-check] Query error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!tournaments || tournaments.length === 0) {
+      return NextResponse.json({ success: true, message: "No tournaments in the 5-hour reminder window", sent: 0 });
+    }
+
+    let totalEmailsSent = 0;
+    const results: any[] = [];
+
+    for (const tournament of tournaments) {
+      try {
+        // Get all user emails who have NOT joined this tournament
+        const { data: participants } = await admin
+          .from("tournament_participants")
+          .select("user_id")
+          .eq("tournament_id", tournament.id);
+
+        const participantIds = new Set((participants || []).map((p) => p.user_id));
+
+        // Get all users with an email
+        const { data: allUsers } = await admin
+          .from("profiles")
+          .select("id, email")
+          .not("email", "is", null);
+
+        const nonJoiners = (allUsers || []).filter(
+          (u) => u.email && !participantIds.has(u.id)
+        );
+
+        if (nonJoiners.length === 0) {
+          // Everyone already joined — still mark as sent so we don't keep checking
+          await admin
+            .from("tournaments")
+            .update({ reminder_sent_at: new Date().toISOString() })
+            .eq("id", tournament.id);
+          results.push({ tournament: tournament.name, sent: 0, reason: "All users already joined" });
+          continue;
+        }
+
+        // Send reminder emails
+        const emailPromises = nonJoiners.map((user) =>
+          sendEmail({
+            to: user.email,
+            template: "tournament_reminder",
+            data: {
+              tournamentName: tournament.name,
+              tournamentId: tournament.id,
+              startsAt: tournament.starts_at,
+              entryFee: tournament.entry_fee || 500,
+              currentPrizePool: tournament.prize_pool || 0,
+            },
+          })
+        );
+
+        const settled = await Promise.allSettled(emailPromises);
+        const sent = settled.filter((s) => s.status === "fulfilled" && s.value === true).length;
+        totalEmailsSent += sent;
+
+        // Mark reminder as sent
+        await admin
+          .from("tournaments")
+          .update({ reminder_sent_at: new Date().toISOString() })
+          .eq("id", tournament.id);
+
+        results.push({ tournament: tournament.name, sent, totalNonJoiners: nonJoiners.length });
+      } catch (e: any) {
+        results.push({ tournament: tournament.name, error: e.message });
+      }
+    }
+
+    console.log(`[reminder-check] Sent ${totalEmailsSent} reminder emails across ${tournaments.length} tournaments`);
+
+    return NextResponse.json({
+      success: true,
+      checked: tournaments.length,
+      emailsSent: totalEmailsSent,
+      results,
+    });
+  } catch (e: any) {
+    console.error("[reminder-check] Error:", e);
+    return NextResponse.json({ error: e.message || "Failed" }, { status: 500 });
+  }
+}
