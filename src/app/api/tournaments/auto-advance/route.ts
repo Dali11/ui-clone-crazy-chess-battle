@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { generateSwissPairings, extractPreviousByes } from "@/lib/tournament/swiss-pairing";
 
 // Can be triggered by cron-job.org or Vercel cron (with CRON_SECRET)
 // Finds all active tournaments where the current round is complete and
@@ -115,50 +116,18 @@ async function handleAutoAdvance(req: NextRequest) {
         }
 
         // Swiss pairing: sort by score, pair within groups, avoid rematches
-        const pairings: Array<{ white: string; black: string; bye?: string }> = [];
-        const used = new Set<string>();
-        // Sort by score, then by Buchholz (opponent strength), then by seed
-        // Fetch all games for Buchholz calculation
-        const { data: allGames } = await admin
-          .from("games")
-          .select("white_player_id, black_player_id")
+        // Fetch previous byes to avoid repeat byes
+        const { data: prevRounds } = await admin
+          .from("tournament_rounds")
+          .select("pairings")
           .eq("tournament_id", tournament.id);
-        const oppScores: Record<string, number[]> = {};
-        const scoreLookup: Record<string, number> = {};
-        for (const p of participants) scoreLookup[p.player_id] = p.score || 0;
-        for (const g of allGames || []) {
-          (oppScores[g.white_player_id] ||= []).push(scoreLookup[g.black_player_id] || 0);
-          (oppScores[g.black_player_id] ||= []).push(scoreLookup[g.white_player_id] || 0);
-        }
-        const buchholz = (pid: string) => {
-          const scores = [...(oppScores[pid] || [])].sort((a, b) => a - b);
-          return scores.length > 1 ? scores.slice(1).reduce((s, v) => s + v, 0) : (scores[0] || 0);
-        };
-        const sorted = [...participants].sort(
-          (a, b) =>
-            (b.score || 0) - (a.score || 0) ||
-            buchholz(b.player_id) - buchholz(a.player_id) ||
-            (a.seed || 0) - (b.seed || 0)
-        );
+        const previousByes = extractPreviousByes(prevRounds || []);
 
-        for (let i = 0; i < sorted.length; i++) {
-          if (used.has(sorted[i].player_id)) continue;
-          let paired = false;
-          for (let j = i + 1; j < sorted.length; j++) {
-            if (used.has(sorted[j].player_id)) continue;
-            const key = `${sorted[i].player_id}|${sorted[j].player_id}`;
-            if (previousMatchups.has(key)) continue;
-            pairings.push({ white: sorted[i].player_id, black: sorted[j].player_id });
-            used.add(sorted[i].player_id);
-            used.add(sorted[j].player_id);
-            paired = true;
-            break;
-          }
-          if (!paired) {
-            pairings.push({ white: "", black: "", bye: sorted[i].player_id });
-            used.add(sorted[i].player_id);
-          }
-        }
+        const pairings = generateSwissPairings(
+          participants.map((p: any) => ({ player_id: p.player_id, score: p.score || 0, seed: p.seed || 0 })),
+          previousMatchups,
+          previousByes,
+        );
 
         // Calculate when next round games should start (now + rest minutes)
         const restMinutes = tournament.rest_minutes || 5;

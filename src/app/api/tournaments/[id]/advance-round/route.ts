@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { advanceKnockoutRound, knockoutRoundCount, generateKnockoutBracket, getGroupAdvancers, generateGroups, generateGroupRoundRobin } from "@/lib/tournament/knockout";
 import { sendEmail, sendBatchEmails } from "@/lib/email";
 import { finishTournament } from "@/lib/tournament/finish";
+import { generateSwissPairings, extractPreviousByes } from "@/lib/tournament/swiss-pairing";
 
 // Allow enough time for large tournaments (100+ players / ~50 games per round)
 export const maxDuration = 60;
@@ -441,41 +442,20 @@ export async function POST(
       previousMatchups.add(`${g.black_player_id}|${g.white_player_id}`);
     }
 
-    // Swiss pairing for next round:
-    // Group by score, pair within score groups, avoid rematches
-    const pairings: Array<{ white: string; black: string; bye?: string }> = [];
-    const used = new Set<string>();
+    // Fetch previous byes to avoid giving the same player multiple byes
+    const { data: previousRounds } = await admin
+      .from("tournament_rounds")
+      .select("pairings")
+      .eq("tournament_id", tournamentId);
+    const previousByes = extractPreviousByes(previousRounds || []);
 
-    // Sort by score descending, then by seed for tiebreak
-    const sorted = [...participants].sort((a, b) => (b.score || 0) - (a.score || 0) || (a.seed || 0) - (b.seed || 0));
-
-    for (let i = 0; i < sorted.length; i++) {
-      if (used.has(sorted[i].player_id)) continue;
-
-      let paired = false;
-      for (let j = i + 1; j < sorted.length; j++) {
-        if (used.has(sorted[j].player_id)) continue;
-
-        // Skip if these players have already been paired in this tournament
-        const key = `${sorted[i].player_id}|${sorted[j].player_id}`;
-        if (previousMatchups.has(key)) continue;
-
-        pairings.push({
-          white: sorted[i].player_id,
-          black: sorted[j].player_id,
-        });
-        used.add(sorted[i].player_id);
-        used.add(sorted[j].player_id);
-        paired = true;
-        break;
-      }
-
-      if (!paired) {
-        // Bye
-        pairings.push({ white: "", black: "", bye: sorted[i].player_id });
-        used.add(sorted[i].player_id);
-      }
-    }
+    // Generate pairings using shared Swiss pairing utility
+    // (handles bye tracking, avoids multiple byes, allows rematches as last resort)
+    const pairings = generateSwissPairings(
+      participants.map((p: any) => ({ player_id: p.player_id, score: p.score || 0, seed: p.seed || 0 })),
+      previousMatchups,
+      previousByes,
+    );
 
     // Calculate when next round games should start (now + rest minutes)
     const restMinutes = tournament.rest_minutes || 5;

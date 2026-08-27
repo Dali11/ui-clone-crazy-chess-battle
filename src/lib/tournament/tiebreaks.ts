@@ -95,11 +95,10 @@ export async function calculateTiebreaks(
         if (g.winner === "white" && isWhite) result = "win";
         else if (g.winner === "black" && isBlack) result = "win";
         else result = "loss";
-      } else {
-        // Checkmate/resign/timeout — need to infer winner
-        // status could be "checkmate", "resign", "timeout"
-        // winner field might not exist — check if there's a winner field
-        // For now, skip if we can't determine
+      } else if (g.status === "white_win") {
+        result = isWhite ? "win" : "loss";
+      } else if (g.status === "black_win") {
+        result = isBlack ? "win" : "loss";
       }
 
       if (result === "win") sonneborn_berger += oppScore;

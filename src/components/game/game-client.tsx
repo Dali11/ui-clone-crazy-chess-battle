@@ -151,7 +151,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const didIWin = game.winner === (isWhite ? "white" : "black");
   const isBattleGame = battleInfo?.isBattle === true;
   const isTournamentGame = !!tournamentId;
-  const moneyEarned = isBattleGame && didIWin ? (battleInfo?.winnerPayout ?? 0) / 100 : undefined;
+  const moneyEarned = isBattleGame && didIWin ? (battleInfo?.winnerPayout ?? 0) : undefined;
   // For battles, berries are not awarded (they have their own reward system)
   // For non-battle games, berries are awarded as before
   const berriesEarned = !isBattleGame && didIWin ? (game.rated ? 10 : 15) : 0;

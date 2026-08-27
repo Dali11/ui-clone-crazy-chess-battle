@@ -23,7 +23,7 @@ interface VictoryOverlayProps {
   playerNames?: { white: string; black: string };
   winnerSide?: "white" | "black" | null;
   berriesAwarded?: number;
-  moneyEarned?: number;     // in MWK (already divided by 100)
+  moneyEarned?: number;     // in MWK
   moneyLabel?: string;       // e.g. "Battle winnings"
   onNewGame?: () => void;
   onRematch?: () => void;
