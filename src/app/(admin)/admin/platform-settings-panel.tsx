@@ -54,6 +54,7 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "max_stake", label: "Max Stake", type: "number", group: "control", unit: "MWK" },
     { key: "platform_fee_pct", label: "Platform Fee", type: "number", group: "control", unit: "%", help: "Platform cut of each battle" },
     { key: "auto_cancel_minutes", label: "Auto-Cancel", type: "number", group: "control", unit: "min", help: "Cancel unmatched battles after N minutes" },
+    { key: "stake_levels", label: "Stake Levels (comma-separated)", type: "text", group: "control", help: "MWK values players can choose: 500,1000,2000,5000,10000" },
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
     { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
@@ -86,7 +87,8 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "berries_per_draw", label: "Berries Per Draw", type: "number", group: "control" },
     { key: "berries_per_tournament_win", label: "Berries Per Tournament Win", type: "number", group: "control" },
     { key: "daily_cap", label: "Daily Cap", type: "number", group: "control", help: "Max berries per user per day" },
-    { key: "conversion_rate", label: "Conversion Rate", type: "number", group: "control", help: "Berries to 1 MWK" },
+    { key: "conversion_rate", label: "Conversion Rate (berries per MWK)", type: "number", group: "control", help: "1000 berries = MWK 500 → rate = 2" },
+    { key: "min_conversion_berries", label: "Min Berries to Convert", type: "number", group: "control", help: "Minimum berries needed before conversion (10,000)" },
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
   ],
   leagues: [
@@ -208,16 +210,21 @@ export default function PlatformSettingsPanel({ section }: { section: string }) 
     setConfig((prev) => ({ ...prev, [key]: value }));
   };
 
-  // Convert MWK display values to cents on save, and cents to MWK on load
+  // Get display value, handling arrays (e.g., stake_levels) by joining with commas
   const getDisplayValue = (field: SettingField): any => {
     const raw = config[field.key];
     if (raw === undefined || raw === null) return "";
+    if (Array.isArray(raw)) return raw.join(",");
     if (field.unit === "MWK") return Math.floor(raw);
     return raw;
   };
 
   const setFieldValue = (field: SettingField, value: any) => {
-    if (field.unit === "MWK") {
+    if (field.type === "text" && field.key === "stake_levels") {
+      // Convert comma-separated string to number array
+      const arr = value.split(",").map((v: string) => Number(v.trim())).filter((v: number) => !isNaN(v) && v > 0);
+      updateField(field.key, arr);
+    } else if (field.unit === "MWK") {
       updateField(field.key, Number(value));
     } else {
       updateField(field.key, value);

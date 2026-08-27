@@ -43,10 +43,11 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
   },
   battles: {
     enabled: true,
-    min_stake: 1_000,
-    max_stake: 100_000,
+    min_stake: 500,
+    max_stake: 50_000,
     platform_fee_pct: 10,
     auto_cancel_minutes: 10,
+    stake_levels: [500, 1000, 2000, 5000, 10000],
     show_kpi_cards: true,
     page_size: 20,
   },
@@ -76,7 +77,9 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     berries_per_draw: 5,
     berries_per_tournament_win: 50,
     daily_cap: 100,
-    conversion_rate: 100,
+    // 1000 berries = MWK 500 → 2 berries per 1 MWK
+    conversion_rate: 2,
+    min_conversion_berries: 10000,
     show_kpi_cards: true,
   },
   leagues: {

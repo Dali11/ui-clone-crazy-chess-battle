@@ -9,7 +9,7 @@ import {
   ShieldCheck, UserRound, XCircle,
   Menu, LogOut, Crown, Play,
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
-  Settings, FileText,
+  Settings, FileText, SlidersHorizontal, Database, ChevronDown,
 } from "lucide-react";
 import PlatformSettingsPanel from "./platform-settings-panel";
 
@@ -127,7 +127,7 @@ interface AdminLog {
   profiles: { username: string; display_name: string } | null;
 }
 
-type Tab = "overview" | "users" | "withdrawals" | "tournaments" | "games" | "deposits" | "battles" | "berry" | "logs" | "leagues" | "seasons" | "membership" | "verification";
+type Tab = "overview" | "users" | "withdrawals" | "tournaments" | "games" | "deposits" | "battles" | "berry" | "logs" | "leagues" | "seasons" | "membership" | "verification" | "settings";
 
 // Convert datetime-local (user's local TZ) to UTC ISO string for API
 function localToUTC(localValue: string): string {
@@ -997,6 +997,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     { id: "seasons", label: "Seasons", icon: Calendar },
     { id: "membership", label: "Membership", icon: Crown },
     { id: "verification", label: "Verification", icon: ShieldCheck },
+    { id: "settings", label: "Settings", icon: Settings },
   ];
 
   return (
@@ -1041,29 +1042,50 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           </button>
         </div>
 
-        {/* Nav items */}
-        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            const isActive = tab === t.id;
+        {/* Nav items — grouped */}
+        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
+          {[
+            { label: null, items: ["overview"] },
+            { label: "Financial", items: ["deposits", "withdrawals", "battles"] },
+            { label: "Compete", items: ["tournaments", "games", "leagues", "seasons"] },
+            { label: "Community", items: ["users", "membership", "verification", "berry"] },
+            { label: "System", items: ["logs", "settings"] },
+          ].map((group, gi) => {
+            const groupTabs = group.items
+              .map(id => tabs.find(t => t.id === id))
+              .filter(Boolean);
+            if (groupTabs.length === 0) return null;
             return (
-              <button
-                key={t.id}
-                onClick={() => { setTab(t.id); setWithdrawalFilter("pending"); setDepositFilter("all"); setGamesFilter("all"); setSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActive
-                    ? "bg-ccb-primary/15 text-ccb-primary shadow-sm"
-                    : "text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className="flex-1 text-left">{t.label}</span>
-                {t.badge ? (
-                  <span className="px-1.5 py-0.5 rounded-full bg-ccb-accent/20 text-ccb-accent text-[10px] font-bold">
-                    {t.badge}
-                  </span>
-                ) : null}
-              </button>
+              <div key={gi} className="space-y-0.5">
+                {group.label && (
+                  <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-ccb-muted/60 font-bold">
+                    {group.label}
+                  </div>
+                )}
+                {groupTabs.map((t: any) => {
+                  const Icon = t.icon;
+                  const isActive = tab === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => { setTab(t.id); setWithdrawalFilter("pending"); setDepositFilter("all"); setGamesFilter("all"); setSidebarOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                        isActive
+                          ? "bg-ccb-primary/15 text-ccb-primary shadow-sm"
+                          : "text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="flex-1 text-left">{t.label}</span>
+                      {t.badge ? (
+                        <span className="px-1.5 py-0.5 rounded-full bg-ccb-accent/20 text-ccb-accent text-[10px] font-bold">
+                          {t.badge}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </nav>
@@ -3258,7 +3280,142 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
             </div>
           )}
 
+          {/* ========== PLATFORM SETTINGS ========== */}
+          {tab === "settings" && (
+            <PlatformSettingsHub />
+          )}
+
         </div>
+      </div>
+    </div>
+  );
+}
+
+function PlatformSettingsHub() {
+  const [settingsSection, setSettingsSection] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["battles", "withdrawals", "berry"]));
+
+  const settingSections = [
+    { id: "battles", label: "Battles", icon: Swords, desc: "Stakes, fees, auto-cancel" },
+    { id: "withdrawals", label: "Withdrawals", icon: ArrowDownUp, desc: "Limits, fees, approval" },
+    { id: "deposits", label: "Deposits", icon: DollarSign, desc: "Limits, auto-credit, approval" },
+    { id: "berry", label: "Berry Rewards", icon: Cherry, desc: "Earning rates, conversion, caps" },
+    { id: "tournaments", label: "Tournaments", icon: Trophy, desc: "Approval, max players" },
+    { id: "games", label: "Games", icon: Gamepad2, desc: "Spectators, concurrency" },
+    { id: "users", label: "Users", icon: Users, desc: "Signups, verification, admin" },
+    { id: "leagues", label: "Leagues", icon: Crown, desc: "Membership, promotion/relegation" },
+    { id: "seasons", label: "Seasons", icon: Calendar, desc: "Auto-create, duration, overlap" },
+    { id: "membership", label: "Membership", icon: Shield, desc: "Auto-renew, grace period" },
+    { id: "verification", label: "Verification", icon: ShieldCheck, desc: "ID, selfie, auto-approve" },
+    { id: "logs", label: "Logs", icon: ScrollText, desc: "Retention period" },
+    { id: "overview", label: "Dashboard", icon: LayoutDashboard, desc: "Refresh, KPI cards" },
+  ];
+
+  const toggleSection = (id: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const filteredSections = settingSections.filter(s => {
+    if (searchQuery) {
+      return s.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             s.desc.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    return true;
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* HEADER */}
+      <div className="card p-4 sm:p-5">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-ccb-primary/10 flex items-center justify-center">
+            <SlidersHorizontal className="w-5 h-5 text-ccb-primary" />
+          </div>
+          <div>
+            <h2 className="font-bold text-lg">Platform Settings</h2>
+            <p className="text-xs text-ccb-muted">Configure all platform behavior in one place. Changes apply instantly across the entire site.</p>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ccb-muted" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search settings..."
+            className="w-full pl-9 pr-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm focus:outline-none focus:border-ccb-primary/50"
+          />
+        </div>
+      </div>
+
+      {/* QUICK NAV CHIPS */}
+      <div className="flex gap-1.5 flex-wrap">
+        {settingSections.map(s => {
+          const Icon = s.icon;
+          const isExpanded = expandedSections.has(s.id);
+          return (
+            <button
+              key={s.id}
+              onClick={() => toggleSection(s.id)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                isExpanded
+                  ? "bg-ccb-primary text-white"
+                  : "bg-ccb-surface text-ccb-muted hover:text-ccb-text border border-ccb-border"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* SETTINGS SECTIONS */}
+      <div className="space-y-3">
+        {filteredSections.map(s => {
+          const Icon = s.icon;
+          const isExpanded = expandedSections.has(s.id);
+          return (
+            <div key={s.id} className={`card overflow-hidden transition-all ${isExpanded ? "" : "opacity-60"}`}>
+              <button
+                onClick={() => toggleSection(s.id)}
+                className="w-full flex items-center gap-3 p-4 hover:bg-ccb-surface/50 transition-colors"
+              >
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                  isExpanded ? "bg-ccb-primary/10 text-ccb-primary" : "bg-ccb-surface text-ccb-muted"
+                }`}>
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                  <div className="font-bold text-sm">{s.label}</div>
+                  <div className="text-xs text-ccb-muted truncate">{s.desc}</div>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-ccb-muted transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`} />
+              </button>
+              {isExpanded && (
+                <div className="px-4 pb-4 border-t border-ccb-border/50">
+                  <PlatformSettingsPanel section={s.id} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* FOOTER NOTE */}
+      <div className="card p-4 flex items-start gap-2.5">
+        <Database className="w-4 h-4 text-ccb-muted shrink-0 mt-0.5" />
+        <p className="text-xs text-ccb-muted">
+          Settings are stored in the <code className="text-ccb-text font-mono">platform_settings</code> table and synced to legacy config tables (battle_config, withdrawal_config, berry_config) automatically. All backend routes read from these values.
+        </p>
       </div>
     </div>
   );
