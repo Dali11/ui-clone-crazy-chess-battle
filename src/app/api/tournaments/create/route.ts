@@ -108,15 +108,13 @@ export async function POST(req: NextRequest) {
     if (initialStatus === "upcoming") {
       try {
         const { data: allUsers } = await admin
-          .from("profiles")
-          .select("email")
-          .not("email", "is", null);
+          .rpc("get_all_user_emails");
 
         if (allUsers && allUsers.length > 0) {
-          const emailPromises = allUsers
-            .map((u) => u.email)
-            .filter((e): e is string => !!e)
-            .map((to) =>
+          const emailPromises = (allUsers as any[])
+            .map((u: any) => u.email)
+            .filter((e: any): e is string => !!e)
+            .map((to: string) =>
               sendEmail({
                 to,
                 template: "new_tournament" as const,

@@ -58,14 +58,12 @@ export async function GET(req: NextRequest) {
 
         const participantIds = new Set((participants || []).map((p) => p.user_id));
 
-        // Get all users with an email
+        // Get all users with an email via RPC (emails are in auth.users, not profiles)
         const { data: allUsers } = await admin
-          .from("profiles")
-          .select("id, email")
-          .not("email", "is", null);
+          .rpc("get_all_user_emails");
 
-        const nonJoiners = (allUsers || []).filter(
-          (u) => u.email && !participantIds.has(u.id)
+        const nonJoiners = ((allUsers as any[]) || []).filter(
+          (u: any) => u.email && !participantIds.has(u.user_id)
         );
 
         if (nonJoiners.length === 0) {
@@ -79,7 +77,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Send reminder emails
-        const emailPromises = nonJoiners.map((user) =>
+        const emailPromises = nonJoiners.map((user: any) =>
           sendEmail({
             to: user.email,
             template: "tournament_reminder",
