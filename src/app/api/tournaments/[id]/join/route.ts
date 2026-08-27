@@ -161,13 +161,44 @@ export async function POST(
     }
 
     // Join tournament
-    const { error: joinErr } = await admin
+    const { data: insertedParticipant, error: joinErr } = await admin
       .from("tournament_participants")
       .insert({
         tournament_id: tournamentId,
         player_id: user.id,
         paid_entry_fee: paidEntryFee,
-      });
+      })
+      .select("id")
+      .single();
+
+    // Post-insert capacity check to prevent race condition
+    // (two users could pass the pre-check simultaneously)
+    if (!joinErr && insertedParticipant && tournament.max_players) {
+      const { count: postCount } = await admin
+        .from("tournament_participants")
+        .select("id", { count: "exact", head: true })
+        .eq("tournament_id", tournamentId);
+
+      if (postCount !== null && postCount > tournament.max_players) {
+        // We went over capacity — remove our participant and refund
+        await admin
+          .from("tournament_participants")
+          .delete()
+          .eq("id", insertedParticipant.id);
+
+        if (didDebit) {
+          await admin.rpc("credit_wallet", {
+            p_user_id: user.id,
+            p_amount: entryFee,
+          });
+        }
+
+        return NextResponse.json(
+          { error: "Tournament is full" },
+          { status: 400 }
+        );
+      }
+    }
 
     if (joinErr) {
       // If we actually debited the wallet this join, refund on failure

@@ -173,17 +173,22 @@ async function handleAutoStart(req: NextRequest) {
           }
         } else {
           // Swiss pairings
-          const mid = Math.ceil(seeded.length / 2);
-          const topHalf = seeded.slice(0, mid);
-          const bottomHalf = seeded.slice(mid);
+          // If odd number of players, give the bye to the lowest seed (last in seeded array)
+          const hasOddCount = seeded.length % 2 === 1;
+          const byePlayer = hasOddCount ? seeded[seeded.length - 1].player_id : null;
+          const paired = hasOddCount ? seeded.slice(0, -1) : seeded;
+          const mid = Math.ceil(paired.length / 2);
+          const topHalf = paired.slice(0, mid);
+          const bottomHalf = paired.slice(mid);
           for (let i = 0; i < mid; i++) {
             if (i < bottomHalf.length) {
               const white = i % 2 === 0 ? topHalf[i].player_id : bottomHalf[i].player_id;
               const black = i % 2 === 0 ? bottomHalf[i].player_id : topHalf[i].player_id;
               pairings.push({ white, black });
-            } else {
-              pairings.push({ white: "", black: "", bye: topHalf[i].player_id });
             }
+          }
+          if (byePlayer) {
+            pairings.push({ white: "", black: "", bye: byePlayer });
           }
           // Set total rounds for Swiss: ceil(log2(N)) ensures enough rounds for a clear winner, min 3
           const swissRounds = Math.max(3, Math.ceil(Math.log2(seeded.length)));
