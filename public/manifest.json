@@ -140,8 +140,8 @@
   "related_applications": [
     {
       "platform": "play",
-      "url": "https://play.google.com/store/apps/details?id=live.crazychessbattles",
-      "id": "live.crazychessbattles"
+      "url": "https://play.google.com/store/apps/details?id=live.crazychessbattles.twa",
+      "id": "live.crazychessbattles.twa"
     }
   ],
   "prefer_related_applications": false

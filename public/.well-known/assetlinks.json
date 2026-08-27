@@ -1,1 +1,8 @@
-[]
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "live.crazychessbattles.twa",
+        "sha256_cert_fingerprints": ["2E:D3:A7:E8:5C:7D:13:B3:1A:40:B1:22:DC:D4:AD:33:A0:E5:19:94:FD:C7:0D:40:6B:4B:43:C3:0C:A6:CE:B9"]
+      }
+    }]
