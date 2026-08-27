@@ -1964,7 +1964,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           <input type="number" value={createForm.min_players ?? 2} onChange={(e) => setCreateForm({ ...createForm, min_players: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-ccb-muted">Max Players (blank = \u221e)</label>
+                          <label className="text-xs font-medium text-ccb-muted">Max Players (blank = ∞)</label>
                           <input type="number" value={createForm.max_players ?? ""} onChange={(e) => setCreateForm({ ...createForm, max_players: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                       </div>
@@ -2335,7 +2335,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs font-medium text-ccb-muted">Max Players (blank = \u221e)</label>
+                          <label className="text-xs font-medium text-ccb-muted">Max Players (blank = ∞)</label>
                           <input type="number" value={editForm.max_players ?? ""} onChange={(e) => setEditForm({ ...editForm, max_players: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                         <div>
