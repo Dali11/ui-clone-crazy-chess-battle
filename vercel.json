@@ -1,50 +1,54 @@
 {
-    "name": "ccb-github",
-    "framework": "nextjs",
-    "env": {
-        "NEXT_PUBLIC_SUPABASE_URL": "https://jykrncwtrmegmzimqekf.supabase.co",
-        "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5a3JuY3d0cm1lZ216aW1xZWtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5NDU5MDgsImV4cCI6MjEwMDUyMTkwOH0.GqVNE0xi-SBcHqNCDX-hTPSM_wJ89BCbLZutcHWj93k"
+  "name": "ccb-github",
+  "framework": "nextjs",
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "https://jykrncwtrmegmzimqekf.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5a3JuY3d0cm1lZ216aW1xZWtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5NDU5MDgsImV4cCI6MjEwMDUyMTkwOH0.GqVNE0xi-SBcHqNCDX-hTPSM_wJ89BCbLZutcHWj93k"
+  },
+  "crons": [
+    {
+      "path": "/api/tournaments/daily-create",
+      "schedule": "0 22 * * *"
     },
-    "crons": [
+    {
+      "path": "/api/battles/challenge/cleanup-expired",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/league/membership-cleanup",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/tournaments/reminder-check",
+      "schedule": "30 13 * * *"
+    },
+    {
+      "path": "/api/league/weekend-cron",
+      "schedule": "0 6 * * 6,0"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
         {
-            "path": "/api/tournaments/daily-create",
-            "schedule": "0 22 * * *"
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
         },
         {
-            "path": "/api/battles/challenge/cleanup-expired",
-            "schedule": "0 0 * * *"
-        },
-        {
-            "path": "/api/league/membership-cleanup",
-            "schedule": "0 2 * * *"
-        },
-        {
-            "path": "/api/tournaments/reminder-check",
-            "schedule": "30 13 * * *"
+          "key": "Service-Worker-Allowed",
+          "value": "/"
         }
-    ],
-    "headers": [
+      ]
+    },
+    {
+      "source": "/manifest.json",
+      "headers": [
         {
-            "source": "/sw.js",
-            "headers": [
-                {
-                    "key": "Cache-Control",
-                    "value": "public, max-age=0, must-revalidate"
-                },
-                {
-                    "key": "Service-Worker-Allowed",
-                    "value": "/"
-                }
-            ]
-        },
-        {
-            "source": "/manifest.json",
-            "headers": [
-                {
-                    "key": "Content-Type",
-                    "value": "application/manifest+json"
-                }
-            ]
+          "key": "Content-Type",
+          "value": "application/manifest+json"
         }
-    ]
+      ]
+    }
+  ]
 }

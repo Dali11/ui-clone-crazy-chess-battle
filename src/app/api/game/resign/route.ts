@@ -1,4 +1,5 @@
 import { processTournamentGameResult } from "@/lib/tournament/results";
+import { processLeagueGameResult } from "@/lib/league/process-game-result";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest) {
     // Process tournament game result if this is a tournament game
     const { data: fullGame } = await admin
       .from("games")
-      .select("tournament_id")
+      .select("tournament_id, league_fixture_id")
       .eq("id", gameId)
       .single();
 
@@ -131,6 +132,21 @@ export async function POST(req: NextRequest) {
         });
       } catch (e) {
         console.error("[resign] Tournament processing failed for game", gameId, e);
+      }
+    }
+
+    // Process league game result if this is a league fixture game
+    if (fullGame?.league_fixture_id) {
+      try {
+        await processLeagueGameResult({
+          gameId,
+          whitePlayerId: game.white_player_id,
+          blackPlayerId: game.black_player_id,
+          winner: winner as "white" | "black" | "draw",
+          status: "resign",
+        });
+      } catch (e) {
+        console.error("[resign] League processing failed for game", gameId, e);
       }
     }
 

@@ -160,6 +160,17 @@ export async function GET(req: Request) {
       })
     );
 
+    // Determine recommended league tier based on player rating
+    let recommendedTier: number | null = null;
+    if (profile?.rating != null) {
+      const r = profile.rating;
+      if (r >= 2000) recommendedTier = 1;
+      else if (r >= 1600) recommendedTier = 2;
+      else if (r >= 1200) recommendedTier = 3;
+      else if (r >= 800) recommendedTier = 4;
+      else recommendedTier = 5;
+    }
+
     return NextResponse.json({
       success: true,
       isAdmin,
@@ -167,6 +178,7 @@ export async function GET(req: Request) {
       userId: user?.id || null,
       userGender: profile?.gender || null,
       userIdentityVerified: profile?.identity_verified || false,
+      recommendedTier,
       market: {
         currencyCode: market.currencyCode,
         currencySymbol: market.currencySymbol,

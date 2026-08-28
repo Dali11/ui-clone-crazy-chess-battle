@@ -74,6 +74,7 @@ interface ApiResponse {
   userId: string | null;
   userGender: string | null;
   userIdentityVerified: boolean | null;
+  recommendedTier: number | null;
   market: {
     currencyCode: string;
     currencySymbol: string;
@@ -315,6 +316,11 @@ export default function PremiumLeaguesTab() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${meta.bgColor} ${meta.color}`}>L{league.tier}</span>
+                        {data?.recommendedTier === league.tier && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-primary/20 text-ccb-primary flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" /> Recommended
+                          </span>
+                        )}
                         <h3 className="font-bold text-sm truncate">{league.name}</h3>
                         {league.gender_restriction === 'female' && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-pink-500/10 text-pink-400 shrink-0">Women's</span>

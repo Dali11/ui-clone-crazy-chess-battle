@@ -28,6 +28,9 @@ export async function POST(req: NextRequest) {
       `ALTER TABLE premier_leagues ADD COLUMN IF NOT EXISTS max_rating INT`,
       `ALTER TABLE premier_leagues ADD COLUMN IF NOT EXISTS requires_qualification BOOLEAN NOT NULL DEFAULT FALSE`,
       `ALTER TABLE premier_leagues ADD COLUMN IF NOT EXISTS qualifier_tournament_id UUID`,
+      `ALTER TABLE premier_leagues ADD COLUMN IF NOT EXISTS season_start_date TIMESTAMPTZ`,
+      `ALTER TABLE games ADD COLUMN IF NOT EXISTS league_fixture_id UUID`,
+      `ALTER TABLE games ADD COLUMN IF NOT EXISTS league_id UUID`,
     ];
 
     for (const sql of alterStatements) {
