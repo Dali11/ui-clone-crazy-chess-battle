@@ -932,44 +932,75 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   ) : (
                     arenaGames.map((g) => {
                       const isMyGame = g.whiteId === data.currentPlayerId || g.blackId === data.currentPlayerId;
+                      const initials = (name: string) => (name || '?').trim().charAt(0).toUpperCase();
                       return (
-                        <div key={g.id} className={`bg-ccb-card border rounded-2xl p-4 transition-all ${isMyGame ? 'border-ccb-primary/40 shadow-lg shadow-ccb-primary/10' : 'border-ccb-border'}`}>
-                          <div className="flex items-center justify-between gap-3 mb-3">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <div className="text-center min-w-0">
-                                <div className="text-sm font-bold truncate">{g.whiteName}</div>
-                                <div className="text-[10px] text-ccb-muted">{g.whiteRating}</div>
-                              </div>
-                              <span className="text-xs font-bold text-ccb-muted px-2 py-0.5 rounded-lg bg-ccb-surface border border-ccb-border shrink-0">vs</span>
-                              <div className="text-center min-w-0">
-                                <div className="text-sm font-bold truncate">{g.blackName}</div>
-                                <div className="text-[10px] text-ccb-muted">{g.blackRating}</div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {g.status === 'playing' ? (
-                                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-ccb-success/10 text-ccb-success border border-ccb-success/30 flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-ccb-success animate-pulse" /> Live
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30">
-                                  Starting
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
+                        <Link
+                          key={g.id}
+                          href={`/game/${g.id}`}
+                          className={`group block relative overflow-hidden bg-ccb-card border rounded-2xl transition-all active:scale-[0.99] ${
+                            isMyGame ? 'border-ccb-primary/50 shadow-lg shadow-ccb-primary/10' : 'border-ccb-border hover:border-ccb-primary/30'
+                          }`}
+                        >
+                          {isMyGame && <div className="absolute inset-y-0 left-0 w-1 bg-ccb-primary" />}
+
+                          <div className="flex items-center justify-between px-4 pt-3">
                             {isMyGame ? (
-                              <Link href={`/game/${g.id}`} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-ccb-primary text-white font-bold text-xs hover:bg-ccb-primary/90 transition-all">
-                                <Play className="w-3.5 h-3.5" /> Play Your Game
-                              </Link>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-primary/15 text-ccb-primary border border-ccb-primary/30">
+                                Your Match
+                              </span>
+                            ) : <span />}
+                            {g.status === 'playing' ? (
+                              <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-ccb-success/10 text-ccb-success border border-ccb-success/30 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-ccb-success animate-pulse" /> Live
+                              </span>
                             ) : (
-                              <Link href={`/game/${g.id}`} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-ccb-surface border border-ccb-border text-ccb-text font-bold text-xs hover:bg-ccb-primary/10 hover:border-ccb-primary/30 transition-all">
-                                <Eye className="w-3.5 h-3.5" /> Watch
-                              </Link>
+                              <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-ccb-accent/10 text-ccb-accent border border-ccb-accent/30">
+                                Starting
+                              </span>
                             )}
                           </div>
-                        </div>
+
+                          <div className="flex items-center gap-3 px-4 py-3.5">
+                            {/* White player */}
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div className="w-9 h-9 shrink-0 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center text-sm font-bold text-ccb-text">
+                                {initials(g.whiteName)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-bold truncate leading-tight">{g.whiteName}</div>
+                                <div className="text-[11px] text-ccb-muted font-medium">{g.whiteRating}</div>
+                              </div>
+                            </div>
+
+                            {/* VS divider */}
+                            <div className="shrink-0 w-8 h-8 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center">
+                              <Swords className="w-3.5 h-3.5 text-ccb-muted" />
+                            </div>
+
+                            {/* Black player */}
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1 justify-end text-right">
+                              <div className="min-w-0">
+                                <div className="text-sm font-bold truncate leading-tight">{g.blackName}</div>
+                                <div className="text-[11px] text-ccb-muted font-medium">{g.blackRating}</div>
+                              </div>
+                              <div className="w-9 h-9 shrink-0 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center text-sm font-bold text-ccb-text">
+                                {initials(g.blackName)}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className={`flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold border-t ${
+                            isMyGame
+                              ? 'bg-ccb-primary/10 text-ccb-primary border-ccb-primary/20 group-hover:bg-ccb-primary/15'
+                              : 'text-ccb-muted border-ccb-border group-hover:text-ccb-text group-hover:bg-ccb-surface/50'
+                          } transition-colors`}>
+                            {isMyGame ? (
+                              <><Play className="w-3.5 h-3.5" /> Play Your Game</>
+                            ) : (
+                              <><Eye className="w-3.5 h-3.5" /> Watch</>
+                            )}
+                          </div>
+                        </Link>
                       );
                     })
                   )}
