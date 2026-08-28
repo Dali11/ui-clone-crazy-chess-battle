@@ -182,7 +182,7 @@ async function handleTournamentCron(req: NextRequest) {
             }
           }
           // No byes in arena
-          const durMin = (tournament as any).duration_minutes || 60;
+          const durMin = (tournament as any).duration_minutes || 120;
           const endsAt = new Date(new Date(tournament.starts_at || Date.now()).getTime() + durMin * 60 * 1000);
           await admin.from("tournaments").update({ rounds: null, ends_at: endsAt.toISOString() }).eq("id", tournament.id);
         } else {
