@@ -713,7 +713,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               {tab === 'standings' && <Trophy className="w-3.5 h-3.5" />}
               {tab === 'rounds' && <Swords className="w-3.5 h-3.5" />}
               {tab === 'info' && <Settings className="w-3.5 h-3.5" />}
-              {tab}
+              {tab === 'rounds' && isArena ? 'matches' : tab}
             </button>
           ))}
         </div>
@@ -960,6 +960,18 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     })
                   )}
                 </div>
+              ) : isArena ? (
+              <div className="bg-ccb-card border border-ccb-border rounded-2xl p-10 text-center">
+                <Swords className="w-10 h-10 text-ccb-muted mx-auto mb-3" />
+                <h3 className="font-bold text-sm mb-1">
+                  {isFinished ? 'Arena has ended' : 'No matches yet'}
+                </h3>
+                <p className="text-xs text-ccb-muted">
+                  {isFinished
+                    ? 'Check the Standings tab for final results.'
+                    : 'Live matches will appear here once the arena starts.'}
+                </p>
+              </div>
               ) : (
               <div className="bg-ccb-card border border-ccb-border rounded-2xl p-10 text-center">
                 <Swords className="w-10 h-10 text-ccb-muted mx-auto mb-3" />
