@@ -32,7 +32,8 @@ export async function finishTournament(tournamentId: string): Promise<void> {
       creator_profit_percent,
       created_by,
       pool_source,
-      status
+      status,
+      type
     `)
     .eq("id", tournamentId)
     .single();
@@ -116,7 +117,13 @@ export async function finishTournament(tournamentId: string): Promise<void> {
   // Fallback to Swiss tiebreaks for non-knockout tournaments or if bracket data is missing
   if (rankedParticipants.length === 0) {
     const { calculateTiebreaks } = await import("@/lib/tournament/tiebreaks");
-    rankedParticipants = await calculateTiebreaks(admin, tournamentId);
+    const tb = await calculateTiebreaks(admin, tournamentId);
+    rankedParticipants = (tb || []).map((p: any) => ({
+      player_id: p.player_id,
+      final_rank: p.final_rank ?? 0,
+      score: p.score ?? 0,
+      wins: p.wins ?? 0,
+    }));
   }
 
   // Assign final ranks
