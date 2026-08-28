@@ -2416,10 +2416,16 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           <input type="number" value={editForm.max_players ?? ""} onChange={(e) => setEditForm({ ...editForm, max_players: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-ccb-muted">Rounds</label>
+                          <label className="text-xs font-medium text-ccb-muted">Rounds (blank = arena)</label>
                           <input type="number" value={editForm.rounds ?? ""} onChange={(e) => setEditForm({ ...editForm, rounds: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                       </div>
+                      {editForm.type === "arena" && (
+                        <div>
+                          <label className="text-xs font-medium text-ccb-muted">Duration (minutes)</label>
+                          <input type="number" value={editForm.duration_minutes ?? ""} onChange={(e) => setEditForm({ ...editForm, duration_minutes: e.target.value })} className="input-field mt-1 w-full" placeholder="e.g. 30" />
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Min Rating</label>
