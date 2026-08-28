@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { runWeekendLeagueCron } from "@/lib/league/weekend-scheduler";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateSwissPairings, extractPreviousByes } from "@/lib/tournament/swiss-pairing";
 import { shouldArenaFinish, runArenaMatchmakingWave } from "@/lib/tournament/arena";
@@ -1163,6 +1164,16 @@ async function handleTournamentCron(req: NextRequest) {
           results.errors.push(`${tournament.name} re-advance: ${e.message}`);
         }
       }
+    }
+
+    // Run weekend league cron (auto-advances matchdays on Sat/Sun)
+    try {
+      const leagueResults = await runWeekendLeagueCron();
+      if (leagueResults.advanced.length > 0 || leagueResults.completed.length > 0) {
+        (results as any).leagues = leagueResults;
+      }
+    } catch (e: any) {
+      (results as any).leagueError = e.message;
     }
 
     return NextResponse.json(results);
