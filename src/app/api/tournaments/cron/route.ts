@@ -893,7 +893,7 @@ async function handleTournamentCron(req: NextRequest) {
       // (this was the cause of inflated arena standings).
       const { data: claimedGame } = await admin.from("games")
         .update({
-          status: "resigned",
+          status: "resign",
           winner: winner,
           ended_at: new Date().toISOString(),
         })
@@ -914,7 +914,7 @@ async function handleTournamentCron(req: NextRequest) {
           whitePlayerId: g.white_player_id,
           blackPlayerId: g.black_player_id,
           winner: winner as "white" | "black",
-          status: "resigned",
+          status: "resign",
         });
       }
 
