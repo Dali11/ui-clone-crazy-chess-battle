@@ -107,6 +107,7 @@ export async function POST(
       // Determine winners from completed games
       const winners: string[] = [];
       const byes: string[] = [];
+      const losers: string[] = [];
 
       for (const p of prevPairings) {
         if (p.bye) {
@@ -114,14 +115,21 @@ export async function POST(
         } else if (p.white && p.black && p.result) {
           if (p.result === "white") {
             winners.push(p.white as string);
+            losers.push(p.black as string);
           } else if (p.result === "black") {
             winners.push(p.black as string);
+            losers.push(p.white as string);
           } else if (p.result === "draw") {
             // In knockout, draws need a tiebreak — for now, higher seed advances
-            // (The game resolution should handle this, but as a fallback:)
             const whiteSeed = participants.find((p2: any) => p2.player_id === p.white)?.seed || 0;
             const blackSeed = participants.find((p2: any) => p2.player_id === p.black)?.seed || 0;
-            winners.push(whiteSeed <= blackSeed ? (p.white as string) : (p.black as string));
+            if (whiteSeed <= blackSeed) {
+              winners.push(p.white as string);
+              losers.push(p.black as string);
+            } else {
+              winners.push(p.black as string);
+              losers.push(p.white as string);
+            }
           }
         }
       }
@@ -325,24 +333,32 @@ export async function POST(
         return NextResponse.json({ success: true, finished: true });
       }
 
+      // 3rd-place decider: when semi-finals produce exactly 2 winners
+      // and 2 losers, add a 3rd-place match alongside the final.
+      const thirdPlacePairing = (winners.length + byes.length === 2 && losers.length === 2)
+        ? [{ white: losers[0], black: losers[1], is_third_place: true }]
+        : [];
+
       const restMinutes = tournament.rest_minutes || 5;
       const scheduledStart = new Date(Date.now() + restMinutes * 60 * 1000);
 
+      const allPairings = [...pairings, ...thirdPlacePairing];
       await admin.from("tournament_rounds").insert({
         tournament_id: tournamentId,
         round_number: nextRound,
-        pairings: pairings.map((p, i) => ({
+        pairings: allPairings.map((p, i) => ({
           board: i + 1,
           white: p.white || null,
           black: p.black || null,
           bye: p.bye || null,
           result: null,
+          is_third_place: (p as any).is_third_place ?? false,
         })),
         is_complete: false,
         starts_at: scheduledStart.toISOString(),
       });
 
-      const matchPairings = pairings.filter((p) => !p.bye);
+      const matchPairings = allPairings.filter((p) => !p.bye);
       const initialMs = tournament.initial_minutes * 60 * 1000;
 
       // Fetch actual ratings
@@ -384,12 +400,13 @@ export async function POST(
       if (Object.keys(pureKoGameIds).length > 0) {
         await admin.from("tournament_rounds")
           .update({
-            pairings: pairings.map((p, i) => ({
+            pairings: allPairings.map((p, i) => ({
               board: i + 1,
               white: p.white || null,
               black: p.black || null,
               bye: p.bye || null,
               result: null,
+              is_third_place: (p as any).is_third_place ?? false,
               game_id: pureKoGameIds[`${p.white}|${p.black}`] || null,
             })),
           })
