@@ -57,6 +57,7 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drawOffer, setDrawOffer] = useState<string | null>(null);
+  const [spectatorCount, setSpectatorCount] = useState(0);
   const [opponentMove, setOpponentMove] = useState<MoveBroadcast | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -301,6 +302,15 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
       .on("presence", { event: "sync" }, () => {
         lastEventTimeRef.current = Date.now();
         updateConnectionQuality("online");
+        const state = channel.presenceState();
+        const userIds = new Set(Object.keys(state));
+        // Spectators = total presence minus the 2 players
+        const players = new Set([initialState.white_player_id, initialState.black_player_id].filter(Boolean));
+        let specs = 0;
+        for (const id of userIds) {
+          if (!players.has(id)) specs++;
+        }
+        setSpectatorCount(specs);
       })
       .on("presence", { event: "join" }, () => {
         lastEventTimeRef.current = Date.now();
@@ -543,5 +553,5 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
     };
   }, []);
 
-  return { game, connected, connectionQuality, error, drawOffer, makeMove, resign, checkTimeout, setGame, offerDraw, acceptDraw, declineDraw, opponentMove };
+  return { game, connected, connectionQuality, error, drawOffer, makeMove, resign, checkTimeout, setGame, offerDraw, acceptDraw, declineDraw, opponentMove, spectatorCount };
 }

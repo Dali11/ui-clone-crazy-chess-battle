@@ -66,7 +66,7 @@ function formatClock(ms: number | null): string {
 }
 
 export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo, tournamentId }: GameClientProps) {
-  const { game, connected, connectionQuality, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw } = useRealtimeGame(gameId, initialGame, currentUserId);
+  const { game, connected, connectionQuality, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw, spectatorCount } = useRealtimeGame(gameId, initialGame, currentUserId);
   const router = useRouter();
   const [fen, setFen] = useState(game.fen);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
@@ -941,6 +941,11 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           {isSpectator && <Eye className="w-3.5 h-3.5 text-ccb-muted" />}
           <Swords className="w-3.5 h-3.5 text-ccb-primary" />
           <span className="text-sm font-bold text-ccb-text">Crazy Chess Battles</span>
+          {spectatorCount > 0 && !gameEnded && (
+            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-surface border border-ccb-border text-ccb-muted">
+              <Eye className="w-3 h-3" /> {spectatorCount}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-0.5">
           <button
@@ -1240,6 +1245,11 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           </Link>
           <div className="flex items-center gap-1.5">
             {isSpectator && <span className="flex items-center gap-1 text-xs text-ccb-muted"><Eye className="w-3.5 h-3.5" />Spectating</span>}
+            {spectatorCount > 0 && !gameEnded && (
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-surface border border-ccb-border text-ccb-muted">
+                <Eye className="w-3 h-3" /> {spectatorCount} {spectatorCount === 1 ? 'watching' : 'watching'}
+              </span>
+            )}
             <Swords className="w-4 h-4 text-ccb-primary" />
             <span className="text-sm font-bold text-ccb-text">Crazy Chess Battles</span>
           </div>
