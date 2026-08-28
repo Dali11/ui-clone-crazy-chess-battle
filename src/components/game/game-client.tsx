@@ -362,6 +362,26 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     return formatClock(Math.max(0, baseMs - elapsed));
   };
 
+  // No-show countdown: while move_count is 0 (white hasn't moved) or 1
+  // (black hasn't responded), the tournament cron auto-resigns the player
+  // on the clock if they don't move within 2 minutes. Surface a visible
+  // countdown so both players know the timer is ticking instead of it
+  // silently happening server-side.
+  const NO_SHOW_MS = 2 * 60 * 1000;
+  const noShowInfo = useMemo(() => {
+    if (gameEnded || game.status !== "playing") return null;
+    if (game.move_count !== 0 && game.move_count !== 1) return null;
+    const timerStartRaw = game.last_move_at || game.created_at;
+    if (!timerStartRaw) return null;
+    void clockTick; // re-run every second
+    const elapsed = Date.now() - new Date(timerStartRaw).getTime();
+    const remainingMs = NO_SHOW_MS - elapsed;
+    return {
+      remainingSec: Math.max(0, Math.ceil(remainingMs / 1000)),
+      noShowPlayer: game.turn as "white" | "black",
+    };
+  }, [game.move_count, game.last_move_at, game.created_at, game.turn, game.status, gameEnded, clockTick]);
+
   const isPromotionMove = useCallback((from: string, to: string): boolean => {
     const game2 = new Chess(fen);
     const piece = game2.get(from as any);
@@ -979,6 +999,25 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
             >
               Refresh
             </button>
+          </div>
+        )}
+
+        {/* No-show countdown — visible to both players while the game is
+            waiting on White's opening move or Black's reply. Turns red and
+            starts pulsing in the final 30 seconds. */}
+        {noShowInfo && (
+          <div
+            className={`absolute top-0.5 left-3 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] shadow-md ${
+              noShowInfo.remainingSec <= 30
+                ? "bg-red-500/95 border-red-500 text-white animate-pulse"
+                : "bg-amber-500/95 border-amber-500 text-black"
+            }`}
+          >
+            <span className="font-medium">
+              {noShowInfo.noShowPlayer === "white" ? "White" : "Black"} must move
+              {" · "}
+              {Math.floor(noShowInfo.remainingSec / 60)}:{String(noShowInfo.remainingSec % 60).padStart(2, "0")}
+            </span>
           </div>
         )}
       </div>
