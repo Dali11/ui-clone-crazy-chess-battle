@@ -397,6 +397,7 @@ async function handleTournamentCron(req: NextRequest) {
             // ── Pure knockout advancement ──
             const winners: string[] = [];
             const byes: string[] = [];
+            const losers: string[] = [];
 
             // Fetch all participants for seed lookup
             const { data: allKoParts } = await admin
@@ -408,12 +409,13 @@ async function handleTournamentCron(req: NextRequest) {
             for (const p of prevPairings) {
               if (p.bye) { byes.push(p.bye as string); }
               else if (p.white && p.black && p.result) {
-                if (p.result === "white") winners.push(p.white as string);
-                else if (p.result === "black") winners.push(p.black as string);
+                if (p.result === "white") { winners.push(p.white as string); losers.push(p.black as string); }
+                else if (p.result === "black") { winners.push(p.black as string); losers.push(p.white as string); }
                 else if (p.result === "draw") {
                   const wSeed = seedLookup.get(p.white as string) || 0;
                   const bSeed = seedLookup.get(p.black as string) || 0;
-                  winners.push(wSeed <= bSeed ? (p.white as string) : (p.black as string));
+                  if (wSeed <= bSeed) { winners.push(p.white as string); losers.push(p.black as string); }
+                  else { winners.push(p.black as string); losers.push(p.white as string); }
                 }
               }
             }
@@ -431,6 +433,13 @@ async function handleTournamentCron(req: NextRequest) {
             const nextPairings = advanceKnockoutRound(winners, byes);
             for (const p of nextPairings) {
               koPairings.push({ white: p.white, black: p.black, bye: p.bye });
+            }
+
+            // 3rd-place decider: when the semi-finals produce exactly 2 winners
+            // (advancing to the final) and exactly 2 losers, pair the losers up
+            // for a parallel 3rd-place match in the same round.
+            if (winners.length + byes.length === 2 && losers.length === 2) {
+              koPairings.push({ white: losers[0], black: losers[1] } as any);
             }
           }
 
@@ -455,6 +464,7 @@ async function handleTournamentCron(req: NextRequest) {
               bye: p.bye || null,
               result: null,
               group: p.group ?? null,
+              is_third_place: i === koPairings.length - 1 && koPairings.length > 1 && winners.length + byes.length === 2,
             })),
             is_complete: false,
             starts_at: koStart.toISOString(),
@@ -504,6 +514,7 @@ async function handleTournamentCron(req: NextRequest) {
             bye: p.bye || null,
             result: null,
             group: p.group ?? null,
+            is_third_place: i === koPairings.length - 1 && koPairings.length > 1 && winners.length + byes.length === 2,
             game_id: koGameIds[`${p.white}|${p.black}`] || null,
           }));
           await admin
