@@ -516,7 +516,7 @@ async function handleTournamentCron(req: NextRequest) {
             bye: p.bye || null,
             result: null,
             group: p.group ?? null,
-            is_third_place: i === koPairings.length - 1 && koPairings.length > 1 && winners.length + byes.length === 2,
+            is_third_place: i === thirdPlaceIndex,
             game_id: koGameIds[`${p.white}|${p.black}`] || null,
           }));
           await admin
