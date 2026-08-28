@@ -193,7 +193,7 @@ async function handleAutoStart(req: NextRequest) {
           // Swiss round count is admin-controlled. If not set, default to 5
           // (never auto-calculate from player count — that's a knockout concept).
           if (!tournament.rounds) {
-            await admin.from("tournaments").update({ rounds: 5 }).eq("id", tournament.id);
+            await admin.from("tournaments").update({ rounds: 8 }).eq("id", tournament.id);
           }
         }
 
