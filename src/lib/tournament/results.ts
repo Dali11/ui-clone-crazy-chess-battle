@@ -194,7 +194,16 @@ async function _processTournamentGameResult(result: GameResult) {
         const roundByes = bracketPairings.filter((p) => p.bye).length;
 
         if (roundWinners + roundByes <= 1) {
-          await finishTournament(tournamentId);
+          // Bracket final is done. Check if a 3rd-place match exists
+          // and is still in progress — if so, wait for it before finishing.
+          const thirdPlaceMatch = updatedPairings.find((p) => (p as any).is_third_place);
+          if (thirdPlaceMatch && thirdPlaceMatch.result !== "white" && thirdPlaceMatch.result !== "black") {
+            // 3rd-place match still in progress — don't finish yet.
+            console.log("[processTournamentGameResult] Bracket final done, waiting for 3rd-place match");
+          } else {
+            // No 3rd-place match, or it's already completed — finish now.
+            await finishTournament(tournamentId);
+          }
         }
       } else {
         if (tournament.current_round >= tournament.rounds) {
