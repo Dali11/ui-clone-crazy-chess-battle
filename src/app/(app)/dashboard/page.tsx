@@ -33,14 +33,14 @@ export default async function DashboardPage() {
   // If the user has an active tournament game where it's their turn,
   // redirect them straight to the board before the dashboard even renders.
   const admin = createAdminClient();
-  const { data: activeTournaments } = await admin
+  const { data: myTournamentEntries } = await admin
     .from("tournament_participants")
     .select("tournament_id")
     .eq("player_id", user!.id)
     .eq("eliminated", false);
 
-  if (activeTournaments && activeTournaments.length > 0) {
-    const tournamentIds = activeTournaments.map((t) => t.tournament_id);
+  if (myTournamentEntries && myTournamentEntries.length > 0) {
+    const tournamentIds = myTournamentEntries.map((t) => t.tournament_id);
     const { data: activeGame } = await admin
       .from("games")
       .select("id, tournament_id, status, turn, white_player_id, black_player_id")
