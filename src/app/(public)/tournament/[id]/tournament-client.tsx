@@ -171,7 +171,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'standings' | 'rounds' | 'info'>('standings');
+  const [activeTab, setActiveTab] = useState<'standings' | 'rounds' | 'info'>('rounds');
   const [redirecting, setRedirecting] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -606,7 +606,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       {/* TAB BAR */}
       <div className="px-3 sm:px-6 lg:px-8 mb-4">
         <div className="flex gap-1.5 p-1 bg-ccb-surface rounded-xl border border-ccb-border">
-          {(['standings', 'rounds', 'info'] as const).map(tab => (
+          {(['rounds', 'standings', 'info'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
