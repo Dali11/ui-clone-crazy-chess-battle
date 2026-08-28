@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import AppNav from "@/components/layout/app-nav";
 import ActiveBattleWatcher from "@/components/battles/active-battle-watcher";
+import TournamentPopup from "@/components/layout/tournament-popup";
 
 
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ export default async function AppLayout({
     <div className="min-h-screen flex flex-col">
       <AppNav profile={profile} />
       <ActiveBattleWatcher />
+      <TournamentPopup />
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {children}
       </main>
