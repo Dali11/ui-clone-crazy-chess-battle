@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateKnockoutBracket, knockoutRoundCount, generateGroups, generateGroupRoundRobin } from "@/lib/tournament/knockout";
-import { pairArenaPlayers, getArenaPreviousMatchups, createArenaGames } from "@/lib/tournament/arena";
+import { pairArenaPlayers, getArenaLastOpponents, createArenaGames } from "@/lib/tournament/arena";
 import { sendEmail, sendBatchEmails } from "@/lib/email";
 
 // Allow enough time for large tournaments (100+ players) to seed + create games

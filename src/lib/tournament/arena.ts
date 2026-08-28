@@ -72,34 +72,49 @@ export async function getAvailableArenaPlayers(
 }
 
 /**
- * Get previous matchups to avoid immediate rematches.
+ * Get each player's most recent opponent in the arena.
+ * Returns a Map<playerId, lastOpponentId>.
+ *
+ * This is the key anti-rematch mechanism: we only avoid pairing a player
+ * with the opponent they JUST played. Unlike the old approach (which blocked
+ * ALL previous matchups and then force-rematched in Phase 2), this lets
+ * players meet again later in the arena after playing other opponents,
+ * while preventing the immediate "both free → instant rematch" problem.
  */
-export async function getArenaPreviousMatchups(
+export async function getArenaLastOpponents(
   admin: ReturnType<typeof createAdminClient>,
   tournamentId: string,
-): Promise<Set<string>> {
+): Promise<Map<string, string>> {
+  // Fetch games ordered by most recent first.
+  // We rely on created_at ordering to determine which game was "last" for each player.
   const { data: games } = await admin
     .from("games")
-    .select("white_player_id, black_player_id")
-    .eq("tournament_id", tournamentId);
+    .select("white_player_id, black_player_id, created_at")
+    .eq("tournament_id", tournamentId)
+    .order("created_at", { ascending: false })
+    .limit(200);
 
-  const matchups = new Set<string>();
+  const lastOpponent = new Map<string, string>();
+
   for (const g of games || []) {
-    if (g.white_player_id && g.black_player_id) {
-      matchups.add(`${g.white_player_id}|${g.black_player_id}`);
-      matchups.add(`${g.black_player_id}|${g.white_player_id}`);
-    }
+    const w = g.white_player_id as string;
+    const b = g.black_player_id as string;
+    if (!lastOpponent.has(w)) lastOpponent.set(w, b);
+    if (!lastOpponent.has(b)) lastOpponent.set(b, w);
   }
-  return matchups;
+
+  return lastOpponent;
 }
 
 /**
  * Pair available arena players by score (similar scores play each other).
- * Avoids immediate rematches. If odd number, the lowest-scored player waits.
+ * Avoids pairing a player with their most recent opponent.
+ * If the only available pairing would be an immediate rematch, those
+ * players simply wait until someone else becomes free.
  */
 export function pairArenaPlayers(
   players: ArenaPlayer[],
-  previousMatchups: Set<string>,
+  lastOpponents: Map<string, string>,
 ): Array<{ white: string; black: string }> {
   if (players.length < 2) return [];
 
@@ -112,7 +127,8 @@ export function pairArenaPlayers(
   const used = new Set<string>();
   let gameIdx = 0;
 
-  // Phase 1: Greedy pairing avoiding rematches
+  // Greedy pairing: for each player, find the best available opponent
+  // who is NOT their most recent opponent.
   for (let i = 0; i < sorted.length; i++) {
     if (used.has(sorted[i].player_id)) continue;
 
@@ -120,8 +136,10 @@ export function pairArenaPlayers(
     for (let j = i + 1; j < sorted.length; j++) {
       if (used.has(sorted[j].player_id)) continue;
 
-      const key = `${sorted[i].player_id}|${sorted[j].player_id}`;
-      if (previousMatchups.has(key)) continue;
+      // Skip if these two just played each other
+      const lastA = lastOpponents.get(sorted[i].player_id);
+      const lastB = lastOpponents.get(sorted[j].player_id);
+      if (lastA === sorted[j].player_id && lastB === sorted[i].player_id) continue;
 
       // Alternate colors based on game index
       const white = gameIdx % 2 === 0 ? sorted[i].player_id : sorted[j].player_id;
@@ -134,15 +152,9 @@ export function pairArenaPlayers(
       gameIdx++;
       break;
     }
-  }
 
-  // Phase 2: Allow rematches for remaining unpaired players
-  const remaining = sorted.filter((p) => !used.has(p.player_id));
-  for (let i = 0; i + 1 < remaining.length; i += 2) {
-    const white = gameIdx % 2 === 0 ? remaining[i].player_id : remaining[i + 1].player_id;
-    const black = gameIdx % 2 === 0 ? remaining[i + 1].player_id : remaining[i].player_id;
-    pairings.push({ white, black });
-    gameIdx++;
+    // If no valid opponent found, this player waits.
+    // Do NOT force a rematch — they'll be paired next wave when someone else is free.
   }
 
   return pairings;
@@ -278,17 +290,18 @@ export function shouldArenaFinish(tournament: { ends_at: string | null; status: 
 
 /**
  * Run one matchmaking wave for an active arena tournament: find available
- * (not-currently-playing) participants, pair them up avoiding rematches,
- * and create games for the new pairings.
+ * (not-currently-playing) participants, pair them up avoiding immediate
+ * rematches, and create games for the new pairings.
+ *
+ * If the only free players just played each other, they will NOT be paired
+ * — they wait until another player becomes free.
  *
  * This is the single source of truth for arena pairing and is meant to be
  * called EVENT-DRIVEN (right after a game finishes, right after a player
- * joins mid-arena) as well as from the periodic cron sweep — event-driven
- * calls make matching feel instant instead of waiting for the next cron
- * tick, while the cron sweep remains a safety net for edge cases (stuck
- * games, players who joined while nobody else was free, etc).
+ * joins mid-arena) as well as from the periodic cron sweep.
  *
- * Returns the number of new games created (0 if nobody was available to pair).
+ * Returns the number of new games created (0 if nobody was available to pair
+ * or if the only available pairing would be an immediate rematch).
  */
 export async function runArenaMatchmakingWave(
   admin: ReturnType<typeof createAdminClient>,
@@ -305,8 +318,8 @@ export async function runArenaMatchmakingWave(
   const available = await getAvailableArenaPlayers(admin, tournamentId);
   if (available.length < 2) return 0;
 
-  const previousMatchups = await getArenaPreviousMatchups(admin, tournamentId);
-  const pairings = pairArenaPlayers(available, previousMatchups);
+  const lastOpponents = await getArenaLastOpponents(admin, tournamentId);
+  const pairings = pairArenaPlayers(available, lastOpponents);
   if (pairings.length === 0) return 0;
 
   const nextWave = (tournament.current_round || 1) + 1;
