@@ -191,15 +191,19 @@ export async function POST(req: NextRequest) {
       const berries = await awardBerries(gameId, winnerId);
     }
 
-    // Process tournament game result
+    // Process tournament game result (non-blocking — game is already saved)
     if (gameEnded && result.winner && game.tournament_id) {
-      await processTournamentGameResult({
-        gameId,
-        whitePlayerId: game.white_player_id,
-        blackPlayerId: game.black_player_id,
-        winner: result.winner as "white" | "black" | "draw",
-        status: result.status || "playing",
-      });
+      try {
+        await processTournamentGameResult({
+          gameId,
+          whitePlayerId: game.white_player_id,
+          blackPlayerId: game.black_player_id,
+          winner: result.winner as "white" | "black" | "draw",
+          status: result.status || "playing",
+        });
+      } catch (e) {
+        console.error("[move] Tournament processing failed for game", gameId, e);
+      }
     }
 
     // Check if this is a Battle game and settle

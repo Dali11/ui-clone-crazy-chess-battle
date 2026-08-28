@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
 
       // Process tournament game result if this is a tournament game
       if (game.tournament_id) {
+        try {
         await processTournamentGameResult({
           gameId,
           whitePlayerId: game.white_player_id,
@@ -130,6 +131,9 @@ export async function POST(req: NextRequest) {
           winner: "draw",
           status: chess.isStalemate() ? "stalemate" : "draw",
         });
+      } catch (e) {
+        console.error("[draw] Tournament processing failed for game", gameId, e);
+      }
       }
 
       return NextResponse.json({ success: true, status: "draw" });

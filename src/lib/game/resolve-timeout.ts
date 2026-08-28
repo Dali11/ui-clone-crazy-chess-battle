@@ -111,13 +111,17 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
 
   // Tournament advancement
   if (game.tournament_id) {
-    await processTournamentGameResult({
-      gameId: game.id,
-      whitePlayerId: game.white_player_id,
-      blackPlayerId: game.black_player_id,
-      winner: winner as "white" | "black",
-      status: "timeout",
-    });
+    try {
+      await processTournamentGameResult({
+        gameId: game.id,
+        whitePlayerId: game.white_player_id,
+        blackPlayerId: game.black_player_id,
+        winner: winner as "white" | "black",
+        status: "timeout",
+      });
+    } catch (e) {
+      console.error("[timeout] Tournament processing failed for game", game.id, e);
+    }
   }
 
   // Battle settlement

@@ -114,13 +114,17 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (fullGame?.tournament_id) {
-      await processTournamentGameResult({
-        gameId,
-        whitePlayerId: game.white_player_id,
-        blackPlayerId: game.black_player_id,
-        winner: winner as "white" | "black",
-        status: "resign",
-      });
+      try {
+        await processTournamentGameResult({
+          gameId,
+          whitePlayerId: game.white_player_id,
+          blackPlayerId: game.black_player_id,
+          winner: winner as "white" | "black",
+          status: "resign",
+        });
+      } catch (e) {
+        console.error("[resign] Tournament processing failed for game", gameId, e);
+      }
     }
 
     // Check if this is a Battle game and settle
