@@ -5,6 +5,7 @@ import AppNav from "@/components/layout/app-nav";
 import ActiveBattleWatcher from "@/components/battles/active-battle-watcher";
 import ActiveTournamentWatcher from "@/components/layout/active-tournament-watcher";
 import TournamentPopup from "@/components/layout/tournament-popup";
+import OpenMatchBanner from "@/components/layout/open-match-banner";
 
 
 export const metadata: Metadata = {
@@ -33,6 +34,7 @@ export default async function AppLayout({
       <ActiveBattleWatcher />
       <ActiveTournamentWatcher />
       <TournamentPopup />
+      <OpenMatchBanner />
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {children}
       </main>
