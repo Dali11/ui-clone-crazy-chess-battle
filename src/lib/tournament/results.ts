@@ -157,7 +157,9 @@ async function _processTournamentGameResult(result: GameResult) {
       return p;
     });
 
-    const allDone = updatedPairings.every((p) => (p.result !== null && p.result !== undefined) || p.bye);
+    // Round is complete when all non-3rd-place pairings have results (or byes).
+    // 3rd-place match may still be in progress when the final finishes.
+    const allDone = updatedPairings.every((p) => (p.result !== null && p.result !== undefined) || p.bye || (p as any).is_third_place);
 
     const { error: roundUpdateErr } = await admin
       .from("tournament_rounds")
@@ -184,10 +186,12 @@ async function _processTournamentGameResult(result: GameResult) {
       }
 
       if (tournament.type === "knockout") {
-        const roundWinners = updatedPairings.filter(
+        // Count only non-3rd-place pairings to determine if bracket is done
+        const bracketPairings = updatedPairings.filter((p) => !(p as any).is_third_place);
+        const roundWinners = bracketPairings.filter(
           (p) => p.result === "white" || p.result === "black"
         ).length;
-        const roundByes = updatedPairings.filter((p) => p.bye).length;
+        const roundByes = bracketPairings.filter((p) => p.bye).length;
 
         if (roundWinners + roundByes <= 1) {
           await finishTournament(tournamentId);
