@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import PWAInstaller from "@/components/PWAInstaller";
 import ChunkErrorRecovery from "@/components/ChunkErrorRecovery";
+import CronHeartbeat from "@/components/CronHeartbeat";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -123,6 +124,7 @@ export default function RootLayout({
         {children}
         <PWAInstaller />
         <ChunkErrorRecovery />
+        <CronHeartbeat />
         <Analytics />
         <SpeedInsights />
       </body>

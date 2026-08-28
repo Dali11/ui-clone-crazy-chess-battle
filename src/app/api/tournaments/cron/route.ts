@@ -17,10 +17,33 @@ export async function POST(req: NextRequest) {
   return handleTournamentCron(req);
 }
 
+// In-memory throttle: skip the heavy DB work if another request
+// ran the cron less than 30 seconds ago. With client-side heartbeat
+// triggering, multiple browsers may hit this endpoint within the same
+// 5-minute window. The logic is idempotent, but we avoid hammering
+// Supabase with redundant queries. Resets on serverless cold start.
+let lastCronRunMs = 0;
+const CRON_THROTTLE_MS = 30_000;
+
 async function handleTournamentCron(req: NextRequest) {
   try {
     // No auth required — endpoint only performs safe tournament operations
     // (auto-start, auto-advance). No data exposure or destructive actions.
+
+    // Throttle: if we ran in the last 30s, return immediately
+    const nowMs = Date.now();
+    if (nowMs - lastCronRunMs < CRON_THROTTLE_MS) {
+      return NextResponse.json({
+        started: 0,
+        advanced: 0,
+        finished: 0,
+        errors: [],
+        throttled: true,
+        noShowResigned: 0,
+        timedOut: 0,
+      });
+    }
+    lastCronRunMs = nowMs;
 
     const admin = createAdminClient();
     const now = new Date().toISOString();
