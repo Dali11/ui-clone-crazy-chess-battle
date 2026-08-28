@@ -150,7 +150,7 @@ export async function POST(
             // Create round and games (same as below — we'll refactor to shared function)
             // For now, fall through to the generic round creation below
             // But we need to use these pairings instead of Swiss
-            const restMinutes = tournament.rest_minutes || 5;
+            const restMinutes = tournament.rest_minutes || 1;
             const scheduledStart = new Date(Date.now() + restMinutes * 60 * 1000);
 
             await admin.from("tournament_rounds").insert({
@@ -249,7 +249,7 @@ export async function POST(
             });
 
             const pairings = generateKnockoutBracket(seedPlayers);
-            const restMinutes = tournament.rest_minutes || 5;
+            const restMinutes = tournament.rest_minutes || 1;
             const scheduledStart = new Date(Date.now() + restMinutes * 60 * 1000);
 
             // Fetch actual ratings for game creation
@@ -340,7 +340,7 @@ export async function POST(
         ? [{ white: losers[0], black: losers[1], bye: undefined, is_third_place: true }]
         : [];
 
-      const restMinutes = tournament.rest_minutes || 5;
+      const restMinutes = tournament.rest_minutes || 1;
       const scheduledStart = new Date(Date.now() + restMinutes * 60 * 1000);
 
       const allPairings = [...pairings, ...thirdPlacePairing];
@@ -476,7 +476,7 @@ export async function POST(
     );
 
     // Calculate when next round games should start (now + rest minutes)
-    const restMinutes = tournament.rest_minutes || 5;
+    const restMinutes = tournament.rest_minutes || 1;
     const scheduledStart = new Date(Date.now() + restMinutes * 60 * 1000);
 
     // Create round entry with scheduled start time

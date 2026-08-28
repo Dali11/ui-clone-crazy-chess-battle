@@ -186,9 +186,15 @@ async function handleTournamentCron(req: NextRequest) {
           const endsAt = new Date(new Date(tournament.starts_at || Date.now()).getTime() + durMin * 60 * 1000);
           await admin.from("tournaments").update({ rounds: null, ends_at: endsAt.toISOString() }).eq("id", tournament.id);
         } else {
-          // Swiss pairing: top half vs bottom half
-          const swissRounds = Math.max(3, Math.ceil(Math.log2(seeded.length)));
-          await admin.from("tournaments").update({ rounds: swissRounds }).eq("id", tournament.id);
+          // Swiss pairing: top half vs bottom half.
+          // Rounds are admin-controlled for Swiss — only auto-calculate as a
+          // fallback if the admin left it unset. Auto-calc is a knockout-only
+          // concept (bracket size dictates round count); Swiss round count is
+          // a tournament design choice, not derived from player count.
+          if (!tournament.rounds) {
+            const swissRounds = Math.max(3, Math.ceil(Math.log2(seeded.length)));
+            await admin.from("tournaments").update({ rounds: swissRounds }).eq("id", tournament.id);
+          }
 
           // If odd number of players, give the bye to the lowest seed
           const hasOddCount = seeded.length % 2 === 1;
@@ -542,7 +548,7 @@ async function handleTournamentCron(req: NextRequest) {
           if (koPairings.length === 0) continue;
 
           // Create the next round
-          const restMin = tournament.rest_minutes || 5;
+          const restMin = tournament.rest_minutes || 1;
           const koStart = new Date(Date.now() + restMin * 60 * 1000);
 
           // Fetch ratings for game creation
@@ -700,7 +706,7 @@ async function handleTournamentCron(req: NextRequest) {
           previousByes,
         );
 
-        const restMin = tournament.rest_minutes || 5;
+        const restMin = tournament.rest_minutes || 1;
         const rnStart = new Date(Date.now() + restMin * 60 * 1000);
 
         await admin.from("tournament_rounds").insert({
@@ -1029,7 +1035,7 @@ async function handleTournamentCron(req: NextRequest) {
           // Swiss re-advance (simplified — same logic as section 2)
           if (tournament.type !== "knockout") {
             const nextRound = currentRound + 1;
-            const restMin = tournament.rest_minutes || 5;
+            const restMin = tournament.rest_minutes || 1;
             const rnStart = new Date(Date.now() + restMin * 60 * 1000);
 
             const { data: participants } = await admin

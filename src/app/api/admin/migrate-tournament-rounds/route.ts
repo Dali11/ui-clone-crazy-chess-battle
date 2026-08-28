@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const results: any[] = [];
 
     const statements = [
-      `ALTER TABLE public.tournaments ADD COLUMN IF NOT EXISTS rest_minutes integer DEFAULT 5`,
+      `ALTER TABLE public.tournaments ADD COLUMN IF NOT EXISTS rest_minutes integer DEFAULT 1`,
       `ALTER TABLE public.tournaments ADD COLUMN IF NOT EXISTS countdown_minutes integer DEFAULT 2`,
       `ALTER TABLE public.tournament_rounds ADD COLUMN IF NOT EXISTS starts_at timestamptz`,
       `ALTER TABLE public.games ADD COLUMN IF NOT EXISTS scheduled_start timestamptz`,

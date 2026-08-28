@@ -130,7 +130,7 @@ async function handleAutoAdvance(req: NextRequest) {
         );
 
         // Calculate when next round games should start (now + rest minutes)
-        const restMinutes = tournament.rest_minutes || 5;
+        const restMinutes = tournament.rest_minutes || 1;
         const scheduledStart = new Date(Date.now() + restMinutes * 60 * 1000);
 
         // Create round entry with scheduled start time

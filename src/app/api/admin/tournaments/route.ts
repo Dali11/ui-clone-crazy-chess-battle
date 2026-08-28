@@ -81,8 +81,12 @@ export async function PATCH(req: NextRequest) {
       const { data: tournament } = await admin
         .from("tournaments").select("status").eq("id", tournamentId).single();
       if (!tournament) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
-      if (tournament.status !== "upcoming") {
-        return NextResponse.json({ error: "Can only edit upcoming tournaments" }, { status: 400 });
+      // The admin UI exposes Edit for both "upcoming" and "active" tournaments
+      // (e.g. adjusting creator profit % or total rounds mid-tournament), so
+      // the API must allow the same statuses — otherwise saves silently fail
+      // for anything already live.
+      if (tournament.status !== "upcoming" && tournament.status !== "active") {
+        return NextResponse.json({ error: "Can only edit upcoming or active tournaments" }, { status: 400 });
       }
 
       const updates: Record<string, any> = {};
@@ -110,6 +114,13 @@ export async function PATCH(req: NextRequest) {
       }
       if (updates.time_control && !["bullet", "blitz", "rapid", "classical"].includes(updates.time_control)) {
         return NextResponse.json({ error: "Invalid time control" }, { status: 400 });
+      }
+
+      // Changing type/time_control mid-tournament would corrupt already-created
+      // pairings and in-progress games — only allow those two fields to change
+      // while the tournament is still upcoming (no games exist yet).
+      if (tournament.status === "active" && (updates.type || updates.time_control)) {
+        return NextResponse.json({ error: "Cannot change type or time control on an active tournament" }, { status: 400 });
       }
 
       // If type changed, update default prize distribution to match
