@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
       .from('tournaments')
       .select('*')
       .in('status', ['upcoming', 'active', 'pending_approval', 'completed', 'finished'])
-      .order('created_at', { ascending: false })
+      .order('starts_at', { ascending: true })
       .limit(50);
 
     const tournamentList: any[] = [];

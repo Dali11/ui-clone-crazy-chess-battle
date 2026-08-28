@@ -114,6 +114,12 @@ export default function TournamentsPage() {
     if (filter === 'upcoming') return t.status === 'upcoming' || t.status === 'pending';
     if (filter === 'completed') return t.status === 'completed';
     return true;
+  }).sort((a, b) => {
+    // Sort by event date: upcoming = soonest first, completed = most recent first
+    const aDate = a.startsAt ? new Date(a.startsAt).getTime() : Infinity;
+    const bDate = b.startsAt ? new Date(b.startsAt).getTime() : Infinity;
+    if (filter === 'completed') return bDate - aDate;
+    return aDate - bDate;
   });
 
   const activeCount = allTournaments.filter(t => t.status === 'active').length;
