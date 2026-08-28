@@ -714,7 +714,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
         if (v !== "" && v !== null) {
           if (k === "starts_at" || k === "ends_at") {
             body[k] = v ? localToUTC(v as string) : null;
-          } else if (k === "entry_fee" || k === "prize_pool") {
+          } else if (k === "entry_fee" || k === "prize_pool" || k === "creator_profit_percent") {
             body[k] = v === "" ? null : Number(v);
           } else {
             body[k] = v === "" ? null : v;

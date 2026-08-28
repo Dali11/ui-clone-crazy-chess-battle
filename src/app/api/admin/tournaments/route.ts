@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
         id, name, description, type, status, time_control, initial_minutes, increment_seconds,
         entry_fee, prize_pool, prize_distribution, pool_source,
         max_players, min_rating, max_rating, current_round, rounds, duration_minutes,
+        creator_profit_percent,
         starts_at, ends_at, created_at, created_by
       `)
       .order("created_at", { ascending: false })

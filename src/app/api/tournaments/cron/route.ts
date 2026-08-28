@@ -187,13 +187,10 @@ async function handleTournamentCron(req: NextRequest) {
           await admin.from("tournaments").update({ rounds: null, ends_at: endsAt.toISOString() }).eq("id", tournament.id);
         } else {
           // Swiss pairing: top half vs bottom half.
-          // Rounds are admin-controlled for Swiss — only auto-calculate as a
-          // fallback if the admin left it unset. Auto-calc is a knockout-only
-          // concept (bracket size dictates round count); Swiss round count is
-          // a tournament design choice, not derived from player count.
+          // Swiss round count is admin-controlled. If not set, default to 5
+          // (never auto-calculate from player count — that's a knockout concept).
           if (!tournament.rounds) {
-            const swissRounds = Math.max(3, Math.ceil(Math.log2(seeded.length)));
-            await admin.from("tournaments").update({ rounds: swissRounds }).eq("id", tournament.id);
+            await admin.from("tournaments").update({ rounds: 5 }).eq("id", tournament.id);
           }
 
           // If odd number of players, give the bye to the lowest seed

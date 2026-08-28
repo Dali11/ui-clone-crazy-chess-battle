@@ -190,13 +190,10 @@ async function handleAutoStart(req: NextRequest) {
           if (byePlayer) {
             pairings.push({ white: "", black: "", bye: byePlayer });
           }
-          // Rounds are admin-controlled for Swiss — only auto-calculate as a
-          // fallback if the admin left it unset (auto-calc is a knockout-only
-          // concept; Swiss round count is a design choice, not derived from
-          // player count).
+          // Swiss round count is admin-controlled. If not set, default to 5
+          // (never auto-calculate from player count — that's a knockout concept).
           if (!tournament.rounds) {
-            const swissRounds = Math.max(3, Math.ceil(Math.log2(seeded.length)));
-            await admin.from("tournaments").update({ rounds: swissRounds }).eq("id", tournament.id);
+            await admin.from("tournaments").update({ rounds: 5 }).eq("id", tournament.id);
           }
         }
 
