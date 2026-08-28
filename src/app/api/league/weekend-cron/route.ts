@@ -25,6 +25,25 @@ export async function POST(req: NextRequest) {
 async function handleWeekendCron(req: NextRequest) {
   try {
     const admin = createAdminClient();
+
+    // ── One-time migration: add league columns to games table ──
+    // Safe to run multiple times — uses IF NOT EXISTS
+    try {
+      const dbUrl = process.env.DATABASE_URL;
+      if (dbUrl) {
+        const { Client } = await import("pg");
+        const client = new Client({ connectionString: dbUrl });
+        await client.connect();
+        await client.query("ALTER TABLE games ADD COLUMN IF NOT EXISTS league_fixture_id UUID");
+        await client.query("ALTER TABLE games ADD COLUMN IF NOT EXISTS league_id UUID");
+        await client.query("ALTER TABLE premier_leagues ADD COLUMN IF NOT EXISTS season_start_date TIMESTAMPTZ");
+        await client.end();
+        console.log("[weekend-cron] Migration check complete");
+      }
+    } catch (migErr) {
+      console.error("[weekend-cron] Migration error (non-fatal):", migErr);
+    }
+
     const now = new Date();
     const todayUTC = now.toISOString().split("T")[0]; // YYYY-MM-DD
 
