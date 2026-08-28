@@ -377,21 +377,28 @@ async function handleTournamentCron(req: NextRequest) {
 
               const winners: string[] = [];
               const byes: string[] = [];
+              const losers: string[] = [];
               for (const p of prevPairings) {
                 if (p.bye) { byes.push(p.bye as string); }
                 else if (p.white && p.black && p.result) {
-                  if (p.result === "white") winners.push(p.white as string);
-                  else if (p.result === "black") winners.push(p.black as string);
+                  if (p.result === "white") { winners.push(p.white as string); losers.push(p.black as string); }
+                  else if (p.result === "black") { winners.push(p.black as string); losers.push(p.white as string); }
                   else if (p.result === "draw") {
                     const wSeed = postGroupSeedLookup.get(p.white as string) || 0;
                     const bSeed = postGroupSeedLookup.get(p.black as string) || 0;
-                    winners.push(wSeed <= bSeed ? (p.white as string) : (p.black as string));
+                    if (wSeed <= bSeed) { winners.push(p.white as string); losers.push(p.black as string); }
+                    else { winners.push(p.black as string); losers.push(p.white as string); }
                   }
                 }
               }
               const nextPairings = advanceKnockoutRound(winners, byes);
               for (const p of nextPairings) {
                 koPairings.push({ white: p.white, black: p.black, bye: p.bye });
+              }
+              // 3rd-place decider for group-stage knockout
+              if (winners.length + byes.length === 2 && losers.length === 2) {
+                thirdPlaceIndex = koPairings.length;
+                koPairings.push({ white: losers[0], black: losers[1] } as any);
               }
             }
           } else {
