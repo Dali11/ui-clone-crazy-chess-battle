@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { finishTournament } from "@/lib/tournament/finish";
+import { processArenaGameResult } from "@/lib/tournament/arena";
 
 interface GameResult {
   gameId: string;
@@ -45,6 +46,19 @@ async function _processTournamentGameResult(result: GameResult) {
   if (!game?.tournament_id) return;
 
   const tournamentId = game.tournament_id;
+
+  // ─── Arena tournaments: use continuous matchmaking, no rounds ───
+  const { data: tournamentInfo } = await admin
+    .from("tournaments")
+    .select("type")
+    .eq("id", tournamentId)
+    .single();
+
+  if (tournamentInfo?.type === "arena") {
+    await processArenaGameResult(admin, result, tournamentId);
+    return; // Arena doesn't use round completion or auto-finish
+  }
+
   const roundNumber = game.tournament_round || 1;
 
   // Idempotency: check if this game's result was already processed

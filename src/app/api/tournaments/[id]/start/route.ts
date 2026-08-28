@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateKnockoutBracket, knockoutRoundCount, generateGroups, generateGroupRoundRobin } from "@/lib/tournament/knockout";
+import { pairArenaPlayers, getArenaPreviousMatchups, createArenaGames } from "@/lib/tournament/arena";
 import { sendEmail, sendBatchEmails } from "@/lib/email";
 
 // Allow enough time for large tournaments (100+ players) to seed + create games
@@ -202,6 +203,32 @@ export async function POST(
         await admin.from("tournaments").update({ rounds: numRounds }).eq("id", tournamentId);
       }
 
+    } else if (tournament.type === "arena") {
+      // ─── Arena: initial pairing by rating (continuous matchmaking after) ───
+      const mid = Math.ceil(seeded.length / 2);
+      const topHalf = seeded.slice(0, mid);
+      const bottomHalf = seeded.slice(mid);
+
+      for (let i = 0; i < mid; i++) {
+        if (i < bottomHalf.length) {
+          const white = i % 2 === 0 ? topHalf[i].player_id : bottomHalf[i].player_id;
+          const black = i % 2 === 0 ? bottomHalf[i].player_id : topHalf[i].player_id;
+          pairings.push({ white, black });
+        }
+      }
+      // No byes in arena — odd player waits for next wave
+
+      // Set ends_at from duration_minutes if not already set
+      if (!tournament.ends_at && tournament.duration_minutes) {
+        const endsAt = new Date(new Date(tournament.starts_at || new Date()).getTime() + tournament.duration_minutes * 60 * 1000);
+        await admin.from("tournaments").update({ ends_at: endsAt.toISOString(), rounds: null }).eq("id", tournamentId);
+      } else if (!tournament.ends_at) {
+        // Default 60 min arena if no duration specified
+        const endsAt = new Date(Date.now() + 60 * 60 * 1000);
+        await admin.from("tournaments").update({ ends_at: endsAt.toISOString(), rounds: null }).eq("id", tournamentId);
+      } else {
+        await admin.from("tournaments").update({ rounds: null }).eq("id", tournamentId);
+      }
     } else {
       // ─── Swiss pairing (existing logic) ───
       if (seeded.length === 1) {
@@ -227,36 +254,39 @@ export async function POST(
     const countdownMinutes = tournament.countdown_minutes || 2;
     const scheduledStart = new Date(Date.now() + countdownMinutes * 60 * 1000);
 
-    // Create tournament round entry with scheduled start time
-    const groupSchedulePairings = (tournament.type === "knockout" && (tournament.knockout_format === "group_stage"))
-      ? (pairings as any).map((p: any, i: number) => ({
-          board: i + 1,
-          white: p.white || null,
-          black: p.black || null,
-          bye: p.bye || null,
-          result: null,
-          group: p.group ?? null,
-        }))
-      : pairings.map((p, i) => ({
-          board: i + 1,
-          white: p.white || null,
-          black: p.black || null,
-          bye: p.bye || null,
-          result: null,
-        }));
+    // Build round pairings (used for non-arena tournament_rounds entries)
+    let groupSchedulePairings: any[] = [];
+    if (tournament.type !== "arena") {
+      groupSchedulePairings = (tournament.type === "knockout" && (tournament.knockout_format === "group_stage"))
+        ? (pairings as any).map((p: any, i: number) => ({
+            board: i + 1,
+            white: p.white || null,
+            black: p.black || null,
+            bye: p.bye || null,
+            result: null,
+            group: p.group ?? null,
+          }))
+        : pairings.map((p, i) => ({
+            board: i + 1,
+            white: p.white || null,
+            black: p.black || null,
+            bye: p.bye || null,
+            result: null,
+          }));
 
-    const { error: roundError } = await admin
-      .from("tournament_rounds")
-      .insert({
-        tournament_id: tournamentId,
-        round_number: 1,
-        pairings: groupSchedulePairings,
-        is_complete: false,
-        starts_at: scheduledStart.toISOString(),
-      });
+      const { error: roundError } = await admin
+        .from("tournament_rounds")
+        .insert({
+          tournament_id: tournamentId,
+          round_number: 1,
+          pairings: groupSchedulePairings,
+          is_complete: false,
+          starts_at: scheduledStart.toISOString(),
+        });
 
-    if (roundError) {
-      console.error("Round creation error:", roundError);
+      if (roundError) {
+        console.error("Round creation error:", roundError);
+      }
     }
 
     // Split byes from real matches so we can bulk-insert games in ONE call
@@ -321,9 +351,8 @@ export async function POST(
       console.error("Game/bye creation error:", writeError);
     }
 
-    // Update round pairings with the created game_ids so the client can
-    // auto-redirect players to their game board.
-    if (Object.keys(createdGameIds).length > 0) {
+    // Update round pairings with the created game_ids (skip for arena)
+    if (tournament.type !== "arena" && Object.keys(createdGameIds).length > 0) {
       const pairingsWithGameIds = groupSchedulePairings.map((p: any) => ({
         ...p,
         game_id: createdGameIds[`${p.white}|${p.black}`] || null,

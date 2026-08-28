@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateSwissPairings, extractPreviousByes } from "@/lib/tournament/swiss-pairing";
+import { getAvailableArenaPlayers, getArenaPreviousMatchups, pairArenaPlayers, createArenaGames, shouldArenaFinish } from "@/lib/tournament/arena";
+import { finishTournament } from "@/lib/tournament/finish";
 import { sendEmail } from "@/lib/email";
 import { generateKnockoutBracket, knockoutRoundCount, advanceKnockoutRound, generateGroups, generateGroupRoundRobin, getGroupAdvancers, isKnockoutComplete } from "@/lib/tournament/knockout";
 
@@ -26,7 +28,7 @@ async function handleTournamentCron(req: NextRequest) {
     // ── 1. AUTO-START: Start tournaments whose start time has passed ──
     const { data: toStart } = await admin
       .from("tournaments")
-      .select("id, name, starts_at, status, type, knockout_format, group_schedule, initial_minutes, increment_seconds, time_control, min_players, entry_fee, max_players, rest_minutes, countdown_minutes")
+      .select("id, name, starts_at, status, type, knockout_format, group_schedule, initial_minutes, increment_seconds, time_control, min_players, entry_fee, max_players, rest_minutes, countdown_minutes, duration_minutes")
       .eq("status", "upcoming")
       .lte("starts_at", now);
 
@@ -143,6 +145,22 @@ async function handleTournamentCron(req: NextRequest) {
             }
             await admin.from("tournaments").update({ rounds: totalRounds }).eq("id", tournament.id);
           }
+        } else if (tournament.type === "arena") {
+          // Arena: pair by rating, set ends_at from duration
+          const mid = Math.ceil(seeded.length / 2);
+          const topHalf = seeded.slice(0, mid);
+          const bottomHalf = seeded.slice(mid);
+          for (let i = 0; i < mid; i++) {
+            if (i < bottomHalf.length) {
+              const white = i % 2 === 0 ? topHalf[i].player_id : bottomHalf[i].player_id;
+              const black = i % 2 === 0 ? bottomHalf[i].player_id : topHalf[i].player_id;
+              pairings.push({ white, black });
+            }
+          }
+          // No byes in arena
+          const durMin = (tournament as any).duration_minutes || 60;
+          const endsAt = new Date(new Date(tournament.starts_at || Date.now()).getTime() + durMin * 60 * 1000);
+          await admin.from("tournaments").update({ rounds: null, ends_at: endsAt.toISOString() }).eq("id", tournament.id);
         } else {
           // Swiss pairing: top half vs bottom half
           const swissRounds = Math.max(3, Math.ceil(Math.log2(seeded.length)));
@@ -167,24 +185,26 @@ async function handleTournamentCron(req: NextRequest) {
           }
         }
 
-        // Create tournament round entry
+        // Create tournament round entry (skip for arena)
         const countdownMin1 = tournament.countdown_minutes || 2;
         const r1Start = new Date(Date.now() + countdownMin1 * 60 * 1000);
 
-        await admin.from("tournament_rounds").insert({
-          tournament_id: tournament.id,
-          round_number: 1,
-          pairings: pairings.map((p, i) => ({
-            board: i + 1,
-            white: p.white || null,
-            black: p.black || null,
-            bye: p.bye || null,
-            result: null,
-            group: (p as any).group ?? null,
-          })),
-          is_complete: false,
-          starts_at: r1Start.toISOString(),
-        });
+        if (tournament.type !== "arena") {
+          await admin.from("tournament_rounds").insert({
+            tournament_id: tournament.id,
+            round_number: 1,
+            pairings: pairings.map((p, i) => ({
+              board: i + 1,
+              white: p.white || null,
+              black: p.black || null,
+              bye: p.bye || null,
+              result: null,
+              group: (p as any).group ?? null,
+            })),
+            is_complete: false,
+            starts_at: r1Start.toISOString(),
+          });
+        }
 
         // Split byes from matches for bulk insert
         const byePairings = pairings.filter((p) => p.bye);
@@ -223,20 +243,22 @@ async function handleTournamentCron(req: NextRequest) {
           }
         }
 
-        // Update round pairings with game_id
-        const pairingsWithGameIds = pairings.map((p, i) => ({
-          board: i + 1,
-          white: p.white || null,
-          black: p.black || null,
-          bye: p.bye || null,
-          result: null,
-          game_id: createdGameIds[`${p.white}|${p.black}`] || null,
-        }));
-        await admin
-          .from("tournament_rounds")
-          .update({ pairings: pairingsWithGameIds })
-          .eq("tournament_id", tournament.id)
-          .eq("round_number", 1);
+        // Update round pairings with game_id (skip for arena)
+        if (tournament.type !== "arena") {
+          const pairingsWithGameIds = pairings.map((p, i) => ({
+            board: i + 1,
+            white: p.white || null,
+            black: p.black || null,
+            bye: p.bye || null,
+            result: null,
+            game_id: createdGameIds[`${p.white}|${p.black}`] || null,
+          }));
+          await admin
+            .from("tournament_rounds")
+            .update({ pairings: pairingsWithGameIds })
+            .eq("tournament_id", tournament.id)
+            .eq("round_number", 1);
+        }
 
         // Handle byes
         if (byePairings.length > 0) {
@@ -258,6 +280,58 @@ async function handleTournamentCron(req: NextRequest) {
       }
     }
 
+    // ── 1B. ARENA: Continuous matchmaking + time-based finish ──
+    const { data: arenaTournaments } = await admin
+      .from("tournaments")
+      .select("id, name, current_round, ends_at, time_control, initial_minutes, increment_seconds, duration_minutes, type, status")
+      .eq("status", "active")
+      .eq("type", "arena");
+
+    for (const tournament of arenaTournaments || []) {
+      try {
+        // Check if time's up
+        if (shouldArenaFinish(tournament)) {
+          // Abort any in-progress games before finishing
+          const { data: activeArenaGames } = await admin
+            .from("games")
+            .select("id, white_player_id, black_player_id")
+            .eq("tournament_id", tournament.id)
+            .in("status", ["waiting", "playing", "pending"]);
+
+          for (const g of activeArenaGames || []) {
+            await admin.from("games")
+              .update({ status: "aborted", abort_reason: "Tournament time expired" })
+              .eq("id", g.id);
+          }
+
+          await finishTournament(tournament.id);
+          results.finished++;
+          continue;
+        }
+
+        // Find available players and pair them
+        const available = await getAvailableArenaPlayers(admin, tournament.id);
+        if (available.length < 2) continue;
+
+        const previousMatchups = await getArenaPreviousMatchups(admin, tournament.id);
+        const pairings = pairArenaPlayers(available, previousMatchups);
+        if (pairings.length === 0) continue;
+
+        const nextWave = (tournament.current_round || 1) + 1;
+        await createArenaGames(admin, tournament.id, pairings, {
+          time_control: tournament.time_control,
+          initial_minutes: tournament.initial_minutes,
+          increment_seconds: tournament.increment_seconds,
+        }, nextWave);
+
+        await admin.from("tournaments")
+          .update({ current_round: nextWave })
+          .eq("id", tournament.id);
+      } catch (e: any) {
+        results.errors.push(`Arena ${tournament.name}: ${e.message}`);
+      }
+    }
+
     // ── 2. AUTO-ADVANCE: Advance when current round is complete ──
     const { data: activeTournaments } = await admin
       .from("tournaments")
@@ -266,6 +340,9 @@ async function handleTournamentCron(req: NextRequest) {
 
     for (const tournament of activeTournaments || []) {
       try {
+        // Arena tournaments are handled in the arena section above
+        if (tournament.type === "arena") continue;
+
         const currentRound = tournament.current_round || 1;
 
         const { data: round } = await admin
@@ -807,6 +884,8 @@ async function handleTournamentCron(req: NextRequest) {
 
       for (const tournament of recheckActive || []) {
         try {
+          if (tournament.type === "arena") continue;
+
           const currentRound = tournament.current_round || 1;
           const { data: round } = await admin
             .from("tournament_rounds")

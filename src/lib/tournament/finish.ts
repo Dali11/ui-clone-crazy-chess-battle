@@ -58,7 +58,26 @@ export async function finishTournament(tournamentId: string): Promise<void> {
   // instead of Swiss tiebreaks which don't reflect bracket elimination.
   let rankedParticipants: Array<{ player_id: string; final_rank: number; score: number; wins: number }> = [];
 
-  if (tournament.type === "knockout") {
+  if (tournament.type === "arena") {
+    // Arena: rank by score desc, wins desc, games_played desc
+    const { data: arenaParts } = await admin
+      .from("tournament_participants")
+      .select("player_id, score, wins, games_played")
+      .eq("tournament_id", tournamentId);
+
+    const sorted = (arenaParts || []).sort((a: any, b: any) =>
+      (b.score || 0) - (a.score || 0) ||
+      (b.wins || 0) - (a.wins || 0) ||
+      (b.games_played || 0) - (a.games_played || 0)
+    );
+
+    rankedParticipants = sorted.map((p: any, i: number) => ({
+      player_id: p.player_id,
+      final_rank: i + 1,
+      score: p.score || 0,
+      wins: p.wins || 0,
+    }));
+  } else if (tournament.type === "knockout") {
     // Walk the tournament rounds from last to first to determine placements.
     // Final round: winner = rank 1, loser = rank 2.
     // 3rd-place pairing (is_third_place): winner = rank 3, loser = rank 4.
