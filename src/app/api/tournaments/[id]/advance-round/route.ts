@@ -335,8 +335,9 @@ export async function POST(
 
       // 3rd-place decider: when semi-finals produce exactly 2 winners
       // and 2 losers, add a 3rd-place match alongside the final.
-      const thirdPlacePairing = (winners.length + byes.length === 2 && losers.length === 2)
-        ? [{ white: losers[0], black: losers[1], is_third_place: true }]
+      const thirdPlacePairing: Array<{ white: string; black: string; bye?: string; is_third_place?: boolean }> =
+        (winners.length + byes.length === 2 && losers.length === 2)
+        ? [{ white: losers[0], black: losers[1], bye: undefined, is_third_place: true }]
         : [];
 
       const restMinutes = tournament.rest_minutes || 5;
