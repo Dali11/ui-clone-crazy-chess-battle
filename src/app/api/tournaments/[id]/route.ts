@@ -166,8 +166,9 @@ export async function GET(
     // payout amount so players see accurate numbers, not the inflated gross total.
     const { actualPrizePool } = computeTournamentEconomics(tournament);
 
-    // For arena tournaments, fetch live games (arena doesn't use tournament_rounds)
+    // For arena tournaments, fetch live games + recent finished games
     let arenaGames: any[] = [];
+    let arenaRecentResults: any[] = [];
     if (tournament.type === "arena") {
       const { data: aGames } = await admin
         .from("games")
@@ -197,6 +198,33 @@ export async function GET(
       });
     }
 
+    // Fetch recent finished arena games (last 5) for the "Recent Results" strip
+    if (tournament.type === "arena") {
+      const { data: finishedGames } = await admin
+        .from("games")
+        .select("id, status, winner, white_player_id, black_player_id")
+        .eq("tournament_id", tournamentId)
+        .in("status", ["timeout", "resigned", "draw", "stalemate", "abort"])
+        .order("updated_at", { ascending: false })
+        .limit(5);
+
+      arenaRecentResults = (finishedGames || []).map((g: any) => {
+        const whiteP = participantMap.get(g.white_player_id);
+        const blackP = participantMap.get(g.black_player_id);
+        const result: 'white' | 'black' | 'draw' =
+          g.winner === 'white' ? 'white' :
+          g.winner === 'black' ? 'black' : 'draw';
+        return {
+          id: g.id,
+          whiteId: g.white_player_id,
+          blackId: g.black_player_id,
+          whiteName: whiteP?.profile?.display_name || whiteP?.profile?.username || "Unknown",
+          blackName: blackP?.profile?.display_name || blackP?.profile?.username || "Unknown",
+          result,
+        };
+      });
+    }
+
     return NextResponse.json({
       success: true,
       isAdmin,
@@ -209,6 +237,7 @@ export async function GET(
       rounds: roundsWithGameIds,
       participantCount: participants?.length || 0,
       arenaGames,
+      arenaRecentResults,
     });
   } catch (error: any) {
     console.error('Tournament detail API error:', error);

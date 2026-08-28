@@ -7,7 +7,7 @@ import {
   Trophy, Users, Calendar, Clock, DollarSign, RefreshCw, AlertCircle,
   Crown, Star, Swords, ChevronRight, ArrowLeft, Zap, Award, Medal,
   CheckCircle, XCircle, Play, Settings, Target, Gamepad2, LogIn, UserPlus,
-  Share2, Check, Flame, Eye,
+  Share2, Check, Flame, Eye, History,
 } from 'lucide-react';
 
 interface TournamentData {
@@ -93,6 +93,14 @@ interface TournamentData {
     whiteRating: number;
     blackName: string;
     blackRating: number;
+  }>;
+  arenaRecentResults?: Array<{
+    id: string;
+    whiteId: string;
+    blackId: string;
+    whiteName: string;
+    blackName: string;
+    result: 'white' | 'black' | 'draw';
   }>;
   participantCount: number;
 }
@@ -959,6 +967,50 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       );
                     })
                   )}
+
+                  {/* RECENT RESULTS STRIP */}
+                  {(() => {
+                    const recent = data.arenaRecentResults || [];
+                    if (recent.length === 0) return null;
+                    return (
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-center gap-1.5 px-1">
+                          <History className="w-3.5 h-3.5 text-ccb-muted" />
+                          <span className="text-xs font-bold text-ccb-muted uppercase tracking-wider">Recent Results</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {recent.map((r) => {
+                            const whiteWon = r.result === 'white';
+                            const blackWon = r.result === 'black';
+                            const isDraw = r.result === 'draw';
+                            return (
+                              <Link
+                                key={r.id}
+                                href={`/game/${r.id}`}
+                                className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-ccb-card border border-ccb-border hover:border-ccb-primary/30 transition-all group"
+                              >
+                                <div className={`text-xs font-bold truncate flex-1 text-right ${whiteWon ? 'text-ccb-text' : isDraw ? 'text-ccb-muted' : 'text-ccb-muted/60'}`}>
+                                  {r.whiteName}
+                                </div>
+                                <div className="shrink-0">
+                                  {isDraw ? (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted">½-½</span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-ccb-primary/10 border border-ccb-primary/20 text-ccb-primary">
+                                      {whiteWon ? '1-0' : '0-1'}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className={`text-xs font-bold truncate flex-1 ${blackWon ? 'text-ccb-text' : isDraw ? 'text-ccb-muted' : 'text-ccb-muted/60'}`}>
+                                  {r.blackName}
+                                </div>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : isArena ? (
               <div className="bg-ccb-card border border-ccb-border rounded-2xl p-10 text-center">
