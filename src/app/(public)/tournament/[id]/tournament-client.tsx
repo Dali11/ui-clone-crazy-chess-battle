@@ -1200,7 +1200,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                                   </span>
                                 ) : pairing.game_id ? (
                                   <Link href={`/game/${pairing.game_id}`} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-ccb-primary text-white hover:bg-ccb-primary/90 transition-colors flex items-center gap-1">
-                                    <Gamepad2 className="w-3.5 h-3.5" /> Play
+                                    {currentPlayerId && (pairing.white === currentPlayerId || pairing.black === currentPlayerId) ? (
+                                      <><Gamepad2 className="w-3.5 h-3.5" /> Play</>
+                                    ) : (
+                                      <><Eye className="w-3.5 h-3.5" /> Watch</>
+                                    )}
                                   </Link>
                                 ) : (
                                   <span className="text-xs text-ccb-muted px-2">vs</span>
@@ -1248,7 +1252,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                                     href={`/game/${pairing.game_id}`}
                                     className="text-xs font-bold px-3 py-1.5 rounded-lg bg-ccb-primary text-white hover:bg-ccb-primary/90 transition-colors flex items-center gap-1"
                                   >
-                                    <Gamepad2 className="w-3.5 h-3.5" /> {isRoundStartingSoon ? 'Enter' : 'Play'}
+                                    {currentPlayerId && (pairing.white === currentPlayerId || pairing.black === currentPlayerId) ? (
+                                      <><Gamepad2 className="w-3.5 h-3.5" /> {isRoundStartingSoon ? 'Enter' : 'Play'}</>
+                                    ) : (
+                                      <><Eye className="w-3.5 h-3.5" /> Watch</>
+                                    )}
                                   </Link>
                                 ) : (
                                   <span className="text-xs text-ccb-muted px-2">vs</span>
