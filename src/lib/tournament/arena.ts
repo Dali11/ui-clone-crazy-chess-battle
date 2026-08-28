@@ -211,7 +211,7 @@ export async function processArenaGameResult(
   // Update white player
   const { data: w } = await admin
     .from("tournament_participants")
-    .select("score, wins, losses, draws, games_played")
+    .select("score, wins, losses, draws, games_played, arena_streak")
     .eq("tournament_id", tournamentId)
     .eq("player_id", result.whitePlayerId)
     .single();
@@ -239,7 +239,7 @@ export async function processArenaGameResult(
   // Update black player
   const { data: b } = await admin
     .from("tournament_participants")
-    .select("score, wins, losses, draws, games_played")
+    .select("score, wins, losses, draws, games_played, arena_streak")
     .eq("tournament_id", tournamentId)
     .eq("player_id", result.blackPlayerId)
     .single();
