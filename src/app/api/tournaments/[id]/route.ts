@@ -192,8 +192,10 @@ export async function GET(
           blackId: g.black_player_id,
           whiteName: whiteP?.profile?.display_name || whiteP?.profile?.username || "Unknown",
           whiteRating: g.white_rating || whiteP?.profile?.rating || 0,
+          whiteAvatar: whiteP?.profile?.avatar_url || null,
           blackName: blackP?.profile?.display_name || blackP?.profile?.username || "Unknown",
           blackRating: g.black_rating || blackP?.profile?.rating || 0,
+          blackAvatar: blackP?.profile?.avatar_url || null,
         };
       });
     }

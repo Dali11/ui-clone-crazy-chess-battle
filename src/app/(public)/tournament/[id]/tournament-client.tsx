@@ -91,8 +91,10 @@ interface TournamentData {
     blackId: string;
     whiteName: string;
     whiteRating: number;
+    whiteAvatar?: string | null;
     blackName: string;
     blackRating: number;
+    blackAvatar?: string | null;
   }>;
   arenaRecentResults?: Array<{
     id: string;
@@ -933,6 +935,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     arenaGames.map((g) => {
                       const isMyGame = g.whiteId === data.currentPlayerId || g.blackId === data.currentPlayerId;
                       const initials = (name: string) => (name || '?').trim().charAt(0).toUpperCase();
+                      const Avatar = ({ src, name }: { src?: string | null; name: string }) => (
+                        <div className="relative shrink-0 w-9 h-9">
+                          <div className="absolute inset-0 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center text-sm font-bold text-ccb-text">
+                            {initials(name)}
+                          </div>
+                          {src && (
+                            <img
+                              src={src}
+                              alt=""
+                              className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-ccb-border"
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          )}
+                        </div>
+                      );
                       return (
                         <Link
                           key={g.id}
@@ -963,9 +980,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                           <div className="flex items-center gap-3 px-4 py-3.5">
                             {/* White player */}
                             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                              <div className="w-9 h-9 shrink-0 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center text-sm font-bold text-ccb-text">
-                                {initials(g.whiteName)}
-                              </div>
+                              <Avatar src={g.whiteAvatar} name={g.whiteName} />
                               <div className="min-w-0">
                                 <div className="text-sm font-bold truncate leading-tight">{g.whiteName}</div>
                                 <div className="text-[11px] text-ccb-muted font-medium">{g.whiteRating}</div>
@@ -983,9 +998,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                                 <div className="text-sm font-bold truncate leading-tight">{g.blackName}</div>
                                 <div className="text-[11px] text-ccb-muted font-medium">{g.blackRating}</div>
                               </div>
-                              <div className="w-9 h-9 shrink-0 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center text-sm font-bold text-ccb-text">
-                                {initials(g.blackName)}
-                              </div>
+                              <Avatar src={g.blackAvatar} name={g.blackName} />
                             </div>
                           </div>
 
