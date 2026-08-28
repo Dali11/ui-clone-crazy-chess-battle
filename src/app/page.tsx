@@ -289,12 +289,9 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-ccb-muted">
             <Link href="/league" className="hover:text-ccb-text transition-colors">Compete</Link>
             <Link href="/leaderboard" className="hover:text-ccb-text transition-colors">Ranks</Link>
-            <Link href="/draughts" className="hover:text-ccb-text transition-colors">Draughts</Link>
             <Link href="/how-it-works" className="hover:text-ccb-text transition-colors">How it Works</Link>
-            <Link href="/about" className="hover:text-ccb-text transition-colors">About</Link>
-            <Link href="/faq" className="hover:text-ccb-text transition-colors">FAQ</Link>
-              <span>·</span>
-              <Link href="/download" className="hover:text-ccb-text transition-colors">Download App</Link>
+            <span>·</span>
+            <Link href="/dashboard" className="hover:text-ccb-text transition-colors">Dashboard</Link>
           </div>
         </div>
       </footer>
