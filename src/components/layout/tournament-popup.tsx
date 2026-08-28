@@ -97,7 +97,7 @@ export default function TournamentPopup() {
       : tournament.time_control;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-md animate-slide-up">
+    <div className="fixed left-0 right-0 z-[110] bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-md animate-slide-up">
       <div className="bg-ccb-card border border-ccb-border sm:rounded-xl shadow-2xl px-4 py-3.5">
         <button
           onClick={handleDismiss}
