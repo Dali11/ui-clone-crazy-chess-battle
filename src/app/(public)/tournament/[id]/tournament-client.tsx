@@ -7,6 +7,7 @@ import {
   Trophy, Users, Calendar, Clock, DollarSign, RefreshCw, AlertCircle,
   Crown, Star, Swords, ChevronRight, ArrowLeft, Zap, Award, Medal,
   CheckCircle, XCircle, Play, Settings, Target, Gamepad2, LogIn, UserPlus,
+  Share2, Check,
 } from 'lucide-react';
 
 interface TournamentData {
@@ -171,6 +172,32 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const shareData = {
+      title: t?.name || "Crazy Chess Battles Tournament",
+      text: `Check out this chess tournament on Crazy Chess Battles!`,
+      url,
+    };
+    try {
+      if (typeof navigator !== "undefined" && (navigator as any).share) {
+        await (navigator as any).share(shareData);
+      } else {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    } catch {
+      // User cancelled or clipboard failed — silent fallback
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {}
+    }
+  };
   const [activeTab, setActiveTab] = useState<'standings' | 'rounds' | 'info'>('rounds');
   const [redirecting, setRedirecting] = useState(false);
   const router = useRouter();
@@ -591,6 +618,18 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <p className="text-sm font-bold text-ccb-muted">Tournament Completed</p>
                 </div>
               )}
+
+              {/* Share button — always visible */}
+              <button
+                onClick={handleShare}
+                className="w-full mt-3 py-2.5 rounded-xl bg-ccb-surface border border-ccb-border text-ccb-text font-bold text-sm hover:bg-ccb-primary/10 hover:border-ccb-primary/30 transition-all flex items-center justify-center gap-2"
+              >
+                {copied ? (
+                  <><Check className="w-4 h-4 text-ccb-success" /> Link Copied!</>
+                ) : (
+                  <><Share2 className="w-4 h-4" /> Share Tournament</>
+                )}
+              </button>
             </div>
           </div>
         </div>
