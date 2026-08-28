@@ -222,10 +222,15 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectedRef = useRef<string | null>(null);
+  const initialLoadDone = useRef(false);
   const autoJoinAttemptedRef = useRef(false);
 
   const fetchData = async () => {
-    setLoading(true);
+    // Only show full-page loading spinner on the very first fetch;
+    // background polling refreshes should update data silently.
+    if (!initialLoadDone.current) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const res = await fetch(`/api/tournaments/${resolvedParams.id}`);
@@ -235,6 +240,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     } catch (err: any) {
       setError(err.message);
     } finally {
+      initialLoadDone.current = true;
       setLoading(false);
     }
   };
