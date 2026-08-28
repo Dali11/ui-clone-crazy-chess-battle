@@ -305,6 +305,7 @@ async function handleTournamentCron(req: NextRequest) {
           const prevPairings = prevRound.pairings as Array<Record<string, any>>;
 
           let koPairings: Array<{ white: string; black: string; bye?: string; group?: number }> = [];
+          let thirdPlaceIndex = -1;
           let phase = "knockout";
 
           if (groupSchedule && Array.isArray(groupSchedule) && koFormat === "group_stage") {
@@ -439,6 +440,7 @@ async function handleTournamentCron(req: NextRequest) {
             // (advancing to the final) and exactly 2 losers, pair the losers up
             // for a parallel 3rd-place match in the same round.
             if (winners.length + byes.length === 2 && losers.length === 2) {
+              thirdPlaceIndex = koPairings.length;
               koPairings.push({ white: losers[0], black: losers[1] } as any);
             }
           }
@@ -464,7 +466,7 @@ async function handleTournamentCron(req: NextRequest) {
               bye: p.bye || null,
               result: null,
               group: p.group ?? null,
-              is_third_place: i === koPairings.length - 1 && koPairings.length > 1 && winners.length + byes.length === 2,
+              is_third_place: i === thirdPlaceIndex,
             })),
             is_complete: false,
             starts_at: koStart.toISOString(),
