@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateSwissPairings, extractPreviousByes } from "@/lib/tournament/swiss-pairing";
 import { shouldArenaFinish, runArenaMatchmakingWave } from "@/lib/tournament/arena";
+import { processTournamentGameResult } from "@/lib/tournament/results";
 import { finishTournament } from "@/lib/tournament/finish";
 import { sendEmail } from "@/lib/email";
 import { generateKnockoutBracket, knockoutRoundCount, advanceKnockoutRound, generateGroups, generateGroupRoundRobin, getGroupAdvancers, isKnockoutComplete } from "@/lib/tournament/knockout";
@@ -307,6 +308,51 @@ async function handleTournamentCron(req: NextRequest) {
           await finishTournament(tournament.id);
           results.finished++;
           continue;
+        }
+
+        // ── No-show auto-resign: if a game has been "playing" for 2+ minutes
+        // with zero moves, the player whose turn it is never showed up. They
+        // lose by resignation, the opponent gets the win, and both are freed
+        // for re-pairing. This keeps arena games from being stuck on no-shows.
+        const { data: noShowGames } = await admin
+          .from("games")
+          .select("id, turn, move_count, white_player_id, black_player_id, white_rating, black_rating, rated, last_move_at, created_at")
+          .eq("tournament_id", tournament.id)
+          .eq("status", "playing")
+          .eq("move_count", 0);
+
+        const NO_SHOW_MS = 2 * 60 * 1000; // 2 minutes
+        for (const g of noShowGames || []) {
+          const startTime = new Date(g.last_move_at || g.created_at).getTime();
+          if (Date.now() - startTime < NO_SHOW_MS) continue;
+
+          // The player whose turn it is = the no-show loser
+          const loser = g.turn; // "white" on first move
+          const winner = loser === "white" ? "black" : "white";
+          const loserId = loser === "white" ? g.white_player_id : g.black_player_id;
+          const winnerId = winner === "white" ? g.white_player_id : g.black_player_id;
+
+          await admin.from("games")
+            .update({
+              status: "resigned",
+              winner: winner,
+              ended_at: new Date().toISOString(),
+            })
+            .eq("id", g.id);
+
+          // Process as a tournament game result so scores/streaks update
+          await processTournamentGameResult({
+            gameId: g.id,
+            whitePlayerId: g.white_player_id,
+            blackPlayerId: g.black_player_id,
+            winner: winner as "white" | "black",
+            status: "resigned",
+          });
+
+          // Re-pair the freed players immediately
+          await runArenaMatchmakingWave(admin, tournament.id);
+
+          console.log(`[arena] No-show auto-resign: game ${g.id}, ${loser} (${loserId}) didn't move in 2 min, ${winner} (${winnerId}) wins`);
         }
 
         // Safety-net matchmaking sweep (event-driven calls on game-finish and
