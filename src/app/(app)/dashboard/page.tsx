@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight, Cherry, Gift } from "lucide-react";
@@ -27,6 +28,45 @@ export const metadata = pageMetadata({
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+
+  // ── Tournament game redirect ──
+  // If the user has an active tournament game where it's their turn,
+  // redirect them straight to the board before the dashboard even renders.
+  const admin = createAdminClient();
+  const { data: activeTournaments } = await admin
+    .from("tournament_participants")
+    .select("tournament_id")
+    .eq("player_id", user!.id)
+    .eq("eliminated", false);
+
+  if (activeTournaments && activeTournaments.length > 0) {
+    const tournamentIds = activeTournaments.map((t) => t.tournament_id);
+    const { data: activeGame } = await admin
+      .from("games")
+      .select("id, tournament_id, status, turn, white_player_id, black_player_id")
+      .in("tournament_id", tournamentIds)
+      .eq("status", "playing")
+      .or(`white_player_id.eq.${user!.id},black_player_id.eq.${user!.id}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (activeGame) {
+      const { data: tournament } = await admin
+        .from("tournaments")
+        .select("status")
+        .eq("id", activeGame.tournament_id)
+        .single();
+
+      if (tournament?.status === "active") {
+        const isWhite = activeGame.white_player_id === user!.id;
+        const isBlack = activeGame.black_player_id === user!.id;
+        const myTurn = (activeGame.turn === "white" && isWhite) || (activeGame.turn === "black" && isBlack);
+        if (myTurn) {
+          redirect(`/game/${activeGame.id}`);
+        }
+      }
+    }
+  }
 
   // Fetch profile first (needed for rating init logic)
   const { data: profile } = await supabase
