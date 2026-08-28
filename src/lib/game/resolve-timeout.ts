@@ -49,7 +49,10 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
   const isNoShow = game.move_count === 0 && !game.tournament_id && !battle;
 
   if (isNoShow) {
-    await admin
+    // Atomic claim: only proceed if still "playing". resolveTimeoutForGame
+    // is shared by 3 entry points (move self-check, timeout-check polled
+    // by opponent, cron sweep) that can all race on the same game.
+    const { data: claimed } = await admin
       .from("games")
       .update({
         status: "abort",
@@ -57,7 +60,12 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
         ended_at: new Date().toISOString(),
         [`${loser}_clock_ms`]: 0,
       })
-      .eq("id", game.id);
+      .eq("id", game.id)
+      .eq("status", "playing")
+      .select("id")
+      .single();
+
+    if (!claimed) return { status: "already_resolved" as const, winner: null };
 
     return { status: "abort" as const, winner: null };
   }
@@ -69,7 +77,9 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
   const loserRating = loser === "white" ? game.white_rating : game.black_rating;
   const winnerRating = loser === "white" ? game.black_rating : game.white_rating;
 
-  await admin
+  // Atomic claim: only proceed if still "playing" — same race guard as
+  // the no-show branch above.
+  const { data: claimedTimeout } = await admin
     .from("games")
     .update({
       status: "timeout",
@@ -77,7 +87,12 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
       ended_at: new Date().toISOString(),
       [`${loser}_clock_ms`]: 0,
     })
-    .eq("id", game.id);
+    .eq("id", game.id)
+    .eq("status", "playing")
+    .select("id")
+    .single();
+
+  if (!claimedTimeout) return { status: "already_resolved" as const, winner: null };
 
   if (game.rated && loserRating != null && winnerRating != null) {
     const expectedWinner = 1 / (1 + Math.pow(10, (loserRating - winnerRating) / 400));

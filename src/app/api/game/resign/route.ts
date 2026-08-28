@@ -41,14 +41,21 @@ export async function POST(req: NextRequest) {
     const winner = isWhite ? "black" : "white";
     const admin = createAdminClient();
 
-    const { error: updateError } = await admin.from("games").update({
+    // Atomic claim: only succeed if the game is still "playing" at the
+    // moment of update. This prevents a race where the cron's no-show/
+    // timeout sweep (or a duplicate client request) resolves the same
+    // game concurrently, which would double-process the tournament result
+    // (double score, double rating change, double berries).
+    const { data: claimedGame, error: updateError } = await admin.from("games").update({
       status: "resign",
       winner,
       ended_at: new Date().toISOString(),
-    }).eq("id", gameId);
+    }).eq("id", gameId).eq("status", "playing").select("id").single();
 
-    if (updateError) {
-      return NextResponse.json({ error: "Failed to update game" }, { status: 500 });
+    if (updateError || !claimedGame) {
+      // Someone else (cron sweep, duplicate request) already resolved this
+      // game — treat as already-resigned rather than an error.
+      return NextResponse.json({ error: "Game already resolved" }, { status: 409 });
     }
 
     // Broadcast resignation to opponent via realtime for instant notification

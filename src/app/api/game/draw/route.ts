@@ -57,14 +57,23 @@ export async function POST(req: NextRequest) {
       // End the game as a draw
       const chess = new Chess(game.fen);
 
-      await admin
+      // Atomic claim: only proceed if still "playing" — prevents a race
+      // with the cron no-show/timeout sweep double-processing this game.
+      const { data: claimedGame } = await admin
         .from("games")
         .update({
           status: chess.isStalemate() ? "stalemate" : "draw",
           winner: null,
           ended_at: new Date().toISOString(),
         })
-        .eq("id", gameId);
+        .eq("id", gameId)
+        .eq("status", "playing")
+        .select("id")
+        .single();
+
+      if (!claimedGame) {
+        return NextResponse.json({ error: "Game already resolved" }, { status: 409 });
+      }
 
       // Update ratings for draw
       if (game.rated && game.white_rating && game.black_rating) {

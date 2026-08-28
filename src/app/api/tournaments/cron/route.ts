@@ -879,14 +879,27 @@ async function handleTournamentCron(req: NextRequest) {
       const loserId = loser === "white" ? g.white_player_id : g.black_player_id;
       const winnerId = winner === "white" ? g.white_player_id : g.black_player_id;
 
-      // Update game as resigned
-      await admin.from("games")
+      // Atomic claim: only proceed if the game is still "playing" at the
+      // moment of this update. With multiple browser tabs now firing the
+      // cron heartbeat concurrently, two requests can both SELECT this same
+      // game above before either UPDATE commits — without this guard, both
+      // would call processTournamentGameResult and double-score the game
+      // (this was the cause of inflated arena standings).
+      const { data: claimedGame } = await admin.from("games")
         .update({
           status: "resigned",
           winner: winner,
           ended_at: new Date().toISOString(),
         })
-        .eq("id", g.id);
+        .eq("id", g.id)
+        .eq("status", "playing")
+        .select("id")
+        .single();
+
+      if (!claimedGame) {
+        // Another concurrent cron run already claimed this game — skip.
+        continue;
+      }
 
       // If this is a tournament game, process the result for scores/standings
       if (g.tournament_id) {
