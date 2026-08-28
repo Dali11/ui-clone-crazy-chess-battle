@@ -53,11 +53,71 @@ export async function finishTournament(tournamentId: string): Promise<void> {
     }
   }
 
-  // Rank participants using proper Swiss tiebreaks (Buchholz, Sonneborn-Berger)
-  const { calculateTiebreaks } = await import("@/lib/tournament/tiebreaks");
-  const rankedParticipants = await calculateTiebreaks(admin, tournamentId);
+  // For knockout tournaments, use bracket results (champion, runner-up, 3rd, 4th)
+  // instead of Swiss tiebreaks which don't reflect bracket elimination.
+  let rankedParticipants: Array<{ player_id: string; final_rank: number; score: number; wins: number }> = [];
 
-  if (!rankedParticipants || rankedParticipants.length === 0) return;
+  if (tournament.type === "knockout") {
+    // Walk the tournament rounds from last to first to determine placements.
+    // Final round: winner = rank 1, loser = rank 2.
+    // 3rd-place pairing (is_third_place): winner = rank 3, loser = rank 4.
+    const { data: allRounds } = await admin
+      .from("tournament_rounds")
+      .select("round_number, pairings")
+      .eq("tournament_id", tournamentId)
+      .order("round_number", { ascending: false });
+
+    if (allRounds && allRounds.length > 0) {
+      const finalRound = allRounds[0];
+      const fps = (finalRound.pairings as any[]) || [];
+      const bracketPairings = fps.filter((p) => !p.is_third_place);
+      const thirdPlace = fps.find((p) => p.is_third_place);
+
+      const rankMap = new Map<string, number>();
+
+      // Champion + runner-up from the bracket final
+      const bracketFinal = bracketPairings.find((p) => p.result === "white" || p.result === "black");
+      if (bracketFinal) {
+        const champion = bracketFinal.result === "white" ? bracketFinal.white : bracketFinal.black;
+        const runnerUp = bracketFinal.result === "white" ? bracketFinal.black : bracketFinal.white;
+        rankMap.set(champion, 1);
+        rankMap.set(runnerUp, 2);
+      }
+
+      // 3rd + 4th from the 3rd-place match
+      if (thirdPlace && (thirdPlace.result === "white" || thirdPlace.result === "black")) {
+        const third = thirdPlace.result === "white" ? thirdPlace.white : thirdPlace.black;
+        const fourth = thirdPlace.result === "white" ? thirdPlace.black : thirdPlace.white;
+        rankMap.set(third, 3);
+        rankMap.set(fourth, 4);
+      }
+
+      // For players eliminated in earlier rounds, rank by round eliminated (later = better)
+      // then by score, then by seed.
+      const { data: allParts } = await admin
+        .from("tournament_participants")
+        .select("player_id, score, wins, seed")
+        .eq("tournament_id", tournamentId);
+      const eliminated = (allParts || []).filter((p) => !rankMap.has(p.player_id));
+      eliminated.sort((a: any, b: any) => (b.score || 0) - (a.score || 0) || (a.seed || 0) - (b.seed || 0));
+      eliminated.forEach((p: any, i: number) => {
+        rankMap.set(p.player_id, 5 + i);
+      });
+
+      rankedParticipants = (allParts || []).map((p: any) => ({
+        player_id: p.player_id,
+        final_rank: rankMap.get(p.player_id) || 99,
+        score: p.score || 0,
+        wins: p.wins || 0,
+      }));
+    }
+  }
+
+  // Fallback to Swiss tiebreaks for non-knockout tournaments or if bracket data is missing
+  if (rankedParticipants.length === 0) {
+    const { calculateTiebreaks } = await import("@/lib/tournament/tiebreaks");
+    rankedParticipants = await calculateTiebreaks(admin, tournamentId);
+  }
 
   // Assign final ranks
   for (const p of rankedParticipants) {
