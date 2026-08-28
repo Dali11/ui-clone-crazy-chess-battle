@@ -823,7 +823,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       } else {
                         const koRound = round.round_number - numGroupRounds;
                         const totalKoRounds = tRoundCount - numGroupRounds;
-                        const remaining = Math.pow(2, totalKoRounds - koRound);
+                        const remaining = Math.pow(2, totalKoRounds - koRound + 1);
                         if (remaining === 2) { roundLabel = 'Final'; phaseLabel = 'Knockout'; }
                         else if (remaining === 4) { roundLabel = 'Semi-Finals'; phaseLabel = 'Knockout'; }
                         else if (remaining === 8) { roundLabel = 'Quarter-Finals'; phaseLabel = 'Knockout'; }
@@ -831,7 +831,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                         else { roundLabel = `Knockout Round ${koRound}`; phaseLabel = 'Knockout'; }
                       }
                     } else {
-                      const remaining = Math.pow(2, tRoundCount - round.round_number);
+                      const remaining = Math.pow(2, tRoundCount - round.round_number + 1);
                       if (remaining === 2) roundLabel = 'Final';
                       else if (remaining === 4) roundLabel = 'Semi-Finals';
                       else if (remaining === 8) roundLabel = 'Quarter-Finals';
@@ -840,7 +840,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     }
                   }
 
-                  // Group pairings by group number if group info is present
+                  // Check if any pairing in this round is a 3rd-place match
+                  const hasThirdPlace = round.pairings?.some((p: any) => p.is_third_place === true);
                   const hasGroups = round.pairings?.some((p) => (p as any).group !== null && (p as any).group !== undefined);
                   const groupMap = new Map<number, typeof round.pairings>();
                   if (hasGroups) {
@@ -891,6 +892,45 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                               </div>
                               <div className="flex-1 text-sm font-medium truncate">{pairing.whiteName}</div>
                               <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-ccb-success/10 text-ccb-success border border-ccb-success/30">BYE</span>
+                            </div>
+                          ) : (pairing as any).is_third_place ? (
+                            <div className="flex items-center gap-3">
+                              <div className={`flex-1 flex items-center gap-2 min-w-0 ${pairing.result === 'white' ? '' : pairing.result === 'black' || pairing.result === 'draw' ? 'opacity-50' : ''}`}>
+                                <div className="w-7 h-7 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center text-[10px] font-bold text-ccb-muted shrink-0">
+                                  {(pairing.whiteName || '?').charAt(0)}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className={`text-sm truncate ${pairing.result === 'white' ? 'font-bold text-amber-600 dark:text-amber-400' : ''}`}>
+                                    {pairing.whiteName}
+                                  </div>
+                                  <div className="text-[10px] text-ccb-muted">{pairing.whiteRating}</div>
+                                </div>
+                              </div>
+                              <div className="shrink-0 flex flex-col items-center gap-0.5">
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-amber-600/10 text-amber-600 dark:text-amber-400 border border-amber-600/30">3RD</span>
+                                {pairing.result !== null && pairing.result !== undefined ? (
+                                  <span className="text-xs font-bold px-2 py-1 rounded-lg bg-ccb-muted/10 text-ccb-muted">
+                                    {pairing.result === 'draw' ? '½-½' : pairing.result === 'white' ? '1-0' : '0-1'}
+                                  </span>
+                                ) : pairing.game_id ? (
+                                  <Link href={`/game/${pairing.game_id}`} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-ccb-primary text-white hover:bg-ccb-primary/90 transition-colors flex items-center gap-1">
+                                    <Gamepad2 className="w-3.5 h-3.5" /> Play
+                                  </Link>
+                                ) : (
+                                  <span className="text-xs text-ccb-muted px-2">vs</span>
+                                )}
+                              </div>
+                              <div className={`flex-1 flex items-center justify-end gap-2 min-w-0 ${pairing.result === 'black' ? '' : pairing.result === 'white' || pairing.result === 'draw' ? 'opacity-50' : ''}`}>
+                                <div className="min-w-0 text-right">
+                                  <div className={`text-sm truncate ${pairing.result === 'black' ? 'font-bold text-amber-600 dark:text-amber-400' : ''}`}>
+                                    {pairing.blackName}
+                                  </div>
+                                  <div className="text-[10px] text-ccb-muted">{pairing.blackRating || '—'}</div>
+                                </div>
+                                <div className="w-7 h-7 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center text-[10px] font-bold text-ccb-muted shrink-0">
+                                  {(pairing.blackName || '?').charAt(0)}
+                                </div>
+                              </div>
                             </div>
                           ) : (
                             <div className="flex items-center gap-3">
