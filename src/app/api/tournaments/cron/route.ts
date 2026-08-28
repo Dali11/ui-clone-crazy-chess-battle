@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateSwissPairings, extractPreviousByes } from "@/lib/tournament/swiss-pairing";
-import { getAvailableArenaPlayers, getArenaPreviousMatchups, pairArenaPlayers, createArenaGames, shouldArenaFinish } from "@/lib/tournament/arena";
+import { shouldArenaFinish, runArenaMatchmakingWave } from "@/lib/tournament/arena";
 import { finishTournament } from "@/lib/tournament/finish";
 import { sendEmail } from "@/lib/email";
 import { generateKnockoutBracket, knockoutRoundCount, advanceKnockoutRound, generateGroups, generateGroupRoundRobin, getGroupAdvancers, isKnockoutComplete } from "@/lib/tournament/knockout";
@@ -309,24 +309,10 @@ async function handleTournamentCron(req: NextRequest) {
           continue;
         }
 
-        // Find available players and pair them
-        const available = await getAvailableArenaPlayers(admin, tournament.id);
-        if (available.length < 2) continue;
-
-        const previousMatchups = await getArenaPreviousMatchups(admin, tournament.id);
-        const pairings = pairArenaPlayers(available, previousMatchups);
-        if (pairings.length === 0) continue;
-
-        const nextWave = (tournament.current_round || 1) + 1;
-        await createArenaGames(admin, tournament.id, pairings, {
-          time_control: tournament.time_control,
-          initial_minutes: tournament.initial_minutes,
-          increment_seconds: tournament.increment_seconds,
-        }, nextWave);
-
-        await admin.from("tournaments")
-          .update({ current_round: nextWave })
-          .eq("id", tournament.id);
+        // Safety-net matchmaking sweep (event-driven calls on game-finish and
+        // join already handle the common case instantly; this catches anyone
+        // left stranded — e.g. a lone odd-one-out who now has a partner).
+        await runArenaMatchmakingWave(admin, tournament.id);
       } catch (e: any) {
         results.errors.push(`Arena ${tournament.name}: ${e.message}`);
       }

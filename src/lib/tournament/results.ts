@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { finishTournament } from "@/lib/tournament/finish";
-import { processArenaGameResult } from "@/lib/tournament/arena";
+import { processArenaGameResult, runArenaMatchmakingWave } from "@/lib/tournament/arena";
 
 interface GameResult {
   gameId: string;
@@ -56,6 +56,9 @@ async function _processTournamentGameResult(result: GameResult) {
 
   if (tournamentInfo?.type === "arena") {
     await processArenaGameResult(admin, result, tournamentId);
+    // Immediately try to re-pair the two players who just freed up (plus
+    // anyone else who was waiting) — don't wait for the next cron tick.
+    await runArenaMatchmakingWave(admin, tournamentId);
     return; // Arena doesn't use round completion or auto-finish
   }
 

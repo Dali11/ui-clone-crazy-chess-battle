@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
+import { runArenaMatchmakingWave } from "@/lib/tournament/arena";
 
 export async function POST(
   req: NextRequest,
@@ -25,7 +26,7 @@ export async function POST(
     // Verify tournament exists and is upcoming
     const { data: tournament, error: tErr } = await admin
       .from("tournaments")
-      .select("id, status, max_players, min_rating, max_rating, entry_fee, prize_pool, pool_source")
+      .select("id, type, status, max_players, min_rating, max_rating, entry_fee, prize_pool, pool_source")
       .eq("id", tournamentId)
       .single();
 
@@ -266,6 +267,14 @@ export async function POST(
           tournamentId,
         },
       }).catch(() => {});
+    }
+
+    // If this is a live arena tournament, try to pair the new player right
+    // away instead of making them wait for the next cron tick.
+    if (tournament.type === "arena" && tournament.status === "active") {
+      runArenaMatchmakingWave(admin, tournamentId).catch((e) =>
+        console.error("Arena instant-pair on join failed:", e)
+      );
     }
 
     return NextResponse.json({ success: true, paidEntryFee, berriesAwarded: 50 });

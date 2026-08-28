@@ -166,6 +166,37 @@ export async function GET(
     // payout amount so players see accurate numbers, not the inflated gross total.
     const { actualPrizePool } = computeTournamentEconomics(tournament);
 
+    // For arena tournaments, fetch live games (arena doesn't use tournament_rounds)
+    let arenaGames: any[] = [];
+    if (tournament.type === "arena") {
+      const { data: aGames } = await admin
+        .from("games")
+        .select(`
+          id, status, tournament_round, white_player_id, black_player_id,
+          white_clock_ms, black_clock_ms, turn,
+          white_rating, black_rating
+        `)
+        .eq("tournament_id", tournamentId)
+        .in("status", ["waiting", "playing"])
+        .order("created_at", { ascending: false });
+
+      arenaGames = (aGames || []).map((g: any) => {
+        const whiteP = participantMap.get(g.white_player_id);
+        const blackP = participantMap.get(g.black_player_id);
+        return {
+          id: g.id,
+          status: g.status,
+          round: g.tournament_round,
+          whiteId: g.white_player_id,
+          blackId: g.black_player_id,
+          whiteName: whiteP?.profile?.display_name || whiteP?.profile?.username || "Unknown",
+          whiteRating: g.white_rating || whiteP?.profile?.rating || 0,
+          blackName: blackP?.profile?.display_name || blackP?.profile?.username || "Unknown",
+          blackRating: g.black_rating || blackP?.profile?.rating || 0,
+        };
+      });
+    }
+
     return NextResponse.json({
       success: true,
       isAdmin,
@@ -177,6 +208,7 @@ export async function GET(
       participants: participants || [],
       rounds: roundsWithGameIds,
       participantCount: participants?.length || 0,
+      arenaGames,
     });
   } catch (error: any) {
     console.error('Tournament detail API error:', error);

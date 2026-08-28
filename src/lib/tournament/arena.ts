@@ -275,3 +275,55 @@ export function shouldArenaFinish(tournament: { ends_at: string | null; status: 
   if (!tournament.ends_at) return false;
   return new Date(tournament.ends_at).getTime() <= Date.now();
 }
+
+/**
+ * Run one matchmaking wave for an active arena tournament: find available
+ * (not-currently-playing) participants, pair them up avoiding rematches,
+ * and create games for the new pairings.
+ *
+ * This is the single source of truth for arena pairing and is meant to be
+ * called EVENT-DRIVEN (right after a game finishes, right after a player
+ * joins mid-arena) as well as from the periodic cron sweep — event-driven
+ * calls make matching feel instant instead of waiting for the next cron
+ * tick, while the cron sweep remains a safety net for edge cases (stuck
+ * games, players who joined while nobody else was free, etc).
+ *
+ * Returns the number of new games created (0 if nobody was available to pair).
+ */
+export async function runArenaMatchmakingWave(
+  admin: ReturnType<typeof createAdminClient>,
+  tournamentId: string,
+): Promise<number> {
+  const { data: tournament } = await admin
+    .from("tournaments")
+    .select("id, status, current_round, time_control, initial_minutes, increment_seconds")
+    .eq("id", tournamentId)
+    .single();
+
+  if (!tournament || tournament.status !== "active") return 0;
+
+  const available = await getAvailableArenaPlayers(admin, tournamentId);
+  if (available.length < 2) return 0;
+
+  const previousMatchups = await getArenaPreviousMatchups(admin, tournamentId);
+  const pairings = pairArenaPlayers(available, previousMatchups);
+  if (pairings.length === 0) return 0;
+
+  const nextWave = (tournament.current_round || 1) + 1;
+  await createArenaGames(
+    admin,
+    tournamentId,
+    pairings,
+    {
+      time_control: tournament.time_control,
+      initial_minutes: tournament.initial_minutes,
+      increment_seconds: tournament.increment_seconds,
+    },
+    nextWave,
+  );
+
+  await admin.from("tournaments").update({ current_round: nextWave }).eq("id", tournamentId);
+
+  console.log(`[arena] Matchmaking wave for ${tournamentId}: created ${pairings.length} game(s), wave ${nextWave}`);
+  return pairings.length;
+}

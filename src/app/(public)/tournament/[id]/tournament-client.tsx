@@ -7,7 +7,7 @@ import {
   Trophy, Users, Calendar, Clock, DollarSign, RefreshCw, AlertCircle,
   Crown, Star, Swords, ChevronRight, ArrowLeft, Zap, Award, Medal,
   CheckCircle, XCircle, Play, Settings, Target, Gamepad2, LogIn, UserPlus,
-  Share2, Check,
+  Share2, Check, Flame, Eye,
 } from 'lucide-react';
 
 interface TournamentData {
@@ -82,6 +82,17 @@ interface TournamentData {
       blackRating: number;
       game_id?: string;
     }>;
+  }>;
+  arenaGames?: Array<{
+    id: string;
+    status: string;
+    round: number;
+    whiteId: string;
+    blackId: string;
+    whiteName: string;
+    whiteRating: number;
+    blackName: string;
+    blackRating: number;
   }>;
   participantCount: number;
 }
@@ -226,6 +237,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   useEffect(() => {
     if (!data || !data.isRegistered || !data.currentPlayerId || data.tournament.status !== 'active') return;
 
+    // Arena: check live games for the player
+    if (data.tournament.type === 'arena') {
+      const myGame = (data.arenaGames || []).find(
+        g => g.whiteId === data.currentPlayerId || g.blackId === data.currentPlayerId
+      );
+      if (!myGame) return;
+      if (redirectedRef.current === myGame.id) return;
+      redirectedRef.current = myGame.id;
+      setRedirecting(true);
+      const timer = setTimeout(() => {
+        router.push(`/game/${myGame.id}`);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+
     const currentRound = data.rounds?.find(r => r.round_number === data.tournament.current_round);
     if (!currentRound || currentRound.is_complete) return;
 
@@ -254,6 +280,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   // Auto-refresh when tournament is live — faster (5s) when round is starting soon
   useEffect(() => {
     if (!data || data.tournament.status !== 'active') return;
+    // Arena: refresh every 5s for live match updates
+    if (data.tournament.type === 'arena') {
+      const interval = setInterval(() => fetchData(), 5000);
+      return () => clearInterval(interval);
+    }
     // Check if current round is starting soon
     const currentRd = data.rounds?.find(r => r.round_number === data.tournament.current_round);
     const startsIn = currentRd?.starts_at ? Math.max(0, Math.floor((new Date(currentRd.starts_at).getTime() - Date.now()) / 1000)) : 0;
@@ -261,7 +292,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     const intervalMs = startingSoon ? 5000 : 15000;
     const interval = setInterval(() => fetchData(), intervalMs);
     return () => clearInterval(interval);
-  }, [data?.tournament.status, data?.rounds]);
+  }, [data?.tournament.status, data?.tournament.type, data?.rounds]);
 
   const handleJoin = async () => {
     setActionLoading(true);
@@ -375,6 +406,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const hasPrizePool = displayPrizePool > 0;
   const hasBerryPrize = (t.berry_prize_pool || 0) > 0;
   const isLive = t.status === 'active';
+  const isArena = t.type === 'arena';
+  const arenaGames = data.arenaGames || [];
+  const arenaTimeLeft = t.ends_at ? Math.max(0, Math.floor((new Date(t.ends_at).getTime() - Date.now()) / 1000)) : 0;
 
   // Show redirecting overlay
   if (redirecting) {
@@ -400,11 +434,17 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   // Sonneborn-Berger → wins → seed). This prevents confusing rank jumps
   // when the tournament finishes and server-side tiebreaks kick in.
   const allHaveFinalRank = participants.length > 0 && participants.every((p) => p.final_rank != null);
-  const tiebreaks = computeTiebreaks(participants, rounds);
+  const tiebreaks = isArena ? new Map<string, { buchholz_cut1: number; sonneborn_berger: number }>() : computeTiebreaks(participants, rounds);
 
   const sortedParticipants = [...participants].sort((a, b) => {
     if (allHaveFinalRank) {
       return (a.final_rank || 0) - (b.final_rank || 0);
+    }
+    // Arena: sort by score desc, wins desc, games_played desc
+    if (isArena) {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      return (b.games_played || 0) - (a.games_played || 0);
     }
     // Same tiebreak order as server-side calculateTiebreaks
     if (b.score !== a.score) return b.score - a.score;
@@ -482,7 +522,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               <StatTile icon={Clock} label="Time Control" value={`${t.initial_minutes}+${t.increment_seconds}`} />
               <StatTile icon={Users} label="Players" value={`${data.participantCount}${t.max_players ? `/${t.max_players}` : ''}`} />
               <StatTile icon={Calendar} label="Starts" value={formatDate(t.starts_at)} sub={formatTime(t.starts_at)} />
-              <StatTile icon={Award} label="Rounds" value={t.rounds || '—'} />
+              <StatTile icon={Award} label={isArena ? "Duration" : "Rounds"} value={isArena ? `${t.duration_minutes || 60}min` : (t.rounds || '—')} />
             </div>
 
             {/* PRIZE & FEE BADGES */}
@@ -589,7 +629,22 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 </>
               ))}
 
-              {isLive && (
+              {isLive && isArena ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm text-ccb-success">
+                    <div className="w-2 h-2 rounded-full bg-ccb-success animate-pulse" />
+                    <span className="font-bold">Arena Live</span>
+                    {arenaTimeLeft > 0 && (
+                      <span className="ml-3 text-xs font-bold px-2.5 py-1 rounded-full bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30 tabular-nums">
+                        ⏱ {Math.floor(arenaTimeLeft / 60)}:{(arenaTimeLeft % 60).toString().padStart(2, '0')} left
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-ccb-muted font-medium">
+                    {arenaGames.length} live {arenaGames.length === 1 ? 'match' : 'matches'}
+                  </span>
+                </div>
+              ) : isLive && !isArena ? (
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-sm text-ccb-success">
                     <div className="w-2 h-2 rounded-full bg-ccb-success animate-pulse" />
@@ -610,7 +665,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     </button>
                   )}
                 </div>
-              )}
+              ) : null}
 
               {isFinished && (
                 <div className="text-center py-2 flex items-center justify-center gap-2">
@@ -750,7 +805,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   return tiedScores.size > 0 ? (
                     <div className="flex items-center gap-1.5 px-1 text-[10px] text-ccb-muted">
                       <AlertCircle className="w-3 h-3" />
-                      <span>Tied scores are broken by Buchholz Cut 1, then Sonneborn-Berger (shown in columns below).</span>
+                      <span>Tied scores are broken by {isArena ? 'wins, then games played' : 'Buchholz Cut 1, then Sonneborn-Berger (shown in columns below)'}.</span>
                     </div>
                   ) : null;
                 })()}
@@ -763,8 +818,14 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     <div className="col-span-5 sm:col-span-4">Player</div>
                     <div className="col-span-2 text-center">Score</div>
                     <div className="col-span-2 text-center hidden sm:block">W/L/D</div>
-                    <div className="col-span-1 text-center hidden sm:block" title="Buchholz Cut 1 — sum of opponents' scores minus worst opponent">BH-C1</div>
-                    <div className="col-span-1 text-center hidden sm:block" title="Sonneborn-Berger — weighted sum of results vs opponents' scores">SB</div>
+                    {isArena ? (
+                      <div className="col-span-2 text-center hidden sm:block" title="Current win streak">Streak</div>
+                    ) : (
+                      <>
+                        <div className="col-span-1 text-center hidden sm:block" title="Buchholz Cut 1 — sum of opponents' scores minus worst opponent">BH-C1</div>
+                        <div className="col-span-1 text-center hidden sm:block" title="Sonneborn-Berger — weighted sum of results vs opponents' scores">SB</div>
+                      </>
+                    )}
                     <div className="col-span-2 text-center">Played</div>
                   </div>
 
@@ -807,12 +868,26 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                           <span className="text-ccb-danger">{p.losses}</span>/
                           <span>{p.draws}</span>
                         </div>
-                        <div className={`col-span-1 text-center text-xs hidden sm:block ${tiedWithNext ? 'text-ccb-text font-semibold' : 'text-ccb-muted'}`}>
-                          {tb.buchholz_cut1.toFixed(1)}
-                        </div>
-                        <div className={`col-span-1 text-center text-xs hidden sm:block ${tiedWithNext ? 'text-ccb-text font-semibold' : 'text-ccb-muted'}`}>
-                          {tb.sonneborn_berger.toFixed(1)}
-                        </div>
+                        {isArena ? (
+                          <div className="col-span-2 text-center text-xs hidden sm:block">
+                            {(p.streak || 0) > 0 ? (
+                              <span className="font-bold text-ccb-success flex items-center justify-center gap-1">
+                                <Flame className="w-3 h-3" />{p.streak}
+                              </span>
+                            ) : (
+                              <span className="text-ccb-muted">—</span>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <div className={`col-span-1 text-center text-xs hidden sm:block ${tiedWithNext ? 'text-ccb-text font-semibold' : 'text-ccb-muted'}`}>
+                              {tb.buchholz_cut1.toFixed(1)}
+                            </div>
+                            <div className={`col-span-1 text-center text-xs hidden sm:block ${tiedWithNext ? 'text-ccb-text font-semibold' : 'text-ccb-muted'}`}>
+                              {tb.sonneborn_berger.toFixed(1)}
+                            </div>
+                          </>
+                        )}
                         <div className="col-span-2 text-center text-xs text-ccb-muted">
                           {p.games_played}
                         </div>
@@ -829,6 +904,63 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         {activeTab === 'rounds' && (
           <div className="space-y-3">
             {rounds.length === 0 ? (
+                isArena && isLive ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-xs font-bold text-ccb-muted uppercase tracking-wider">Live Matches</span>
+                    <span className="text-xs font-semibold text-ccb-muted">{arenaGames.length} {arenaGames.length === 1 ? 'match' : 'matches'}</span>
+                  </div>
+                  {arenaGames.length === 0 ? (
+                    <div className="bg-ccb-card border border-ccb-border rounded-2xl p-8 text-center">
+                      <div className="w-8 h-8 rounded-full border-2 border-ccb-primary border-t-transparent animate-spin mx-auto mb-3" />
+                      <p className="text-xs text-ccb-muted">Matching players…</p>
+                    </div>
+                  ) : (
+                    arenaGames.map((g) => {
+                      const isMyGame = g.whiteId === data.currentPlayerId || g.blackId === data.currentPlayerId;
+                      return (
+                        <div key={g.id} className={`bg-ccb-card border rounded-2xl p-4 transition-all ${isMyGame ? 'border-ccb-primary/40 shadow-lg shadow-ccb-primary/10' : 'border-ccb-border'}`}>
+                          <div className="flex items-center justify-between gap-3 mb-3">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="text-center min-w-0">
+                                <div className="text-sm font-bold truncate">{g.whiteName}</div>
+                                <div className="text-[10px] text-ccb-muted">{g.whiteRating}</div>
+                              </div>
+                              <span className="text-xs font-bold text-ccb-muted px-2 py-0.5 rounded-lg bg-ccb-surface border border-ccb-border shrink-0">vs</span>
+                              <div className="text-center min-w-0">
+                                <div className="text-sm font-bold truncate">{g.blackName}</div>
+                                <div className="text-[10px] text-ccb-muted">{g.blackRating}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {g.status === 'playing' ? (
+                                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-ccb-success/10 text-ccb-success border border-ccb-success/30 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-ccb-success animate-pulse" /> Live
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30">
+                                  Starting
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {isMyGame ? (
+                              <Link href={`/game/${g.id}`} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-ccb-primary text-white font-bold text-xs hover:bg-ccb-primary/90 transition-all">
+                                <Play className="w-3.5 h-3.5" /> Play Your Game
+                              </Link>
+                            ) : (
+                              <Link href={`/game/${g.id}`} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-ccb-surface border border-ccb-border text-ccb-text font-bold text-xs hover:bg-ccb-primary/10 hover:border-ccb-primary/30 transition-all">
+                                <Eye className="w-3.5 h-3.5" /> Watch
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              ) : (
               <div className="bg-ccb-card border border-ccb-border rounded-2xl p-10 text-center">
                 <Swords className="w-10 h-10 text-ccb-muted mx-auto mb-3" />
                 <h3 className="font-bold text-sm mb-1">No rounds yet</h3>
@@ -836,6 +968,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   {t.status === 'upcoming' ? 'Pairings will appear when the tournament starts.' : 'No rounds have been generated.'}
                 </p>
               </div>
+              )
             ) : (
               <>
                 {/* Round count */}
