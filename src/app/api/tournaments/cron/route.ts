@@ -310,21 +310,27 @@ async function handleTournamentCron(req: NextRequest) {
           continue;
         }
 
-        // ── No-show auto-resign: if a game has been "playing" for 2+ minutes
-        // with zero moves, the player whose turn it is never showed up. They
-        // lose by resignation, the opponent gets the win, and both are freed
-        // for re-pairing. This keeps arena games from being stuck on no-shows.
+        // ── No-show auto-resign: if a game has been "playing" with no move
+        // from the player whose turn it is for 2+ minutes, they lose by
+        // resignation. Applies to BOTH first moves — white not moving at all
+        // (move_count=0) AND black not responding to white's first move
+        // (move_count=1). The opponent gets the win and both are freed for
+        // re-pairing.
         const { data: noShowGames } = await admin
           .from("games")
           .select("id, turn, move_count, white_player_id, black_player_id, white_rating, black_rating, rated, last_move_at, created_at")
           .eq("tournament_id", tournament.id)
           .eq("status", "playing")
-          .eq("move_count", 0);
+          .in("move_count", [0, 1]);
 
         const NO_SHOW_MS = 2 * 60 * 1000; // 2 minutes
         for (const g of noShowGames || []) {
-          const startTime = new Date(g.last_move_at || g.created_at).getTime();
-          if (Date.now() - startTime < NO_SHOW_MS) continue;
+          // For move_count=0, measure from game start (white's first move).
+          // For move_count=1, measure from white's last move (black's first move).
+          const timerStart = g.move_count === 0
+            ? new Date(g.last_move_at || g.created_at).getTime()
+            : new Date(g.last_move_at || g.created_at).getTime();
+          if (Date.now() - timerStart < NO_SHOW_MS) continue;
 
           // The player whose turn it is = the no-show loser
           const loser = g.turn; // "white" on first move
