@@ -28,7 +28,7 @@ async function handleAutoStart(req: NextRequest) {
     // Find upcoming tournaments whose start time has passed
     const { data: tournaments } = await admin
       .from("tournaments")
-      .select("id, name, starts_at, status, type, knockout_format, group_schedule, initial_minutes, increment_seconds, time_control, min_players, entry_fee, countdown_minutes, rest_minutes")
+      .select("id, name, starts_at, status, type, knockout_format, group_schedule, initial_minutes, increment_seconds, time_control, min_players, entry_fee, countdown_minutes, rest_minutes, rounds")
       .eq("status", "upcoming")
       .lte("starts_at", now);
 
