@@ -592,9 +592,13 @@ export default function PremiumLeaguesTab() {
                         <p className="text-xs text-ccb-muted">
                           {league.status === 'upcoming' ? 'League not started yet' :
                            league.status === 'registration' ? (
-                             league.registrationCount > 0
-                               ? `${league.registrationCount} player${league.registrationCount === 1 ? '' : 's'} registered — season starts once we kick off`
+                             league.playerCount > 0
+                               ? `${league.playerCount} player${league.playerCount === 1 ? '' : 's'} registered — season starts once we kick off`
                                : 'No players registered yet — be the first!'
+                           ) : league.status === 'active' ? (
+                             league.playerCount > 0
+                               ? `${league.playerCount} player${league.playerCount === 1 ? '' : 's'} in the league — standings update after matchday 1`
+                               : 'No players in this league yet'
                            ) : 'No standings available'}
                         </p>
                       </div>

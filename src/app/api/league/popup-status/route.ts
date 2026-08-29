@@ -41,11 +41,11 @@ export async function GET() {
       return NextResponse.json({ show: false, reason: "already_registered" });
     }
 
-    // Check if user is already a player in any league
+    // Check if user is already a player in any league (include active leagues too)
     const { data: leagues } = await admin
       .from("premier_leagues")
       .select("id, player_ids")
-      .in("status", ["registration"]);
+      .in("status", ["registration", "active"]);
 
     const isInAnyLeague = (leagues || []).some((l: any) =>
       l.player_ids?.includes(user.id)
@@ -69,11 +69,11 @@ export async function GET() {
     else if (rating >= 1200) recommendedTier = 3;
     else if (rating >= 800) recommendedTier = 4;
 
-    // Get all leagues in registration
+    // Get all leagues in registration or active (mid-season join support)
     const { data: allLeagueData } = await admin
       .from("premier_leagues")
-      .select("id, name, tier, min_rating, max_rating")
-      .eq("status", "registration")
+      .select("id, name, tier, min_rating, max_rating, status")
+      .in("status", ["registration", "active"])
       .order("tier", { ascending: true });
 
     const allLeagues = allLeagueData || [];
