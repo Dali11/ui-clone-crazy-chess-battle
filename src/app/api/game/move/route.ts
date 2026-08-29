@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { validateAndApplyMove } from "@/lib/game/chess-engine";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { awardBerries } from "@/lib/berry/award";
 import { settleBattle } from "@/lib/battles/settle";
 import { resolveTimeoutForGame } from "@/lib/game/resolve-timeout";
 
@@ -183,13 +182,6 @@ export async function POST(req: NextRequest) {
           black_rating_change: blackNewRating - blackProfile.rating,
         }).eq("id", gameId);
       }
-    }
-
-
-    // Award berries to winner (quick match only — checkmate/stalemate)
-    if (gameEnded && result.winner) {
-      const winnerId = result.winner === "white" ? game.white_player_id : game.black_player_id;
-      const berries = await awardBerries(gameId, winnerId);
     }
 
     // Process tournament game result (non-blocking — game is already saved)

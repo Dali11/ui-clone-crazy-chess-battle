@@ -39,7 +39,6 @@ interface TournamentData {
     actual_prize_pool?: number;
     pool_source: string | null;
     thumbnail_url: string | null;
-    berry_prize_pool: number | null;
     prize_distribution: any;
     min_players: number;
     knockout_format?: string;
@@ -420,8 +419,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const hasEntryFee = (t.entry_fee || 0) > 0;
   const displayPrizePool = t.actual_prize_pool ?? t.prize_pool ?? 0;
   const hasPrizePool = displayPrizePool > 0;
-  const hasBerryPrize = (t.berry_prize_pool || 0) > 0;
-  const isLive = t.status === 'active';
+    const isLive = t.status === 'active';
   const isArena = t.type === 'arena';
   const arenaGames = data.arenaGames || [];
   const arenaTimeLeft = t.ends_at ? Math.max(0, Math.floor((new Date(t.ends_at).getTime() - Date.now()) / 1000)) : 0;
@@ -549,12 +547,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <span className="text-xs font-bold text-ccb-accent">{formatMoney(displayPrizePool)} Pool</span>
                 </div>
               )}
-              {hasBerryPrize && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ccb-primary/10 border border-ccb-primary/30">
-                  <Zap className="w-3.5 h-3.5 text-ccb-primary" />
-                  <span className="text-xs font-bold text-ccb-primary">{t.berry_prize_pool} Berries</span>
-                </div>
-              )}
+              
               {hasEntryFee ? (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ccb-surface border border-ccb-border">
                   <DollarSign className="w-3.5 h-3.5 text-ccb-muted" />
@@ -1327,13 +1320,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               </h4>
               <div className="space-y-3">
                 {hasPrizePool && <InfoRow icon={Trophy} label={t.pool_source === 'fixed' ? "Cash Prize Pool (Fixed)" : "Cash Prize Pool (Entry Fees)"} value={formatMoney(displayPrizePool)} />}
-                {hasBerryPrize && <InfoRow icon={Zap} label="Berry Prize Pool" value={`${t.berry_prize_pool} berries`} />}
                 {hasEntryFee ? (
                   <InfoRow icon={DollarSign} label="Entry Fee" value={formatMoney(t.entry_fee)} />
                 ) : (
                   <InfoRow icon={CheckCircle} label="Entry Fee" value="Free" />
                 )}
-                {!hasPrizePool && !hasBerryPrize && (
+                {!hasPrizePool && (
                   <p className="text-xs text-ccb-muted">{t.entry_fee > 0 ? "Prize pool grows as players join." : "No prize pool for this tournament."}</p>
                 )}
               </div>

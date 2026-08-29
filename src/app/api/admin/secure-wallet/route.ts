@@ -55,9 +55,6 @@ GRANT EXECUTE ON FUNCTION public.debit_wallet(UUID, INT) TO authenticated;
 CREATE UNIQUE INDEX IF NOT EXISTS deposits_reference_unique
   ON deposits (reference) WHERE reference IS NOT NULL;
 
--- 4. Unique index on daily_checkins — prevents double check-in rewards
-CREATE UNIQUE INDEX IF NOT EXISTS daily_checkins_user_date_unique
-  ON daily_checkins (user_id, checkin_date);
 `;
 
 export async function POST(req: NextRequest) {
@@ -94,7 +91,6 @@ export async function POST(req: NextRequest) {
       })),
       constraints: [
         "deposits_reference_unique (partial, reference IS NOT NULL)",
-        "daily_checkins_user_date_unique (user_id, checkin_date)",
       ],
     });
   } catch (e: any) {

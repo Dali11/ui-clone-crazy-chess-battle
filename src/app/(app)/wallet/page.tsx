@@ -56,7 +56,6 @@ export default async function WalletPage() {
   return (
     <WalletClient
       balance={profile?.wallet_balance || 0}
-      berryBalance={profile?.berry_balance || 0}
       email={user.email || ""}
       deposits={deposits}
       phone={null}

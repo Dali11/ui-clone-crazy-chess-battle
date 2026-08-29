@@ -3,7 +3,6 @@ import { processLeagueGameResult } from "@/lib/league/process-game-result";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { awardBerries } from "@/lib/berry/award";
 import { settleBattle } from "@/lib/battles/settle";
 
 export async function POST(req: NextRequest) {
@@ -46,7 +45,6 @@ export async function POST(req: NextRequest) {
     // moment of update. This prevents a race where the cron's no-show/
     // timeout sweep (or a duplicate client request) resolves the same
     // game concurrently, which would double-process the tournament result
-    // (double score, double rating change, double berries).
     const { data: claimedGame, error: updateError } = await admin.from("games").update({
       status: "resign",
       winner,
@@ -110,10 +108,6 @@ export async function POST(req: NextRequest) {
       }).eq("id", gameId);
     }
 
-    // Award berries to winner (quick match only)
-    const winnerId = winner === "white" ? game.white_player_id : game.black_player_id;
-    const berries = await awardBerries(gameId, winnerId);
-
     // Process tournament game result if this is a tournament game
     const { data: fullGame } = await admin
       .from("games")
@@ -168,7 +162,7 @@ export async function POST(req: NextRequest) {
       await settleBattle(battle.id, battleWinnerId, "resign").catch((e) => console.error("Battle settlement failed:", e));
     }
 
-    return NextResponse.json({ status: "resigned", winner, berries });
+    return NextResponse.json({ status: "resigned", winner });
   } catch {
     return NextResponse.json({ error: "Resign failed" }, { status: 500 });
   }

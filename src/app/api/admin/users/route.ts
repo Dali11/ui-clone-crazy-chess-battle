@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
     const { data: users, error } = await admin
       .from("profiles")
-      .select("id, username, display_name, email, rating, games_played, wins, losses, draws, wallet_balance, is_admin, is_banned, phone, berry_balance, created_at")
+      .select("id, username, display_name, email, rating, games_played, wins, losses, draws, wallet_balance, is_admin, is_banned, phone, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
 
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// PATCH — manage a user (ban/unban, toggle admin, adjust rating, adjust wallet, grant berries)
+// PATCH — manage a user (ban/unban, toggle admin, adjust rating, adjust wallet)
 export async function PATCH(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -88,15 +88,6 @@ export async function PATCH(req: NextRequest) {
           if (error) return NextResponse.json({ error: error.message }, { status: 500 });
         }
         break;
-      case "grant_berries":
-        if (typeof value !== "number" || value <= 0)
-          return NextResponse.json({ error: "Invalid berry amount" }, { status: 400 });
-        const { error: berryErr } = await admin.rpc("credit_berries", {
-          p_user_id: userId,
-          p_amount: value,
-          p_description: "Admin grant",
-        });
-        if (berryErr) return NextResponse.json({ error: berryErr.message }, { status: 500 });
         break;
       default:
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });
@@ -148,7 +139,7 @@ export async function DELETE(req: NextRequest) {
     // Get the user's profile for logging
     const { data: targetProfile } = await admin
       .from("profiles")
-      .select("username, email, wallet_balance, berry_balance")
+      .select("username, email, wallet_balance")
       .eq("id", userId)
       .single();
 
@@ -199,12 +190,6 @@ export async function DELETE(req: NextRequest) {
     // Games table has ON DELETE SET NULL for player IDs, so deleting the profile
     // will handle this. But we also want to clean up the game records themselves
     // for bot games where the user is the only human player.
-    
-    // 4. Delete berry transactions
-    await admin.from("berry_transactions").delete().eq("user_id", userId);
-
-    // 5. Delete berry balances
-    await admin.from("berry_balances").delete().eq("user_id", userId);
 
     // 6. Delete referrals (both as referrer and referred)
     await admin.from("referrals").delete().eq("referrer_id", userId);
@@ -257,7 +242,6 @@ export async function DELETE(req: NextRequest) {
           deleted_username: targetProfile.username,
           deleted_email: targetProfile.email,
           wallet_balance: targetProfile.wallet_balance,
-          berry_balance: targetProfile.berry_balance,
         },
       });
     } catch {}

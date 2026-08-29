@@ -5,7 +5,7 @@
  * config stored as JSONB). This helper reads + caches them so every backend route
  * can enforce the same config the admin panel shows.
  *
- * For sections that historically used a separate table (battle_config, berry_config,
+ * For sections that historically used a separate table (battle_config,
  * withdrawal_config), the PATCH route syncs writes to those tables too so existing
  * code keeps working during migration.
  */
@@ -72,16 +72,6 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     show_kpi_cards: true,
     page_size: 20,
   },
-  berry: {
-    berries_per_win: 10,
-    berries_per_draw: 5,
-    berries_per_tournament_win: 50,
-    daily_cap: 100,
-    // 1000 berries = MWK 500 → 2 berries per 1 MWK
-    conversion_rate: 2,
-    min_conversion_berries: 10000,
-    show_kpi_cards: true,
-  },
   leagues: {
     require_membership: true,
     auto_relegate: true,
@@ -137,16 +127,6 @@ export const LEGACY_SYNC: Record<string, { table: string; fieldMap: Record<strin
     fieldMap: {
       enabled: "enabled",
       platform_fee_pct: "platform_fee_pct",
-    },
-  },
-  berry: {
-    table: "berry_config",
-    fieldMap: {
-      berries_per_win: "berries_per_win",
-      berries_per_draw: "berries_per_draw",
-      berries_per_tournament_win: "berries_per_tournament_win",
-      daily_cap: "daily_cap",
-      conversion_rate: "conversion_rate",
     },
   },
 };

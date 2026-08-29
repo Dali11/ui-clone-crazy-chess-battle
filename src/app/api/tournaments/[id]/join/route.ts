@@ -225,24 +225,6 @@ export async function POST(
     });
     if (refErr) console.error("Referral activation failed:", refErr);
 
-    // Award 50 berries for joining a tournament (non-fatal)
-    try {
-      const { data: tConfig } = await admin
-        .from("berry_config")
-        .select("enabled")
-        .limit(1)
-        .single();
-      if (tConfig?.enabled) {
-        await admin.rpc("credit_berries", {
-          p_user_id: user.id,
-          p_amount: 50,
-          p_description: "Joined a tournament!",
-        });
-      }
-    } catch (berryErr) {
-      console.error("Berry award failed:", berryErr);
-    }
-
     return NextResponse.json({ success: true, message: "Successfully joined tournament" });
   } catch (error: any) {
     console.error("Join tournament error:", error);

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
-import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight, Cherry, Gift } from "lucide-react";
+import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight } from "lucide-react";
 import WhatsAppBanner from "@/components/layout/whatsapp-banner";
 
 const LEVEL_RATINGS: Record<string, number> = {
@@ -111,7 +111,6 @@ export default async function DashboardPage() {
   const walletBalance = profile?.wallet_balance
     ? `MK ${profile.wallet_balance.toLocaleString("en-US")}`
     : "MK 0";
-  const berryBalance = profile?.berry_balance ?? 0;
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-24 sm:pb-6">
@@ -241,18 +240,9 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Berry + Wallet row */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3">
-        <Link href="/earn" className="flex items-center justify-between rounded-xl bg-gradient-to-br from-red-500/10 to-ccb-surface border border-red-500/20 px-4 py-3 group">
-          <div className="flex items-center gap-2.5">
-            <Cherry className="w-4 h-4 text-red-500" />
-            <div>
-              <span className="text-xs text-ccb-muted block">CCB Berries</span>
-              <span className="text-sm font-bold">{berryBalance.toLocaleString()} 🍒</span>
-            </div>
-          </div>
-          <Gift className="w-4 h-4 text-ccb-muted group-hover:translate-x-1 transition-transform" />
-        </Link>
+      {/* Wallet row */}
+      <div className="grid grid-cols-1 gap-2 sm:gap-3">
+
         <Link href="/wallet" className="flex items-center justify-between rounded-xl bg-ccb-surface border border-ccb-border px-4 py-3 group">
           <div className="flex items-center gap-2.5">
             <Wallet className="w-4 h-4 text-ccb-accent" />

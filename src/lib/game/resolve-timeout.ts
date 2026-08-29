@@ -1,5 +1,4 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { awardBerries } from "@/lib/berry/award";
 import { settleBattle } from "@/lib/battles/settle";
 import { processTournamentGameResult } from "@/lib/tournament/results";
 import { processLeagueGameResult } from "@/lib/league/process-game-result";
@@ -27,11 +26,11 @@ export interface TimeoutableGame {
  * Two outcomes:
  * - ABORT — nobody made a single move (move_count === 0). This is the
  *   "opponent never showed up" case: no winner, no rating change, no
- *   berries. Tournament and battle games are never aborted this way —
+ *    Tournament and battle games are never aborted this way —
  *   they always resolve decisively since brackets/stakes need a result.
  * - TIMEOUT — a normal decisive loss for whoever's clock ran out. This is
  *   the "opponent disconnected mid-game" case: counts as a real result
- *   (rating change if rated, berries to the winner, battle/tournament
+ *   (rating change if rated, battle/tournament
  *   settlement as usual).
  */
 export async function resolveTimeoutForGame(admin: AdminClient, game: TimeoutableGame) {
@@ -122,8 +121,6 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
     }).eq("id", loserId);
   }
 
-  // Berries for the winner (skipped automatically for tournament/battle games)
-  await awardBerries(game.id, winnerId);
 
   // Tournament advancement
   if (game.tournament_id) {

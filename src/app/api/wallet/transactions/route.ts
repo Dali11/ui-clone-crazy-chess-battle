@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     type Txn = {
       id: string;
-      type: "deposit" | "withdrawal" | "battle_payout" | "battle_stake" | "berry_redeem" | "tournament_entry" | "tournament_prize";
+      type: "deposit" | "withdrawal" | "battle_payout" | "battle_stake" | "tournament_entry" | "tournament_prize";
       amount: number;
       status: string;
       description: string;
@@ -83,27 +83,6 @@ export async function GET(req: NextRequest) {
           amount: b.amount,
           status: b.status,
           description: b.reference || "Battle winnings",
-          created_at: b.created_at,
-        });
-      }
-    } catch {}
-
-    // Fetch berry redemption records (from deposits table where method = berry_redemption)
-    try {
-      const { data: berryRedemptions } = await admin
-        .from("deposits")
-        .select("id, amount, status, reference, created_at")
-        .eq("user_id", user.id)
-        .eq("method", "berry_redemption")
-        .order("created_at", { ascending: false })
-        .limit(limit);
-      for (const b of berryRedemptions || []) {
-        transactions.push({
-          id: b.id,
-          type: "berry_redeem",
-          amount: b.amount,
-          status: b.status,
-          description: b.reference || "Berry redemption",
           created_at: b.created_at,
         });
       }

@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Wallet, Check, Loader2, ArrowDown, ArrowUp,
-  Clock, Cherry, Gift, RefreshCw, History, TrendingUp, TrendingDown,
+  Clock, RefreshCw, History, TrendingUp, TrendingDown,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -40,17 +40,9 @@ interface Transaction {
   created_at: string;
 }
 
-interface BerryConfig {
-  berry_value: number;
-  min_redemption: number;
-  enabled: boolean;
-  berries_per_win: number;
-  berries_per_draw: number;
-}
 
 interface WalletClientProps {
   balance: number;
-  berryBalance: number;
   email: string;
   deposits: Deposit[];
   phone?: string | null;
@@ -63,7 +55,6 @@ const TXN_ICONS: Record<string, any> = {
   withdrawal: ArrowUp,
   battle_payout: TrendingUp,
   battle_stake: TrendingDown,
-  berry_redeem: Cherry,
   tournament_entry: TrendingDown,
   tournament_prize: TrendingUp,
 };
@@ -73,12 +64,11 @@ const TXN_COLORS: Record<string, string> = {
   withdrawal: "text-ccb-accent",
   battle_payout: "text-ccb-success",
   battle_stake: "text-ccb-danger",
-  berry_redeem: "text-red-500",
   tournament_entry: "text-ccb-danger",
   tournament_prize: "text-ccb-success",
 };
 
-export default function WalletClient({ balance, berryBalance, email, deposits, phone: savedPhone }: WalletClientProps) {
+export default function WalletClient({ balance, email, deposits, phone: savedPhone }: WalletClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<"deposit" | "withdraw" | "history">("deposit");
@@ -93,30 +83,11 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
   const [pendingChargeId, setPendingChargeId] = useState<string | null>(null);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [redeemAmount, setRedeemAmount] = useState(10000);
-  const [redeemLoading, setRedeemLoading] = useState(false);
-  const [berries, setBerries] = useState(berryBalance);
   const [walletBal, setWalletBal] = useState(balance);
-  const [berryConfig, setBerryConfig] = useState<BerryConfig>({
-    berry_value: 5000,
-    min_redemption: 10000,
-    enabled: true,
-    berries_per_win: 10,
-    berries_per_draw: 2,
-  });
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [txnLoading, setTxnLoading] = useState(false);
 
-  // Fetch berry config from server
-  useEffect(() => {
-    fetch("/api/berry/config")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.berry_value) setBerryConfig(data);
-        if (data.min_redemption) setRedeemAmount(data.min_redemption);
-      })
-      .catch(() => {});
-  }, []);
 
   // Fetch withdrawal limits from platform settings (user-facing endpoint)
   useEffect(() => {
@@ -351,47 +322,6 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
     }
   };
 
-  const handleRedeemBerries = async () => {
-    setRedeemLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      if (redeemAmount < berryConfig.min_redemption) {
-        setError(`Minimum redemption is ${berryConfig.min_redemption} berries`);
-        setRedeemLoading(false);
-        return;
-      }
-      if (redeemAmount > berries) {
-        setError(`You only have ${berries} berries`);
-        setRedeemLoading(false);
-        return;
-      }
-
-      const res = await fetch("/api/berry/redeem", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ berries: redeemAmount }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Redemption failed");
-      }
-
-      setBerries(data.newBerryBalance);
-      setWalletBal((prev) => prev + data.cashAmount);
-      setSuccess(`Redeemed ${data.berriesRedeemed} berries for ${data.cashFormatted}! Added to your wallet.`);
-      router.refresh();
-    } catch (err: any) {
-      setError(err.message && err.message.length < 200 ? err.message : "Redemption failed");
-    } finally {
-      setRedeemLoading(false);
-    }
-  };
-
-  const redeemCashValue = Math.round((redeemAmount / 100) * berryConfig.berry_value);
   const formatMWK = (amount: number) => `MWK ${Math.floor((amount || 0)).toLocaleString()}`;
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -415,62 +345,6 @@ export default function WalletClient({ balance, berryBalance, email, deposits, p
             </button>
           </div>
           <p className="text-3xl font-bold">{formatMWK(walletBal)}</p>
-
-          {/* Berry balance */}
-          <div className="mt-3 pt-3 border-t border-ccb-border flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Cherry className="w-4 h-4 text-red-500" />
-              <span className="text-sm text-ccb-muted">CRAZYCHESSBERRY</span>
-            </div>
-            <span className="text-sm font-semibold text-red-500">{berries.toLocaleString()} 🍒</span>
-          </div>
-
-          {/* Berry redeem section — only shown when user has enough berries */}
-          {berryConfig.enabled && berries >= berryConfig.min_redemption ? (
-            <div className="mt-3 pt-3 border-t border-red-500/10">
-              <div className="flex items-center gap-2 mb-2">
-                <input
-                  type="number"
-                  value={redeemAmount}
-                  onChange={(e) => setRedeemAmount(Math.max(0, parseInt(e.target.value) || 0))}
-                  min={berryConfig.min_redemption}
-                  max={berries}
-                  step={10}
-                  className="flex-1 px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm"
-                  placeholder="Berries to redeem"
-                />
-                <button
-                  onClick={handleRedeemBerries}
-                  disabled={redeemLoading || redeemAmount < berryConfig.min_redemption || redeemAmount > berries}
-                  className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                >
-                  {redeemLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Redeem
-                </button>
-              </div>
-              <p className="text-xs text-ccb-muted">
-                = {formatMWK(redeemCashValue)} to wallet · 1000🍒 = MWK 500
-              </p>
-            </div>
-          ) : berryConfig.enabled ? (
-            <div className="text-xs text-ccb-muted mt-2 pt-2 border-t border-red-500/10">
-              <p>Win {berryConfig.min_redemption - berries} more CCB 🍒 to unlock cash redemption</p>
-            </div>
-          ) : null}
-
-          {/* Referral bonus link */}
-          <div className="mt-3 pt-3 border-t border-red-500/10">
-            <Link
-              href="/earn"
-              className="flex items-center justify-between text-sm text-ccb-primary font-medium hover:opacity-80"
-            >
-              <span className="flex items-center gap-1">
-                <Gift className="w-3.5 h-3.5" />
-                Earn more CCB 🍒
-              </span>
-              <span>→</span>
-            </Link>
-          </div>
         </div>
       </div>
 

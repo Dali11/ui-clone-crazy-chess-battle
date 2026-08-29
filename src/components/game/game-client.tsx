@@ -154,9 +154,6 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const isBattleGame = battleInfo?.isBattle === true;
   const isTournamentGame = !!tournamentId;
   const moneyEarned = isBattleGame && didIWin ? (battleInfo?.winnerPayout ?? 0) : undefined;
-  // For battles, berries are not awarded (they have their own reward system)
-  // For non-battle games, berries are awarded as before
-  const berriesEarned = !isBattleGame && didIWin ? (game.rated ? 10 : 15) : 0;
 
   // Battle draw → Armageddon: the backend already auto-creates the sudden-death
   // game as soon as the draw is settled, but we gate the redirect behind an
@@ -1356,7 +1353,6 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           outcome={(game.status === "abort" ? "abort" : game.winner === null ? "draw" : game.winner === (isWhite ? "white" : "black") ? "win" : "loss") as GameOutcome}
           reasonLabel={STATUS_LABELS[game.status] || game.status}
           ratingChange={myRatingChange}
-          berriesAwarded={berriesEarned}
           moneyEarned={moneyEarned}
           moneyLabel={isBattleGame ? "Battle winnings" : undefined}
           moveCount={game.move_count}
@@ -1411,7 +1407,6 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         outcome={(game.status === "abort" ? "abort" : game.winner === null ? "draw" : game.winner === (isWhite ? "white" : "black") ? "win" : "loss") as GameOutcome}
         reasonLabel={STATUS_LABELS[game.status] || game.status}
         ratingChange={myRatingChange}
-        berriesAwarded={berriesEarned}
         moneyEarned={moneyEarned}
         moneyLabel={isBattleGame ? "Battle winnings" : undefined}
         moveCount={game.move_count}

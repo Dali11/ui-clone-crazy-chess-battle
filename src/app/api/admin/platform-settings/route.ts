@@ -70,7 +70,7 @@ export async function PATCH(req: NextRequest) {
 
     if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
 
-    // Sync to legacy tables (battle_config, berry_config, withdrawal_config)
+    // Sync to legacy tables (battle_config, withdrawal_config)
     // so existing backend code picks up the changes immediately
     try {
       await syncLegacyTable(admin, section, mergedConfig, user.id);

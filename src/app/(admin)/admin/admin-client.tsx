@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Check, X, Coins, Smartphone, Shield, Clock,
-  TrendingUp, Wallet, AlertCircle, ChevronRight, Cherry, Gamepad2,
+  TrendingUp, Wallet, AlertCircle, ChevronRight, Gamepad2,
   Ban, Star, DollarSign, Search, Save, ScrollText, Swords,
   ShieldCheck, UserRound, XCircle,
   Menu, LogOut, Crown, Play,
@@ -56,7 +56,6 @@ interface UserInfo {
   is_admin: boolean;
   is_banned: boolean;
   phone: string | null;
-  berry_balance: number;
   created_at: string;
 }
 
@@ -131,7 +130,7 @@ interface AdminLog {
   profiles: { username: string; display_name: string } | null;
 }
 
-type Tab = "overview" | "users" | "withdrawals" | "tournaments" | "games" | "deposits" | "battles" | "berry" | "logs" | "leagues" | "seasons" | "membership" | "verification" | "settings";
+type Tab = "overview" | "users" | "withdrawals" | "tournaments" | "games" | "deposits" | "battles" | "logs" | "leagues" | "seasons" | "membership" | "verification" | "settings";
 
 // Convert datetime-local (user's local TZ) to UTC ISO string for API
 function localToUTC(localValue: string): string {
@@ -170,8 +169,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [battleStats, setBattleStats] = useState<any>(null);
   const [battleConfig, setBattleConfig] = useState<any>(null);
   const [battleConfigSaving, setBattleConfigSaving] = useState(false);
-  const [berryConfig, setBerryConfig] = useState<any>(null);
-  const [berrySaving, setBerrySaving] = useState(false);
   const [withdrawalConfig, setWithdrawalConfig] = useState<any>(null);
   const [withdrawalConfigSaving, setWithdrawalConfigSaving] = useState(false);
   const [userSearch, setUserSearch] = useState("");
@@ -248,10 +245,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     setLogs(data.logs || []);
   }, []);
 
-  const fetchBerryConfig = useCallback(async () => {
-    const res = await fetch("/api/admin/berry-config");
-    if (res.ok) setBerryConfig(await res.json());
-  }, []);
 
   const fetchWithdrawalConfig = useCallback(async () => {
     const res = await fetch("/api/admin/withdrawal-config");
@@ -398,7 +391,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       if (tab === "games") await fetchGames();
       if (tab === "logs") await fetchLogs();
       if (tab === "battles") await fetchBattleStats();
-      if (tab === "berry") await fetchBerryConfig();
+      
       if (tab === "leagues") await fetchAdminLeagues();
       if (tab === "seasons") await fetchAdminSeasons();
       if (tab === "membership") await fetchMarketConfigs();
@@ -641,7 +634,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
 
 
   const handleDeleteUser = async (userId: string, username: string) => {
-    const msg1 = "PERMANENTLY DELETE " + username + "?\n\nThis will remove ALL their data:\n- Profile, auth account, game history\n- Berry balance and transactions\n- Tournament participations\n- Battle records\n- Referrals, deposits, withdrawals\n\nThis CANNOT be undone. Are you absolutely sure?";
+    const msg1 = "PERMANENTLY DELETE " + username + "?\n\nThis will remove ALL their data:\n- Profile, auth account, game history\n- Tournament participations\n- Battle records\n- Referrals, deposits, withdrawals\n\nThis CANNOT be undone. Are you absolutely sure?";
     if (!confirm(msg1)) return;
     const msg2 = "Last chance \u2014 really delete " + username + "? This is irreversible.";
     if (!confirm(msg2)) return;
@@ -996,7 +989,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     { id: "games", label: "Games", icon: Gamepad2 },
     { id: "deposits", label: "Deposits", icon: DollarSign, badge: stats?.pendingDeposits || undefined },
     { id: "battles", label: "Battles", icon: Swords },
-    { id: "berry", label: "Berry", icon: Cherry },
     { id: "logs", label: "Logs", icon: ScrollText },
     { id: "leagues", label: "Leagues", icon: Crown },
     { id: "seasons", label: "Seasons", icon: Calendar },
@@ -1053,7 +1045,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
             { label: null, items: ["overview"] },
             { label: "Financial", items: ["deposits", "withdrawals", "battles"] },
             { label: "Compete", items: ["tournaments", "games", "leagues", "seasons"] },
-            { label: "Community", items: ["users", "membership", "verification", "berry"] },
+            { label: "Community", items: ["users", "membership", "verification"] },
             { label: "System", items: ["logs", "settings"] },
           ].map((group, gi) => {
             const groupTabs = group.items
@@ -1249,7 +1241,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         <div className="text-right">
                           <div className="text-sm font-medium">{formatMWK(u.wallet_balance)}</div>
                           <div className="text-xs text-ccb-muted flex items-center gap-1 justify-end">
-                            <Cherry className="w-3 h-3 text-red-500" /> {u.berry_balance || 0}
+                            
                           </div>
                         </div>
                       </div>
@@ -1292,17 +1284,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                           variant="default"
                         >
                           <Star className="w-3.5 h-3.5" /> Rating
-                        </ActionButton>
-
-                        <ActionButton
-                          onClick={() => {
-                            const val = prompt("Grant berries:", "100");
-                            if (val !== null) handleUserAction(u.id, "grant_berries", parseInt(val));
-                          }}
-                          loading={actionLoading === `${u.id}_grant_berries`}
-                          variant="default"
-                        >
-                          <Cherry className="w-3.5 h-3.5" /> Grant Berries
                         </ActionButton>
 
                         <ActionButton
@@ -2993,81 +2974,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
             </div>
           )}
 
-          {/* BERRY CONFIG */}
-          {tab === "berry" && berryConfig && (
-            <div className="space-y-4">
-              <PlatformSettingsPanel section="berry" />
-              <div className="card space-y-4">
-                <div className="flex items-center gap-2">
-                  <Cherry className="w-5 h-5 text-red-500" />
-                  <h3 className="font-medium">CRAZYCHESSBERRY Settings</h3>
-                </div>
-
-                <ConfigInput
-                  label="Berries per Win"
-                  value={berryConfig.berries_per_win ?? 10}
-                  onChange={(v) => setBerryConfig({ ...berryConfig, berries_per_win: v })}
-                />
-                <ConfigInput
-                  label="Berries per Draw"
-                  value={berryConfig.berries_per_draw ?? 2}
-                  onChange={(v) => setBerryConfig({ ...berryConfig, berries_per_draw: v })}
-                />
-                <ConfigInput
-                  label="Berry Value (MWK per 100 berries)"
-                  value={berryConfig.berry_value ?? 1000}
-                  onChange={(v) => setBerryConfig({ ...berryConfig, berry_value: v })}
-                />
-                <p className="text-xs text-ccb-muted">100 berries = MWK {(berryConfig.berry_value ?? 10)}</p>
-                <ConfigInput
-                  label="Minimum Redemption (berries)"
-                  value={berryConfig.min_redemption ?? 1000}
-                  onChange={(v) => setBerryConfig({ ...berryConfig, min_redemption: v })}
-                />
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={berryConfig.enabled ?? true}
-                    onChange={(e) => setBerryConfig({ ...berryConfig, enabled: e.target.checked })}
-                    className="w-4 h-4 rounded"
-                  />
-                  <label className="text-sm">Berry earning enabled</label>
-                </div>
-
-                <button
-                  onClick={async () => {
-                    setBerrySaving(true);
-                    try {
-                      const res = await fetch("/api/admin/berry-config", {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(berryConfig),
-                      });
-                      if (res.ok) {
-                        const updated = await res.json();
-                        setBerryConfig(updated);
-                        showToast("Berry config saved");
-                      } else {
-                        const data = await res.json();
-                        alert(data.error || "Failed to save");
-                      }
-                    } catch (e) {
-                      alert("Failed to save");
-                    } finally {
-                      setBerrySaving(false);
-                    }
-                  }}
-                  disabled={berrySaving}
-                  className="w-full py-2.5 rounded-lg bg-ccb-primary text-white text-sm font-medium hover:bg-ccb-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {berrySaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Save Berry Config
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* ADMIN LOGS */}
           {tab === "logs" && (
             <div className="space-y-2">
@@ -3344,13 +3250,12 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
 function PlatformSettingsHub() {
   const [settingsSection, setSettingsSection] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["battles", "withdrawals", "berry"]));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["battles", "withdrawals"]));
 
   const settingSections = [
     { id: "battles", label: "Battles", icon: Swords, desc: "Stakes, fees, auto-cancel" },
     { id: "withdrawals", label: "Withdrawals", icon: ArrowDownUp, desc: "Limits, fees, approval" },
     { id: "deposits", label: "Deposits", icon: DollarSign, desc: "Limits, auto-credit, approval" },
-    { id: "berry", label: "Berry Rewards", icon: Cherry, desc: "Earning rates, conversion, caps" },
     { id: "tournaments", label: "Tournaments", icon: Trophy, desc: "Approval, max players" },
     { id: "games", label: "Games", icon: Gamepad2, desc: "Spectators, concurrency" },
     { id: "users", label: "Users", icon: Users, desc: "Signups, verification, admin" },
@@ -3464,7 +3369,7 @@ function PlatformSettingsHub() {
       <div className="card p-4 flex items-start gap-2.5">
         <Database className="w-4 h-4 text-ccb-muted shrink-0 mt-0.5" />
         <p className="text-xs text-ccb-muted">
-          Settings are stored in the <code className="text-ccb-text font-mono">platform_settings</code> table and synced to legacy config tables (battle_config, withdrawal_config, berry_config) automatically. All backend routes read from these values.
+          Settings are stored in the <code className="text-ccb-text font-mono">platform_settings</code> table and synced to legacy config tables (battle_config, withdrawal_config) automatically. All backend routes read from these values.
         </p>
       </div>
     </div>

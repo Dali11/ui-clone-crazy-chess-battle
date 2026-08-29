@@ -82,15 +82,6 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
     { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
-  berry: [
-    { key: "berries_per_win", label: "Berries Per Win", type: "number", group: "control" },
-    { key: "berries_per_draw", label: "Berries Per Draw", type: "number", group: "control" },
-    { key: "berries_per_tournament_win", label: "Berries Per Tournament Win", type: "number", group: "control" },
-    { key: "daily_cap", label: "Daily Cap", type: "number", group: "control", help: "Max berries per user per day" },
-    { key: "conversion_rate", label: "Conversion Rate (berries per MWK)", type: "number", group: "control", help: "1000 berries = MWK 500 → rate = 2" },
-    { key: "min_conversion_berries", label: "Min Berries to Convert", type: "number", group: "control", help: "Minimum berries needed before conversion (10,000)" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
-  ],
   leagues: [
     { key: "require_membership", label: "Require Membership", type: "toggle", group: "control" },
     { key: "auto_relegate", label: "Auto-Relegate", type: "toggle", group: "control", help: "Auto-relegate inactive members" },
@@ -148,7 +139,6 @@ const SECTION_LABELS: Record<string, string> = {
   games: "Games",
   users: "Users",
   tournaments: "Tournaments",
-  berry: "Berry Rewards",
   leagues: "Leagues",
   seasons: "Seasons",
   membership: "Membership",

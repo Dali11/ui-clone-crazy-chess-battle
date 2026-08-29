@@ -229,20 +229,11 @@ export default function SignupPage() {
 
         const ref = refCode || localStorage.getItem("ccb_ref_code");
         if (ref) {
-          await fetch("/api/berry/referral/track", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ referralCode: ref, referredId: data.user.id }),
-          });
+          
           localStorage.removeItem("ccb_ref_code");
         }
 
-        // Award 500 berry welcome bonus to new users
-        await fetch("/api/berry/welcome-bonus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: data.user.id }),
-        });
+        
       } catch (postErr: any) {
         console.error("Post-signup error:", postErr);
       }
@@ -295,8 +286,7 @@ export default function SignupPage() {
         {refCode && step === 0 && (
           <div className="rounded-lg bg-ccb-primary/10 border border-ccb-primary/30 px-4 py-3 mb-4 text-center">
             <p className="text-sm font-semibold text-ccb-primary">
-              🍒 Referred by {refCode} — you&apos;ll earn 500+ berries and more when you start playing!
-            </p>
+                          </p>
           </div>
         )}
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Trophy, Handshake, Frown, RefreshCw, Home, Swords, Cherry, ScanSearch, Clock, Wallet, Check, X, Loader2 } from "lucide-react";
+import { Trophy, Handshake, Frown, RefreshCw, Home, Swords, ScanSearch, Clock, Wallet, Check, X, Loader2 } from "lucide-react";
 import FireworksCanvas from "./fireworks-canvas";
 
 export type GameOutcome = "win" | "loss" | "draw" | "abort";
@@ -22,7 +22,6 @@ interface VictoryOverlayProps {
   subtitle: string;
   playerNames?: { white: string; black: string };
   winnerSide?: "white" | "black" | null;
-  berriesAwarded?: number;
   moneyEarned?: number;     // in MWK
   moneyLabel?: string;       // e.g. "Battle winnings"
   onNewGame?: () => void;
@@ -54,7 +53,6 @@ export default function VictoryOverlay({
   ratingChange,
   moveCount,
   subtitle,
-  berriesAwarded = 0,
   moneyEarned,
   moneyLabel = "Battle winnings",
   playerNames,
@@ -108,7 +106,7 @@ export default function VictoryOverlay({
   const headline = isWin ? "Victory" : isDraw ? "Draw" : isAbort ? "Aborted" : "Defeat";
   const headline2 = isWin ? "You Won" : isDraw ? "Game Drawn" : isAbort ? "Game Aborted" : "You Lost";
 
-  const hasEarnings = (isWin && (berriesAwarded > 0 || (moneyEarned !== undefined && moneyEarned > 0)));
+  const hasEarnings = (isWin && (moneyEarned !== undefined && moneyEarned > 0));
 
   return (
     <div
@@ -178,7 +176,7 @@ export default function VictoryOverlay({
         {/* Divider */}
         <div className="my-4 h-px" style={{ background: `linear-gradient(90deg, transparent, ${accentBorder}, transparent)` }} />
 
-        {/* Earnings section — money + berries */}
+        {/* Earnings section */}
         {hasEarnings && (
           <div className="mb-4 flex items-center justify-center gap-4">
             {moneyEarned !== undefined && moneyEarned > 0 && (
@@ -187,14 +185,6 @@ export default function VictoryOverlay({
                   <Wallet className="w-3 h-3" /> {moneyLabel}
                 </span>
                 <span className="text-lg font-extrabold text-emerald-400">MK {moneyEarned.toLocaleString()}</span>
-              </div>
-            )}
-            {berriesAwarded > 0 && (
-              <div className="flex flex-col items-center px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.2)" }}>
-                <span className="text-[10px] uppercase tracking-wider text-orange-400/70 font-semibold mb-0.5 flex items-center gap-1">
-                  <Cherry className="w-3 h-3" /> Berries
-                </span>
-                <span className="text-lg font-extrabold text-orange-400">+{berriesAwarded}</span>
               </div>
             )}
           </div>
