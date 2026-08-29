@@ -246,7 +246,7 @@ export default function PremiumLeaguesTab() {
               <p className="text-xs text-ccb-muted leading-relaxed">
                 Premium Leagues are exclusive to CrazyChess Club members. Join for{' '}
                 {formatMoney(data?.market?.membershipPrice || 1000000, symbol, fxRate)}/month
-                to access tiered leagues, prize pools, promotion/relegation, and exclusive competitions.
+                to access tiered leagues, promotion/relegation, and exclusive competitions.
               </p>
               <Link href="/league/subscribe" className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-ccb-primary text-white text-xs font-bold hover:opacity-90 transition-opacity">
                 <Crown className="w-4 h-4" /> Join the Club
@@ -302,7 +302,7 @@ export default function PremiumLeaguesTab() {
             const meta = getLeagueMeta(league.tier);
             const Icon = meta.icon;
             const isExpanded = expandedLeague === league.tier;
-            const prizeFormatted = formatMoney(league.prize_pool, fxRate !== 1 ? symbol : (league.prize_currency || symbol), fxRate !== 1 ? fxRate : 1);
+            const prizeFormatted = league.entry_type === 'membership' ? formatMoney(league.prize_pool, fxRate !== 1 ? symbol : (league.prize_currency || symbol), fxRate !== 1 ? fxRate : 1) : 'N/A';
             const standings = league.standings || [];
             const capacity = league.league_size || 0;
             const qual = league.qualification;
@@ -342,8 +342,6 @@ export default function PremiumLeaguesTab() {
                       {/* Meta: players · prize · status/progress — wraps on small screens */}
                       <div className="flex items-center gap-1.5 mt-1 text-[11px] text-ccb-muted flex-wrap">
                         <span className="flex items-center gap-0.5 shrink-0"><Users className="w-3 h-3" />{league.playerCount}{capacity > 0 ? `/${capacity}` : ''}</span>
-                        <span className="text-ccb-border">|</span>
-                        <span className="flex items-center gap-0.5 shrink-0"><Trophy className="w-3 h-3" />{prizeFormatted}</span>
                         {league.status === 'registration' && (
                           <>
                             <span className="text-ccb-border">|</span>
@@ -450,7 +448,7 @@ export default function PremiumLeaguesTab() {
                       <div className="bg-ccb-surface rounded-xl p-3">
                         <div className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted mb-1">Prize Pool</div>
                         <div className="text-sm font-bold">{prizeFormatted}</div>
-                        {league.payout_config && (
+                        {league.entry_type === 'membership' && league.payout_config && (
                           <div className="text-[10px] text-ccb-muted mt-0.5">
                             1st: {formatMoney(getPayout(league.prize_pool, 1, league.payout_config), fxRate !== 1 ? symbol : (league.prize_currency || symbol), fxRate !== 1 ? fxRate : 1)}
                           </div>
@@ -700,7 +698,7 @@ export default function PremiumLeaguesTab() {
                   ) : null}
                   <div className="flex items-center gap-2 mt-3 flex-wrap">
                     <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted capitalize">{comp.status.replace('_', ' ')}</span>
-                    {comp.prize_pool > 0 && (
+                    {comp.prize_pool > 0 && comp.requires_membership && (
                       <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">
                         {formatMoney(comp.prize_pool, fxRate !== 1 ? symbol : (comp.prize_currency === 'MWK' ? 'MK' : comp.prize_currency), fxRate !== 1 ? fxRate : 1)} prize
                       </span>

@@ -121,8 +121,8 @@ export default function TournamentsTab() {
       <div className="grid grid-cols-3 gap-3">
         {[
           { id: 'daily', label: 'Daily', desc: 'Quick fire every day' },
-          { id: 'weekly', label: 'Weekly', desc: 'Swiss Battles with rewards' },
-          { id: 'monthly', label: 'Monthly', desc: 'Championships with prizes' },
+          { id: 'weekly', label: 'Weekly', desc: 'Swiss Battles' },
+          { id: 'monthly', label: 'Monthly', desc: 'Championships' },
         ].map(tt => (
           <div key={tt.id} className="bg-ccb-card border border-ccb-border rounded-xl p-3 text-center">
             <div className="w-8 h-8 rounded-lg bg-ccb-primary/10 border border-ccb-primary/30 flex items-center justify-center mx-auto mb-2">
