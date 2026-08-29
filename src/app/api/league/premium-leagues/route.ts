@@ -55,6 +55,29 @@ export async function GET(req: Request) {
       hasMembership = !!membership;
     }
 
+    // Fetch the user's existing league registration (if any) once — used
+    // to enforce one-league-at-a-time exclusivity across all cards below.
+    let myOtherLeagueId: string | null = null;
+    let myOtherLeagueName: string | null = null;
+    if (user) {
+      const { data: myRegs } = await admin
+        .from('league_registrations')
+        .select('league_id')
+        .eq('player_id', user.id);
+      if (myRegs && myRegs.length > 0) {
+        const myLeagueIds = myRegs.map((r: any) => r.league_id);
+        const { data: activeOfMine } = await admin
+          .from('premier_leagues')
+          .select('id, name, status')
+          .in('id', myLeagueIds)
+          .in('status', ['registration', 'active']);
+        if (activeOfMine && activeOfMine.length > 0) {
+          myOtherLeagueId = activeOfMine[0].id;
+          myOtherLeagueName = activeOfMine[0].name;
+        }
+      }
+    }
+
     const leaguesWithStandings = await Promise.all(
       (leagues || []).map(async (league: any) => {
         let standings: any[] = [];
@@ -97,6 +120,9 @@ export async function GET(req: Request) {
             qualification = { canJoin: false, reason: 'already_joined', isRegistered: true, checklist: null, regStatus: 'player' };
           } else if (existingReg) {
             qualification = { canJoin: false, reason: 'already_registered', isRegistered: true, checklist: null, regStatus: existingReg.status };
+          } else if (myOtherLeagueId && myOtherLeagueId !== league.id) {
+            // Player is already in a different league — leagues are exclusive.
+            qualification = { canJoin: false, reason: 'already_in_other_league', isRegistered: false, checklist: null, regStatus: null, otherLeagueName: myOtherLeagueName };
           } else if (league.status === 'completed') {
             qualification = { canJoin: false, reason: 'completed', isRegistered: false, checklist: null, regStatus: null };
           } else if (league.status === 'active') {

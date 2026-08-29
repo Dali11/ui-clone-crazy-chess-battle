@@ -40,6 +40,7 @@ interface Qualification {
   isRegistered: boolean;
   checklist: ChecklistItem[] | null;
   regStatus: string | null;
+  otherLeagueName?: string | null;
 }
 
 interface League {
@@ -139,6 +140,7 @@ const REASON_LABELS: Record<string, string> = {
   not_authenticated: 'Sign in to register',
   already_joined: 'You are a player in this league',
   already_registered: 'Registration pending approval',
+  already_in_other_league: 'You can only be in one league at a time',
   completed: 'League season completed',
   not_registration_phase: 'Registration not open yet',
   registration_closed: 'Registration deadline passed',
@@ -154,6 +156,7 @@ export default function PremiumLeaguesTab() {
   const [genderView, setGenderView] = useState<'male' | 'female' | null>(null);
   const [registering, setRegistering] = useState<string | null>(null);
   const [registerMsg, setRegisterMsg] = useState<{ leagueId: string; type: 'success' | 'error'; msg: string } | null>(null);
+  const [leaving, setLeaving] = useState<string | null>(null);
   const [competitions, setCompetitions] = useState<PremiumCompetition[]>([]);
   const [competitionsLoading, setCompetitionsLoading] = useState(true);
 
@@ -218,6 +221,27 @@ export default function PremiumLeaguesTab() {
       setRegisterMsg({ leagueId, type: 'error', msg: err.message });
     } finally {
       setRegistering(null);
+    }
+  };
+
+  const handleLeave = async (leagueId: string) => {
+    if (!confirm('Leave this league? You can join another league afterward.')) return;
+    setLeaving(leagueId);
+    setRegisterMsg(null);
+    try {
+      const res = await fetch('/api/league/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leagueId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to leave league');
+      setRegisterMsg({ leagueId, type: 'success', msg: "You've left the league." });
+      await fetchData();
+    } catch (err: any) {
+      setRegisterMsg({ leagueId, type: 'error', msg: err.message });
+    } finally {
+      setLeaving(null);
     }
   };
 
@@ -515,17 +539,30 @@ export default function PremiumLeaguesTab() {
                     {league.status === 'registration' && (
                       <div>
                         {isRegistered ? (
-                          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border ${
-                            qual.regStatus === 'player' || qual.regStatus === 'approved'
-                              ? 'bg-ccb-success/10 border-ccb-success/30 text-ccb-success'
-                              : 'bg-ccb-accent/10 border-ccb-accent/30 text-ccb-accent'
-                          }`}>
-                            <CheckCircle className="w-4 h-4" />
-                            <span className="text-xs font-bold">
-                              {qual.regStatus === 'player' ? 'You\'re in this league!' :
-                               qual.regStatus === 'approved' ? 'Registration approved!' :
-                               'Registration pending approval'}
-                            </span>
+                          <div className="space-y-2">
+                            <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border ${
+                              qual.regStatus === 'player' || qual.regStatus === 'approved'
+                                ? 'bg-ccb-success/10 border-ccb-success/30 text-ccb-success'
+                                : 'bg-ccb-accent/10 border-ccb-accent/30 text-ccb-accent'
+                            }`}>
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="text-xs font-bold">
+                                {qual.regStatus === 'player' ? 'You\'re in this league!' :
+                                 qual.regStatus === 'approved' ? 'Registration approved!' :
+                                 'Registration pending approval'}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleLeave(league.id)}
+                              disabled={leaving === league.id}
+                              className="w-full py-2.5 rounded-xl bg-ccb-surface border border-ccb-border text-ccb-muted font-bold text-xs hover:text-ccb-danger hover:border-ccb-danger/30 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                            >
+                              {leaving === league.id ? (
+                                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Leaving...</>
+                              ) : (
+                                'Leave League'
+                              )}
+                            </button>
                           </div>
                         ) : showRegisterBtn && !isFull ? (
                           <button
@@ -541,7 +578,11 @@ export default function PremiumLeaguesTab() {
                           </button>
                         ) : (
                           <div className="px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-center">
-                            <p className="text-xs text-ccb-muted">{REASON_LABELS[qual?.reason || ''] || (isFull ? 'League is full' : 'Registration not available')}</p>
+                            <p className="text-xs text-ccb-muted">
+                              {qual?.reason === 'already_in_other_league' && (qual as any).otherLeagueName
+                                ? `You're already in ${(qual as any).otherLeagueName} — leave it first to switch`
+                                : REASON_LABELS[qual?.reason || ''] || (isFull ? 'League is full' : 'Registration not available')}
+                            </p>
                           </div>
                         )}
                         {registerMsg?.leagueId === league.id && (

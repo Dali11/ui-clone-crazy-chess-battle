@@ -53,6 +53,31 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'You have already registered for this league' }, { status: 400 });
       }
 
+      // ── EXCLUSIVITY: a player can only be in ONE league at a time ──
+      // Check if the player is already registered in any other league that
+      // is still running (registration or active — not finished/cancelled).
+      const { data: otherRegs } = await admin
+        .from('league_registrations')
+        .select('league_id')
+        .eq('player_id', user.id)
+        .neq('league_id', leagueId);
+
+      if (otherRegs && otherRegs.length > 0) {
+        const otherLeagueIds = otherRegs.map((r) => r.league_id);
+        const { data: otherLeagues } = await admin
+          .from('premier_leagues')
+          .select('id, name, status')
+          .in('id', otherLeagueIds)
+          .in('status', ['registration', 'active']);
+
+        if (otherLeagues && otherLeagues.length > 0) {
+          return NextResponse.json({
+            error: `You're already in ${otherLeagues[0].name}. You can only be in one league at a time — leave it first if you want to switch.`,
+            code: 'already_in_league',
+          }, { status: 400 });
+        }
+      }
+
       // Check registration deadline
       if (league.registration_deadline && new Date(league.registration_deadline) < new Date()) {
         return NextResponse.json({ error: 'Registration deadline has passed' }, { status: 400 });
