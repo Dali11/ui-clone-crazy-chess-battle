@@ -52,27 +52,41 @@ export async function GET() {
         const ageS = Math.floor((Date.now() - new Date(queueEntry.created_at).getTime()) / 1000);
 
         if (ageS > timeoutS) {
-          // Stale — auto-refund and expire so the player can search again.
-          const { error: creditErr } = await admin.rpc("credit_wallet", {
-            p_user_id: user.id,
-            p_amount: queueEntry.stake,
-          });
-          if (!creditErr) {
-            await admin.from("battle_queue").update({ status: "expired" }).eq("id", queueEntry.id);
-            await admin.from("deposits").insert({
-              user_id: user.id,
-              amount: queueEntry.stake,
-              status: "success",
-              method: "battle_refund",
-              reference: `battle_queue_timeout:${queueEntry.id}`,
-            }).then(() => {}, () => {});
-            return NextResponse.json({
-              active: false,
-              queueExpired: true,
-              refunded: queueEntry.stake,
-              message: `Your previous search timed out — MK ${queueEntry.stake.toLocaleString()} was refunded.`,
+          // ATOMIC CLAIM: only refund if we successfully claim this entry
+          // Prevents double-refunds when /api/battles/join fires simultaneously
+          const { data: claimed, error: claimErr } = await admin
+            .from("battle_queue")
+            .update({ status: "expired" })
+            .eq("id", queueEntry.id)
+            .eq("status", "waiting")
+            .select("id, stake")
+            .single();
+
+          if (!claimErr && claimed) {
+            const { error: creditErr } = await admin.rpc("credit_wallet", {
+              p_user_id: user.id,
+              p_amount: claimed.stake,
             });
+            if (!creditErr) {
+              await admin.from("deposits").insert({
+                user_id: user.id,
+                amount: claimed.stake,
+                status: "success",
+                method: "battle_refund",
+                reference: `battle_queue_timeout:${claimed.id}`,
+              }).then(() => {}, () => {});
+              return NextResponse.json({
+                active: false,
+                queueExpired: true,
+                refunded: claimed.stake,
+                message: `Your previous search timed out — MK ${claimed.stake.toLocaleString()} was refunded.`,
+              });
+            } else {
+              // Refund failed — revert status so it can be retried
+              await admin.from("battle_queue").update({ status: "waiting" }).eq("id", claimed.id);
+            }
           }
+          // If claim failed, another path already handled it — fall through
         }
 
         // Still within the timeout window — resume the searching UI.

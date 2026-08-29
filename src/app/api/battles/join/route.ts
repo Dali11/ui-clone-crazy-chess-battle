@@ -62,17 +62,33 @@ export async function POST(req: NextRequest) {
       for (const entry of existing) {
         const ageS = Math.floor((Date.now() - new Date(entry.created_at).getTime()) / 1000);
         if (ageS > timeoutS) {
-          const { error: creditErr } = await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: entry.stake });
+          // ATOMIC CLAIM: only refund if we successfully claim this entry
+          // Prevents double-refunds when /api/battles/active fires simultaneously
+          const { data: claimed, error: claimErr } = await admin
+            .from("battle_queue")
+            .update({ status: "expired" })
+            .eq("id", entry.id)
+            .eq("status", "waiting")
+            .select("id, stake")
+            .single();
+
+          if (claimErr || !claimed) {
+            // Already claimed by another path (e.g. /api/battles/active self-heal)
+            continue;
+          }
+
+          const { error: creditErr } = await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: claimed.stake });
           if (!creditErr) {
-            await admin.from("battle_queue").update({ status: "expired" }).eq("id", entry.id);
             await admin.from("deposits").insert({
               user_id: user.id,
-              amount: entry.stake,
+              amount: claimed.stake,
               status: "success",
               method: "battle_refund",
-              reference: `battle_queue_timeout:${entry.id}`,
+              reference: `battle_queue_timeout:${claimed.id}`,
             }).then(() => {}, () => {});
           } else {
+            // Refund failed — revert status so it can be retried
+            await admin.from("battle_queue").update({ status: "waiting" }).eq("id", claimed.id);
             stillFresh.push(entry);
           }
         } else {

@@ -145,27 +145,39 @@ export default async function BattleChallengePage({
 
   if (new Date(challenge.expires_at) < new Date() && challenge.status === "pending") {
     // Challenge has expired — refund the escrowed stake server-side
-    // (atomic claim in the API prevents double-refunds)
-    await admin
+    // ATOMIC CLAIM: only refund if we successfully claim this row
+    // Prevents double-refunds when cron or refund-expired API fires simultaneously
+    const { data: claimed } = await admin
       .from("battle_challenges")
       .update({ status: "expired" })
       .eq("id", id)
-      .eq("status", "pending");
+      .eq("status", "pending")
+      .select("id, challenger_id, stake")
+      .single();
 
-    const { error: creditErr } = await admin.rpc("credit_wallet", {
-      p_user_id: challenge.challenger_id,
-      p_amount: challenge.stake,
-    });
-
-    if (!creditErr) {
-      await admin.from("deposits").insert({
-        user_id: challenge.challenger_id,
-        amount: challenge.stake,
-        status: "success",
-        method: "battle_refund",
-        reference: `expired_challenge:${id}`,
+    if (claimed) {
+      const { error: creditErr } = await admin.rpc("credit_wallet", {
+        p_user_id: claimed.challenger_id,
+        p_amount: claimed.stake,
       });
+
+      if (!creditErr) {
+        await admin.from("deposits").insert({
+          user_id: claimed.challenger_id,
+          amount: claimed.stake,
+          status: "success",
+          method: "battle_refund",
+          reference: `expired_challenge:${id}`,
+        });
+      } else {
+        // Refund failed — revert status so cron can retry
+        await admin
+          .from("battle_challenges")
+          .update({ status: "pending" })
+          .eq("id", id);
+      }
     }
+    // If not claimed, another path already handled the refund
 
     // If the current user is the challenger, show refund confirmation
     if (challenge.challenger_id === user.id) {
