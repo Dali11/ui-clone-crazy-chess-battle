@@ -174,30 +174,36 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         </div>
       </nav>
 
-      {/* === MOBILE HEADER: Menu · Brand · Wallet · Profile === */}
+      {/* === MOBILE HEADER: Menu·Bell · Brand · Wallet·Profile === */}
       {!isGameRoute && (
         <header className="sm:hidden sticky top-0 z-50 border-b border-ccb-border bg-ccb-dark">
           <div className="flex items-center justify-between px-3 h-12">
-            <button
-              onClick={() => setMenuOpen(true)}
-              className="p-2 rounded-md text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
-              aria-label="Open menu"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+            {/* Left: Menu + Bell (mirrors Wallet + Profile on right) */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setMenuOpen(true)}
+                className="p-2 rounded-md text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
+                aria-label="Open menu"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <NotificationBell />
+            </div>
 
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={26} height={26} className="w-6.5 h-6.5 rounded-full" />
+            {/* Center: Brand */}
+            <Link href="/dashboard" className="flex items-center gap-1.5">
+              <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="w-6 h-6 rounded-full" />
               <span className="font-bold text-sm tracking-tight">CCB</span>
             </Link>
 
-            <div className="flex items-center gap-2">
+            {/* Right: Wallet + Profile */}
+            <div className="flex items-center gap-1">
               <Link href="/wallet" className="flex items-center gap-1 px-2 py-1 rounded-md bg-ccb-surface border border-ccb-border">
                 <Wallet className="w-3.5 h-3.5 text-ccb-accent" />
                 <span className="text-[11px] font-bold text-ccb-text">{formatBalance(profile?.wallet_balance)}</span>
               </Link>
-              <Link href="/settings" className="flex items-center">
-                <div className="w-7 h-7 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">
+              <Link href="/settings" className="flex items-center p-1">
+                <div className="w-6 h-6 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">
                   {profile?.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
