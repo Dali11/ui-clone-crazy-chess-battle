@@ -223,7 +223,9 @@ export default function PremiumLeaguesTab() {
 
   const symbol = fxRate !== 1 ? getSymbol(visitorCurrency) : (data?.market?.currencySymbol || 'MK');
   const allLeagues = data?.leagues || [];
-  const leagues = allLeagues.filter(l => l.gender_restriction === genderView);
+  // 'open' leagues (Season 1) are visible to everyone. Gender-restricted
+  // leagues ('male'/'female') are locked to the player's own gender.
+  const leagues = allLeagues.filter(l => l.gender_restriction === 'open' || l.gender_restriction === genderView);
   const hasMembership = data?.hasMembership || false;
   // Only show the membership upsell if there's actually a membership-gated league
   // the player hasn't unlocked yet. Season 1 leagues are all free entry, so this
