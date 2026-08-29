@@ -423,16 +423,20 @@ export async function PATCH(
 
     // ── CANCEL ──
     if (action === "cancel") {
-      if (!["upcoming", "active"].includes(tournament.status)) {
-        return NextResponse.json({ error: "Can only cancel upcoming or active tournaments" }, { status: 400 });
+      // ATOMIC GUARD: only cancel if not already cancelled — prevents double-refund
+      const { data: claimed, error: cancelErr } = await admin
+        .from("tournaments")
+        .update({ status: "cancelled", ended_at: new Date().toISOString() })
+        .eq("id", tournamentId)
+        .in("status", ["upcoming", "active"])
+        .select("entry_fee");
+      if (cancelErr) return NextResponse.json({ error: cancelErr.message }, { status: 500 });
+      if (!claimed || claimed.length === 0) {
+        return NextResponse.json({ error: "Tournament already cancelled or finished" }, { status: 400 });
       }
 
-      await admin.from("tournaments")
-        .update({ status: "cancelled", ended_at: new Date().toISOString() })
-        .eq("id", tournamentId);
-
       // Refund paid participants
-      const entryFee = tournament.entry_fee || 0;
+      const entryFee = claimed[0].entry_fee || 0;
       if (entryFee > 0) {
         const { data: paidParticipants } = await admin
           .from("tournament_participants")
@@ -441,6 +445,13 @@ export async function PATCH(
           .eq("paid_entry_fee", true);
         for (const p of paidParticipants || []) {
           await admin.rpc("credit_wallet", { p_user_id: p.player_id, p_amount: entryFee });
+          await admin.from("deposits").insert({
+            user_id: p.player_id,
+            amount: entryFee,
+            status: "success",
+            method: "tournament_refund",
+            reference: `tournament_cancel:${tournamentId}:${p.player_id}`,
+          }).then(() => {}, () => {});
         }
       }
 

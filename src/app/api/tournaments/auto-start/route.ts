@@ -47,10 +47,18 @@ async function handleAutoStart(req: NextRequest) {
 
         if (!participants || participants.length < minRequired) {
           // Not enough players — cancel and refund
-          await admin
+          // ATOMIC GUARD: only cancel if still upcoming
+          const { data: claimed } = await admin
             .from("tournaments")
             .update({ status: "cancelled", ended_at: now })
-            .eq("id", tournament.id);
+            .eq("id", tournament.id)
+            .eq("status", "upcoming")
+            .select("id, entry_fee");
+
+          if (!claimed || claimed.length === 0) {
+            // Already claimed by another process
+            continue;
+          }
 
           // Refund entry fees
           if (tournament.entry_fee && tournament.entry_fee > 0) {

@@ -29,8 +29,25 @@ export async function POST(req: NextRequest) {
     }
 
     if (challenge.expires_at && new Date(challenge.expires_at) < new Date()) {
-      await admin.from("battle_challenges").update({ status: "expired" }).eq("id", challengeId);
-      await admin.rpc("credit_wallet", { p_user_id: challenge.challenger_id, p_amount: challenge.stake });
+      // ATOMIC CLAIM: only refund if we successfully claim this row
+      const { data: claimed } = await admin
+        .from("battle_challenges")
+        .update({ status: "expired" })
+        .eq("id", challengeId)
+        .eq("status", "pending")
+        .select("id, challenger_id, stake")
+        .single();
+
+      if (claimed) {
+        await admin.rpc("credit_wallet", { p_user_id: claimed.challenger_id, p_amount: claimed.stake });
+        await admin.from("deposits").insert({
+          user_id: claimed.challenger_id,
+          amount: claimed.stake,
+          status: "success",
+          method: "battle_refund",
+          reference: `expired_challenge:${challengeId}`,
+        }).then(() => {}, () => {});
+      }
       return NextResponse.json({ error: "Challenge has expired" }, { status: 400 });
     }
 

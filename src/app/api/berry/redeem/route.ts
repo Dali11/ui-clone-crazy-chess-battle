@@ -57,17 +57,40 @@ export async function POST(req: NextRequest) {
     }
 
     // Debit berries
-    await admin.rpc("debit_berries", {
+    const { error: debitBerryErr } = await admin.rpc("debit_berries", {
       p_user_id: user.id,
       p_amount: berries,
       p_description: `Redeemed ${berries} berries for MWK ${cashAmount.toLocaleString()}`,
     });
 
-    // Credit wallet
-    await admin.rpc("credit_wallet", {
+    if (debitBerryErr) {
+      return NextResponse.json({ error: "Failed to debit berries. Please try again." }, { status: 500 });
+    }
+
+    // Credit wallet — if this fails, rollback the berry debit
+    const { error: creditWalletErr } = await admin.rpc("credit_wallet", {
       p_user_id: user.id,
       p_amount: cashAmount,
     });
+
+    if (creditWalletErr) {
+      // Rollback: re-credit the berries
+      await admin.rpc("credit_berries", {
+        p_user_id: user.id,
+        p_amount: berries,
+        p_description: `Rollback: berry redemption failed`,
+      });
+      return NextResponse.json({ error: "Failed to credit wallet. Your berries have been restored." }, { status: 500 });
+    }
+
+    // Audit log
+    await admin.from("deposits").insert({
+      user_id: user.id,
+      amount: cashAmount,
+      status: "success",
+      method: "berry_redeem",
+      reference: `berry_redeem:${user.id}:${berries}`,
+    }).then(() => {}, () => {});
 
     return NextResponse.json({
       success: true,
