@@ -43,7 +43,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/play", label: "Play", icon: Swords },
     { href: "/battles", label: "Battles", icon: Coins },
     { href: "/league", label: "Leagues", icon: Crown },
-    { href: "/league/tournaments", label: "Tournaments", icon: Trophy },
+    { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/live", label: "Live", icon: Radio },
   ];
 
@@ -53,7 +53,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/play", label: "Play", icon: Swords },
     { href: "/battles", label: "Battles", icon: Coins },
     { href: "/league", label: "Leagues", icon: Crown },
-    { href: "/league/tournaments", label: "Tournaments", icon: Trophy },
+    { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/live", label: "Live", icon: Radio },
     { href: "/leaderboard", label: "Ranks", icon: TrendingUp },
   ];
@@ -73,7 +73,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
       title: "Compete",
       items: [
         { href: "/league", label: "Premium Leagues", icon: Crown, desc: "Season 1 — 5 tiers" },
-        { href: "/league/tournaments", label: "Tournaments", icon: Trophy, desc: "Swiss, Arena, Knockout" },
+        { href: "/tournaments", label: "Tournaments", icon: Trophy, desc: "Swiss, Arena, Knockout" },
         { href: "/live", label: "Live Matches", icon: Radio, desc: "Watch ongoing games" },
         { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp, desc: "Global rankings" },
       ],

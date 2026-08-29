@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Swords, Crown, LayoutDashboard, Crown as Membership } from "lucide-react";
 
 const leagueNavItems = [
-  { href: "/league/tournaments", label: "Tournaments", icon: Swords },
+  { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/league", label: "Leagues", icon: Crown },
   { href: "/league/dashboard", label: "My Stats", icon: LayoutDashboard },
   { href: "/league/subscribe", label: "Membership", icon: Membership },

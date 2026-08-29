@@ -1,14 +1,5 @@
-import type { Metadata } from "next";
-import TournamentsClient from "./tournaments-client";
+import { redirect } from "next/navigation";
 
-import { pageMetadata } from "@/lib/seo/metadata";
-
-export const metadata = pageMetadata({
-  title: "Chess Tournaments — Browse & Enter Competitions",
-  description: "Browse all active and upcoming chess tournaments on Crazy Chess Battles. Find open tournaments, check entry requirements, and register to compete for prizes.",
-  path: "/league/tournaments",
-});
-
-export default function TournamentsPage() {
-  return <TournamentsClient />;
+export default function TournamentsRedirect() {
+  redirect("/tournaments");
 }

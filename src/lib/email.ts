@@ -117,7 +117,7 @@ function wrapContent(title: string, bodyHtml: string, previewText?: string): str
                     <p style="margin:0 0 8px;font-size:13px;color:#9ca3af;">
                       <a href="${BASE_URL}" style="color:#7c3aed;text-decoration:none;font-weight:600;">crazychessbattles.live</a>
                       &nbsp;\u00b7&nbsp;
-                      <a href="${BASE_URL}/league/tournaments" style="color:#7c3aed;text-decoration:none;">Tournaments</a>
+                      <a href="${BASE_URL}/tournaments" style="color:#7c3aed;text-decoration:none;">Tournaments</a>
                       &nbsp;\u00b7&nbsp;
                       <a href="${BASE_URL}/leaderboard" style="color:#7c3aed;text-decoration:none;">Leaderboard</a>
                     </p>
@@ -194,7 +194,7 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
           </p>
           ${infoBox("Your Username", data.username || "Player", "#7c3aed")}
           ${infoBox("Starting Rating", String(rating), "#f59e0b")}
-          ${button(`${BASE_URL}/league/tournaments`, "Browse Tournaments")}
+          ${button(`${BASE_URL}/tournaments`, "Browse Tournaments")}
           <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Tip: Complete your profile to get matched with players at your skill level.</p>
         `,
       };
@@ -427,7 +427,7 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
           ${infoBox("Tournament", data.tournamentName || "Tournament", "#7c3aed")}
           ${data.refunded ? infoBox("Entry Fee", "Refunded to wallet", "#10b981") : ""}
           ${infoBox("Reason", data.reason || "Insufficient players or admin decision", "#9ca3af")}
-          ${button(`${BASE_URL}/league/tournaments`, "Browse Other Tournaments")}
+          ${button(`${BASE_URL}/tournaments`, "Browse Other Tournaments")}
         `,
       };
     }
@@ -512,7 +512,7 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
           </p>
           ${infoBox("Plan", planName, "#7c3aed")}
           ${data.expiresAt ? infoBox("Valid Until", data.expiresAt, "#f59e0b") : ""}
-          ${button(`${BASE_URL}/league/tournaments`, "Browse Member Tournaments")}
+          ${button(`${BASE_URL}/tournaments`, "Browse Member Tournaments")}
         `,
       };
     }
@@ -546,7 +546,7 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
           ${infoBox("Eliminated in", `Round ${data.round || "?"}`, "#ef4444")}
           ${data.opponent ? infoBox("Eliminated by", data.opponent, "#9ca3af") : ""}
           <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">You can still watch the remaining rounds and join other tournaments.</p>
-          ${button(`${BASE_URL}/league/tournaments`, "Find More Tournaments")}
+          ${button(`${BASE_URL}/tournaments`, "Find More Tournaments")}
         `,
       };
     }
