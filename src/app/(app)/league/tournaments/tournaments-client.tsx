@@ -135,30 +135,28 @@ export default function TournamentsPage() {
   return (
     <div className="space-y-6 pb-20 sm:pb-8">
 
-      {/* HEADER */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-ccb-accent/10 border border-ccb-accent/30 flex items-center justify-center">
-            <Swords className="w-6 h-6 text-ccb-accent" />
+      {/* HERO BANNER */}
+      <div className="relative overflow-hidden rounded-2xl border border-ccb-accent/20 bg-gradient-to-br from-ccb-accent/10 via-ccb-surface to-ccb-surface p-5 sm:p-6">
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-2 h-2 rounded-full bg-ccb-success animate-pulse" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-ccb-success">{activeCount} Live</span>
+            <span className="text-ccb-muted text-[10px]">·</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">{upcomingCount} Upcoming</span>
           </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold">Tournaments</h1>
-            <p className="text-sm text-ccb-muted">Open competitive chess — play, climb, win.</p>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Tournaments</h1>
+          <p className="text-sm text-ccb-muted mt-1">Swiss · Arena · Knockout — play, climb, win.</p>
+          <div className="flex items-center gap-4 mt-4">
+            <Link href="/league" className="text-xs font-bold text-ccb-accent hover:underline flex items-center gap-1">
+              <Crown className="w-3.5 h-3.5" /> Premium Leagues
+            </Link>
+            <Link href="/leaderboard" className="text-xs font-bold text-ccb-muted hover:text-ccb-text flex items-center gap-1">
+              <TrendingUp className="w-3.5 h-3.5" /> Rankings
+            </Link>
           </div>
         </div>
-
-        {/* DESCRIPTION */}
-        <div className="card space-y-3">
-          <p className="text-sm text-ccb-muted leading-relaxed">
-            <span className="text-ccb-text font-medium">Swiss Battles</span> are open tournaments where every player gets paired each round — no eliminations. You face opponents of similar skill, earn points per win, and the best performers rise to the top of the standings.
-          </p>
-          <p className="text-sm text-ccb-muted leading-relaxed">
-            Tournaments can be <span className="text-ccb-text font-medium">free or paid</span>, with optional player caps and time controls. Daily, weekly, and monthly events run throughout each season — some with cash prizes and sponsorship rewards.
-          </p>
-          <p className="text-sm text-ccb-muted leading-relaxed">
-            Top performers in Swiss tournaments can qualify for <span className="text-ccb-text font-medium">Premium Leagues</span> and exclusive competitive events. <Link href="/league/subscribe" className="text-ccb-accent hover:underline">Get membership</Link> to unlock the full competitive ladder.
-          </p>
-        </div>
+        {/* Decorative bg */}
+        <Trophy className="absolute -bottom-4 -right-4 w-28 h-28 text-ccb-accent/5 rotate-12" />
       </div>
 
       {/* JOIN MESSAGE */}
