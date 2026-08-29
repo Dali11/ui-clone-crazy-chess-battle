@@ -6,6 +6,7 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 import PWAInstaller from "@/components/PWAInstaller";
 import ChunkErrorRecovery from "@/components/ChunkErrorRecovery";
 import CronHeartbeat from "@/components/CronHeartbeat";
+import NavProgress from "@/components/layout/nav-progress";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -125,6 +126,7 @@ export default function RootLayout({
         <PWAInstaller />
         <ChunkErrorRecovery />
         <CronHeartbeat />
+        <NavProgress />
         <Analytics />
         <SpeedInsights />
       </body>

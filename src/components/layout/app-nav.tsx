@@ -129,7 +129,8 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    prefetch={true}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all active:scale-95 ${
                       active
                         ? "bg-ccb-primary/10 text-ccb-primary"
                         : "text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
@@ -262,7 +263,8 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`flex items-center gap-3 px-4 py-2.5 hover:bg-ccb-surface transition-colors ${
+                      prefetch={true}
+                      className={`flex items-center gap-3 px-4 py-2.5 hover:bg-ccb-surface transition-all active:scale-95 ${
                         active ? "text-ccb-primary" : "text-ccb-text"
                       }`}
                     >
@@ -294,7 +296,8 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex-1 flex flex-col items-center justify-center gap-0.5 relative"
+                  prefetch={true}
+                  className="flex-1 flex flex-col items-center justify-center gap-0.5 relative active:bg-gray-100 active:scale-95 transition-all duration-150"
                 >
                   {active && (
                     <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-ccb-primary" />
