@@ -826,7 +826,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           name: createForm.name,
           description: createForm.description || "",
           type: createForm.type || "swiss",
-          timeControl: createForm.time_control || "blitz",
+          timeControl: createForm.time_control || "rapid",
           initialMinutes: Number(createForm.initial_minutes) || 10,
           incrementSeconds: Number(createForm.increment_seconds) || 5,
           maxPlayers: createForm.max_players ? Number(createForm.max_players) : null,
@@ -1951,7 +1951,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Type</label>
-                          <select value={createForm.type || "swiss"} onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })} className="input-field mt-1 w-full">
+                          <select value={createForm.type || "swiss"} onChange={(e) => { const t = e.target.value; setCreateForm({ ...createForm, type: t, duration_minutes: t === "arena" ? "120" : createForm.duration_minutes, rounds: t === "arena" ? "" : createForm.rounds }); }} className="input-field mt-1 w-full">
                             <option value="swiss">Swiss</option>
                             <option value="arena">Arena</option>
                             <option value="knockout">Knockout</option>
@@ -1968,7 +1968,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         )}
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Time Control</label>
-                          <select value={createForm.time_control || "blitz"} onChange={(e) => setCreateForm({ ...createForm, time_control: e.target.value })} className="input-field mt-1 w-full">
+                          <select value={createForm.time_control || "rapid"} onChange={(e) => setCreateForm({ ...createForm, time_control: e.target.value })} className="input-field mt-1 w-full">
                             <option value="bullet">Bullet</option>
                             <option value="blitz">Blitz</option>
                             <option value="rapid">Rapid</option>
@@ -2393,7 +2393,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         </div>
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Time Control</label>
-                          <select value={editForm.time_control || "blitz"} onChange={(e) => setEditForm({ ...editForm, time_control: e.target.value })} className="input-field mt-1 w-full">
+                          <select value={editForm.time_control || "rapid"} onChange={(e) => setEditForm({ ...editForm, time_control: e.target.value })} className="input-field mt-1 w-full">
                             <option value="bullet">Bullet</option>
                             <option value="blitz">Blitz</option>
                             <option value="rapid">Rapid</option>
