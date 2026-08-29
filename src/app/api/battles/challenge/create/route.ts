@@ -18,33 +18,46 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient();
 
     // ─── Load platform config ──────────────────────────────────────────
-    const bConfig = await getPlatformConfig(admin, "battles");
+    let bConfig: Record<string, any>;
+    try {
+      bConfig = await getPlatformConfig(admin, "battles");
+    } catch (cfgErr: any) {
+      console.error("[challenge/create] getPlatformConfig failed:", cfgErr?.message);
+      bConfig = { enabled: true }; // fallback to defaults
+    }
 
     // Check if battles are enabled
     if (!bConfig.enabled) {
       return NextResponse.json({ error: "Chess Battles are currently disabled" }, { status: 403 });
     }
 
-    // Challenges have no stake limits — friends agree on any amount
-
     // Check active battle
-    const { data: activeBattle } = await admin
+    const { data: activeBattle, error: activeErr } = await admin
       .from("battles")
       .select("id")
       .or(`white_player_id.eq.${user.id},black_player_id.eq.${user.id}`)
       .in("status", ["pending", "playing", "draw_armageddon"])
       .limit(1);
 
+    if (activeErr) {
+      console.error("[challenge/create] active battle check error:", activeErr.message);
+    }
+
     if (activeBattle && activeBattle.length > 0) {
       return NextResponse.json({ error: "You have an active battle. Finish it first." }, { status: 400 });
     }
 
     // Check wallet balance
-    const { data: profile } = await admin
+    const { data: profile, error: profileErr } = await admin
       .from("profiles")
       .select("wallet_balance")
       .eq("id", user.id)
       .single();
+
+    if (profileErr) {
+      console.error("[challenge/create] profile fetch error:", profileErr.message);
+      return NextResponse.json({ error: "Failed to load profile" }, { status: 500 });
+    }
 
     if ((profile?.wallet_balance || 0) < stake) {
       return NextResponse.json({ error: "Insufficient wallet balance" }, { status: 400 });
@@ -57,10 +70,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (debitErr) {
+      console.error("[challenge/create] debit_wallet error:", debitErr.message);
       return NextResponse.json({ error: "Failed to lock stake. Try again." }, { status: 500 });
     }
 
-    await admin.from("deposits").insert({
+    // Record the escrow deposit
+    const { error: depositErr } = await admin.from("deposits").insert({
       user_id: user.id,
       amount: stake,
       status: "success",
@@ -68,10 +83,12 @@ export async function POST(req: NextRequest) {
       reference: `battle_challenge_create:${user.id}:${stake}`,
     });
 
-    // Create the challenge record (expires in 24 hours). We do NOT create a
-    // `battles` row here — the opponent (black_player_id) isn't known yet,
-    // and battles.black_player_id is NOT NULL. The /accept route creates the
-    // real battles row (with both players) once someone accepts the link.
+    if (depositErr) {
+      console.error("[challenge/create] deposit insert error:", depositErr.message);
+      // Non-fatal — the wallet debit already happened, don't block challenge creation
+    }
+
+    // Create the challenge record (expires in 24 hours)
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     const { data: challenge, error: challengeErr } = await admin
@@ -87,6 +104,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (challengeErr || !challenge) {
+      console.error("[challenge/create] challenge insert error:", challengeErr?.message || "no row returned");
       // Refund the debit
       await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake });
       return NextResponse.json({ error: "Failed to create challenge" }, { status: 500 });
@@ -94,6 +112,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ challengeId: challenge.id });
   } catch (err: any) {
+    console.error("[challenge/create] unexpected error:", err?.message, err?.stack);
     return NextResponse.json({ error: "Failed to create challenge" }, { status: 500 });
   }
 }
