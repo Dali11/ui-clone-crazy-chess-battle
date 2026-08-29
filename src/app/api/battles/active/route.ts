@@ -30,7 +30,65 @@ export async function GET() {
       .limit(1)
       .maybeSingle();
 
-    if (!battle) return NextResponse.json({ active: false });
+    if (!battle) {
+      // ── SELF-HEAL: stale/lingering battle_queue entry ──
+      // If the player has a "waiting" queue entry, either resume it (so the
+      // client can show the searching UI) or, if it's past the configured
+      // queue timeout, auto-refund the escrowed stake and clear it. Without
+      // this, a player who backgrounds/closes the app mid-search comes back
+      // to a permanent "Already in a battle queue" error with no way out.
+      const { data: queueEntry } = await admin
+        .from("battle_queue")
+        .select("id, stake, time_control, created_at")
+        .eq("player_id", user.id)
+        .eq("status", "waiting")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (queueEntry) {
+        const { data: battleConfigRow } = await admin.from("battle_config").select("queue_timeout_s").limit(1).single();
+        const timeoutS = battleConfigRow?.queue_timeout_s ?? 120;
+        const ageS = Math.floor((Date.now() - new Date(queueEntry.created_at).getTime()) / 1000);
+
+        if (ageS > timeoutS) {
+          // Stale — auto-refund and expire so the player can search again.
+          const { error: creditErr } = await admin.rpc("credit_wallet", {
+            p_user_id: user.id,
+            p_amount: queueEntry.stake,
+          });
+          if (!creditErr) {
+            await admin.from("battle_queue").update({ status: "expired" }).eq("id", queueEntry.id);
+            await admin.from("deposits").insert({
+              user_id: user.id,
+              amount: queueEntry.stake,
+              status: "success",
+              method: "battle_refund",
+              reference: `battle_queue_timeout:${queueEntry.id}`,
+            }).then(() => {}, () => {});
+            return NextResponse.json({
+              active: false,
+              queueExpired: true,
+              refunded: queueEntry.stake,
+              message: `Your previous search timed out — MK ${queueEntry.stake.toLocaleString()} was refunded.`,
+            });
+          }
+        }
+
+        // Still within the timeout window — resume the searching UI.
+        return NextResponse.json({
+          active: false,
+          queued: true,
+          queueId: queueEntry.id,
+          stake: queueEntry.stake,
+          timeControl: queueEntry.time_control,
+          ageSeconds: ageS,
+          queueTimeoutS: timeoutS,
+        });
+      }
+
+      return NextResponse.json({ active: false });
+    }
 
     // ── SELF-HEAL: Game over but battle not settled ──
     // The fire-and-forget settleBattle() call in the move/resign/timeout

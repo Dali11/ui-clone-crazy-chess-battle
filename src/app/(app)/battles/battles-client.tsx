@@ -47,6 +47,7 @@ interface BattleConfig {
   rating_range: number;
   initial_minutes: number;
   increment_seconds: number;
+  queue_timeout_s?: number;
 }
 
 type View = "main" | "challenge";
@@ -107,6 +108,16 @@ export default function BattlesPage() {
           router.push(`/game/${data.gameId}`);
           return;
         }
+      } else if (data.queued) {
+        // Resume a battle search that was already in progress (e.g. the
+        // player backgrounded or closed the app mid-search) instead of
+        // leaving them stuck on the select screen with no way to leave.
+        setState("searching");
+        setSearchSeconds(data.ageSeconds || 0);
+        if ((data.ageSeconds || 0) >= 20) setAdminNotified(true);
+      } else if (data.queueExpired) {
+        setError(data.message || "Your previous search timed out and was refunded.");
+        loadProfile();
       }
     } catch {}
     setCheckingActive(false);
@@ -193,7 +204,7 @@ export default function BattlesPage() {
 
       const { data: queueEntry } = await supabase
         .from("battle_queue")
-        .select("status, battle_id")
+        .select("status, battle_id, created_at")
         .eq("player_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -207,6 +218,29 @@ export default function BattlesPage() {
           setOpponent(battleData.opponent);
           setState("matched");
         }
+        return;
+      }
+
+      // Queue entry was cleared/expired externally (e.g. self-healed by
+      // another tab or the /api/battles/active check) — return to select.
+      if (!queueEntry || queueEntry.status !== "waiting") {
+        setState("select");
+        setSearchSeconds(0);
+        loadProfile();
+        return;
+      }
+
+      // Enforce the configured queue timeout client-side too — no opponent
+      // found in time, auto-leave and refund instead of searching forever.
+      const timeoutS = config?.queue_timeout_s ?? 120;
+      const ageS = Math.floor((Date.now() - new Date(queueEntry.created_at).getTime()) / 1000);
+      if (ageS >= timeoutS) {
+        await fetch("/api/battles/leave", { method: "POST" });
+        setState("select");
+        setSearchSeconds(0);
+        setAdminNotified(false);
+        setError("No opponent found in time — your stake was refunded. Try again!");
+        loadProfile();
       }
     }, 2000);
 
@@ -660,7 +694,19 @@ export default function BattlesPage() {
       {error && (
         <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300">
+          {error.toLowerCase().includes("battle queue") && (
+            <button
+              onClick={async () => {
+                await fetch("/api/battles/leave", { method: "POST" });
+                setError(null);
+                loadProfile();
+              }}
+              className="text-red-300 hover:text-red-200 font-semibold underline shrink-0 ml-2"
+            >
+              Leave Queue
+            </button>
+          )}
+          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300 shrink-0">
             <XCircle className="w-4 h-4" />
           </button>
         </div>

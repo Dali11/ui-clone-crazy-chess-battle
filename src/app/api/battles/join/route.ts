@@ -48,15 +48,44 @@ export async function POST(req: NextRequest) {
 
     const { data: existing } = await admin
       .from("battle_queue")
-      .select("id, stake")
+      .select("id, stake, created_at")
       .eq("player_id", user.id)
       .eq("status", "waiting");
 
     if (existing && existing.length > 0) {
-      return NextResponse.json(
-        { error: "Already in a battle queue. Leave the current queue first." },
-        { status: 400 }
-      );
+      // ── SELF-HEAL: auto-clear stale entries past the queue timeout ──
+      // Prevents a player from being permanently locked out if they closed
+      // the app mid-search and the entry never got cleaned up client-side.
+      const { data: configRowForTimeout } = await admin.from("battle_config").select("queue_timeout_s").limit(1).single();
+      const timeoutS = configRowForTimeout?.queue_timeout_s ?? 120;
+      const stillFresh: typeof existing = [];
+      for (const entry of existing) {
+        const ageS = Math.floor((Date.now() - new Date(entry.created_at).getTime()) / 1000);
+        if (ageS > timeoutS) {
+          const { error: creditErr } = await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: entry.stake });
+          if (!creditErr) {
+            await admin.from("battle_queue").update({ status: "expired" }).eq("id", entry.id);
+            await admin.from("deposits").insert({
+              user_id: user.id,
+              amount: entry.stake,
+              status: "success",
+              method: "battle_refund",
+              reference: `battle_queue_timeout:${entry.id}`,
+            }).then(() => {}, () => {});
+          } else {
+            stillFresh.push(entry);
+          }
+        } else {
+          stillFresh.push(entry);
+        }
+      }
+
+      if (stillFresh.length > 0) {
+        return NextResponse.json(
+          { error: "Already in a battle queue. Leave the current queue first." },
+          { status: 400 }
+        );
+      }
     }
 
     const { data: activeBattle } = await admin
