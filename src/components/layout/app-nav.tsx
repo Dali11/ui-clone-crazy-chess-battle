@@ -6,8 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   Home, Swords, TrendingUp, User, Wallet, Shield, Coins, Gift,
-  Crown, Disc3, Menu, X, Trophy, Radio, Clock, Play, Users,
-  BookOpen, Settings, Bell,
+  Crown, Disc3, Menu, X, Trophy, Radio, Clock, Play, Settings,
 } from "lucide-react";
 import NotificationBell from "./notification-bell";
 
@@ -20,23 +19,31 @@ interface Profile {
   wallet_balance: number | null;
 }
 
+// Exact active check — avoids /league matching /league/tournaments etc.
+function isPathActive(pathname: string, href: string): boolean {
+  if (href === "/dashboard") return pathname === "/dashboard";
+  // For top-level routes, match exactly or with trailing slash
+  const next = href + "/";
+  return pathname === href || pathname.startsWith(next);
+}
+
 export default function AppNav({ profile }: { profile: Profile | null }) {
   const pathname = usePathname();
   const isGameRoute = pathname.startsWith("/game/") || pathname.startsWith("/play/computer") || pathname.startsWith("/draughts/game/");
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    setDrawerOpen(false);
+    setMenuOpen(false);
   }, [pathname]);
 
   useEffect(() => {
-    if (drawerOpen) {
+    if (menuOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
     }
     return () => { document.body.style.overflow = ""; };
-  }, [drawerOpen]);
+  }, [menuOpen]);
 
   // Bottom nav: Play · Battles · Leagues · Tournaments · Live
   const bottomNav = [
@@ -58,8 +65,8 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/leaderboard", label: "Ranks", icon: TrendingUp },
   ];
 
-  // Drawer — categorized, ordered by relevance
-  const drawerSections = [
+  // Menu — categorized, ordered by relevance
+  const menuSections = [
     {
       title: "Play",
       items: [
@@ -89,9 +96,8 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     },
   ];
 
-  // Add admin section if applicable
   if (profile?.is_admin) {
-    drawerSections.push({
+    menuSections.push({
       title: "Admin",
       items: [
         { href: "/admin", label: "Admin Panel", icon: Shield, desc: "Manage platform" },
@@ -118,13 +124,13 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
             <div className="flex items-center gap-1">
               {desktopNav.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname.startsWith(item.href);
+                const active = isPathActive(pathname, item.href);
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
+                      active
                         ? "bg-ccb-primary/10 text-ccb-primary"
                         : "text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
                     }`}
@@ -135,7 +141,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
                 );
               })}
               <button
-                onClick={() => setDrawerOpen(true)}
+                onClick={() => setMenuOpen(true)}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface transition-colors"
               >
                 <Menu className="w-4 h-4" />
@@ -144,7 +150,6 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
             </div>
           </div>
 
-          {/* Right side: Bell, Wallet, Profile */}
           <div className="flex items-center gap-3">
             <NotificationBell />
             <Link
@@ -173,22 +178,19 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
       {!isGameRoute && (
         <header className="sm:hidden sticky top-0 z-50 border-b border-ccb-border bg-ccb-dark">
           <div className="flex items-center justify-between px-3 h-12">
-            {/* Menu button */}
             <button
-              onClick={() => setDrawerOpen(true)}
+              onClick={() => setMenuOpen(true)}
               className="p-2 rounded-md text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
               aria-label="Open menu"
             >
               <Menu className="w-5 h-5" />
             </button>
 
-            {/* Brand logo + name */}
             <Link href="/dashboard" className="flex items-center gap-2">
               <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={26} height={26} className="w-6.5 h-6.5 rounded-full" />
               <span className="font-bold text-sm tracking-tight">CCB</span>
             </Link>
 
-            {/* Wallet + Profile */}
             <div className="flex items-center gap-2">
               <Link href="/wallet" className="flex items-center gap-1 px-2 py-1 rounded-md bg-ccb-surface border border-ccb-border">
                 <Wallet className="w-3.5 h-3.5 text-ccb-accent" />
@@ -209,79 +211,65 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         </header>
       )}
 
-      {/* === DRAWER (mobile + desktop) === */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-[200]">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
-          <div className="absolute right-0 top-0 bottom-0 w-[82vw] max-w-sm bg-ccb-card border-l border-ccb-border flex flex-col">
-            {/* Drawer header */}
-            <div className="flex items-center justify-between px-4 h-12 border-b border-ccb-border shrink-0">
-              <span className="font-bold text-sm">Menu</span>
-              <button
-                onClick={() => setDrawerOpen(false)}
-                className="p-1.5 rounded-md text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* === FULL-SCREEN MENU OVERLAY === */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-[200] bg-ccb-dark flex flex-col">
+          {/* Top bar — close button */}
+          <div className="flex items-center justify-between px-4 h-12 border-b border-ccb-border shrink-0">
+            <span className="font-bold text-sm">Menu</span>
+            <button
+              onClick={() => setMenuOpen(false)}
+              className="p-2 rounded-md text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-            {/* User mini-profile */}
-            <Link href="/settings" className="flex items-center gap-3 px-4 py-3 border-b border-ccb-border hover:bg-ccb-surface transition-colors">
-              <div className="w-10 h-10 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">
-                {profile?.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-5 h-5" />
-                )}
+          {/* User mini-profile */}
+          <Link href="/settings" className="flex items-center gap-3 px-4 py-3 border-b border-ccb-border hover:bg-ccb-surface transition-colors shrink-0">
+            <div className="w-10 h-10 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">
+              {profile?.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-5 h-5" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold truncate">{profile?.display_name || profile?.username || "Player"}</p>
+              <p className="text-xs text-ccb-muted">Rating: {profile?.rating ?? "—"}</p>
+            </div>
+          </Link>
+
+          {/* Scrollable menu sections */}
+          <div className="flex-1 overflow-y-auto">
+            {menuSections.map((section, si) => (
+              <div key={si} className={si > 0 ? "border-t border-ccb-border" : ""}>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted px-4 pt-3 pb-1">
+                  {section.title}
+                </p>
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = isPathActive(pathname, item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-3 px-4 py-2.5 hover:bg-ccb-surface transition-colors ${
+                        active ? "text-ccb-primary" : "text-ccb-text"
+                      }`}
+                    >
+                      <Icon className="w-5 h-5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{item.label}</p>
+                        <p className="text-[10px] text-ccb-muted">{item.desc}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold truncate">{profile?.display_name || profile?.username || "Player"}</p>
-                <p className="text-xs text-ccb-muted">Rating: {profile?.rating ?? "—"}</p>
-              </div>
-            </Link>
-
-            {/* Categorized sections */}
-            <div className="flex-1 overflow-y-auto">
-              {drawerSections.map((section, si) => (
-                <div key={si} className={si > 0 ? "border-t border-ccb-border" : ""}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted px-4 pt-3 pb-1">
-                    {section.title}
-                  </p>
-                  {section.items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname.startsWith(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`flex items-center gap-3 px-4 py-2.5 hover:bg-ccb-surface transition-colors ${
-                          isActive ? "text-ccb-primary" : "text-ccb-text"
-                        }`}
-                      >
-                        <Icon className="w-5 h-5 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium">{item.label}</p>
-                          <p className="text-[10px] text-ccb-muted">{item.desc}</p>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-
-            {/* Footer — earn CCB + wallet */}
-            <div className="border-t border-ccb-border p-3 space-y-2 shrink-0">
-              <Link
-                href="/earn"
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-gradient-to-r from-ccb-primary to-ccb-accent text-white text-sm font-bold"
-              >
-                <Gift className="w-4 h-4" />
-                Earn CCB
-              </Link>
-            </div>
+            ))}
           </div>
         </div>
       )}
@@ -295,18 +283,18 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
           <div className="flex items-stretch justify-around h-14">
             {bottomNav.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname.startsWith(item.href);
+              const active = isPathActive(pathname, item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className="flex-1 flex flex-col items-center justify-center gap-0.5 relative"
                 >
-                  {isActive && (
+                  {active && (
                     <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-ccb-primary" />
                   )}
-                  <Icon className={`w-5 h-5 transition-colors ${isActive ? "text-ccb-primary" : "text-gray-400"}`} />
-                  <span className={`text-[9px] font-medium transition-colors ${isActive ? "text-ccb-primary" : "text-gray-500"}`}>
+                  <Icon className={`w-5 h-5 transition-colors ${active ? "text-ccb-primary" : "text-gray-400"}`} />
+                  <span className={`text-[9px] font-medium transition-colors ${active ? "text-ccb-primary" : "text-gray-500"}`}>
                     {item.label}
                   </span>
                 </Link>
