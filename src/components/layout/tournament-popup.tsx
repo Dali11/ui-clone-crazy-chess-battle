@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Trophy, X, Zap, Clock, Users, DollarSign } from "lucide-react";
+import { Trophy, X, Zap, Clock, Users, DollarSign, AlertCircle } from "lucide-react";
 
 type PopupTournament = {
   id: string;
@@ -16,8 +16,10 @@ type PopupTournament = {
   entry_fee: number | null;
   max_players: number | null;
   starts_at: string | null;
-  popup_reason: "new" | "starting_soon";
+  popup_reason: "new" | "starting_soon" | "paused";
   minutes_until_start: number | null;
+  resume_at?: string | null;
+  current_round?: number;
 };
 
 const DISMISSED_KEY = "ccb-tournament-popups";
@@ -33,11 +35,9 @@ function getDismissedIds(): string[] {
 
 function markDismissed(id: string, reason: string) {
   try {
-    // Key includes reason so "new" popup and "starting_soon" popup are independent
     const key = `${id}:${reason}`;
     const dismissed = getDismissedIds().filter((d) => d !== key);
     dismissed.push(key);
-    // Keep only last 20 entries
     const trimmed = dismissed.slice(-20);
     localStorage.setItem(DISMISSED_KEY, JSON.stringify(trimmed));
   } catch {}
@@ -46,6 +46,23 @@ function markDismissed(id: string, reason: string) {
 function isDismissed(id: string, reason: string): boolean {
   const key = `${id}:${reason}`;
   return getDismissedIds().includes(key);
+}
+
+function formatResumeDate(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleString("en-GB", {
+      timeZone: "Africa/Blantyre",
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }) + " CAT";
+  } catch {
+    return isoString;
+  }
 }
 
 export default function TournamentPopup() {
@@ -59,7 +76,7 @@ export default function TournamentPopup() {
       const data = await res.json();
       const tournaments: PopupTournament[] = data.tournaments || [];
 
-      // Find first non-dismissed tournament
+      // Prioritize paused tournaments, then find first non-dismissed
       for (const t of tournaments) {
         if (!isDismissed(t.id, t.popup_reason)) {
           setTournament(t);
@@ -71,9 +88,7 @@ export default function TournamentPopup() {
   }, []);
 
   useEffect(() => {
-    // Check shortly after page load
     const timer = setTimeout(fetchPopup, 2000);
-    // Re-check every 2 minutes in case a new tournament is created
     const interval = setInterval(fetchPopup, 2 * 60 * 1000);
     return () => {
       clearTimeout(timer);
@@ -90,6 +105,62 @@ export default function TournamentPopup() {
 
   if (!visible || !tournament) return null;
 
+  // ── Paused tournament banner ──
+  if (tournament.popup_reason === "paused") {
+    return (
+      <div className="fixed left-0 right-0 z-[110] bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-md animate-slide-up">
+        <div className="bg-ccb-card border border-amber-500/40 sm:rounded-xl shadow-2xl px-4 py-3.5">
+          <button
+            onClick={handleDismiss}
+            className="absolute top-2 right-2 text-ccb-muted hover:text-ccb-text p-1 transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-start gap-3 pr-6">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-amber-500 to-orange-500">
+              <AlertCircle className="w-5 h-5 text-white" />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                  Tournament Paused
+                </span>
+              </div>
+              <h3 className="font-bold text-sm mt-1.5 truncate">{tournament.name}</h3>
+              <p className="text-xs text-ccb-muted mt-0.5">
+                A technical issue occurred mid-tournament. It has been resolved.
+              </p>
+              <p className="text-xs text-ccb-muted mt-1">
+                Round {tournament.current_round || 2} scores are saved. Round {(tournament.current_round || 2) + 1} will be re-paired fresh.
+              </p>
+
+              {tournament.resume_at && (
+                <p className="text-sm text-amber-400 font-semibold mt-1.5">
+                  Resuming {formatResumeDate(tournament.resume_at)}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 mt-3">
+            <Link
+              href={`/tournament/${tournament.id}`}
+              onClick={handleDismiss}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 text-white text-sm font-semibold px-4 py-2.5 transition-all shadow-lg shadow-amber-500/20"
+            >
+              <Trophy className="w-4 h-4" />
+              View Tournament
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Standard new/starting soon popup ──
   const isNew = tournament.popup_reason === "new";
   const timeLabel =
     tournament.initial_minutes && tournament.increment_seconds !== undefined
