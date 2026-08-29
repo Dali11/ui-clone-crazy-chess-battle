@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
-  Home, Swords, TrendingUp, User, Wallet, Shield, Coins,
+  Home, Swords, TrendingUp, User, Wallet, Shield, Coins, Gift,
   Crown, Disc3, Menu, X, Trophy, Radio, Clock, Play, Settings,
 } from "lucide-react";
 import NotificationBell from "./notification-bell";
@@ -90,6 +90,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
       items: [
         { href: "/settings", label: "Settings & Profile", icon: Settings, desc: "Account preferences" },
         { href: "/wallet", label: "Wallet", icon: Wallet, desc: "Balance & transactions" },
+                { href: "/affiliate", label: "Affiliate", icon: Gift, desc: "Earn MK500 per referral" },
                 { href: "/history", label: "Game History", icon: Clock, desc: "Your past games" },
       ],
     },

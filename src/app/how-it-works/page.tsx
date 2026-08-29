@@ -67,7 +67,7 @@ export default function HowItWorksPage() {
                 {[
                   "Pick a unique username — this is how opponents see you",
                   "Choose your skill level or link Chess.com for auto-rating",
-                  "Get a referral code to invite friends to the platform",
+                  "Get a referral link — earn MK500 cash when friends activate",
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm text-ccb-muted">
                     <Check className="w-4 h-4 text-ccb-success shrink-0" />

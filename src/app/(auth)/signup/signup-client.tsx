@@ -229,7 +229,15 @@ export default function SignupPage() {
 
         const ref = refCode || localStorage.getItem("ccb_ref_code");
         if (ref) {
-          
+          try {
+            await fetch("/api/affiliate/track", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ referrerCode: ref, referredId: data.user.id }),
+            });
+          } catch (refErr) {
+            console.error("Referral tracking failed:", refErr);
+          }
           localStorage.removeItem("ccb_ref_code");
         }
 
