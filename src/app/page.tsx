@@ -187,7 +187,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
               </div>
               <div className="text-ccb-muted text-sm font-mono mb-2">Stage 03</div>
               <h3 className="font-semibold mb-2">Climb</h3>
-              <p className="text-sm text-ccb-muted">Climb the standings, accumulate season points, and fight for the championship title. Top players earn glory and prizes.</p>
+              <p className="text-sm text-ccb-muted">Climb the standings, accumulate season points, and fight for the championship title. Top players earn glory and the championship title.</p>
             </div>
           </div>
 

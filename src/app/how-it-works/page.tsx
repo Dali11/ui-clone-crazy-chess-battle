@@ -12,7 +12,7 @@ import { pageMetadata } from "@/lib/seo/metadata";
 
 export const metadata = pageMetadata({
   title: "How It Works — Start Playing Competitive Chess",
-  description: "Learn how to join Crazy Chess Battles: create an account, play your first game, enter tournaments, climb the leaderboard, and earn prizes. A step-by-step guide.",
+  description: "Learn how to join Crazy Chess Battles: create an account, play your first game, enter tournaments, climb the leaderboard, and prove your rank. A step-by-step guide.",
   path: "/how-it-works",
 });
 
@@ -67,7 +67,7 @@ export default function HowItWorksPage() {
                 {[
                   "Pick a unique username — this is how opponents see you",
                   "Choose your skill level or link Chess.com for auto-rating",
-                  "Get a referral code to invite friends and earn rewards",
+                  "Get a referral code to invite friends to the platform",
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm text-ccb-muted">
                     <Check className="w-4 h-4 text-ccb-success shrink-0" />
