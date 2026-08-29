@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export interface GameState {
   id: string;
@@ -58,6 +59,12 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
   const [error, setError] = useState<string | null>(null);
   const [drawOffer, setDrawOffer] = useState<string | null>(null);
   const [spectatorCount, setSpectatorCount] = useState(0);
+  const spectatorCountRef = useRef(0);
+
+  // Admin client for DB updates (spectator count persistence)
+  const admin = useMemo(() => {
+    try { return createAdminClient(); } catch { return null as any; }
+  }, []);
   const [opponentMove, setOpponentMove] = useState<MoveBroadcast | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -311,6 +318,11 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
           if (!players.has(id)) specs++;
         }
         setSpectatorCount(specs);
+        // Persist spectator count to DB (throttled — only on change)
+        if (specs !== spectatorCountRef.current) {
+          spectatorCountRef.current = specs;
+          admin.from("games").update({ spectator_count: specs }).eq("id", gameId).then();
+        }
       })
       .on("presence", { event: "join" }, () => {
         lastEventTimeRef.current = Date.now();

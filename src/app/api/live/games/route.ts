@@ -19,7 +19,7 @@ export async function GET() {
         id, status, time_control, initial_minutes, increment_seconds, rated,
         turn, move_count, fen, pgn, white_clock_ms, black_clock_ms,
         last_move_at, tournament_id, league_id, league_fixture_id,
-        white_player_id, black_player_id,
+        white_player_id, black_player_id, spectator_count,
         white_player:profiles!games_white_player_id_fkey(id, username, display_name, avatar_url, rating),
         black_player:profiles!games_black_player_id_fkey(id, username, display_name, avatar_url, rating)
       `)
@@ -48,6 +48,7 @@ export async function GET() {
         tournament_id: g.tournament_id,
         league_id: g.league_id,
         league_fixture_id: g.league_fixture_id,
+        spectator_count: g.spectator_count || 0,
         white_player: g.white_player,
         black_player: g.black_player,
         is_my_game: !!isMyGame,

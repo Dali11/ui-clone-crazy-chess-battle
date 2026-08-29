@@ -33,6 +33,7 @@ interface LiveGame {
   tournament_id: string | null;
   league_id: string | null;
   league_fixture_id: string | null;
+  spectator_count: number;
   is_my_game: boolean;
   game_type: "chess";
 }
@@ -267,6 +268,12 @@ function GameCard({ game, priority = false }: { game: LiveGame; priority?: boole
         <span className="text-[10px] text-ccb-muted">
           Move {game.move_count}
         </span>
+        {game.spectator_count > 0 && (
+          <span className="flex items-center gap-1 text-[10px] font-medium text-ccb-muted">
+            <Eye className="w-3 h-3" />
+            {game.spectator_count} {game.spectator_count === 1 ? "viewer" : "viewers"}
+          </span>
+        )}
         {game.rated && (
           <span className="text-[10px] font-bold text-ccb-accent">Rated</span>
         )}
