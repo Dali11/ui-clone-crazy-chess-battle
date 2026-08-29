@@ -2,10 +2,14 @@
 
 import React from 'react';
 import PremiumLeaguesTab from './_components/premium-leagues-tab';
+import LeagueWelcomeChecklist from './_components/league-welcome-checklist';
 
 export default function CompetePage() {
   return (
     <div className="space-y-6 pb-20 sm:pb-8">
+
+      {/* WELCOME CHECKLIST MODAL */}
+      <LeagueWelcomeChecklist />
 
       {/* HEADER */}
       <div className="px-4 sm:px-6 lg:px-8">

@@ -197,6 +197,9 @@ export async function GET(req: Request) {
       userId: user?.id || null,
       userGender: profile?.gender || null,
       userIdentityVerified: profile?.identity_verified || false,
+      displayName: profile?.display_name || null,
+      country: profile?.country || null,
+      profileComplete: !!(profile?.display_name && profile?.country),
       recommendedTier,
       market: {
         currencyCode: market.currencyCode,
