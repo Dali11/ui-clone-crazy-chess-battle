@@ -110,20 +110,6 @@ export async function POST(req: NextRequest) {
 
     if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
-    const minGames = (config as any).min_games_for_battles ?? 5;
-    const gamesPlayed = profile.games_played ?? 0;
-    if (gamesPlayed < minGames) {
-      return NextResponse.json(
-        {
-          error: `You need to play at least ${minGames} games before entering Battles. You have played ${gamesPlayed} so far. Play some Quick Matches or Challenge a Friend to unlock Battles!`,
-          needsMoreGames: true,
-          gamesPlayed,
-          minRequired: minGames,
-        },
-        { status: 403 }
-      );
-    }
-
     const balance = profile.wallet_balance ?? 0;
     if (balance < stake) {
       return NextResponse.json(
