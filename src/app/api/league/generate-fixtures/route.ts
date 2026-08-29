@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateRoundRobin, recalcStandings } from "@/lib/league/engine";
 import { scheduleFixtureDates } from "@/lib/league/weekend-scheduler";
 
 const DEFAULT_SEASON_START = "2026-09-05T10:00:00Z";
 
+async function requireAdmin() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, status: 401, error: "Unauthorized" };
+  const admin = createAdminClient();
+  const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
+  if (!profile?.is_admin) return { ok: false as const, status: 403, error: "Forbidden" };
+  return { ok: true as const, userId: user.id };
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
     const body = await request.json();
     const { leagueId, playerIds, name, country, seasonId, scoringConfig, seasonStartDate } = body;
 

@@ -12,6 +12,7 @@ import {
   Settings, FileText, SlidersHorizontal, Database, ChevronDown,
 } from "lucide-react";
 import PlatformSettingsPanel from "./platform-settings-panel";
+import LeagueManager from "./league-manager";
 
 interface Withdrawal {
   id: string;
@@ -3098,51 +3099,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {tab === "leagues" && (
             <div className="space-y-4">
               <PlatformSettingsPanel section="leagues" />
-              {adminLeagues.length === 0 ? (
-                <div className="text-center py-12 text-ccb-muted text-sm">
-                  <Crown className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  No leagues configured
-                </div>
-              ) : (
-                adminLeagues.map((league: any) => (
-                  <div key={league.id} className="card space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${league.tier <= 2 ? "bg-ccb-primary/10 text-ccb-primary" : league.tier <= 3 ? "bg-amber-500/10 text-amber-500" : "bg-ccb-surface text-ccb-muted"}`}>L{league.tier}</span>
-                        <span className="font-bold text-sm">{league.name}</span>
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${league.status === "registration" ? "bg-ccb-success/10 text-ccb-success" : league.status === "active" ? "bg-ccb-primary/10 text-ccb-primary" : "bg-ccb-surface text-ccb-muted"}`}>{league.status}</span>
-                      </div>
-                      <span className="text-xs text-ccb-muted">{league.participant_count} players</span>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <ConfigInput label="Prize Pool (MK)" value={leagueEdits[league.id]?.prize_pool ?? (league.prize_pool || 0)} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], prize_pool: Number(v) } }))} />
-                      <ConfigInput label="League Size" value={leagueEdits[league.id]?.league_size ?? league.league_size} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], league_size: v } }))} />
-                      <ConfigInput label="Promotes" value={leagueEdits[league.id]?.promotes_count ?? league.promotes_count} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], promotes_count: v } }))} />
-                      <ConfigInput label="Relegates" value={leagueEdits[league.id]?.relegates_count ?? league.relegates_count} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], relegates_count: v } }))} />
-                      <ConfigInput label="Qualifying Positions" value={leagueEdits[league.id]?.qualifying_positions ?? league.qualifying_positions} onChange={(v) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], qualifying_positions: v } }))} />
-                      <div>
-                        <label className="text-xs text-ccb-muted mb-1 block">Status</label>
-                        <select
-                          value={leagueEdits[league.id]?.status ?? league.status}
-                          onChange={(e) => setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], status: e.target.value } }))}
-                          className="w-full px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm"
-                        >
-                          <option value="upcoming">Upcoming</option>
-                          <option value="registration">Registration</option>
-                          <option value="active">Active</option>
-                          <option value="completed">Completed</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <ActionButton onClick={() => saveLeague(league.id)} loading={actionLoading === league.id} variant="primary">Save</ActionButton>
-                      {league.status === "registration" && (
-                        <ActionButton onClick={() => { setLeagueEdits((p: any) => ({ ...p, [league.id]: { ...p[league.id], status: "active" } })); setTimeout(() => saveLeague(league.id), 100); }} loading={actionLoading === league.id} variant="success">Start League</ActionButton>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
+              <LeagueManager />
             </div>
           )}
 
