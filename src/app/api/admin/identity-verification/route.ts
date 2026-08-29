@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { searchParams } = new URL(req.url);
-    const filter = searchParams.get("filter") || "pending"; // pending | verified | all
+    const filter = searchParams.get("filter") || "pending";
 
     let query = admin
       .from("profiles")
@@ -34,7 +34,6 @@ export async function GET(req: NextRequest) {
     }
 
     const { data: players, error } = await query.limit(100);
-
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     return NextResponse.json({ players });
@@ -65,7 +64,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing playerId or action" }, { status: 400 });
     }
 
-    // ─── Load platform config for verification ──────────────────
     const vConfig = await getPlatformConfig(admin, "verification");
 
     if (action === "verify") {
@@ -76,29 +74,20 @@ export async function POST(req: NextRequest) {
         updated_at: new Date().toISOString(),
       };
 
-      // Auto-approve trusted users if enabled
       if (vConfig.auto_approve_trusted) {
         const { data: playerProfile } = await admin
           .from("profiles")
           .select("phone_verified, identity_verified, created_at")
           .eq("id", playerId)
           .single();
-        // Trusted = phone verified + account older than 30 days
         if (playerProfile?.phone_verified) {
           const accountAge = (Date.now() - new Date(playerProfile.created_at || Date.now()).getTime()) / (1000 * 60 * 60 * 24);
           if (accountAge >= 30) {
-            // Auto-approve — skip manual review
+            // Auto-approve
           }
         }
       }
 
-      // Validate required documents if configured
-      if (vConfig.require_id_document) {
-        // The admin is verifying — they've seen the documents
-        // This is a guard to prevent bulk-approving without documents
-      }
-
-      // Admin can correct gender during verification
       if (genderOverride) {
         const validGenders = ["male", "female", "other", "prefer_not_to_say"];
         if (!validGenders.includes(genderOverride)) {
@@ -107,8 +96,6 @@ export async function POST(req: NextRequest) {
         updates.gender = genderOverride;
       }
 
-      // Use admin client to bypass the trigger (admin-verified gender shouldn't reset identity)
-      // We need to set identity_verified AFTER gender to avoid the trigger resetting it
       const { data: current } = await admin
         .from("profiles")
         .select("gender, identity_verified")
@@ -117,13 +104,10 @@ export async function POST(req: NextRequest) {
 
       if (!current) return NextResponse.json({ error: "Player not found" }, { status: 404 });
 
-      // If overriding gender, update gender first (trigger will reset identity_verified),
-      // then set identity_verified in a second query
       if (genderOverride && genderOverride !== current.gender) {
         await admin.from("profiles")
           .update({ gender: genderOverride, updated_at: new Date().toISOString() })
           .eq("id", playerId);
-        // Now set identity_verified (trigger won't fire because gender didn't change in this update)
         const { error } = await admin.from("profiles")
           .update({
             identity_verified: true,
@@ -134,7 +118,6 @@ export async function POST(req: NextRequest) {
           .eq("id", playerId);
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       } else {
-        // Gender unchanged, just verify
         const { error } = await admin.from("profiles")
           .update(updates)
           .eq("id", playerId);
@@ -151,6 +134,27 @@ export async function POST(req: NextRequest) {
           details: { action: "verify", genderOverride: genderOverride || null },
         });
       } catch {}
+
+      // Send identity verified email (fire-and-forget)
+      try {
+        const { data: playerProfile } = await admin
+          .from("profiles")
+          .select("email, display_name, username")
+          .eq("id", playerId)
+          .single();
+
+        if (playerProfile?.email) {
+          await sendEmail({
+            to: playerProfile.email,
+            template: "identity_verified",
+            data: {
+              displayName: playerProfile.display_name || playerProfile.username || "Player",
+            },
+          });
+        }
+      } catch (emailErr) {
+        console.error("Identity verified email failed:", emailErr);
+      }
 
       return NextResponse.json({ success: true, message: "Identity verified" });
     } else if (action === "reject") {

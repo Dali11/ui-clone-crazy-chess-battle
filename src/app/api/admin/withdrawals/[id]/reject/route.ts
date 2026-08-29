@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -39,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-    // Add admin notes + processed_by/at (refund_withdrawal RPC doesn't set these)
+    // Add admin notes + processed_by/at
     await admin
       .from("withdrawals")
       .update({
@@ -51,42 +50,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
       .eq("id", id);
 
-    // Insert in-app notification directly (no self-HTTP fetch)
-    const amountMWK = withdrawal.amount;
-    try {
-      // Send branded email
-    const rejWProfile = await admin.from("profiles").select("email").eq("id", withdrawal.user_id).single();
-    const rejAmountMWK = withdrawal.amount;
-    await sendEmail({
-      to: rejWProfile.data?.email || "",
-      subject: `Withdrawal update — MK ${rejAmountMWK.toLocaleString()}`,
-      template: "withdrawal_rejected",
-      data: { amount: `MK ${rejAmountMWK.toLocaleString()}`, currency: "MWK", reason: adminNotes || "Could not be processed" },
-    }).catch(() => {});
-
-    await admin.from("notifications").insert({
-        user_id: withdrawal.user_id,
-        type: "withdrawal_rejected",
-        title: "Your withdrawal request was rejected",
-        body: `Your withdrawal for MWK ${amountMWK} was rejected. Funds returned to wallet. Reason: ${adminNotes}`,
-        data: { amount: amountMWK, reason: adminNotes },
-        read: false,
-      });
-    } catch {}
-
-    // Log action
-    try {
-      await admin.from("admin_logs").insert({
-        admin_id: user.id,
-        action: "withdrawal_reject",
-        target_type: "withdrawal",
-        target_id: id,
-        details: { notes: adminNotes },
-      });
-    } catch {}
-
-    return NextResponse.json({ status: "rejected" });
-  } catch (err: any) {
-    return NextResponse.json({ error: "Failed to reject withdrawal. Please try again." }, { status: 500 });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Reject withdrawal error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

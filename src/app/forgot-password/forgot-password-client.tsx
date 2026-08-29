@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 
 export const dynamic = "force-dynamic";
 
@@ -11,22 +10,30 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const supabase = createClient();
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Something went wrong. Please try again.");
+        setLoading(false);
+        return;
+      }
+
       setSuccess(true);
+      setLoading(false);
+    } catch {
+      setError("Network error. Please try again.");
       setLoading(false);
     }
   };
@@ -42,7 +49,7 @@ export default function ForgotPasswordPage() {
             <span className="text-lg font-bold">Crazy Chess Battles</span>
           </Link>
           <h1 className="text-2xl font-bold mt-4">Forgot Password</h1>
-          <p className="text-sm text-ccb-muted mt-1">We'll send you a reset link</p>
+          <p className="text-sm text-ccb-muted mt-1">We&apos;ll send you a reset link</p>
         </div>
 
         {success ? (
@@ -53,7 +60,7 @@ export default function ForgotPasswordPage() {
               </svg>
             </div>
             <p className="font-medium">Check your email</p>
-            <p className="text-sm text-ccb-muted mt-1">We sent a reset link to {email}</p>
+            <p className="text-sm text-ccb-muted mt-1">If an account exists for {email}, we&apos;ve sent a reset link.</p>
             <Link href="/login" className="text-ccb-primary text-sm hover:underline mt-4 inline-block">Back to login</Link>
           </div>
         ) : (

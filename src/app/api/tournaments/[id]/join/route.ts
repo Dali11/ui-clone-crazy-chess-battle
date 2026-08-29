@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/email";
 import { runArenaMatchmakingWave } from "@/lib/tournament/arena";
 
 export async function POST(
@@ -244,45 +243,9 @@ export async function POST(
       console.error("Berry award failed:", berryErr);
     }
 
-    // Send confirmation email (fire-and-forget)
-    const { data: tInfo } = await admin
-      .from("tournaments")
-      .select("name, starts_at, entry_fee")
-      .eq("id", tournamentId)
-      .single();
-    const { data: userProfile } = await admin
-      .from("profiles")
-      .select("email, display_name, username")
-      .eq("id", user.id)
-      .single();
-    if (userProfile?.email && tInfo) {
-      sendEmail({
-        to: userProfile.email,
-        subject: `Registered for ${tInfo.name}`,
-        template: "tournament_registered",
-        data: {
-          tournamentName: tInfo.name,
-          startsAt: tInfo.starts_at,
-          entryFee: tInfo.entry_fee || 0,
-          tournamentId,
-        },
-      }).catch(() => {});
-    }
-
-    // If this is a live arena tournament, try to pair the new player right
-    // away instead of making them wait for the next cron tick.
-    if (tournament.type === "arena" && tournament.status === "active") {
-      runArenaMatchmakingWave(admin, tournamentId).catch((e) =>
-        console.error("Arena instant-pair on join failed:", e)
-      );
-    }
-
-    return NextResponse.json({ success: true, paidEntryFee, berriesAwarded: 50 });
-  } catch (e: any) {
-    console.error("Join tournament error:", e);
-    return NextResponse.json(
-      { error: e.message || "Failed to join tournament" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, message: "Successfully joined tournament" });
+  } catch (error: any) {
+    console.error("Join tournament error:", error);
+    return NextResponse.json({ error: error.message || "Failed to join tournament" }, { status: 500 });
   }
 }

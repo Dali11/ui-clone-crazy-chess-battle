@@ -213,40 +213,27 @@ export async function finishTournament(tournamentId: string): Promise<void> {
     }
   }
 
-  // Send tournament finished emails to all participants (fire-and-forget)
-  const { data: allPartProfiles } = await admin
-    .from("tournament_participants")
-    .select("player_id")
-    .eq("tournament_id", tournamentId);
-  const partIds = (allPartProfiles || []).map((p: any) => p.player_id);
-  const { data: partEmails } = await admin
-    .from("profiles")
-    .select("id, email, display_name")
-    .in("id", partIds);
-  const emailMap = new Map((partEmails || []).map((p: any) => [p.id, p]));
-  const rankMap = new Map((rankedParticipants || []).map((p: any) => [p.player_id, p.final_rank ?? 0]));
+  // Insert in-app notifications for all participants (fire-and-forget)
+  try {
+    const { data: allParts } = await admin
+      .from("tournament_participants")
+      .select("player_id")
+      .eq("tournament_id", tournamentId);
+    const partIds = (allParts || []).map((p: any) => p.player_id);
+    const rankMap = new Map((rankedParticipants || []).map((p: any) => [p.player_id, p.final_rank ?? 0]));
 
-  const emails = partIds
-    .map((pid: string) => {
-      const prof = emailMap.get(pid);
-      if (!prof?.email) return null;
-      return {
-        to: prof.email,
-        subject: `${tournament.name} — Final Results`,
-        template: "tournament_finished" as const,
-        data: {
-          tournamentName: tournament.name,
-          tournamentId,
-          finalRank: rankMap.get(pid) || 0,
-          playerName: prof.display_name || "Player",
-        },
-      };
-    })
-    .filter(Boolean) as any[];
-
-  if (emails.length > 0) {
-    import("@/lib/email").then(({ sendBatchEmails }) => {
-      sendBatchEmails(emails).catch(() => {});
-    });
+    for (const pid of partIds) {
+      const rank = rankMap.get(pid) ?? 0;
+      await admin.from("notifications").insert({
+        user_id: pid,
+        type: "tournament_finished",
+        title: `${tournament.name} — Final Results`,
+        body: `The tournament has finished. Your final rank: #${rank}. Check the results page for full standings.`,
+        data: { tournament_id: tournamentId, final_rank: rank },
+        read: false,
+      });
+    }
+  } catch (e) {
+    console.error("Tournament finished notifications failed:", e);
   }
 }

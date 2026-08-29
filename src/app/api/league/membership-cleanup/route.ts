@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 import { getPlatformConfig } from "@/lib/platform-config";
 
 /**
  * Membership Cleanup — called daily by Vercel cron.
  *
- * Two phases:
- * 1. MARK EXPIRED: Memberships where end_date < NOW() and status='active'
- *    -> set status='expired'. Player keeps league spot during grace period.
- *
- * 2. ENFORCE 10-DAY RULE: Memberships expired >10 days ago (status='expired')
- *    -> Remove player from all premier_leagues (player_ids)
- *    -> Delete their league_standings rows
- *    -> Forfeit all unplayed league_fixtures (opponent gets the win)
- *    -> Set membership status='cancelled'
+ * Phase 1: Mark memberships as expired (end_date passed, still active)
+ *   -> Send membership_expired email with renewal link
+ * Phase 2: Enforce grace period — remove from leagues after grace period
  */
-
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -23,7 +17,6 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient();
 
-    // ─── Load platform config for membership ──────────────────────
     const mConfig = await getPlatformConfig(admin, 'membership');
     const gracePeriodDays = mConfig.grace_period_days || 10;
 
@@ -35,6 +28,7 @@ export async function POST(req: NextRequest) {
       removedFromLeagues: 0,
       fixturesForfeited: 0,
       standingsDeleted: 0,
+      emailsSent: 0,
       details: [] as any[],
     };
 
@@ -56,10 +50,37 @@ export async function POST(req: NextRequest) {
 
       if (!updateErr) {
         results.markedExpired = expiredIds.length;
+
+        // Send membership expired email to each player
+        for (const membership of justExpired) {
+          try {
+            const { data: profile } = await admin
+              .from("profiles")
+              .select("email, display_name, username")
+              .eq("id", membership.player_id)
+              .single();
+
+            if (profile?.email) {
+              await sendEmail({
+                to: profile.email,
+                template: "membership_expired",
+                data: {
+                  displayName: profile.display_name || profile.username || "Player",
+                  endDate: membership.end_date,
+                  renewalUrl: "https://crazychessbattles.live/membership",
+                  gracePeriodDays,
+                },
+              });
+              results.emailsSent++;
+            }
+          } catch (emailErr) {
+            console.error("Membership expired email failed:", emailErr);
+          }
+        }
       }
     }
 
-    // PHASE 2: Enforce 10-day grace period — remove from leagues
+    // PHASE 2: Enforce grace period — remove from leagues
     const { data: overdue, error: overdueErr } = await admin
       .from("memberships")
       .select("id, player_id, end_date")
@@ -72,7 +93,6 @@ export async function POST(req: NextRequest) {
       for (const membership of overdue) {
         const playerId = membership.player_id;
 
-        // Find all leagues this player is in
         const { data: leagues } = await admin
           .from("premier_leagues")
           .select("id, name, player_ids, status")
@@ -87,7 +107,6 @@ export async function POST(req: NextRequest) {
         }
 
         for (const league of leagues) {
-          // Remove player from player_ids
           const updatedPlayerIds = (league.player_ids || []).filter(
             (id: string) => id !== playerId
           );
@@ -102,7 +121,7 @@ export async function POST(req: NextRequest) {
 
           results.removedFromLeagues++;
 
-          // Forfeit unplayed fixtures — opponent gets the win
+          // Forfeit unplayed fixtures
           const { data: unplayedFixtures } = await admin
             .from("league_fixtures")
             .select("id, home_player_id, away_player_id")
@@ -126,7 +145,6 @@ export async function POST(req: NextRequest) {
 
               results.fixturesForfeited++;
 
-              // Update opponent's standings (add a win)
               const opponentId = isHome
                 ? fixture.away_player_id
                 : fixture.home_player_id;
@@ -172,7 +190,6 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        // Mark membership as cancelled (fully processed)
         await admin
           .from("memberships")
           .update({ status: "cancelled", updated_at: now.toISOString() })
@@ -186,7 +203,8 @@ export async function POST(req: NextRequest) {
         `${results.markedExpired} marked expired, ` +
         `${results.removedFromLeagues} removed from leagues, ` +
         `${results.fixturesForfeited} fixtures forfeited, ` +
-        `${results.standingsDeleted} standings deleted`
+        `${results.standingsDeleted} standings deleted, ` +
+        `${results.emailsSent} emails sent`
       );
     }
 

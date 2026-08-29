@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,7 +28,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (deposit.status === "success") return NextResponse.json({ error: "Deposit already credited" }, { status: 400 });
 
     // ATOMIC CLAIM: Set status to 'success' first — prevents double-crediting on concurrent requests
-    // Only succeeds if the deposit is still in pending/processing (not already claimed)
     const { data: claimed } = await admin
       .from("deposits")
       .update({
@@ -46,7 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Deposit was already claimed by another process" }, { status: 409 });
     }
 
-    // Now safe to credit wallet — no concurrent request can reach this point
+    // Now safe to credit wallet
     await admin.rpc("credit_wallet", {
       p_user_id: deposit.user_id,
       p_amount: deposit.amount,
@@ -57,32 +55,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       await admin.rpc("check_referral_activation", { p_user_id: deposit.user_id, p_action: "deposit" });
     } catch {}
 
-    // Notify user
-    const amountMWK = deposit.amount;
-    try {
-      // Send branded email
-      const depProfile = await admin.from("profiles").select("email").eq("id", deposit.user_id).single();
-      // Fetch actual wallet balance after credit
-      const { data: depWallet } = await admin.from("profiles").select("wallet_balance").eq("id", deposit.user_id).single();
-      const depBalanceMWK = depWallet?.wallet_balance ? depWallet.wallet_balance.toLocaleString() : amountMWK.toLocaleString();
-
-      await sendEmail({
-        to: depProfile.data?.email || "",
-        subject: `Deposit confirmed — MK ${amountMWK.toLocaleString()}`,
-        template: "deposit_credited",
-        data: { amount: `MK ${amountMWK.toLocaleString()}`, currency: "MWK", newBalance: `MK ${depBalanceMWK}`, method: deposit.method },
-      }).catch(() => {});
-
-      await admin.from("notifications").insert({
-        user_id: deposit.user_id,
-        type: "deposit_success",
-        title: "Deposit confirmed",
-        body: `Your deposit of MWK ${amountMWK.toLocaleString()} has been credited to your wallet.`,
-        data: { amount: amountMWK, method: deposit.method },
-        read: false,
-      });
-    } catch {}
-
     // Log action
     try {
       await admin.from("admin_logs").insert({
@@ -90,7 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         action: "manual_credit",
         target_type: "deposit",
         target_id: id,
-        details: { amount: amountMWK, notes, original_status: deposit.status },
+        details: { amount: deposit.amount, notes, original_status: deposit.status },
       });
     } catch {}
 

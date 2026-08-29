@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 
 interface PrizeDistribution {
   type: "flat" | "percentage" | "tiered";
@@ -11,10 +12,6 @@ interface ParticipantResult {
   score: number;
 }
 
-// Default payout structure by tournament format.
-// Knockout tournaments have fewer total games, so only the top 4 who reach
-// the semis/final are rewarded. Swiss/arena run more rounds against a wider
-// field, so the top 5 share the pool.
 export const PRIZE_SPLITS_BY_TYPE: Record<string, Array<{ rank: number; percentage: number }>> = {
   knockout: [
     { rank: 1, percentage: 50 },
@@ -38,13 +35,8 @@ export const PRIZE_SPLITS_BY_TYPE: Record<string, Array<{ rank: number; percenta
   ],
 };
 
-// Fallback used when a tournament's type doesn't match a known key
 export const DEFAULT_PRIZE_SPLITS = PRIZE_SPLITS_BY_TYPE.swiss;
 
-/**
- * Distribute prize pool to winners based on tournament's prize_distribution config.
- * Called after tournament.finish() sets final_rank on all participants.
- */
 export async function distributePrizes(
   tournamentId: string,
   participants: ParticipantResult[],
@@ -58,7 +50,6 @@ export async function distributePrizes(
   const payouts: Array<{ player_id: string; amount: number; rank: number }> = [];
 
   if (prizeDistribution.type === "flat" && prizeDistribution.payouts.length > 0) {
-    // Fixed amounts per rank
     for (const payout of prizeDistribution.payouts) {
       const winner = participants.find((p) => p.final_rank === payout.rank);
       if (winner && payout.amount) {
@@ -66,7 +57,6 @@ export async function distributePrizes(
       }
     }
   } else if (prizeDistribution.type === "percentage" && prizeDistribution.payouts.length > 0) {
-    // Percentage of prize pool per rank
     for (const payout of prizeDistribution.payouts) {
       const winner = participants.find((p) => p.final_rank === payout.rank);
       if (winner && payout.percentage) {
@@ -77,7 +67,6 @@ export async function distributePrizes(
       }
     }
   } else {
-    // Default fallback: top 5 split 40/20/18/12/10
     for (const split of DEFAULT_PRIZE_SPLITS) {
       const winner = participants.find((p) => p.final_rank === split.rank);
       if (winner) {
@@ -89,7 +78,14 @@ export async function distributePrizes(
     }
   }
 
-  // Credit winners' wallets (skip already-paid entries to prevent double-payout)
+  // Fetch tournament name for email
+  const { data: tournament } = await admin
+    .from("tournaments")
+    .select("name")
+    .eq("id", tournamentId)
+    .single();
+
+  // Credit winners' wallets (skip already-paid entries)
   for (const payout of payouts) {
     const payoutRef = `tournament:${tournamentId}:rank:${payout.rank}`;
     const { data: existing } = await admin
@@ -98,22 +94,46 @@ export async function distributePrizes(
       .eq("reference", payoutRef)
       .eq("user_id", payout.player_id)
       .single();
-    if (existing) continue; // already paid for this rank
+    if (existing) continue;
 
     await admin.rpc("credit_wallet", {
       p_user_id: payout.player_id,
       p_amount: payout.amount,
     });
 
-    // Record the payout as a deposit entry for audit trail
     const { error: _depErr } = await admin.from("deposits").insert({
       user_id: payout.player_id,
       amount: payout.amount,
       status: "success",
       method: "tournament_payout",
-      reference: `tournament:${tournamentId}:rank:${payout.rank}`,
+      reference: payoutRef,
     });
     if (_depErr) console.error("Deposit audit log failed:", _depErr);
+
+    // Send prize payout email (fire-and-forget)
+    try {
+      const { data: winnerProfile } = await admin
+        .from("profiles")
+        .select("email, display_name, username")
+        .eq("id", payout.player_id)
+        .single();
+
+      if (winnerProfile?.email) {
+        await sendEmail({
+          to: winnerProfile.email,
+          subject: `Prize won — #${payout.rank} in ${tournament?.name || "tournament"}`,
+          template: "prize_payout",
+          data: {
+            displayName: winnerProfile.display_name || winnerProfile.username || "Player",
+            tournamentName: tournament?.name || "Tournament",
+            rank: payout.rank,
+            amount: payout.amount,
+          },
+        });
+      }
+    } catch (emailErr) {
+      console.error("Prize payout email failed:", emailErr);
+    }
   }
 
   // Update tournament with actual payouts
