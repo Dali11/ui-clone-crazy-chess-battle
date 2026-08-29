@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create the challenge record (expires in 24 hours)
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
     const { data: challenge, error: challengeErr } = await admin
       .from("battle_challenges")

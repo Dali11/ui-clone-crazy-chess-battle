@@ -50,6 +50,34 @@ async function handleTournamentCron(req: NextRequest) {
     const now = new Date().toISOString();
     const results = { started: 0, advanced: 0, finished: 0, errors: [] as string[] };
 
+    // ── 0. AUTO-RESUME: Resume paused tournaments whose resume_at has passed ──
+    const { data: toResume } = await admin
+      .from("tournaments")
+      .select("id, name, current_round, rounds, type, knockout_format, group_schedule, time_control, initial_minutes, increment_seconds, rest_minutes, countdown_minutes, resume_at")
+      .eq("status", "paused")
+      .lte("resume_at", now);
+
+    for (const tournament of toResume || []) {
+      try {
+        const nextRound = (tournament.current_round || 1) + 1;
+        await admin.from("tournaments").update({
+          status: "active",
+          resume_at: null,
+        }).eq("id", tournament.id);
+
+        // Mark the previous round's resume_at cleared
+        await admin.from("tournament_rounds")
+          .update({ resume_at: null })
+          .eq("tournament_id", tournament.id)
+          .eq("round_number", tournament.current_round);
+
+        console.log(`[cron] Auto-resumed "${tournament.name}" → round ${nextRound}`);
+        results.advanced++;
+      } catch (e: any) {
+        results.errors.push(`Resume ${tournament.name}: ${e.message}`);
+      }
+    }
+
     // ── 1. AUTO-START: Start tournaments whose start time has passed ──
     const { data: toStart } = await admin
       .from("tournaments")
