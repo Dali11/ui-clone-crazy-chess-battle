@@ -109,31 +109,31 @@ export default function LeagueRegistrationPopup() {
   const recMeta = rec ? TIER_META[rec.tier] || TIER_META[5] : null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-md bg-ccb-card border border-ccb-border rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
-        {/* Close button */}
-        <button
-          onClick={handleDismiss}
-          className="absolute top-3 right-3 z-10 text-ccb-muted hover:text-ccb-text p-1.5 rounded-lg hover:bg-ccb-surface transition-colors"
-          aria-label="Close"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Header banner */}
-        <div className="bg-gradient-to-br from-ccb-primary to-ccb-accent px-5 py-5">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-              <Crown className="w-6 h-6 text-white" />
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="relative w-full max-w-md max-h-[92vh] my-auto bg-ccb-card border border-ccb-border rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up">
+        {/* Header banner (fixed, doesn't scroll) */}
+        <div className="relative shrink-0 bg-gradient-to-br from-ccb-primary to-ccb-accent px-4 sm:px-5 py-4 sm:py-5 pr-11">
+          {/* Close button */}
+          <button
+            onClick={handleDismiss}
+            className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 z-20 text-white/90 hover:text-white p-1.5 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm shrink-0">
+              <Crown className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <div>
-              <h2 className="text-lg font-black text-white uppercase tracking-tight">Season 1 is Here!</h2>
-              <p className="text-xs text-white/80">5 Leagues. 12 Weeks. Free Entry.</p>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight leading-tight">Season 1 is Here!</h2>
+              <p className="text-[11px] sm:text-xs text-white/80">5 Leagues. 12 Weeks. Free Entry.</p>
             </div>
           </div>
         </div>
 
-        <div className="px-5 py-4 space-y-4">
+        {/* Scrollable body */}
+        <div className="overflow-y-auto px-4 sm:px-5 py-3.5 sm:py-4 space-y-3 sm:space-y-4">
           {/* Deadline urgency */}
           <div className="flex items-center gap-2 text-xs text-amber-500 dark:text-amber-400 font-semibold">
             <Clock className="w-4 h-4" />
