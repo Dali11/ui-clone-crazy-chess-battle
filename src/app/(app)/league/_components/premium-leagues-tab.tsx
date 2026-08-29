@@ -590,11 +590,13 @@ export default function PremiumLeaguesTab() {
                       <div className="text-center py-4">
                         <Trophy className="w-7 h-7 text-ccb-muted mx-auto mb-2" />
                         <p className="text-xs text-ccb-muted">
-                          {league.status === 'upcoming' ? 'League not started yet' : league.status === 'registration' ? 'No players registered yet' : 'No standings available'}
+                          {league.status === 'upcoming' ? 'League not started yet' :
+                           league.status === 'registration' ? (
+                             league.registrationCount > 0
+                               ? `${league.registrationCount} player${league.registrationCount === 1 ? '' : 's'} registered — season starts once we kick off`
+                               : 'No players registered yet — be the first!'
+                           ) : 'No standings available'}
                         </p>
-                        {league.status === 'registration' && league.registrationCount > 0 && (
-                          <p className="text-[10px] text-ccb-muted mt-1">{league.registrationCount} players registered</p>
-                        )}
                       </div>
                     )}
 
