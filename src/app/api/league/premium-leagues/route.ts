@@ -130,9 +130,9 @@ export async function GET(req: Request) {
               { id: 'account_age', label: `Account ${league.min_account_age_days || 0}+ days old`, done: accountAge >= (league.min_account_age_days || 0), required: (league.min_account_age_days || 0) > 0, action: null, actionLabel: null },
               {
                 id: 'rating',
-                label: league.max_rating ? `Rating ${league.min_rating || 0}\u2013${league.max_rating}` : `Min rating: ${league.min_rating || 0}`,
+                label: league.max_rating ? `Suggested rating ${league.min_rating || 0}\u2013${league.max_rating}` : `Suggested min rating: ${league.min_rating || 0}`,
                 done: (profile?.rating || 0) >= (league.min_rating || 0) && (!league.max_rating || (profile?.rating || 0) <= league.max_rating),
-                required: (league.min_rating || 0) > 0 || !!league.max_rating,
+                required: false, // Season 1: advisory only, players can join any tier
                 action: '/play', actionLabel: 'Play Rated Games',
               },
               { id: 'membership', label: 'Active membership', done: league.entry_type === 'membership' ? !!hasMembership : true, required: league.entry_type === 'membership', action: '/league/subscribe', actionLabel: 'Get Membership' },

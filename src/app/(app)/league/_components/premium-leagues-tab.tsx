@@ -336,6 +336,9 @@ export default function PremiumLeaguesTab() {
                         {league.status === 'registration' && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-ccb-success/10 text-ccb-success border border-ccb-success/30">OPEN</span>
                         )}
+                        {league.entry_type !== 'membership' && league.status === 'registration' && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-ccb-primary/10 text-ccb-primary">FREE</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-xs text-ccb-muted">
                         <span className="flex items-center gap-1"><Trophy className="w-3 h-3" /> {prizeFormatted}</span>

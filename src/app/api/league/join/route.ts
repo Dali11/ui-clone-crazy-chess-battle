@@ -75,20 +75,8 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Check rating requirements
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('rating')
-        .eq('id', user.id)
-        .single();
-      const rating = profile?.rating || 0;
-
-      if (league.min_rating && rating < league.min_rating) {
-        return NextResponse.json({ error: `Minimum rating of ${league.min_rating} required` }, { status: 403 });
-      }
-      if (league.max_rating && rating > league.max_rating) {
-        return NextResponse.json({ error: `Maximum rating of ${league.max_rating} required` }, { status: 403 });
-      }
+      // Season 1: rating bands are recommendations only — players can join any tier.
+      // The /league page shows a "Recommended" badge based on rating, but doesn't block.
 
       // Check gender restriction + identity verification
       if (league.gender_restriction && league.gender_restriction !== 'open') {
