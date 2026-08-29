@@ -106,7 +106,7 @@ export async function GET(req: Request) {
             ) : 0;
 
             const checklist = [
-              { id: 'profile_complete', label: 'Complete your profile', done: !!(profile?.full_name && profile?.display_name && profile?.country), required: true, action: '/settings', actionLabel: 'Edit Profile' },
+              { id: 'profile_complete', label: 'Complete your profile', done: !!(profile?.display_name && profile?.country), required: true, action: '/settings', actionLabel: 'Edit Profile' },
               { id: 'min_games', label: `Play ${league.min_games_played || 0} games`, done: (profile?.games_played || 0) >= (league.min_games_played || 0), required: (league.min_games_played || 0) > 0, action: '/play', actionLabel: 'Play Now' },
               { id: 'membership', label: 'Active membership', done: league.entry_type === 'membership' ? !!hasMembership : true, required: league.entry_type === 'membership', action: '/league/subscribe', actionLabel: 'Get Membership' },
             ];
@@ -126,8 +126,8 @@ export async function GET(req: Request) {
             ) : 0;
 
             const checklist = [
-              { id: 'profile_complete', label: 'Complete your profile', done: !!(profile?.full_name && profile?.display_name && profile?.country), required: true, action: '/settings', actionLabel: 'Edit Profile' },
-              { id: 'gender_selected', label: 'Select your gender', done: !!profile?.gender, required: true, action: '/settings', actionLabel: 'Set Gender' },
+              { id: 'profile_complete', label: 'Complete your profile', done: !!(profile?.display_name && profile?.country), required: true, action: '/settings', actionLabel: 'Edit Profile' },
+              { id: 'gender_selected', label: 'Select your gender', done: !!profile?.gender, required: !!(league.gender_restriction && league.gender_restriction !== 'open'), action: '/settings', actionLabel: 'Set Gender' },
               {
                 id: 'gender_requirement',
                 label: `Gender: ${league.gender_restriction || 'open'} division`,

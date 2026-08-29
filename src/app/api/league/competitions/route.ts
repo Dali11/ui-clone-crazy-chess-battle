@@ -90,8 +90,8 @@ export async function GET(request: NextRequest) {
           ) : 0;
 
           const checklist = [
-            { id: 'profile_complete', label: 'Complete your profile', done: !!(profile?.full_name && profile?.display_name && profile?.country), required: true, action: '/settings', actionLabel: 'Edit Profile' },
-            { id: 'gender_selected', label: 'Select your gender', done: !!profile?.gender, required: true, action: '/settings', actionLabel: 'Set Gender' },
+            { id: 'profile_complete', label: 'Complete your profile', done: !!(profile?.display_name && profile?.country), required: true, action: '/settings', actionLabel: 'Edit Profile' },
+            { id: 'gender_selected', label: 'Select your gender', done: !!profile?.gender, required: !!(league.gender_restriction && league.gender_restriction !== 'open'), action: '/settings', actionLabel: 'Set Gender' },
             {
               id: 'gender_requirement',
               label: `Gender: ${league.gender_restriction || 'open'} division`,
