@@ -335,10 +335,10 @@ export default function PremiumLeaguesTab() {
                             <Sparkles className="w-2.5 h-2.5" /> Recommended
                           </span>
                         )}
-                        <h3 className="font-bold text-sm truncate">{league.name}</h3>
+                        <h3 className="font-bold text-sm truncate flex-1 min-w-0">{league.name}</h3>
                       </div>
-                      {/* Single-line meta: players · prize · status — no wrapping */}
-                      <div className="flex items-center gap-2 mt-1 text-xs text-ccb-muted overflow-hidden whitespace-nowrap">
+                      {/* Meta: players · prize · status — wraps on small screens */}
+                      <div className="flex items-center gap-1.5 mt-1 text-[11px] text-ccb-muted flex-wrap">
                         <span className="flex items-center gap-0.5 shrink-0"><Users className="w-3 h-3" />{league.playerCount}{capacity > 0 ? `/${capacity}` : ''}</span>
                         <span className="text-ccb-border">|</span>
                         <span className="flex items-center gap-0.5 shrink-0"><Trophy className="w-3 h-3" />{prizeFormatted}</span>
@@ -456,7 +456,7 @@ export default function PremiumLeaguesTab() {
                         <Sparkles className="w-4 h-4 text-ccb-primary shrink-0 mt-0.5" />
                         <div>
                           <div className="text-xs font-bold text-ccb-primary">Join Anytime</div>
-                          <div className="text-[10px] text-ccb-muted mt-0.5">New players can join mid-season — you'll get fixtures for remaining matchdays and start with 0 points.</div>
+                          <div className="text-[10px] text-ccb-muted mt-0.5 leading-snug">New players can join mid-season — you'll get fixtures for remaining matchdays and start with 0 points.</div>
                         </div>
                       </div>
                     )}
