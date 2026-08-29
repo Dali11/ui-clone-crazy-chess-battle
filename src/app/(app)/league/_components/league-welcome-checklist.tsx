@@ -106,9 +106,9 @@ export default function LeagueWelcomeChecklist() {
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 animate-fade-in">
-      <div className="w-full max-w-md bg-ccb-card border border-ccb-border rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
+      <div className="w-full max-w-md bg-ccb-card border border-ccb-border rounded-2xl shadow-lg overflow-hidden animate-slide-up">
         {/* Header */}
-        <div className="relative bg-gradient-to-br from-ccb-primary to-ccb-accent px-5 py-4 pr-10">
+        <div className="relative bg-ccb-primary px-5 py-4 pr-10">
           <button
             onClick={handleDismiss}
             className="absolute top-3 right-3 text-white/90 hover:text-white p-1.5 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
@@ -184,7 +184,7 @@ export default function LeagueWelcomeChecklist() {
           {allDone ? (
             <button
               onClick={handleDismiss}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent hover:opacity-90 text-white text-sm font-bold px-4 py-3 transition-all"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-ccb-primary hover:opacity-90 text-white text-sm font-bold px-4 py-3 transition-all"
             >
               <Trophy className="w-4 h-4" />
               Browse Leagues

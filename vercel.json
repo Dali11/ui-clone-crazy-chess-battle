@@ -7,10 +7,6 @@
   },
   "crons": [
     {
-      "path": "/api/tournaments/daily-create",
-      "schedule": "0 22 * * *"
-    },
-    {
       "path": "/api/battles/challenge/cleanup-expired",
       "schedule": "0 0 * * *"
     },

@@ -136,7 +136,7 @@ export default function TournamentsPage() {
     <div className="space-y-6 pb-20 sm:pb-8">
 
       {/* HERO BANNER */}
-      <div className="relative overflow-hidden rounded-2xl border border-ccb-accent/20 bg-gradient-to-br from-ccb-accent/10 via-ccb-surface to-ccb-surface p-5 sm:p-6">
+      <div className="relative overflow-hidden rounded-2xl border border-ccb-border bg-ccb-card p-5 sm:p-6">
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-3">
             <span className="w-2 h-2 rounded-full bg-ccb-success animate-pulse" />
@@ -311,7 +311,7 @@ function TournamentCard({ competition, onJoin, joining }: { competition: Competi
           </div>
         ) : canJoin ? (
           <button onClick={() => onJoin(competition)} disabled={joining}
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-ccb-accent text-ccb-dark font-bold text-sm hover:bg-ccb-gold transition-all shadow-lg shadow-ccb-accent/20 disabled:opacity-50">
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-ccb-accent text-ccb-dark font-bold text-sm hover:bg-ccb-gold transition-all disabled:opacity-50">
             {joining ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />} Join Tournament
           </button>
         ) : (

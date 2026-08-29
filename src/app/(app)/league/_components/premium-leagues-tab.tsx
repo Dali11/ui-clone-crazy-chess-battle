@@ -103,11 +103,11 @@ interface PremiumCompetition {
 }
 
 const LEAGUE_META: Record<number, { color: string; bgColor: string; borderColor: string; icon: typeof Crown }> = {
-  1: { color: 'text-ccb-primary', bgColor: 'bg-ccb-primary/10', borderColor: 'border-ccb-primary/30', icon: Crown },
-  2: { color: 'text-ccb-accent', bgColor: 'bg-ccb-accent/10', borderColor: 'border-ccb-accent/30', icon: Trophy },
-  3: { color: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/30', icon: Medal },
-  4: { color: 'text-ccb-muted', bgColor: 'bg-ccb-muted/10', borderColor: 'border-ccb-muted/30', icon: Shield },
-  5: { color: 'text-ccb-success', bgColor: 'bg-ccb-success/10', borderColor: 'border-ccb-success/30', icon: Star },
+  1: { color: 'text-ccb-primary', bgColor: 'bg-ccb-surface', borderColor: 'border-ccb-border', icon: Crown },
+  2: { color: 'text-ccb-primary', bgColor: 'bg-ccb-surface', borderColor: 'border-ccb-border', icon: Trophy },
+  3: { color: 'text-ccb-primary', bgColor: 'bg-ccb-surface', borderColor: 'border-ccb-border', icon: Medal },
+  4: { color: 'text-ccb-muted', bgColor: 'bg-ccb-surface', borderColor: 'border-ccb-border', icon: Shield },
+  5: { color: 'text-ccb-muted', bgColor: 'bg-ccb-surface', borderColor: 'border-ccb-border', icon: Star },
 };
 
 function getLeagueMeta(tier: number) {
@@ -236,7 +236,7 @@ export default function PremiumLeaguesTab() {
     <div className="px-4 sm:px-6 lg:px-8 space-y-6">
       {/* MEMBERSHIP GATE */}
       {!hasMembership && hasMembershipGatedLeague && !loading && (
-        <div className="bg-gradient-to-br from-ccb-primary/10 to-ccb-accent/10 border border-ccb-primary/30 rounded-2xl p-5">
+        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-ccb-primary/20 border border-ccb-primary/30 flex items-center justify-center shrink-0">
               <Lock className="w-6 h-6 text-ccb-primary" />
@@ -248,7 +248,7 @@ export default function PremiumLeaguesTab() {
                 {formatMoney(data?.market?.membershipPrice || 1000000, symbol, fxRate)}/month
                 to access tiered leagues, prize pools, promotion/relegation, and exclusive competitions.
               </p>
-              <Link href="/league/subscribe" className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white text-xs font-bold shadow-lg shadow-ccb-primary/20">
+              <Link href="/league/subscribe" className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-ccb-primary text-white text-xs font-bold hover:opacity-90 transition-opacity">
                 <Crown className="w-4 h-4" /> Join the Club
               </Link>
             </div>
@@ -267,7 +267,7 @@ export default function PremiumLeaguesTab() {
               <span className={`text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${
                 i === 0 ? 'bg-ccb-accent/10 text-ccb-accent' :
                 i === 1 ? 'bg-ccb-primary/10 text-ccb-primary' :
-                i === arr.length - 1 ? 'bg-gradient-to-r from-ccb-primary to-ccb-accent text-white' :
+                i === arr.length - 1 ? 'bg-ccb-primary text-white' :
                 'bg-ccb-surface text-ccb-muted'
               }`}>
                 {step}
@@ -314,7 +314,7 @@ export default function PremiumLeaguesTab() {
               <div
                 key={league.id}
                 className={`bg-ccb-card border rounded-2xl overflow-hidden transition-all ${
-                  isExpanded ? `${meta.borderColor} shadow-xl` : 'border-ccb-border'
+                  isExpanded ? `${meta.borderColor}` : 'border-ccb-border'
                 }`}
               >
                 {/* ── COMPACT LEAGUE HEADER ── */}
@@ -370,7 +370,7 @@ export default function PremiumLeaguesTab() {
                             <CheckCircle className="w-3 h-3" /> In
                           </span>
                         ) : showRegisterBtn && league.status === 'registration' && !isFull ? (
-                          <span className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-ccb-primary to-ccb-accent text-white">
+                          <span className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-ccb-primary text-white">
                             Join
                           </span>
                         ) : league.status === 'registration' && isFull ? (
@@ -394,7 +394,7 @@ export default function PremiumLeaguesTab() {
                         </div>
                         <div className="h-2 rounded-full bg-ccb-surface overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-ccb-primary to-ccb-accent transition-all"
+                            className="h-full rounded-full bg-ccb-primary transition-all"
                             style={{ width: `${Math.min(100, (league.playerCount / capacity) * 100)}%` }}
                           />
                         </div>
@@ -410,7 +410,7 @@ export default function PremiumLeaguesTab() {
                         </div>
                         <div className="h-2 rounded-full bg-ccb-surface overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-ccb-primary to-ccb-accent transition-all"
+                            className="h-full rounded-full bg-ccb-primary transition-all"
                             style={{ width: `${Math.min(100, (league.current_matchday / league.total_matchdays) * 100)}%` }}
                           />
                         </div>
@@ -452,10 +452,10 @@ export default function PremiumLeaguesTab() {
 
                     {/* MID-SEASON JOIN INFO */}
                     {league.status === 'active' && (
-                      <div className="bg-ccb-primary/5 border border-ccb-primary/20 rounded-xl p-3 flex items-start gap-2">
-                        <Sparkles className="w-4 h-4 text-ccb-primary shrink-0 mt-0.5" />
+                      <div className="bg-ccb-surface border border-ccb-border rounded-xl p-3 flex items-start gap-2">
+                        <Sparkles className="w-4 h-4 text-ccb-muted shrink-0 mt-0.5" />
                         <div>
-                          <div className="text-xs font-bold text-ccb-primary">Join Anytime</div>
+                          <div className="text-xs font-bold text-ccb-text">Join Anytime</div>
                           <div className="text-[10px] text-ccb-muted mt-0.5 leading-snug">New players can join mid-season — you'll get fixtures for remaining matchdays and start with 0 points.</div>
                         </div>
                       </div>
@@ -505,7 +505,7 @@ export default function PremiumLeaguesTab() {
                           <button
                             onClick={() => handleRegister(league.id)}
                             disabled={registering === league.id}
-                            className="w-full py-3 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                            className="w-full py-3 rounded-xl bg-ccb-primary text-white font-bold text-sm hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                           >
                             {registering === league.id ? (
                               <><Loader2 className="w-4 h-4 animate-spin" /> Registering...</>
@@ -533,7 +533,7 @@ export default function PremiumLeaguesTab() {
                       <button
                         onClick={() => handleRegister(league.id)}
                         disabled={registering === league.id}
-                        className="w-full py-3 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="w-full py-3 rounded-xl bg-ccb-primary text-white font-bold text-sm hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         {registering === league.id ? (
                           <><Loader2 className="w-4 h-4 animate-spin" /> Joining...</>
@@ -647,9 +647,9 @@ export default function PremiumLeaguesTab() {
                     ...(comp.format?.knockoutRounds ? ['Knockouts', 'Semis', 'Final'] : []),
                   ];
               return (
-                <div key={comp.id} className="bg-gradient-to-br from-ccb-primary/10 to-ccb-accent/10 border border-ccb-primary/30 rounded-2xl p-4">
+                <div key={comp.id} className="bg-ccb-card border border-ccb-border rounded-2xl p-4">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-ccb-primary/20 border border-ccb-primary/30 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-ccb-surface flex items-center justify-center shrink-0">
                       <Icon className="w-5 h-5 text-ccb-primary" />
                     </div>
                     <div className="min-w-0">

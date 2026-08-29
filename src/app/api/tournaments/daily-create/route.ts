@@ -43,6 +43,8 @@ export async function POST(req: NextRequest) {
   return handleCreate(req);
 }
 export async function GET(req: NextRequest) {
+  // Disabled — no longer creating daily tournaments automatically
+  return NextResponse.json({ success: true, message: "Daily tournament creation is disabled" }, { status: 200 });
   return handleCreate(req);
 }
 
