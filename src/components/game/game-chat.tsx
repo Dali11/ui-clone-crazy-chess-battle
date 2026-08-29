@@ -87,6 +87,7 @@ export default function GameChat({ gameId, currentUserId, currentUserName, oppon
   }, [isVisible, onUnreadChange]);
 
   const sendMessage = useCallback((text: string) => {
+    if (isSpectator) return; // Spectators can read but not send
     const trimmed = text.trim();
     if (!trimmed || trimmed.length > 500) return;
 
@@ -114,7 +115,7 @@ export default function GameChat({ gameId, currentUserId, currentUserName, oppon
 
     setInput("");
     setShowQuick(false);
-  }, [currentUserId, currentUserName]);
+  }, [currentUserId, currentUserName, isSpectator]);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,7 +131,7 @@ export default function GameChat({ gameId, currentUserId, currentUserName, oppon
       >
         {messages.length === 0 ? (
           <div className="text-center text-xs text-ccb-muted py-4">
-            Say something to {opponentName || "your opponent"}...
+            {isSpectator ? "Spectating — chat is for players only." : `Say something to ${opponentName || "your opponent"}...`}
           </div>
         ) : (
           messages.map((msg, idx) => {
@@ -153,8 +154,8 @@ export default function GameChat({ gameId, currentUserId, currentUserName, oppon
         )}
       </div>
 
-      {/* Quick messages */}
-      {showQuick && (
+      {/* Quick messages — hidden for spectators */}
+      {showQuick && !isSpectator && (
         <div className="px-2 pb-1.5 flex flex-wrap gap-1">
           {QUICK_MESSAGES.map((q) => (
             <button
@@ -168,32 +169,39 @@ export default function GameChat({ gameId, currentUserId, currentUserName, oppon
         </div>
       )}
 
-      {/* Input */}
-      <form onSubmit={handleSend} className="flex items-center gap-1.5 p-2 border-t border-ccb-border shrink-0">
-        <button
-          type="button"
-          onClick={() => setShowQuick(!showQuick)}
-          className="shrink-0 text-ccb-muted hover:text-ccb-primary p-1.5 rounded-lg hover:bg-ccb-surface transition-colors"
-          title="Quick messages"
-        >
-          <Send className="w-4 h-4" />
-        </button>
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          maxLength={500}
-          placeholder="Type a message..."
-          className="flex-1 min-w-0 bg-ccb-surface border border-ccb-border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-ccb-primary"
-        />
-        <button
-          type="submit"
-          disabled={!input.trim()}
-          className="shrink-0 bg-ccb-primary text-white rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-40 hover:bg-ccb-primary/90 transition-colors"
-        >
-          Send
-        </button>
-      </form>
+      {/* Input — hidden for spectators */}
+      {isSpectator ? (
+        <div className="flex items-center justify-center gap-1.5 p-2 border-t border-ccb-border shrink-0 text-xs text-ccb-muted">
+          <Send className="w-3.5 h-3.5 opacity-50" />
+          Spectator mode — listen only
+        </div>
+      ) : (
+        <form onSubmit={handleSend} className="flex items-center gap-1.5 p-2 border-t border-ccb-border shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowQuick(!showQuick)}
+            className="shrink-0 text-ccb-muted hover:text-ccb-primary p-1.5 rounded-lg hover:bg-ccb-surface transition-colors"
+            title="Quick messages"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            maxLength={500}
+            placeholder="Type a message..."
+            className="flex-1 min-w-0 bg-ccb-surface border border-ccb-border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-ccb-primary"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim()}
+            className="shrink-0 bg-ccb-primary text-white rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-40 hover:bg-ccb-primary/90 transition-colors"
+          >
+            Send
+          </button>
+        </form>
+      )}
     </div>
   );
 }
