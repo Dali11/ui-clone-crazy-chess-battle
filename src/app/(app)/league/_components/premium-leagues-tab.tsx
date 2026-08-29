@@ -46,6 +46,7 @@ interface League {
   id: string;
   name: string;
   status: string;
+  entry_type: string;
   tier: number;
   gender_restriction: string;
   league_size: number;
@@ -224,11 +225,15 @@ export default function PremiumLeaguesTab() {
   const allLeagues = data?.leagues || [];
   const leagues = allLeagues.filter(l => l.gender_restriction === genderView);
   const hasMembership = data?.hasMembership || false;
+  // Only show the membership upsell if there's actually a membership-gated league
+  // the player hasn't unlocked yet. Season 1 leagues are all free entry, so this
+  // stays hidden until paid tiers exist — avoids contradicting "Free Entry" messaging.
+  const hasMembershipGatedLeague = allLeagues.some(l => l.entry_type === 'membership');
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 space-y-6">
       {/* MEMBERSHIP GATE */}
-      {!hasMembership && !loading && (
+      {!hasMembership && hasMembershipGatedLeague && !loading && (
         <div className="bg-gradient-to-br from-ccb-primary/10 to-ccb-accent/10 border border-ccb-primary/30 rounded-2xl p-5">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-ccb-primary/20 border border-ccb-primary/30 flex items-center justify-center shrink-0">
@@ -255,7 +260,7 @@ export default function PremiumLeaguesTab() {
           <Target className="w-3.5 h-3.5" /> Player Journey
         </h3>
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-          {['Open Tournaments', 'Premium', 'Open League', 'Amateur', 'Bronze', 'Championship', 'Premier', 'Champion'].map((step, i, arr) => (
+          {['Open Tournaments', 'Open League', 'Amateur', 'Bronze', 'Championship', 'Premier', 'Champion'].map((step, i, arr) => (
             <div key={step} className="flex items-center gap-1.5 shrink-0">
               <span className={`text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${
                 i === 0 ? 'bg-ccb-accent/10 text-ccb-accent' :

@@ -91,11 +91,11 @@ export default function LeagueRegistrationPopup() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to register");
 
-      setJoinMsg({ type: "success", msg: "You're registered! See you on the board." });
+      setJoinMsg({ type: "success", msg: "You're in! See you on the board." });
       // Auto-close after success
       setTimeout(() => {
         setVisible(false);
-      }, 2000);
+      }, 1800);
     } catch (e: any) {
       setJoinMsg({ type: "error", msg: e.message || "Registration failed" });
     } finally {
@@ -107,139 +107,86 @@ export default function LeagueRegistrationPopup() {
 
   const rec = data.recommended;
   const recMeta = rec ? TIER_META[rec.tier] || TIER_META[5] : null;
+  const RecIcon = recMeta?.icon || Crown;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="relative w-full max-w-md max-h-[92vh] my-auto bg-ccb-card border border-ccb-border rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up">
-        {/* Header banner (fixed, doesn't scroll) */}
-        <div className="relative shrink-0 bg-gradient-to-br from-ccb-primary to-ccb-accent px-4 sm:px-5 py-4 sm:py-5 pr-11">
-          {/* Close button */}
-          <button
-            onClick={handleDismiss}
-            className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 z-20 text-white/90 hover:text-white p-1.5 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm shrink-0">
-              <Crown className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight leading-tight">Season 1 is Here!</h2>
-              <p className="text-[11px] sm:text-xs text-white/80">5 Leagues. 12 Weeks. Free Entry.</p>
-            </div>
+    <div
+      className="fixed bottom-4 right-3 sm:bottom-5 sm:right-5 z-[120] w-[85vw] sm:w-[320px] max-w-[340px] max-h-[45vh] sm:max-h-[70vh]
+                 bg-ccb-card border border-ccb-border rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slide-up"
+    >
+      {/* Compact header */}
+      <div className="relative shrink-0 bg-gradient-to-br from-ccb-primary to-ccb-accent px-3.5 py-2.5 pr-9">
+        <button
+          onClick={handleDismiss}
+          className="absolute top-2 right-2 z-20 text-white/90 hover:text-white p-1 rounded-md bg-black/20 hover:bg-black/30 transition-colors"
+          aria-label="Close"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+        <div className="flex items-center gap-2">
+          <Crown className="w-4 h-4 text-white shrink-0" />
+          <div className="min-w-0">
+            <p className="text-xs font-black text-white uppercase tracking-tight leading-tight">Season 1</p>
+            <p className="text-[10px] text-white/80 leading-tight">Free Entry · Closes {data.deadline}</p>
           </div>
         </div>
+      </div>
 
-        {/* Scrollable body */}
-        <div className="overflow-y-auto px-4 sm:px-5 py-3.5 sm:py-4 space-y-3 sm:space-y-4">
-          {/* Deadline urgency */}
-          <div className="flex items-center gap-2 text-xs text-amber-500 dark:text-amber-400 font-semibold">
-            <Clock className="w-4 h-4" />
-            Registration closes {data.deadline}
-          </div>
-
-          {/* Recommended league */}
-          {rec && recMeta && (
-            <div className="bg-ccb-surface border border-ccb-border rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-4 h-4 text-ccb-primary" />
-                <span className="text-xs font-bold uppercase tracking-wide text-ccb-primary">Recommended for You</span>
+      {/* Compact body */}
+      <div className="overflow-y-auto px-3.5 py-3 space-y-2.5">
+        {rec && recMeta && (
+          <div className="bg-ccb-surface border border-ccb-border rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Sparkles className="w-3 h-3 text-ccb-primary shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-wide text-ccb-primary">For You</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${recMeta.bg}`}>
+                <RecIcon className={`w-3.5 h-3.5 ${recMeta.color}`} />
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-sm text-ccb-text">{rec.name}</p>
-                  <p className="text-xs text-ccb-muted mt-0.5">
-                    Rating {rec.minRating}+{rec.maxRating ? `–${rec.maxRating}` : ""} · You: {data.userRating}
-                  </p>
-                </div>
-                <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${recMeta.bg} ${recMeta.color}`}>
-                  Tier {rec.tier}
-                </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-xs text-ccb-text truncate">{rec.name}</p>
+                <p className="text-[10px] text-ccb-muted">
+                  {rec.minRating}+{rec.maxRating ? `–${rec.maxRating}` : ""} · You: {data.userRating}
+                </p>
               </div>
-              <button
-                onClick={() => handleJoin(rec.id)}
-                disabled={joining}
-                className="w-full mt-3 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-ccb-primary to-ccb-accent hover:opacity-90 text-white text-sm font-bold px-4 py-2.5 transition-all shadow-lg shadow-ccb-primary/20 disabled:opacity-50"
-              >
-                {joining ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Crown className="w-4 h-4" />
-                )}
-                Register Now
-              </button>
             </div>
-          )}
-
-          {/* All leagues list */}
-          <div>
-            <p className="text-xs font-semibold text-ccb-muted uppercase tracking-wide mb-2">
-              Or pick your league
-            </p>
-            <div className="space-y-1.5">
-              {data.leagues.map((league) => {
-                const meta = TIER_META[league.tier] || TIER_META[5];
-                const Icon = meta.icon;
-                const isRec = rec?.id === league.id;
-                return (
-                  <button
-                    key={league.id}
-                    onClick={() => handleJoin(league.id)}
-                    disabled={joining}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-lg border transition-colors disabled:opacity-50 ${
-                      isRec
-                        ? "border-ccb-primary/30 bg-ccb-primary/5"
-                        : "border-ccb-border hover:bg-ccb-surface"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${meta.bg}`}>
-                        <Icon className={`w-4 h-4 ${meta.color}`} />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-semibold text-ccb-text">{league.name}</p>
-                        <p className="text-[11px] text-ccb-muted">
-                          {league.minRating}+{league.maxRating ? `–${league.maxRating}` : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-ccb-muted" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Join message */}
-          {joinMsg && (
-            <div className={`text-sm font-medium text-center px-3 py-2 rounded-lg ${
-              joinMsg.type === "success"
-                ? "bg-ccb-success/10 text-ccb-success"
-                : "bg-destructive/10 text-destructive"
-            }`}>
-              {joinMsg.msg}
-            </div>
-          )}
-
-          {/* Footer */}
-          <div className="flex items-center justify-between pt-1">
-            <Link
-              href="/league"
-              onClick={handleDismiss}
-              className="text-xs text-ccb-muted hover:text-ccb-text font-medium underline"
-            >
-              Learn more about leagues
-            </Link>
             <button
-              onClick={handleDismiss}
-              className="text-xs text-ccb-muted hover:text-ccb-text font-medium"
+              onClick={() => handleJoin(rec.id)}
+              disabled={joining}
+              className="w-full mt-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-ccb-primary to-ccb-accent hover:opacity-90 text-white text-xs font-bold px-3 py-2 transition-all disabled:opacity-50"
             >
-              Remind me next week
+              {joining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Crown className="w-3.5 h-3.5" />}
+              Register Now
             </button>
           </div>
-        </div>
+        )}
+
+        {joinMsg && (
+          <div className={`text-xs font-medium text-center px-2.5 py-1.5 rounded-lg ${
+            joinMsg.type === "success"
+              ? "bg-ccb-success/10 text-ccb-success"
+              : "bg-destructive/10 text-destructive"
+          }`}>
+            {joinMsg.msg}
+          </div>
+        )}
+
+        <Link
+          href="/league"
+          onClick={handleDismiss}
+          className="flex items-center justify-between w-full text-xs font-semibold text-ccb-text hover:text-ccb-primary px-1 py-1"
+        >
+          <span>Not your tier? Pick any of the 5 leagues</span>
+          <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+        </Link>
+
+        <button
+          onClick={handleDismiss}
+          className="w-full text-center text-[10px] text-ccb-muted hover:text-ccb-text font-medium"
+        >
+          Remind me next week
+        </button>
       </div>
     </div>
   );
