@@ -29,18 +29,35 @@ export default function WelcomePopup() {
   const leagueRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    // Only show for authenticated users who haven't seen it
+    // Only show for users who haven't seen it AND have an account < 7 days old
     const seen = localStorage.getItem(WELCOME_SEEN_KEY);
     if (seen) return;
 
     const timer = setTimeout(async () => {
       try {
+        // Check if user profile exists and get account age
+        const profileRes = await fetch("/api/profile/me");
+        if (!profileRes.ok) return;
+        const profile = await profileRes.json();
+
+        // If account is older than 7 days, don't show welcome popup
+        if (profile.created_at) {
+          const accountAge = Date.now() - new Date(profile.created_at).getTime();
+          if (accountAge > 7 * 24 * 60 * 60 * 1000) {
+            // Mark as seen so we don't keep checking
+            try { localStorage.setItem(WELCOME_SEEN_KEY, Date.now().toString()); } catch {}
+            return;
+          }
+        }
+
+        // Get league recommendation
         const res = await fetch("/api/league/popup-status");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.recommended) {
-          setRecommendedLeague(data.recommended);
-          setUserRating(data.userRating || 1200);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.recommended) {
+            setRecommendedLeague(data.recommended);
+            setUserRating(data.userRating || 1200);
+          }
         }
         setVisible(true);
       } catch {
