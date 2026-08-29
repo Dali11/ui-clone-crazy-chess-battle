@@ -309,6 +309,7 @@ export default function PremiumLeaguesTab() {
             const showRegisterBtn = qual?.canJoin === true;
             const isRegistered = qual?.isRegistered;
             const isFull = capacity > 0 && league.playerCount >= capacity;
+            const myStanding = data?.userId ? standings.find((s) => s.player?.id === data.userId) || null : null;
 
             return (
               <div
@@ -322,22 +323,23 @@ export default function PremiumLeaguesTab() {
                   onClick={() => setExpandedLeague(isExpanded ? null : league.tier)}
                   className="w-full p-3.5 text-left"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <div className={`w-11 h-11 rounded-xl ${meta.bgColor} border ${meta.borderColor} flex items-center justify-center shrink-0`}>
                       <Icon className={`w-5.5 h-5.5 ${meta.color}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      {/* Title row: tier badge, name, status badges — all inline */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* Name gets its own full-width line so it never gets clipped to 1-2 letters */}
+                      <h3 className="font-bold text-sm leading-snug line-clamp-2">{league.name}</h3>
+                      {/* Tier + recommended badges */}
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${meta.bgColor} ${meta.color}`}>L{league.tier}</span>
                         {data?.recommendedTier === league.tier && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-primary/20 text-ccb-primary flex items-center gap-0.5">
                             <Sparkles className="w-2.5 h-2.5" /> Recommended
                           </span>
                         )}
-                        <h3 className="font-bold text-sm truncate flex-1 min-w-0">{league.name}</h3>
                       </div>
-                      {/* Meta: players · prize · status — wraps on small screens */}
+                      {/* Meta: players · prize · status/progress — wraps on small screens */}
                       <div className="flex items-center gap-1.5 mt-1 text-[11px] text-ccb-muted flex-wrap">
                         <span className="flex items-center gap-0.5 shrink-0"><Users className="w-3 h-3" />{league.playerCount}{capacity > 0 ? `/${capacity}` : ''}</span>
                         <span className="text-ccb-border">|</span>
@@ -348,10 +350,10 @@ export default function PremiumLeaguesTab() {
                             <span className="flex items-center gap-0.5 shrink-0 text-ccb-success font-medium">OPEN{isFull ? ' · FULL' : league.entry_type !== 'membership' ? ' · FREE' : ''}</span>
                           </>
                         )}
-                        {league.status === 'active' && (
+                        {league.status === 'active' && myStanding && (
                           <>
                             <span className="text-ccb-border">|</span>
-                            <span className="flex items-center gap-0.5 shrink-0 text-ccb-primary font-medium">MD {league.current_matchday}/{league.total_matchdays || '?'}</span>
+                            <span className="flex items-center gap-0.5 shrink-0 text-ccb-primary font-medium">#{myStanding.position} · {myStanding.points}pts</span>
                           </>
                         )}
                         {league.status === 'completed' && (
@@ -361,24 +363,50 @@ export default function PremiumLeaguesTab() {
                           </>
                         )}
                       </div>
+                      {/* In-progress season bar — replaces "Join" clutter once matches are underway */}
+                      {league.status === 'active' && league.total_matchdays > 0 && (
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between text-[10px] text-ccb-muted mb-1">
+                            <span>Matchday {league.current_matchday} of {league.total_matchdays}</span>
+                            {myStanding && <span className="font-medium text-ccb-text">Rank #{myStanding.position}</span>}
+                          </div>
+                          <div className="h-1.5 rounded-full bg-ccb-surface overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-ccb-primary transition-all"
+                              style={{ width: `${Math.min(100, (league.current_matchday / league.total_matchdays) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {/* Register/Registering status on collapsed card */}
+                    {/* Register/Registering status on collapsed card — only during registration */}
                     {!isExpanded && (
-                      <div className="shrink-0">
-                        {isRegistered ? (
-                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-success/10 text-ccb-success flex items-center gap-1">
+                      <div className="shrink-0 flex flex-col items-end gap-1">
+                        {league.status === 'active' && isRegistered ? (
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-success/10 text-ccb-success flex items-center gap-1 whitespace-nowrap">
+                            <CheckCircle className="w-3 h-3" /> Playing
+                          </span>
+                        ) : isRegistered ? (
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-success/10 text-ccb-success flex items-center gap-1 whitespace-nowrap">
                             <CheckCircle className="w-3 h-3" /> In
                           </span>
                         ) : showRegisterBtn && league.status === 'registration' && !isFull ? (
-                          <span className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-ccb-primary text-white">
+                          <span className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-ccb-primary text-white whitespace-nowrap">
+                            Join
+                          </span>
+                        ) : showRegisterBtn && league.status === 'active' && !isFull ? (
+                          <span className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-text whitespace-nowrap">
                             Join
                           </span>
                         ) : league.status === 'registration' && isFull ? (
-                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">Full</span>
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted whitespace-nowrap">Full</span>
                         ) : null}
+                        <ChevronRight className={`w-5 h-5 text-ccb-muted shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                       </div>
                     )}
-                    <ChevronRight className={`w-5 h-5 text-ccb-muted shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                    {isExpanded && (
+                      <ChevronRight className="w-5 h-5 text-ccb-muted shrink-0 transition-transform rotate-90 mt-1" />
+                    )}
                   </div>
                 </button>
 
