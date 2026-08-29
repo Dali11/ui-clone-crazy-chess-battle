@@ -61,17 +61,8 @@ export async function GET() {
     return NextResponse.json({ active: false });
   }
 
-  // It's the player's turn if:
-  // - game.turn matches their color, OR
-  // - move_count is 0 (white's turn, game just started)
-  const isWhite = game.white_player_id === user.id;
-  const isBlack = game.black_player_id === user.id;
-  const myTurn = (game.turn === "white" && isWhite) || (game.turn === "black" && isBlack);
-
-  if (!myTurn) {
-    return NextResponse.json({ active: false });
-  }
-
+  // Redirect regardless of whose turn it is — the player should always
+  // be taken to their tournament game until they resign or the game ends.
   return NextResponse.json({
     active: true,
     gameId: game.id,

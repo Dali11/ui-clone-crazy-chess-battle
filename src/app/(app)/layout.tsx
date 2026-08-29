@@ -7,6 +7,7 @@ import ActiveTournamentWatcher from "@/components/layout/active-tournament-watch
 import TournamentPopup from "@/components/layout/tournament-popup";
 import OpenMatchBanner from "@/components/layout/open-match-banner";
 import LeagueRegistrationPopup from "@/components/layout/league-registration-popup";
+import ActiveGameRedirect from "@/components/layout/active-game-redirect";
 
 
 export const metadata: Metadata = {
@@ -37,6 +38,7 @@ export default async function AppLayout({
       <TournamentPopup />
       <OpenMatchBanner />
       <LeagueRegistrationPopup />
+      <ActiveGameRedirect />
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {children}
       </main>

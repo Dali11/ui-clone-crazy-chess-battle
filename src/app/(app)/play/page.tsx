@@ -24,39 +24,19 @@ export default async function PlayPage() {
 
   if (user) {
     const admin = createAdminClient();
-    const { data: activeTournaments } = await admin
-      .from("tournament_participants")
-      .select("tournament_id")
-      .eq("player_id", user.id)
-      .eq("eliminated", false);
+    // Redirect to ANY active game — free play, battle, tournament, or league.
+    // No turn restriction — like chess.com, you go to your game until it's done.
+    const { data: activeGame } = await admin
+      .from("games")
+      .select("id, status")
+      .eq("status", "playing")
+      .or(`white_player_id.eq.${user.id},black_player_id.eq.${user.id}`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (activeTournaments && activeTournaments.length > 0) {
-      const tournamentIds = activeTournaments.map((t) => t.tournament_id);
-      const { data: activeGame } = await admin
-        .from("games")
-        .select("id, tournament_id, status, turn, white_player_id, black_player_id")
-        .in("tournament_id", tournamentIds)
-        .eq("status", "playing")
-        .or(`white_player_id.eq.${user.id},black_player_id.eq.${user.id}`)
-        .limit(1)
-        .maybeSingle();
-
-      if (activeGame) {
-        const { data: tournament } = await admin
-          .from("tournaments")
-          .select("status")
-          .eq("id", activeGame.tournament_id)
-          .single();
-
-        if (tournament?.status === "active") {
-          const isWhite = activeGame.white_player_id === user.id;
-          const isBlack = activeGame.black_player_id === user.id;
-          const myTurn = (activeGame.turn === "white" && isWhite) || (activeGame.turn === "black" && isBlack);
-          if (myTurn) {
-            redirect(`/game/${activeGame.id}`);
-          }
-        }
-      }
+    if (activeGame) {
+      redirect(`/game/${activeGame.id}`);
     }
   }
 
