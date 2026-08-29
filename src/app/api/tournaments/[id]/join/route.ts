@@ -218,13 +218,6 @@ export async function POST(
       return NextResponse.json({ error: joinErr.message }, { status: 500 });
     }
 
-    // Trigger referral activation for joining a tournament (non-fatal)
-    const { error: refErr } = await admin.rpc("check_referral_activation", {
-      p_user_id: user.id,
-      p_action: "tournament",
-    });
-    if (refErr) console.error("Referral activation failed:", refErr);
-
     return NextResponse.json({ success: true, message: "Successfully joined tournament" });
   } catch (error: any) {
     console.error("Join tournament error:", error);

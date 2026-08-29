@@ -85,11 +85,6 @@ export async function POST(req: NextRequest) {
         .update({ status: "success", updated_at: new Date().toISOString() })
         .eq("id", deposit.id);
 
-      // Trigger referral activation
-      try {
-        await admin.rpc("check_referral_activation", { p_user_id: user.id, p_action: "deposit" });
-      } catch {}
-
       // Notify user
       const amountMWK = deposit.amount;
       try {

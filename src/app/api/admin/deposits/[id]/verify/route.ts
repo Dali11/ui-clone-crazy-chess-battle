@@ -64,11 +64,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           .update({ status: "success", updated_at: new Date().toISOString() })
           .eq("id", id);
 
-        // Trigger referral activation
-        try {
-          await admin.rpc("check_referral_activation", { p_user_id: deposit.user_id, p_action: "deposit" });
-        } catch {}
-
         const amountMWK = deposit.amount;
         try {
           await admin.from("notifications").insert({

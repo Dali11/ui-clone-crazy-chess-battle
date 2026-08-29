@@ -50,11 +50,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       p_amount: deposit.amount,
     });
 
-    // Trigger referral activation
-    try {
-      await admin.rpc("check_referral_activation", { p_user_id: deposit.user_id, p_action: "deposit" });
-    } catch {}
-
     // Log action
     try {
       await admin.from("admin_logs").insert({

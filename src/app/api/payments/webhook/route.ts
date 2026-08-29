@@ -114,8 +114,6 @@ export async function POST(req: NextRequest) {
         .update({ status: "success", updated_at: new Date().toISOString() })
         .eq("id", deposit.id);
 
-      // Trigger referral activation for wallet top-up
-      await admin.rpc("check_referral_activation", { p_user_id: deposit.user_id, p_action: "wallet_topup" });
     } else if (status === "failed" || status === "cancelled") {
       await admin
         .from("deposits")

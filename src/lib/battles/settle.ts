@@ -54,13 +54,6 @@ export async function settleBattle(
       await admin.rpc("credit_wallet", { p_user_id: battle.white_player_id, p_amount: battle.stake });
       await admin.rpc("credit_wallet", { p_user_id: battle.black_player_id, p_amount: battle.stake });
 
-      try {
-        await admin.rpc("check_referral_activation", { p_user_id: battle.white_player_id, p_action: "battle" });
-        await admin.rpc("check_referral_activation", { p_user_id: battle.black_player_id, p_action: "battle" });
-      } catch (e) {
-        console.error("Referral activation failed:", e);
-      }
-
       await admin
         .from("battle_escrow")
         .update({ status: "refunded", released_at: new Date().toISOString() })
@@ -155,13 +148,6 @@ export async function settleBattle(
     .from("battle_escrow")
     .update({ status: "released", released_at: new Date().toISOString() })
     .eq("battle_id", battleId);
-
-  try {
-    await admin.rpc("check_referral_activation", { p_user_id: battle.white_player_id, p_action: "battle" });
-    await admin.rpc("check_referral_activation", { p_user_id: battle.black_player_id, p_action: "battle" });
-  } catch (e) {
-    console.error("Referral activation failed:", e);
-  }
 
   return { settled: true, winnerId, payout, result: result || "win" };
 }

@@ -90,5 +90,17 @@ export async function activateMembership(
     });
   } catch {}
 
+  // ─── Trigger affiliate referral reward ──────────────────────────
+  // The only activation condition: the referred user purchases a
+  // membership subscription.  MK500 is credited to the referrer's wallet.
+  try {
+    await admin.rpc("check_referral_activation", {
+      p_user_id: userId,
+      p_action: "membership_purchase",
+    });
+  } catch (refErr) {
+    console.error("Referral activation (membership) failed:", refErr);
+  }
+
   return membership;
 }
