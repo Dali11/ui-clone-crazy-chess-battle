@@ -102,7 +102,12 @@ export async function PATCH(req: NextRequest) {
         if (body[field] !== undefined) {
           // Convert numeric fields
           if (["initial_minutes", "increment_seconds", "max_players", "min_rating", "max_rating", "rounds", "duration_minutes", "entry_fee", "prize_pool", "creator_profit_percent"].includes(field)) {
-            updates[field] = body[field] === null ? null : Number(body[field]);
+            const numVal = body[field] === null ? null : Number(body[field]);
+            // Cap entry fee at MK5000
+            if (field === "entry_fee" && numVal !== null && numVal > 5000) {
+              return NextResponse.json({ error: "Entry fee cannot exceed MK 5,000" }, { status: 400 });
+            }
+            updates[field] = numVal;
           } else {
             updates[field] = body[field];
           }

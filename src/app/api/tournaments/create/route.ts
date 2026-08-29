@@ -29,6 +29,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tournament name and start time are required" }, { status: 400 });
     }
 
+    // Cap entry fee at MK5000
+    const fee = Number(entryFee || 0);
+    if (fee > 5000) {
+      return NextResponse.json({ error: "Entry fee cannot exceed MK 5,000" }, { status: 400 });
+    }
+
     const admin = createAdminClient();
 
     // ─── Load platform config ──────────────────────────────────────────

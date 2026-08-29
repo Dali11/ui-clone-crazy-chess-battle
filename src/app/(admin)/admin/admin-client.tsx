@@ -2008,7 +2008,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Entry Fee (MK)</label>
-                          <input type="number" value={createForm.entry_fee ?? 0} onChange={(e) => setCreateForm({ ...createForm, entry_fee: e.target.value })} className="input-field mt-1 w-full" placeholder="0 = free" />
+                          <input type="number" min={0} max={5000} value={createForm.entry_fee ?? 0} onChange={(e) => setCreateForm({ ...createForm, entry_fee: Math.min(Number(e.target.value), 5000) })} className="input-field mt-1 w-full" placeholder="0 = free" />
+                            <p className="text-[10px] text-ccb-muted mt-1">Max MK 5,000</p>
                         </div>
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Creator Profit %</label>
@@ -2429,7 +2430,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Entry Fee (MK)</label>
-                          <input type="number" value={editForm.entry_fee ?? 0} onChange={(e) => setEditForm({ ...editForm, entry_fee: e.target.value })} className="input-field mt-1 w-full" />
+                          <input type="number" min={0} max={5000} value={editForm.entry_fee ?? 0} onChange={(e) => setEditForm({ ...editForm, entry_fee: Math.min(Number(e.target.value), 5000) })} className="input-field mt-1 w-full" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Prize Pool (MK)</label>
