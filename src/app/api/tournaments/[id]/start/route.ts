@@ -305,7 +305,7 @@ export async function POST(
       status: "waiting",
       time_control: tournament.time_control,
       initial_minutes: tournament.initial_minutes,
-      increment_seconds: tournament.increment_seconds,
+      increment_seconds: tournament.increment_seconds || 5,
       rated: false,
       tournament_id: tournamentId,
       tournament_round: 1,

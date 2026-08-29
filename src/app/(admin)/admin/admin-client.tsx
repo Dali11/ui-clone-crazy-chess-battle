@@ -827,8 +827,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           description: createForm.description || "",
           type: createForm.type || "swiss",
           timeControl: createForm.time_control || "blitz",
-          initialMinutes: Number(createForm.initial_minutes) || 5,
-          incrementSeconds: Number(createForm.increment_seconds) || 0,
+          initialMinutes: Number(createForm.initial_minutes) || 10,
+          incrementSeconds: Number(createForm.increment_seconds) || 5,
           maxPlayers: createForm.max_players ? Number(createForm.max_players) : null,
           minPlayers: Number(createForm.min_players) || 2,
           rounds: createForm.rounds ? Number(createForm.rounds) : null,
@@ -1979,11 +1979,11 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Initial Minutes</label>
-                          <input type="number" value={createForm.initial_minutes ?? 5} onChange={(e) => setCreateForm({ ...createForm, initial_minutes: e.target.value })} className="input-field mt-1 w-full" />
+                          <input type="number" value={createForm.initial_minutes ?? 10} onChange={(e) => setCreateForm({ ...createForm, initial_minutes: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                         <div>
                           <label className="text-xs font-medium text-ccb-muted">Increment (sec)</label>
-                          <input type="number" value={createForm.increment_seconds ?? 0} onChange={(e) => setCreateForm({ ...createForm, increment_seconds: e.target.value })} className="input-field mt-1 w-full" />
+                          <input type="number" value={createForm.increment_seconds ?? 5} onChange={(e) => setCreateForm({ ...createForm, increment_seconds: e.target.value })} className="input-field mt-1 w-full" />
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">

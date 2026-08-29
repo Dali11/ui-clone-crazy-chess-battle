@@ -111,11 +111,11 @@ async function handleCreate(req: NextRequest) {
       .from("tournaments")
       .insert({
         name: tournamentName,
-        description: `Daily ${tournamentName} — 5-round Swiss rapid. MK500 entry. Prize pool from entries.`,
+        description: `Daily ${tournamentName} — 5-round Swiss rapid 10+5. MK500 entry. Prize pool from entries.`,
         type: "swiss",
         time_control: "rapid",
         initial_minutes: 10,
-        increment_seconds: 0,
+        increment_seconds: 5,
         max_players: 128,
         min_players: 6,
         rounds: 5,

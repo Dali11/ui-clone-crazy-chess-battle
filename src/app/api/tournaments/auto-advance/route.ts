@@ -161,7 +161,7 @@ async function handleAutoAdvance(req: NextRequest) {
           status: "waiting",
           time_control: tournament.time_control,
           initial_minutes: tournament.initial_minutes,
-          increment_seconds: tournament.increment_seconds,
+          increment_seconds: tournament.increment_seconds || 5,
           rated: false,
           tournament_id: tournament.id,
           tournament_round: nextRound,
