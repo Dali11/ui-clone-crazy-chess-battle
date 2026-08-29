@@ -99,6 +99,25 @@ export async function GET(req: Request) {
             qualification = { canJoin: false, reason: 'already_registered', isRegistered: true, checklist: null, regStatus: existingReg.status };
           } else if (league.status === 'completed') {
             qualification = { canJoin: false, reason: 'completed', isRegistered: false, checklist: null, regStatus: null };
+          } else if (league.status === 'active') {
+            // ── Mid-season join: allow it with same requirements, but no deadline check ──
+            const accountAge = profile ? Math.floor(
+              (Date.now() - new Date(profile.account_created_at || profile.created_at || Date.now()).getTime()) / (1000 * 60 * 60 * 24)
+            ) : 0;
+
+            const checklist = [
+              { id: 'profile_complete', label: 'Complete your profile', done: !!(profile?.full_name && profile?.display_name && profile?.country), required: true, action: '/settings', actionLabel: 'Edit Profile' },
+              { id: 'min_games', label: `Play ${league.min_games_played || 0} games`, done: (profile?.games_played || 0) >= (league.min_games_played || 0), required: (league.min_games_played || 0) > 0, action: '/play', actionLabel: 'Play Now' },
+              { id: 'membership', label: 'Active membership', done: league.entry_type === 'membership' ? !!hasMembership : true, required: league.entry_type === 'membership', action: '/league/subscribe', actionLabel: 'Get Membership' },
+            ];
+
+            const allRequiredMet = checklist.filter((c: any) => c.required).every((c: any) => c.done);
+
+            if (!allRequiredMet) {
+              qualification = { canJoin: false, reason: 'requirements_not_met', isRegistered: false, checklist, regStatus: null };
+            } else {
+              qualification = { canJoin: true, reason: null, isRegistered: false, checklist, regStatus: null };
+            }
           } else if (league.status !== 'registration') {
             qualification = { canJoin: false, reason: 'not_registration_phase', isRegistered: false, checklist: null, regStatus: null };
           } else {

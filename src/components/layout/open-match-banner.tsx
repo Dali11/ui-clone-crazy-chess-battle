@@ -130,77 +130,81 @@ export default function OpenMatchBanner() {
       )}
 
       {/* Banner container */}
-      <div className="fixed bottom-20 sm:bottom-4 left-1/2 -translate-x-1/2 z-[55] w-[92vw] max-w-md space-y-2">
-        {visible.map((match) => (
-          <div
-            key={match.id}
-            className="flex items-center gap-3 p-3 rounded-xl bg-ccb-card border border-ccb-primary/30 shadow-lg shadow-ccb-primary/10 backdrop-blur-sm animate-slide-up"
-          >
-            {/* Avatar / Icon */}
-            {match.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={match.avatarUrl}
-                alt={match.playerName}
-                className="w-10 h-10 rounded-full object-cover shrink-0"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-ccb-primary/15 flex items-center justify-center shrink-0">
-                {match.type === "battle" ? (
-                  <Trophy className="w-5 h-5 text-ccb-primary" />
-                ) : (
-                  <Zap className="w-5 h-5 text-ccb-primary" />
-                )}
-              </div>
-            )}
+      <div className="fixed bottom-20 sm:bottom-4 left-1/2 -translate-x-1/2 z-[55] w-[92vw] max-w-md space-y-1.5">
+        {visible.map((match) => {
+          const waitSecs = match.type === "battle"
+            ? Math.floor((Date.now() - new Date(match.createdAt || match.joinedAt || Date.now()).getTime()) / 1000)
+            : Math.floor((Date.now() - new Date(match.joinedAt || Date.now()).getTime()) / 1000);
+          const waitLabel = waitSecs < 60 ? `${waitSecs}s` : `${Math.floor(waitSecs / 60)}m`;
+          const initials = match.playerName.slice(0, 2).toUpperCase();
+          const meta = match.type === "battle"
+            ? `MK ${match.stake?.toLocaleString()} · ${match.timeControlLabel}`
+            : `${match.timeControlLabel}${match.rated ? " · Ranked" : ""}`;
 
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-sm text-foreground truncate">{match.playerName}</span>
-                <span className="text-xs text-ccb-muted shrink-0">({match.playerRating})</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-ccb-muted">
-                {match.type === "battle" ? (
-                  <>
-                    <Trophy className="w-3 h-3 text-ccb-accent" />
-                    <span className="font-medium text-ccb-accent">MK {match.stake?.toLocaleString()}</span>
-                    <span>·</span>
-                    <span>{match.timeControlLabel}</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-3 h-3" />
-                    <span>{match.timeControlLabel}</span>
-                    {match.rated && <><span>·</span><span>Ranked</span></>}
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Accept button */}
-            <button
-              onClick={() => handleAccept(match)}
-              disabled={accepting === match.id}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ccb-primary text-white text-sm font-semibold hover:bg-ccb-primary/90 transition-colors disabled:opacity-50 shrink-0"
+          return (
+            <div
+              key={match.id}
+              className="flex items-center gap-2.5 p-2.5 rounded-xl bg-ccb-card border border-ccb-primary/30 shadow-lg shadow-ccb-primary/10 backdrop-blur-sm animate-slide-up"
             >
-              {accepting === match.id ? (
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              {/* Avatar / Initials */}
+              {match.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={match.avatarUrl}
+                  alt={match.playerName}
+                  className="w-9 h-9 rounded-full object-cover shrink-0"
+                />
               ) : (
-                <Swords className="w-4 h-4" />
+                <div className="w-9 h-9 rounded-full bg-ccb-primary/15 flex items-center justify-center shrink-0">
+                  {match.type === "battle" ? (
+                    <Trophy className="w-4 h-4 text-ccb-primary" />
+                  ) : (
+                    <span className="text-[11px] font-bold text-ccb-primary">{initials}</span>
+                  )}
+                </div>
               )}
-              {accepting === match.id ? "..." : "Accept"}
-            </button>
 
-            {/* Dismiss */}
-            <button
-              onClick={() => handleDismiss(match.id)}
-              className="p-1 rounded-lg text-ccb-muted hover:text-foreground hover:bg-ccb-surface transition-colors shrink-0"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
+              {/* Info — compact, single-line meta */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-sm text-foreground truncate">{match.playerName}</span>
+                  <span className="text-xs text-ccb-muted shrink-0">({match.playerRating})</span>
+                  <span className="text-[10px] text-ccb-muted/70 shrink-0 ml-auto">{waitLabel}</span>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-ccb-muted truncate">
+                  {match.type === "battle" ? (
+                    <Trophy className="w-3 h-3 text-ccb-accent shrink-0" />
+                  ) : (
+                    <Zap className="w-3 h-3 shrink-0" />
+                  )}
+                  <span className={`truncate ${match.type === "battle" ? "font-medium text-ccb-accent" : ""}`}>{meta}</span>
+                </div>
+              </div>
+
+              {/* Accept button */}
+              <button
+                onClick={() => handleAccept(match)}
+                disabled={accepting === match.id}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-ccb-primary text-white text-sm font-semibold hover:bg-ccb-primary/90 transition-colors disabled:opacity-50 shrink-0"
+              >
+                {accepting === match.id ? (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Swords className="w-4 h-4" />
+                )}
+                {accepting === match.id ? "" : "Accept"}
+              </button>
+
+              {/* Dismiss */}
+              <button
+                onClick={() => handleDismiss(match.id)}
+                className="p-1 rounded-lg text-ccb-muted hover:text-foreground hover:bg-ccb-surface transition-colors shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          );
+        })}
 
         {/* "More" indicator */}
         {matches.length > 3 && (

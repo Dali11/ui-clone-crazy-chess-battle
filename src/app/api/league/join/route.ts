@@ -30,9 +30,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'League not found' }, { status: 404 });
       }
 
-      if (league.status !== 'registration') {
-        return NextResponse.json({ error: 'Registration is not open for this league' }, { status: 400 });
+      // Allow registration during 'registration' phase OR mid-season join during 'active'
+      if (league.status !== 'registration' && league.status !== 'active') {
+        return NextResponse.json({ error: 'This league is not accepting new players' }, { status: 400 });
       }
+      const isMidSeasonJoin = league.status === 'active';
 
       // Check if already a player
       if (league.player_ids?.includes(user.id)) {
@@ -121,7 +123,7 @@ export async function POST(request: NextRequest) {
           player_id: user.id,
           status: 'approved', // Auto-approve for now if all checks pass
           qualified: true,
-          qualification_reason: 'met_all_requirements',
+          qualification_reason: isMidSeasonJoin ? 'mid_season_join' : 'met_all_requirements',
           registered_at: new Date().toISOString(),
         });
 
@@ -134,6 +136,91 @@ export async function POST(request: NextRequest) {
         .from('premier_leagues')
         .update({ player_ids: updatedPlayerIds, updated_at: new Date().toISOString() })
         .eq('id', leagueId);
+
+      // ── MID-SEASON JOIN: generate fixtures for remaining matchdays ──
+      if (isMidSeasonJoin) {
+        const currentMatchday = league.current_matchday || 1;
+        const totalMatchdays = league.total_matchdays || 0;
+
+        // Get existing fixtures to find which matchdays still have pending games
+        const { data: existingFixtures } = await admin
+          .from('league_fixtures')
+          .select('matchday, home_player_id, away_player_id, played')
+          .eq('league_id', leagueId)
+          .order('matchday', { ascending: true });
+
+        // Build a set of existing fixture keys (player pair per matchday)
+        const existingPairs = new Set<string>();
+        for (const f of existingFixtures || []) {
+          existingPairs.add(`${f.matchday}:${f.home_player_id}:${f.away_player_id}`);
+          existingPairs.add(`${f.matchday}:${f.away_player_id}:${f.home_player_id}`);
+        }
+
+        // Get all current player IDs (including the new joiner)
+        const allPlayers = updatedPlayerIds;
+
+        // Generate new fixtures: new player vs each existing player, for matchdays >= current
+        // Only for matchdays that haven't been fully played yet
+        const newFixtures: any[] = [];
+        for (let md = currentMatchday; md <= totalMatchdays; md++) {
+          // Check if this matchday has any unplayed fixtures (still active)
+          const mdFixtures = (existingFixtures || []).filter(f => f.matchday === md);
+          const hasUnplayed = mdFixtures.some(f => !f.played);
+          if (!hasUnplayed && mdFixtures.length > 0) continue; // matchday already done
+
+          for (const opponentId of allPlayers) {
+            if (opponentId === user.id) continue;
+            const key = `${md}:${user.id}:${opponentId}`;
+            if (existingPairs.has(key)) continue;
+
+            // Alternate home/away by matchday for fairness
+            const isHome = (md + allPlayers.indexOf(opponentId)) % 2 === 0;
+            newFixtures.push({
+              league_id: leagueId,
+              matchday: md,
+              home_player_id: isHome ? user.id : opponentId,
+              away_player_id: isHome ? opponentId : user.id,
+              result: 'pending',
+              played: false,
+            });
+          }
+        }
+
+        if (newFixtures.length > 0) {
+          const { error: fixtureErr } = await admin
+            .from('league_fixtures')
+            .insert(newFixtures);
+          if (fixtureErr) console.error('Mid-season fixture generation failed:', fixtureErr);
+        }
+
+        // Create standings entry for the new player (0 points, 0 games)
+        const { error: standingsErr } = await admin
+          .from('league_standings')
+          .insert({
+            league_id: leagueId,
+            player_id: user.id,
+            position: 0,
+            previous_position: 0,
+            played: 0,
+            wins: 0,
+            draws: 0,
+            losses: 0,
+            points: 0,
+            form: [],
+          });
+        if (standingsErr) console.error('Standings entry creation failed:', standingsErr);
+
+        // Recalculate standings to position the new player at the bottom
+        const { recalcStandings } = await import('@/lib/league/engine');
+        await recalcStandings(admin as any, leagueId);
+
+        return NextResponse.json({
+          success: true,
+          message: 'Joined mid-season! Your remaining fixtures have been scheduled.',
+          midSeason: true,
+          fixturesAdded: newFixtures.length,
+        });
+      }
 
       return NextResponse.json({ success: true, message: 'Successfully joined the league!' });
     }

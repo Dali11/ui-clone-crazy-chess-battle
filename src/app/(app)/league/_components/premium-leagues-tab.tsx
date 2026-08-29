@@ -291,8 +291,13 @@ export default function PremiumLeaguesTab() {
             <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Retry
           </button>
         </div>
+      ) : leagues.length === 0 ? (
+        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-8 text-center">
+          <AlertCircle className="w-8 h-8 text-ccb-muted mx-auto mb-3" />
+          <p className="text-sm text-ccb-muted">No leagues available right now.</p>
+        </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {leagues.map((league) => {
             const meta = getLeagueMeta(league.tier);
             const Icon = meta.icon;
@@ -303,6 +308,7 @@ export default function PremiumLeaguesTab() {
             const qual = league.qualification;
             const showRegisterBtn = qual?.canJoin === true;
             const isRegistered = qual?.isRegistered;
+            const isFull = capacity > 0 && league.playerCount >= capacity;
 
             return (
               <div
@@ -311,105 +317,154 @@ export default function PremiumLeaguesTab() {
                   isExpanded ? `${meta.borderColor} shadow-xl` : 'border-ccb-border'
                 }`}
               >
-                {/* LEAGUE HEADER */}
+                {/* ── COMPACT LEAGUE HEADER ── */}
                 <button
                   onClick={() => setExpandedLeague(isExpanded ? null : league.tier)}
-                  className="w-full p-4 text-left"
+                  className="w-full p-3.5 text-left"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl ${meta.bgColor} border ${meta.borderColor} flex items-center justify-center shrink-0`}>
-                      <Icon className={`w-6 h-6 ${meta.color}`} />
+                  <div className="flex items-center gap-3">
+                    <div className={`w-11 h-11 rounded-xl ${meta.bgColor} border ${meta.borderColor} flex items-center justify-center shrink-0`}>
+                      <Icon className={`w-5.5 h-5.5 ${meta.color}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      {/* Title row: tier badge, name, status badges — all inline */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${meta.bgColor} ${meta.color}`}>L{league.tier}</span>
                         {data?.recommendedTier === league.tier && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-primary/20 text-ccb-primary flex items-center gap-1">
-                            <Sparkles className="w-3 h-3" /> Recommended
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-primary/20 text-ccb-primary flex items-center gap-0.5">
+                            <Sparkles className="w-2.5 h-2.5" /> Recommended
                           </span>
                         )}
                         <h3 className="font-bold text-sm truncate">{league.name}</h3>
-                        {league.gender_restriction === 'female' && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-pink-500/10 text-pink-400 shrink-0">Women's</span>
-                        )}
-                        {league.gender_restriction === 'male' && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 shrink-0">Men's</span>
-                        )}
-                        {league.status === 'registration' && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-ccb-success/10 text-ccb-success border border-ccb-success/30">OPEN</span>
-                        )}
-                        {league.entry_type !== 'membership' && league.status === 'registration' && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-ccb-primary/10 text-ccb-primary">FREE</span>
-                        )}
                       </div>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-ccb-muted">
-                        <span className="flex items-center gap-1"><Trophy className="w-3 h-3" /> {prizeFormatted}</span>
-                        <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {league.playerCount}{capacity > 0 ? `/${capacity}` : ''}</span>
-                        {league.status === 'registration' && league.registrationCount > 0 && (
-                          <span className="flex items-center gap-1 text-ccb-accent"><Sparkles className="w-3 h-3" /> {league.registrationCount} registered</span>
+                      {/* Single-line meta: players · prize · status — no wrapping */}
+                      <div className="flex items-center gap-2 mt-1 text-xs text-ccb-muted overflow-hidden whitespace-nowrap">
+                        <span className="flex items-center gap-0.5 shrink-0"><Users className="w-3 h-3" />{league.playerCount}{capacity > 0 ? `/${capacity}` : ''}</span>
+                        <span className="text-ccb-border">|</span>
+                        <span className="flex items-center gap-0.5 shrink-0"><Trophy className="w-3 h-3" />{prizeFormatted}</span>
+                        {league.status === 'registration' && (
+                          <>
+                            <span className="text-ccb-border">|</span>
+                            <span className="flex items-center gap-0.5 shrink-0 text-ccb-success font-medium">OPEN{isFull ? ' · FULL' : league.entry_type !== 'membership' ? ' · FREE' : ''}</span>
+                          </>
                         )}
                         {league.status === 'active' && (
-                          <span className="flex items-center gap-1 text-ccb-success"><Calendar className="w-3 h-3" /> MD {league.current_matchday}/{league.total_matchdays || '?'}</span>
+                          <>
+                            <span className="text-ccb-border">|</span>
+                            <span className="flex items-center gap-0.5 shrink-0 text-ccb-primary font-medium">MD {league.current_matchday}/{league.total_matchdays || '?'}</span>
+                          </>
+                        )}
+                        {league.status === 'completed' && (
+                          <>
+                            <span className="text-ccb-border">|</span>
+                            <span className="flex items-center gap-0.5 shrink-0 text-ccb-muted">Finished</span>
+                          </>
                         )}
                       </div>
                     </div>
+                    {/* Register/Registering status on collapsed card */}
+                    {!isExpanded && (
+                      <div className="shrink-0">
+                        {isRegistered ? (
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-success/10 text-ccb-success flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" /> In
+                          </span>
+                        ) : showRegisterBtn && league.status === 'registration' && !isFull ? (
+                          <span className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-ccb-primary to-ccb-accent text-white">
+                            Join
+                          </span>
+                        ) : league.status === 'registration' && isFull ? (
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-surface text-ccb-muted">Full</span>
+                        ) : null}
+                      </div>
+                    )}
                     <ChevronRight className={`w-5 h-5 text-ccb-muted shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                   </div>
                 </button>
 
-                {/* EXPANDED CONTENT */}
+                {/* ── EXPANDED CONTENT ── */}
                 {isExpanded && (
                   <div className="border-t border-ccb-border p-4 space-y-4">
-                    {/* PRIZE POOL BREAKDOWN */}
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-2 flex items-center gap-1.5">
-                        <Award className="w-3.5 h-3.5" /> Prize Pool — {prizeFormatted}
-                      </h4>
-                      <div className="space-y-1.5">
-                        {[1, 2, 3, 4, 5].map(pos => {
-                          const payout = getPayout(league.prize_pool, pos, league.payout_config);
-                          return (
-                            <div key={pos} className="flex items-center justify-between bg-ccb-surface rounded-lg px-3 py-2">
-                              <div className="flex items-center gap-2">
-                                <span className={`w-6 h-6 rounded-full bg-ccb-card border border-ccb-border flex items-center justify-center text-[11px] font-bold ${meta.color}`}>{pos}</span>
-                                <span className="text-xs text-ccb-muted">Place</span>
-                              </div>
-                              <span className="text-sm font-bold">{formatMoney(payout, fxRate !== 1 ? symbol : (league.prize_currency || symbol), fxRate !== 1 ? fxRate : 1)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* PROMOTION / RELEGATION */}
-                    <div className="flex gap-2">
-                      {league.promotes_count > 0 && (
-                        <div className="flex-1 bg-ccb-success/10 border border-ccb-success/30 rounded-xl p-3 text-center">
-                          <ArrowUp className="w-4 h-4 text-ccb-success mx-auto mb-1" />
-                          <div className="text-xs font-bold text-ccb-success">Top {league.promotes_count} Promoted</div>
-                        </div>
-                      )}
-                      {league.relegates_count > 0 && (
-                        <div className="flex-1 bg-ccb-danger/10 border border-ccb-danger/30 rounded-xl p-3 text-center">
-                          <ArrowDown className="w-4 h-4 text-ccb-danger mx-auto mb-1" />
-                          <div className="text-xs font-bold text-ccb-danger">Bottom {league.relegates_count} Relegated</div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* QUALIFYING POSITIONS */}
-                    <div className="bg-ccb-accent/10 border border-ccb-accent/30 rounded-xl p-3 flex items-center gap-3">
-                      <Sparkles className="w-4 h-4 text-ccb-accent shrink-0" />
+                    {/* Registration progress bar */}
+                    {league.status === 'registration' && capacity > 0 && (
                       <div>
-                        <div className="text-xs font-bold text-ccb-accent">Top {league.qualifying_positions} Qualify for Premium Competitions</div>
-                        <div className="text-[10px] text-ccb-muted mt-0.5">Champions League, Sponsored Shield & more</div>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-ccb-muted">Registration</span>
+                          <span className="font-medium">{league.playerCount}/{capacity}{isFull ? ' · Full' : ''}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-ccb-surface overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-ccb-primary to-ccb-accent transition-all"
+                            style={{ width: `${Math.min(100, (league.playerCount / capacity) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Active season progress bar */}
+                    {league.status === 'active' && league.total_matchdays > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-ccb-muted">Season Progress</span>
+                          <span className="font-medium">Matchday {league.current_matchday} of {league.total_matchdays}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-ccb-surface overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-ccb-primary to-ccb-accent transition-all"
+                            style={{ width: `${Math.min(100, (league.current_matchday / league.total_matchdays) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* PRIZE + PROMOTION/RELEGATION — compact 2-col */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-ccb-surface rounded-xl p-3">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted mb-1">Prize Pool</div>
+                        <div className="text-sm font-bold">{prizeFormatted}</div>
+                        {league.payout_config && (
+                          <div className="text-[10px] text-ccb-muted mt-0.5">
+                            1st: {formatMoney(getPayout(league.prize_pool, 1, league.payout_config), fxRate !== 1 ? symbol : (league.prize_currency || symbol), fxRate !== 1 ? fxRate : 1)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="bg-ccb-surface rounded-xl p-3 space-y-1">
+                        {league.promotes_count > 0 && (
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <ArrowUp className="w-3 h-3 text-ccb-success" />
+                            <span className="text-ccb-success font-medium">Top {league.promotes_count} ↑</span>
+                          </div>
+                        )}
+                        {league.relegates_count > 0 && (
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <ArrowDown className="w-3 h-3 text-ccb-danger" />
+                            <span className="text-ccb-danger font-medium">Bot {league.relegates_count} ↓</span>
+                          </div>
+                        )}
+                        {league.qualifying_positions > 0 && (
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <Sparkles className="w-3 h-3 text-ccb-accent" />
+                            <span className="text-ccb-accent font-medium">Top {league.qualifying_positions} qualify</span>
+                          </div>
+                        )}
                       </div>
                     </div>
+
+                    {/* MID-SEASON JOIN INFO */}
+                    {league.status === 'active' && (
+                      <div className="bg-ccb-primary/5 border border-ccb-primary/20 rounded-xl p-3 flex items-start gap-2">
+                        <Sparkles className="w-4 h-4 text-ccb-primary shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-ccb-primary">Join Anytime</div>
+                          <div className="text-[10px] text-ccb-muted mt-0.5">New players can join mid-season — you'll get fixtures for remaining matchdays and start with 0 points.</div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* QUALIFICATION CHECKLIST */}
-                    {qual?.checklist && (
+                    {qual?.checklist && qual.checklist.filter((c) => c.required).length > 0 && (
                       <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-2">Registration Requirements</h4>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-2">Requirements</h4>
                         <div className="space-y-1">
                           {qual.checklist.filter((c) => c.required).map((item) => (
                             <div key={item.id} className="flex items-center gap-2 text-xs">
@@ -435,18 +490,18 @@ export default function PremiumLeaguesTab() {
                       <div>
                         {isRegistered ? (
                           <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border ${
-                            qual.regStatus === 'player' ? 'bg-ccb-success/10 border-ccb-success/30 text-ccb-success' :
-                            qual.regStatus === 'approved' ? 'bg-ccb-success/10 border-ccb-success/30 text-ccb-success' :
-                            'bg-ccb-accent/10 border-ccb-accent/30 text-ccb-accent'
+                            qual.regStatus === 'player' || qual.regStatus === 'approved'
+                              ? 'bg-ccb-success/10 border-ccb-success/30 text-ccb-success'
+                              : 'bg-ccb-accent/10 border-ccb-accent/30 text-ccb-accent'
                           }`}>
                             <CheckCircle className="w-4 h-4" />
                             <span className="text-xs font-bold">
-                              {qual.regStatus === 'player' ? 'You are in this league!' :
+                              {qual.regStatus === 'player' ? 'You\'re in this league!' :
                                qual.regStatus === 'approved' ? 'Registration approved!' :
                                'Registration pending approval'}
                             </span>
                           </div>
-                        ) : showRegisterBtn ? (
+                        ) : showRegisterBtn && !isFull ? (
                           <button
                             onClick={() => handleRegister(league.id)}
                             disabled={registering === league.id}
@@ -460,7 +515,7 @@ export default function PremiumLeaguesTab() {
                           </button>
                         ) : (
                           <div className="px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-center">
-                            <p className="text-xs text-ccb-muted">{REASON_LABELS[qual?.reason || ''] || 'Registration not available'}</p>
+                            <p className="text-xs text-ccb-muted">{REASON_LABELS[qual?.reason || ''] || (isFull ? 'League is full' : 'Registration not available')}</p>
                           </div>
                         )}
                         {registerMsg?.leagueId === league.id && (
@@ -473,12 +528,27 @@ export default function PremiumLeaguesTab() {
                       </div>
                     )}
 
-                    {/* STANDINGS */}
+                    {/* MID-SEASON JOIN BUTTON */}
+                    {league.status === 'active' && !isRegistered && qual?.canJoin !== false && (
+                      <button
+                        onClick={() => handleRegister(league.id)}
+                        disabled={registering === league.id}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {registering === league.id ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Joining...</>
+                        ) : (
+                          <><Swords className="w-4 h-4" /> Join Mid-Season</>
+                        )}
+                      </button>
+                    )}
+
+                    {/* STANDINGS — compact */}
                     {standings.length > 0 ? (
                       <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-2">Current Standings</h4>
-                        <div className="space-y-1">
-                          {standings.slice(0, 15).map((s) => {
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-2">Standings</h4>
+                        <div className="space-y-0.5">
+                          {standings.slice(0, 10).map((s) => {
                             const isPromotion = league.promotes_count > 0 && s.position <= league.promotes_count;
                             const isRelegation = league.relegates_count > 0 && s.position > (standings.length - league.relegates_count);
                             const isQualifying = s.position <= league.qualifying_positions;
@@ -486,31 +556,39 @@ export default function PremiumLeaguesTab() {
                             return (
                               <div
                                 key={s.player?.id || s.position}
-                                className={`flex items-center gap-3 p-2 rounded-lg ${
+                                className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg ${
                                   isPromotion ? 'bg-ccb-success/5' :
                                   isRelegation ? 'bg-ccb-danger/5' :
                                   isQualifying ? 'bg-ccb-accent/5' : ''
                                 }`}
                               >
-                                <span className={`text-xs font-bold w-6 text-center ${
+                                <span className={`text-xs font-bold w-5 text-center ${
                                   isPromotion ? 'text-ccb-success' :
                                   isRelegation ? 'text-ccb-danger' :
                                   isQualifying ? 'text-ccb-accent' : 'text-ccb-muted'
                                 }`}>{s.position}</span>
+                                {/* Avatar or initials */}
+                                {s.player?.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={s.player.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                                ) : (
+                                  <span className="w-5 h-5 rounded-full bg-ccb-surface text-[9px] font-bold flex items-center justify-center shrink-0 text-ccb-muted">
+                                    {(s.player?.display_name || s.player?.username || '?')[0]?.toUpperCase()}
+                                  </span>
+                                )}
                                 <span className="text-xs font-medium flex-1 truncate">
                                   {s.player?.display_name || s.player?.username || 'Unknown'}
                                 </span>
-                                <span className="text-[10px] text-ccb-muted hidden sm:block">{s.player?.rating || '—'}</span>
-                                <span className="text-xs font-bold">{s.points}pts</span>
-                                <span className="text-[10px] text-ccb-muted hidden sm:block">{s.played}P</span>
+                                <span className="text-[10px] text-ccb-muted shrink-0">{s.played}P</span>
+                                <span className="text-xs font-bold shrink-0">{s.points}pts</span>
                               </div>
                             );
                           })}
                         </div>
                       </div>
                     ) : (
-                      <div className="text-center py-6">
-                        <Trophy className="w-8 h-8 text-ccb-muted mx-auto mb-2" />
+                      <div className="text-center py-4">
+                        <Trophy className="w-7 h-7 text-ccb-muted mx-auto mb-2" />
                         <p className="text-xs text-ccb-muted">
                           {league.status === 'upcoming' ? 'League not started yet' : league.status === 'registration' ? 'No players registered yet' : 'No standings available'}
                         </p>
