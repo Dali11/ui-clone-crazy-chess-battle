@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Radio, Eye, Crown, Disc3, Swords, Clock, User, Loader2 } from "lucide-react";
+import { Radio, Eye, Crown, Swords, Clock, User, Loader2 } from "lucide-react";
 
 interface LiveGame {
   id: string;
@@ -34,7 +34,7 @@ interface LiveGame {
   league_id: string | null;
   league_fixture_id: string | null;
   is_my_game: boolean;
-  game_type: "chess" | "draughts";
+  game_type: "chess";
 }
 
 function formatClock(ms: number): string {
@@ -57,7 +57,7 @@ function timeAgo(dateStr: string): string {
 export default function LiveMatchesPage() {
   const [games, setGames] = useState<LiveGame[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "mine" | "chess" | "draughts">("all");
+  const [filter, setFilter] = useState<"all" | "mine">("all");
 
   const fetchLiveGames = useCallback(async () => {
     try {
@@ -80,8 +80,6 @@ export default function LiveMatchesPage() {
 
   const filtered = games.filter((g) => {
     if (filter === "mine") return g.is_my_game;
-    if (filter === "chess") return g.game_type === "chess";
-    if (filter === "draughts") return g.game_type === "draughts";
     return true;
   });
 
@@ -107,8 +105,6 @@ export default function LiveMatchesPage() {
           {([
             { key: "all", label: "All", count: games.length },
             { key: "mine", label: "My Games", count: myGames.length },
-            { key: "chess", label: "Chess", count: games.filter((g) => g.game_type === "chess").length },
-            { key: "draughts", label: "Draughts", count: games.filter((g) => g.game_type === "draughts").length },
           ] as const).map((tab) => (
             <button
               key={tab.key}
@@ -162,7 +158,7 @@ export default function LiveMatchesPage() {
       )}
 
       {/* My Games (priority) */}
-      {!loading && myGames.length > 0 && filter !== "draughts" && filter !== "chess" && (
+      {!loading && myGames.length > 0 && (
         <div className="px-4 sm:px-6 lg:px-8 space-y-2">
           <h2 className="text-xs font-bold uppercase tracking-wider text-ccb-primary flex items-center gap-1.5">
             <Crown className="w-3.5 h-3.5" /> Your Active Games
@@ -176,7 +172,7 @@ export default function LiveMatchesPage() {
       {/* Other Live Games */}
       {!loading && otherGames.length > 0 && (
         <div className="px-4 sm:px-6 lg:px-8 space-y-2">
-          {myGames.length > 0 && filter !== "draughts" && filter !== "chess" && (
+          {myGames.length > 0 && (
             <h2 className="text-xs font-bold uppercase tracking-wider text-ccb-muted flex items-center gap-1.5 pt-2">
               <Eye className="w-3.5 h-3.5" /> Watch Live
             </h2>
@@ -195,8 +191,7 @@ function GameCard({ game, priority = false }: { game: LiveGame; priority?: boole
   const black = game.black_player;
   const whiteName = white?.display_name || white?.username || "White";
   const blackName = black?.display_name || black?.username || "Black";
-  const isDraughts = game.game_type === "draughts";
-  const watchHref = isDraughts ? `/draughts/game/${game.id}` : `/game/${game.id}`;
+  const watchHref = `/game/${game.id}`;
 
   return (
     <div
@@ -264,11 +259,7 @@ function GameCard({ game, priority = false }: { game: LiveGame; priority?: boole
       </div>
 
       {/* Meta row */}
-      <div className="flex items-center gap-3 mt-2.5 pt-2.5 border-t border-ccb-border">
-        <span className="flex items-center gap-1 text-[10px] text-ccb-muted">
-          {isDraughts ? <Disc3 className="w-3 h-3" /> : <Swords className="w-3 h-3" />}
-          {isDraughts ? "Draughts" : "Chess"}
-        </span>
+      <div className="flex items-center gap-3 mt-2.5 pt-2.5 border-t border-ccb-border/50">
         <span className="flex items-center gap-1 text-[10px] text-ccb-muted">
           <Clock className="w-3 h-3" />
           {game.initial_minutes}+{game.increment_seconds}
@@ -276,22 +267,22 @@ function GameCard({ game, priority = false }: { game: LiveGame; priority?: boole
         <span className="text-[10px] text-ccb-muted">
           Move {game.move_count}
         </span>
-        {game.turn === "white" ? (
-          <span className="text-[10px] font-bold text-white/80">⚪ White to move</span>
-        ) : (
-          <span className="text-[10px] font-bold text-gray-400">⚫ Black to move</span>
-        )}
         {game.rated && (
-          <span className="text-[10px] text-ccb-accent font-bold">Rated</span>
-        )}
-        {game.league_id && (
-          <span className="text-[10px] text-ccb-primary font-bold flex items-center gap-0.5">
-            <Crown className="w-2.5 h-2.5" /> League
-          </span>
+          <span className="text-[10px] font-bold text-ccb-accent">Rated</span>
         )}
         {game.tournament_id && (
-          <span className="text-[10px] text-ccb-accent font-bold">Tournament</span>
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-primary/10 text-ccb-primary">
+            Tournament
+          </span>
         )}
+        {game.league_id && (
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-accent/10 text-ccb-accent">
+            League
+          </span>
+        )}
+        <span className="text-[10px] text-ccb-muted ml-auto">
+          {timeAgo(game.last_move_at)}
+        </span>
       </div>
     </div>
   );
