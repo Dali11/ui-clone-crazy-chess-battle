@@ -98,6 +98,9 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
   membership: [
+    { key: "monthly_price", label: "Monthly Price", type: "number", group: "control", unit: "MWK", help: "Monthly membership fee in MWK" },
+    { key: "yearly_price", label: "Yearly Price", type: "number", group: "control", unit: "MWK", help: "Yearly membership fee (2 months free)" },
+    { key: "membership_active", label: "Membership Active", type: "toggle", group: "control", help: "Allow new membership purchases" },
     { key: "auto_renew", label: "Auto-Renew", type: "toggle", group: "control" },
     { key: "grace_period_days", label: "Grace Period", type: "number", group: "control", unit: "days" },
     { key: "require_verification", label: "Require Verification", type: "toggle", group: "control" },
