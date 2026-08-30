@@ -5,8 +5,8 @@ import { detectOperator } from "@/lib/operator";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Wallet, Check, Loader2, ArrowDown, ArrowUp,
-  Clock, RefreshCw, History, TrendingUp, TrendingDown,
+  Wallet, Check, Loader2, ArrowDown, ArrowUp, ArrowDownLeft, ArrowUpRight,
+  Clock, RefreshCw, History,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -33,7 +33,7 @@ interface Withdrawal {
 
 interface Transaction {
   id: string;
-  type: string;
+  direction: "in" | "out";
   amount: number;
   status: string;
   description: string;
@@ -49,24 +49,6 @@ interface WalletClientProps {
 }
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000, 10000, 25000];
-
-const TXN_ICONS: Record<string, any> = {
-  deposit: ArrowDown,
-  withdrawal: ArrowUp,
-  battle_payout: TrendingUp,
-  battle_stake: TrendingDown,
-  tournament_entry: TrendingDown,
-  tournament_prize: TrendingUp,
-};
-
-const TXN_COLORS: Record<string, string> = {
-  deposit: "text-ccb-success",
-  withdrawal: "text-ccb-accent",
-  battle_payout: "text-ccb-success",
-  battle_stake: "text-ccb-danger",
-  tournament_entry: "text-ccb-danger",
-  tournament_prize: "text-ccb-success",
-};
 
 export default function WalletClient({ balance, email, deposits, phone: savedPhone }: WalletClientProps) {
   const router = useRouter();
@@ -580,13 +562,12 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
           ) : (
             <div className="space-y-2">
               {transactions.map((txn) => {
-                const Icon = TXN_ICONS[txn.type] || Clock;
-                const color = TXN_COLORS[txn.type] || "text-ccb-muted";
-                const isPositive = txn.amount > 0;
+                const isIn = txn.direction === "in";
+                const Icon = isIn ? ArrowDownLeft : ArrowUpRight;
                 return (
                   <div key={txn.id} className="flex items-center justify-between p-3 rounded-lg bg-ccb-surface border border-ccb-border">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center ${color}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isIn ? "bg-ccb-success/10 text-ccb-success" : "bg-ccb-danger/10 text-ccb-danger"}`}>
                         <Icon className="w-4 h-4" />
                       </div>
                       <div>
@@ -595,8 +576,8 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className={`text-sm font-semibold ${isPositive ? "text-ccb-success" : "text-ccb-danger"}`}>
-                        {isPositive ? "+" : ""}{formatMWK(txn.amount)}
+                      <p className={`text-sm font-semibold ${isIn ? "text-ccb-success" : "text-ccb-danger"}`}>
+                        {isIn ? "+" : ""}{formatMWK(txn.amount)}
                       </p>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${
                         txn.status === "success" || txn.status === "completed" || txn.status === "approved" ? "bg-green-500/10 text-green-600" :
