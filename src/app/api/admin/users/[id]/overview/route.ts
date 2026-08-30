@@ -25,9 +25,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         rating, rating_deviation, rating_volatility,
         games_played, wins, losses, draws,
         tournaments_played, tournaments_won,
-        wallet_balance, wallet_balance_cents,
+        wallet_balance,
         is_admin, is_banned,
-        gender, gender_locked, identity_verified,
+        gender, identity_verified,
         created_at, updated_at
       `)
       .eq("id", id)
@@ -68,25 +68,45 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .order("created_at", { ascending: false })
       .limit(20);
 
-    // ─── Wallet transactions (last 20) ───────────────────────────────────
-    const { data: transactions } = await admin
-      .from("wallet_transactions")
-      .select("id, type, amount, status, description, created_at")
-      .eq("user_id", id)
-      .order("created_at", { ascending: false })
-      .limit(20);
+    // Note: there's no dedicated wallet ledger table — wallet_balance lives on
+    // profiles and is derived from deposits/withdrawals/battle settlements.
+    const transactions: any[] = [];
 
-    // ─── Battles (last 20) ───────────────────────────────────────────────
-    const { data: battles } = await admin
+    // ─── Battles (last 20) ────────────────────────────────────────────────
+    // battles.white_player_id / black_player_id / winner_id reference
+    // auth.users, not profiles, so we can't embed profiles via FK hint —
+    // fetch battles raw, then batch-resolve usernames from profiles.
+    const { data: rawBattles } = await admin
       .from("battles")
       .select(`
-        id, stake_amount, status, winner_id, created_at, ended_at,
-        white_player:profiles!battles_white_player_id_fkey(username),
-        black_player:profiles!battles_black_player_id_fkey(username)
+        id, stake, status, winner_id, created_at, completed_at,
+        white_player_id, black_player_id
       `)
       .or(`white_player_id.eq.${id},black_player_id.eq.${id}`)
       .order("created_at", { ascending: false })
       .limit(20);
+
+    let battles: any[] = [];
+    if (rawBattles && rawBattles.length > 0) {
+      const playerIds = Array.from(
+        new Set(rawBattles.flatMap((b) => [b.white_player_id, b.black_player_id]).filter(Boolean))
+      );
+      const { data: battlePlayers } = await admin
+        .from("profiles")
+        .select("id, username")
+        .in("id", playerIds);
+      const byId = new Map((battlePlayers || []).map((pl) => [pl.id, pl.username]));
+      battles = rawBattles.map((b) => ({
+        id: b.id,
+        stake_amount: b.stake,
+        status: b.status,
+        winner_id: b.winner_id,
+        created_at: b.created_at,
+        ended_at: b.completed_at,
+        white_player: { username: byId.get(b.white_player_id) || null },
+        black_player: { username: byId.get(b.black_player_id) || null },
+      }));
+    }
 
     // ─── Tournament participations ──────────────────────────────────────
     const { data: tournaments } = await admin
@@ -110,31 +130,63 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .order("registered_at", { ascending: false })
       .limit(10);
 
-    // ─── Referrals ──────────────────────────────────────────────────────
-    const { data: referralsMade } = await admin
+    // ─── Referrals ────────────────────────────────────────────────────────
+    // referrals.referrer_id / referred_id reference auth.users, not profiles —
+    // same FK-embed limitation as battles, so resolve usernames manually.
+    const { data: rawReferralsMade } = await admin
       .from("referrals")
-      .select(`
-        id, status, reward_amount, created_at,
-        referred:profiles!referrals_referred_id_fkey(username, email)
-      `)
+      .select("id, status, reward_amount, created_at, referred_id")
       .eq("referrer_id", id)
       .order("created_at", { ascending: false })
       .limit(10);
 
-    const { data: referralReceived } = await admin
+    const { data: rawReferralReceived } = await admin
       .from("referrals")
-      .select(`
-        id, status, reward_amount, created_at,
-        referrer:profiles!referrals_referrer_id_fkey(username, email)
-      `)
+      .select("id, status, reward_amount, created_at, referrer_id")
       .eq("referred_id", id)
       .order("created_at", { ascending: false })
       .limit(1);
 
+    const referralUserIds = Array.from(
+      new Set([
+        ...(rawReferralsMade || []).map((r) => r.referred_id),
+        ...(rawReferralReceived || []).map((r) => r.referrer_id),
+      ].filter(Boolean))
+    );
+    let referralProfilesById = new Map<string, { username: string; email: string }>();
+    if (referralUserIds.length > 0) {
+      const { data: referralProfiles } = await admin
+        .from("profiles")
+        .select("id, username, email")
+        .in("id", referralUserIds);
+      referralProfilesById = new Map(
+        (referralProfiles || []).map((rp) => [rp.id, { username: rp.username, email: rp.email }])
+      );
+    }
+
+    const referralsMade = (rawReferralsMade || []).map((r) => ({
+      id: r.id,
+      status: r.status,
+      reward_amount: r.reward_amount,
+      created_at: r.created_at,
+      referred: referralProfilesById.get(r.referred_id) || null,
+    }));
+
+    const referralReceivedRaw = rawReferralReceived?.[0];
+    const referralReceived = referralReceivedRaw
+      ? {
+          id: referralReceivedRaw.id,
+          status: referralReceivedRaw.status,
+          reward_amount: referralReceivedRaw.reward_amount,
+          created_at: referralReceivedRaw.created_at,
+          referrer: referralProfilesById.get(referralReceivedRaw.referrer_id) || null,
+        }
+      : null;
+
     // ─── Admin logs for this user ────────────────────────────────────────
     const { data: adminActions } = await admin
       .from("admin_logs")
-      .select("id, action, details, created_at, actor:profiles!admin_logs_actor_id_fkey(username)")
+      .select("id, action, details, created_at, actor:profiles!admin_logs_admin_id_fkey(username)")
       .eq("target_id", id)
       .eq("target_type", "user")
       .order("created_at", { ascending: false })
@@ -145,12 +197,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       games: games || [],
       deposits: deposits || [],
       withdrawals: withdrawals || [],
-      transactions: transactions || [],
-      battles: battles || [],
+      transactions,
+      battles,
       tournaments: tournaments || [],
       leagues: leagues || [],
-      referralsMade: referralsMade || [],
-      referralReceived: referralReceived?.[0] || null,
+      referralsMade,
+      referralReceived,
       adminActions: adminActions || [],
     });
   } catch (err: any) {
