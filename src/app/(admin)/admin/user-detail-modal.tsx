@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import {
-  Loader2, X, Wallet, Trophy, Gamepad2, ArrowDown, ArrowUp, Ban,
+  Loader2, X, Wallet, Trophy, Gamepad2, ArrowDownLeft, ArrowUpRight, Ban,
   Shield, Star, DollarSign, Trash2, Swords, Gift, Calendar,
   TrendingUp, TrendingDown, CheckCircle, XCircle, Clock,
   ShieldCheck, UserRound, ChevronRight, ScrollText,
@@ -236,62 +236,51 @@ export default function UserDetailModal({ userId, onClose, onAction, onDelete, a
 
           {section === "wallet" && (
             <>
-              <div className="card p-4 bg-gradient-to-br from-ccb-primary/10 to-transparent">
-                <div className="text-xs text-ccb-muted">CURRENT BALANCE</div>
-                <div className="text-2xl font-bold text-ccb-primary mt-1">{formatMWK(p.wallet_balance || 0)}</div>
-              </div>
-
-              <div>
-                <div className="text-xs font-bold text-ccb-muted mb-2 flex items-center gap-1.5"><ArrowDown className="w-3.5 h-3.5 text-ccb-success" /> DEPOSITS ({data.deposits?.length || 0})</div>
-                <div className="space-y-1.5">
-                  {data.deposits?.length === 0 ? <p className="text-xs text-ccb-muted px-3">No deposits</p> : data.deposits?.map((d: any) => (
-                    <div key={d.id} className="card p-2.5 flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium">{formatMWK(d.amount)}</div>
-                        <div className="text-xs text-ccb-muted">{d.method || "Unknown"} · {new Date(d.created_at).toLocaleString()}</div>
-                      </div>
-                      <StatusBadge status={d.status} />
-                    </div>
-                  ))}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="card p-4 bg-gradient-to-br from-ccb-primary/10 to-transparent">
+                  <div className="text-xs text-ccb-muted">CURRENT BALANCE</div>
+                  <div className="text-2xl font-bold text-ccb-primary mt-1">{formatMWK(p.wallet_balance || 0)}</div>
+                </div>
+                <div className="card p-4">
+                  <div className="text-xs text-ccb-muted">REAL CASH DEPOSITED</div>
+                  <div className="text-2xl font-bold text-ccb-success mt-1">{formatMWK(data.cashDepositTotal || 0)}</div>
+                  <div className="text-[10px] text-ccb-muted mt-0.5">Mobile money + card, successful only</div>
                 </div>
               </div>
 
               <div>
-                <div className="text-xs font-bold text-ccb-muted mb-2 flex items-center gap-1.5"><ArrowUp className="w-3.5 h-3.5 text-ccb-accent" /> WITHDRAWALS ({data.withdrawals?.length || 0})</div>
-                <div className="space-y-1.5">
-                  {data.withdrawals?.length === 0 ? <p className="text-xs text-ccb-muted px-3">No withdrawals</p> : data.withdrawals?.map((w: any) => (
-                    <div key={w.id} className="card p-2.5 flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium">
-                          {formatMWK(w.amount)}
-                          {w.fee > 0 && <span className="text-xs text-ccb-muted ml-2">(fee: {formatMWK(w.fee)}, net: {formatMWK(w.net_amount)})</span>}
-                        </div>
-                        <div className="text-xs text-ccb-muted">{w.operator_name} · {w.phone} · {new Date(w.created_at).toLocaleString()}</div>
-                      </div>
-                      <StatusBadge status={w.status} />
-                    </div>
-                  ))}
+                <div className="text-xs font-bold text-ccb-muted mb-2 flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5" /> WALLET ACTIVITY ({data.transactions?.length || 0})
                 </div>
-              </div>
-
-              {data.transactions?.length > 0 && (
-                <div>
-                  <div className="text-xs font-bold text-ccb-muted mb-2 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> TRANSACTIONS ({data.transactions.length})</div>
-                  <div className="space-y-1.5">
-                    {data.transactions.map((t: any) => (
+                <div className="text-[10px] text-ccb-muted mb-2 px-0.5">
+                  <span className="text-ccb-success font-semibold">Green = money in</span> (deposits, payouts, refunds) · <span className="text-ccb-danger font-semibold">Red = money out</span> (escrow, entry fees, withdrawals, admin corrections)
+                </div>
+                <div className="space-y-1.5">
+                  {(data.transactions?.length || 0) === 0 ? <p className="text-xs text-ccb-muted px-3">No wallet activity</p> : data.transactions?.map((t: any) => {
+                    const isIn = t.direction === "in";
+                    const Icon = isIn ? ArrowDownLeft : ArrowUpRight;
+                    return (
                       <div key={t.id} className="card p-2.5 flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-medium">
-                            <span className={t.amount >= 0 ? "text-ccb-success" : "text-ccb-danger"}>{t.amount >= 0 ? "+" : ""}{formatMWK(t.amount)}</span>
-                            <span className="text-xs text-ccb-muted ml-2">{t.type}</span>
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isIn ? "bg-ccb-success/10 text-ccb-success" : "bg-ccb-danger/10 text-ccb-danger"}`}>
+                            <Icon className="w-3.5 h-3.5" />
                           </div>
-                          <div className="text-xs text-ccb-muted">{t.description || "—"} · {new Date(t.created_at).toLocaleString()}</div>
+                          <div>
+                            <div className="text-sm font-medium">{t.label}</div>
+                            <div className="text-xs text-ccb-muted">{new Date(t.created_at).toLocaleString()}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-sm font-semibold ${isIn ? "text-ccb-success" : "text-ccb-danger"}`}>
+                            {isIn ? "+" : ""}{formatMWK(t.display_amount)}
+                          </div>
+                          <StatusBadge status={t.status} />
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
             </>
           )}
 
