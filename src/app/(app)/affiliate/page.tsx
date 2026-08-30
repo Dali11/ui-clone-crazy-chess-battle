@@ -7,8 +7,8 @@ import AffiliateClient from "./affiliate-client";
 import { pageMetadata } from "@/lib/seo/metadata";
 
 export const metadata = pageMetadata({
-  title: "Affiliate Program — Earn MK500 Per Referral",
-  description: "Invite friends to Crazy Chess Battles and earn MK500 cash when they become active players. Share your referral link and grow the community.",
+  title: "Affiliate Program — Earn 25% Commission",
+  description: "Invite friends to Crazy Chess Battles and earn 25% commission on every membership fee they pay. Ongoing commissions, paid to your wallet.",
   path: "/affiliate",
   noIndex: true,
 });
@@ -30,10 +30,13 @@ export default async function AffiliatePage() {
     .eq("id", user.id)
     .single();
 
-  // Get referral stats
+  // Get referral stats — use correct column names (activation_condition, commission_amount, commission_paid)
   const { data: referrals } = await admin
     .from("referrals")
-    .select("id, referred_id, status, created_at, activated_at, reward_paid, activation_action")
+    .select(`
+      id, referred_id, status, created_at, activated_at,
+      activation_condition, commission_amount, commission_paid
+    `)
     .eq("referrer_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -50,6 +53,29 @@ export default async function AffiliatePage() {
     }
   }
 
+  // Get total commission earned from deposits ledger (more accurate than summing referrals)
+  const { data: commissionDeposits } = await admin
+    .from("deposits")
+    .select("amount")
+    .eq("user_id", user.id)
+    .eq("method", "affiliate_commission")
+    .eq("status", "success");
+  const totalCommissionEarned = (commissionDeposits || []).reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+
+  // Get membership pricing for display
+  const { data: marketConfig } = await admin
+    .from("market_config")
+    .select("membership_price_cents, membership_currency, country_code")
+    .eq("country_code", profile?.country || "MW")
+    .single();
+
+  const membershipPrice = marketConfig?.membership_price_cents
+    ? Math.floor(marketConfig.membership_price_cents / 100)
+    : 10000; // fallback
+  const membershipCurrency = marketConfig?.membership_currency || "MWK";
+  const yearlyPrice = membershipPrice * 10; // 10 months (2 free)
+  const commissionRate = 0.25;
+
   const refCode = profile?.referral_code || profile?.username || "";
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://crazychessbattles.live";
 
@@ -58,13 +84,19 @@ export default async function AffiliatePage() {
       refCode={refCode}
       baseUrl={baseUrl}
       walletBalance={profile?.wallet_balance || 0}
+      totalCommissionEarned={totalCommissionEarned}
+      membershipPrice={membershipPrice}
+      yearlyPrice={yearlyPrice}
+      membershipCurrency={membershipCurrency}
+      commissionRate={commissionRate}
       referrals={(referrals || []).map((r: any) => ({
         id: r.id,
         status: r.status,
         created_at: r.created_at,
         activated_at: r.activated_at,
-        reward_paid: r.reward_paid,
-        activation_action: r.activation_action,
+        activation_condition: r.activation_condition,
+        commission_amount: r.commission_amount || 0,
+        commission_paid: r.commission_paid || false,
         referred: r.referred_id ? referredProfiles[r.referred_id] : null,
       }))}
     />
