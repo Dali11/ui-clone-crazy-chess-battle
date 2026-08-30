@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPlatformConfig } from "@/lib/platform-config";
 import { redirect } from "next/navigation";
 import AffiliateClient from "./affiliate-client";
 import { pageMetadata } from "@/lib/seo/metadata";
@@ -62,16 +63,11 @@ export default async function AffiliatePage() {
     .eq("status", "success");
   const totalCommissionEarned = (commissionDeposits || []).reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
 
-  // Get membership pricing for display
-  const { data: marketConfig } = await admin
-    .from("market_config")
-    .select("membership_price, membership_currency, country_code")
-    .eq("country_code", profile?.country || "MW")
-    .single();
-
-  const membershipPrice = marketConfig?.membership_price || 10000; // MWK, already integer
-  const membershipCurrency = marketConfig?.membership_currency || "MWK";
-  const yearlyPrice = membershipPrice * 10; // 10 months (2 free)
+  // Get membership pricing from platform settings (admin-configurable)
+  const mConfig = await getPlatformConfig(admin, "membership");
+  const membershipPrice = mConfig.monthly_price || 10000; // MWK
+  const membershipCurrency = mConfig.currency || "MWK";
+  const yearlyPrice = mConfig.yearly_price || membershipPrice * 10; // 10 months (2 free)
   const commissionRate = 0.25;
 
   const refCode = profile?.referral_code || profile?.username || "";
