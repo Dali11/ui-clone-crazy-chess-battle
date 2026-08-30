@@ -91,6 +91,10 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     auto_renew: false,
     grace_period_days: 10,
     require_verification: false,
+    monthly_price: 10000,   // MWK — admin-configurable
+    yearly_price: 100000,    // MWK — 10 months (2 free)
+    currency: "MWK",
+    membership_active: true,
     show_kpi_cards: true,
     page_size: 20,
   },
