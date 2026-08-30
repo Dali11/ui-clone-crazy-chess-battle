@@ -50,7 +50,8 @@ export function getLedgerMeta(method: string | null | undefined): LedgerMeta {
 /** Returns the amount to display, signed by canonical direction (ignores stored sign quirks). */
 export function ledgerDisplayAmount(amount: number, direction: LedgerDirection): number {
   const abs = Math.abs(amount || 0);
-  return direction === "in" ? abs : -abs;
+  const result = direction === "in" ? abs : -abs;
+  return result === 0 ? 0 : result; // normalize -0 to +0
 }
 
 /** Withdrawals are always outflow — no method lookup needed. */
