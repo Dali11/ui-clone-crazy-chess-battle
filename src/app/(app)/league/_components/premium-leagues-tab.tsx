@@ -332,7 +332,8 @@ export default function PremiumLeaguesTab() {
             const qual = league.qualification;
             const showRegisterBtn = qual?.canJoin === true;
             const isRegistered = qual?.isRegistered;
-            const isFull = capacity > 0 && league.playerCount >= capacity;
+            const displayCount = league.status === 'registration' ? league.registrationCount : league.playerCount;
+            const isFull = capacity > 0 && displayCount >= capacity;
             const myStanding = data?.userId ? standings.find((s) => s.player?.id === data.userId) || null : null;
 
             return (
@@ -365,7 +366,7 @@ export default function PremiumLeaguesTab() {
                       </div>
                       {/* Meta: players · prize · status/progress — wraps on small screens */}
                       <div className="flex items-center gap-1.5 mt-1 text-[11px] text-ccb-muted flex-wrap">
-                        <span className="flex items-center gap-0.5 shrink-0"><Users className="w-3 h-3" />{league.playerCount}{capacity > 0 ? `/${capacity}` : ''}</span>
+                        <span className="flex items-center gap-0.5 shrink-0"><Users className="w-3 h-3" />{displayCount}{capacity > 0 ? `/${capacity}` : ''}</span>
                         {league.status === 'registration' && (
                           <>
                             <span className="text-ccb-border">|</span>
@@ -440,12 +441,12 @@ export default function PremiumLeaguesTab() {
                       <div>
                         <div className="flex items-center justify-between text-xs mb-1">
                           <span className="text-ccb-muted">Registration</span>
-                          <span className="font-medium">{league.playerCount}/{capacity}{isFull ? ' · Full' : ''}</span>
+                          <span className="font-medium">{displayCount}/{capacity}{isFull ? ' · Full' : ''}</span>
                         </div>
                         <div className="h-2 rounded-full bg-ccb-surface overflow-hidden">
                           <div
                             className="h-full rounded-full bg-ccb-primary transition-all"
-                            style={{ width: `${Math.min(100, (league.playerCount / capacity) * 100)}%` }}
+                            style={{ width: `${Math.min(100, (displayCount / capacity) * 100)}%` }}
                           />
                         </div>
                       </div>
@@ -659,8 +660,8 @@ export default function PremiumLeaguesTab() {
                         <p className="text-xs text-ccb-muted">
                           {league.status === 'upcoming' ? 'League not started yet' :
                            league.status === 'registration' ? (
-                             league.playerCount > 0
-                               ? `${league.playerCount} player${league.playerCount === 1 ? '' : 's'} registered — season starts once we kick off`
+                             league.registrationCount > 0
+                               ? `${league.registrationCount} player${league.registrationCount === 1 ? '' : 's'} registered — season starts once we kick off`
                                : 'No players registered yet — be the first!'
                            ) : league.status === 'active' ? (
                              league.playerCount > 0
