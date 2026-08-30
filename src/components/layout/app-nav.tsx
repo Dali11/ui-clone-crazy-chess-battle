@@ -70,28 +70,28 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     {
       title: "Play",
       items: [
-        { href: "/play", label: "Quick Match", icon: Swords, desc: "Find an opponent" },
-        { href: "/play/computer", label: "Play Computer", icon: Play, desc: "Practice vs AI" },
-        { href: "/draughts", label: "Draughts", icon: Disc3, desc: "Checkers" },
-        { href: "/battles", label: "Cash Battles", icon: Coins, desc: "Stake & play" },
+        { href: "/play", label: "Quick Match", icon: Swords },
+        { href: "/play/computer", label: "Play Computer", icon: Play },
+        { href: "/draughts", label: "Draughts", icon: Disc3 },
+        { href: "/battles", label: "Cash Battles", icon: Coins },
       ],
     },
     {
       title: "Compete",
       items: [
-        { href: "/league", label: "Premium Leagues", icon: Crown, desc: "Season 1 — 5 tiers" },
-        { href: "/tournaments", label: "Tournaments", icon: Trophy, desc: "Swiss, Arena, Knockout" },
-        { href: "/live", label: "Live Matches", icon: Radio, desc: "Watch ongoing games" },
-        { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp, desc: "Global rankings" },
+        { href: "/league", label: "Premium Leagues", icon: Crown },
+        { href: "/tournaments", label: "Tournaments", icon: Trophy },
+        { href: "/live", label: "Live Matches", icon: Radio },
+        { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp },
       ],
     },
     {
       title: "Account",
       items: [
-        { href: "/settings", label: "Settings & Profile", icon: Settings, desc: "Account preferences" },
-        { href: "/wallet", label: "Wallet", icon: Wallet, desc: "Balance & transactions" },
-                { href: "/affiliate", label: "Affiliate", icon: Gift, desc: "Earn MK500 per referral" },
-                { href: "/history", label: "Game History", icon: Clock, desc: "Your past games" },
+        { href: "/settings", label: "Settings & Profile", icon: Settings },
+        { href: "/wallet", label: "Wallet", icon: Wallet },
+        { href: "/affiliate", label: "Affiliate", icon: Gift },
+        { href: "/history", label: "Game History", icon: Clock },
       ],
     },
   ];
@@ -100,7 +100,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     menuSections.push({
       title: "Admin",
       items: [
-        { href: "/admin", label: "Admin Panel", icon: Shield, desc: "Manage platform" },
+        { href: "/admin", label: "Admin Panel", icon: Shield },
       ],
     });
   }
@@ -264,15 +264,12 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
                       key={item.href}
                       href={item.href}
                       prefetch={true}
-                      className={`flex items-center gap-3 px-4 py-2.5 hover:bg-ccb-surface transition-all active:scale-95 ${
+                      className={`flex items-center gap-3 px-4 py-2 hover:bg-ccb-surface transition-all active:scale-95 ${
                         active ? "text-ccb-primary" : "text-ccb-text"
                       }`}
                     >
                       <Icon className="w-5 h-5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{item.label}</p>
-                        <p className="text-[10px] text-ccb-muted">{item.desc}</p>
-                      </div>
+                      <p className="text-sm font-medium">{item.label}</p>
                     </Link>
                   );
                 })}
