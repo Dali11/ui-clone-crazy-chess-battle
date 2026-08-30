@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     // Find rematch offers for this game where the current user is the opponent
     const { data: offers } = await admin
       .from("rematch_offers")
-      .select("id, from_game_id, status, new_game_id, requester_id, opponent_id")
+      .select("id, from_game_id, status, new_game_id, requester_id, opponent_id, stake")
       .eq("from_game_id", gameId)
       .eq("opponent_id", user.id)
       .order("created_at", { ascending: false })

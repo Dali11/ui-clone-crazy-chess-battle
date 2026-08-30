@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { DEFAULT_CONFIG, calcPayout } from "@/lib/battles/battle-helpers";
 
 /**
  * POST /api/game/rematch/accept
  * Opponent accepts the rematch — creates the game and notifies the requester.
+ * If the rematch carries a stake (staked battle rematch):
+ *   - Checks both players' balances
+ *   - Debits both wallets
+ *   - Creates a battle record linked to the new game
  * Body: { offerId: string }
  */
 export async function POST(req: NextRequest) {
@@ -41,6 +46,81 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Offer expired" }, { status: 410 });
     }
 
+    const stake = offer.stake || 0;
+    const isStakedRematch = stake > 0;
+
+    // ── Staked rematch: balance checks + escrow ──
+    if (isStakedRematch) {
+      // Check acceptor's (opponent's) balance
+      const { data: acceptorProfile } = await admin
+        .from("profiles")
+        .select("rating, wallet_balance")
+        .eq("id", user.id)
+        .single();
+
+      const acceptorBalance = acceptorProfile?.wallet_balance ?? 0;
+      if (acceptorBalance < stake) {
+        return NextResponse.json({
+          error: `Insufficient balance for a staked rematch. You need MK ${stake.toLocaleString()}.`,
+          insufficientFunds: true,
+          requiredAmount: stake,
+          balance: acceptorBalance,
+        }, { status: 402 });
+      }
+
+      // Check requester's balance too — they might have spent it since sending the offer
+      const { data: requesterProfile } = await admin
+        .from("profiles")
+        .select("wallet_balance")
+        .eq("id", offer.requester_id)
+        .single();
+
+      const requesterBalance = requesterProfile?.wallet_balance ?? 0;
+      if (requesterBalance < stake) {
+        return NextResponse.json({
+          error: "Your opponent no longer has enough balance for this staked rematch.",
+        }, { status: 402 });
+      }
+
+      // Debit acceptor's wallet
+      const { error: debitAcceptor } = await admin.rpc("debit_wallet", {
+        p_user_id: user.id,
+        p_amount: stake,
+      });
+      if (debitAcceptor) {
+        return NextResponse.json({ error: "Failed to lock your stake. Try again." }, { status: 500 });
+      }
+
+      // Debit requester's wallet
+      const { error: debitRequester } = await admin.rpc("debit_wallet", {
+        p_user_id: offer.requester_id,
+        p_amount: stake,
+      });
+      if (debitRequester) {
+        // Refund the acceptor
+        await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake });
+        return NextResponse.json({ error: "Failed to lock opponent's stake. Try again." }, { status: 500 });
+      }
+
+      // Audit logs
+      await admin.from("deposits").insert([
+        {
+          user_id: user.id,
+          amount: stake,
+          status: "success",
+          method: "battle_escrow",
+          reference: `staked_rematch_accept:${offerId}:${user.id}`,
+        },
+        {
+          user_id: offer.requester_id,
+          amount: stake,
+          status: "success",
+          method: "battle_escrow",
+          reference: `staked_rematch_accept:${offerId}:${offer.requester_id}`,
+        },
+      ]);
+    }
+
     // Fetch player profiles for current ratings
     const [requesterProfile, opponentProfile] = await Promise.all([
       admin.from("profiles").select("rating, display_name, username").eq("id", offer.requester_id).single(),
@@ -67,7 +147,46 @@ export async function POST(req: NextRequest) {
 
     if (rpcError || !newGameId) {
       console.error("Rematch accept create_game error:", rpcError);
+      // Refund if staked
+      if (isStakedRematch) {
+        await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake });
+        await admin.rpc("credit_wallet", { p_user_id: offer.requester_id, p_amount: stake });
+      }
       return NextResponse.json({ error: "Failed to create rematch game" }, { status: 500 });
+    }
+
+    // Create battle record for staked rematches
+    if (isStakedRematch) {
+      const { data: configRow } = await admin.from("battle_config").select("*").limit(1).single();
+      const config = { ...DEFAULT_CONFIG, ...configRow };
+      const { pot, fee, payout } = calcPayout(stake, config.platform_fee_pct);
+
+      const { data: battle, error: battleErr } = await admin
+        .from("battles")
+        .insert({
+          white_player_id: newWhiteId,
+          black_player_id: newBlackId,
+          stake,
+          pot,
+          platform_fee: fee,
+          winner_payout: payout,
+          status: "pending",
+          white_rating: newWhiteRating,
+          black_rating: newBlackRating,
+        })
+        .select("id")
+        .single();
+
+      if (battleErr || !battle) {
+        console.error("Staked rematch battle creation failed:", battleErr);
+        // Refund
+        await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake });
+        await admin.rpc("credit_wallet", { p_user_id: offer.requester_id, p_amount: stake });
+        return NextResponse.json({ error: "Failed to create battle for rematch" }, { status: 500 });
+      }
+
+      // Link battle to the new game
+      await admin.from("battles").update({ game_id: newGameId }).eq("id", battle.id);
     }
 
     // Update the offer
@@ -77,8 +196,7 @@ export async function POST(req: NextRequest) {
       responded_at: new Date().toISOString(),
     }).eq("id", offerId);
 
-    // No in-app notification — the requester polls for offer status in real-time
-    return NextResponse.json({ gameId: newGameId, offerId });
+    return NextResponse.json({ gameId: newGameId, offerId, stake });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
   }

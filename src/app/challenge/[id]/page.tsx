@@ -35,9 +35,13 @@ export default async function ChallengePage({
   const supabase = await createClient();
   const admin = createAdminClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { id: string } | null = null;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data?.user ?? null;
+  } catch {
+    // Corrupted/expired session — send to login instead of crashing
+  }
 
   // If not logged in, redirect to login with return path
   if (!user) {

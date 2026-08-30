@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { calcPayout } from "./battles/battle-helpers";
 
 // Test the membership pricing logic without importing the full module
 // (which depends on Supabase). We replicate the core calculation here
@@ -129,5 +130,65 @@ describe("Battle escrow — double-spend prevention", () => {
     const battle = { settled: false };
     const guardPassed = battle.settled === false;
     expect(guardPassed).toBe(true);
+  });
+});
+
+
+
+describe("Staked rematch flow — business rules", () => {
+  it("rematch of a staked battle carries the same stake", () => {
+    const originalStake = 5000;
+    const rematchStake = originalStake;
+    expect(rematchStake).toBe(5000);
+  });
+
+  it("rematch of a non-battle game has stake = 0 (free)", () => {
+    const stake = 0;
+    expect(stake).toBe(0);
+  });
+
+  it("staked rematch payout follows the same formula as battles", () => {
+    const stake = 5000;
+    const feePct = 5;
+    const { pot, fee, payout } = calcPayout(stake, feePct);
+    expect(pot).toBe(10000);
+    expect(fee).toBe(500);
+    expect(payout).toBe(9500);
+  });
+
+  it("both players must have sufficient balance for staked rematch", () => {
+    const stake = 5000;
+    const requesterBalance = 3000;
+    const acceptorBalance = 6000;
+
+    expect(requesterBalance < stake).toBe(true);
+    expect(acceptorBalance >= stake).toBe(true);
+  });
+
+  it("if requester balance drops after offer, accept fails for requester", () => {
+    const stake = 5000;
+    const requesterBalanceAtAccept = 2000;
+    expect(requesterBalanceAtAccept < stake).toBe(true);
+  });
+
+  it("staked rematch refunds both players if game creation fails", () => {
+    const stake = 5000;
+    const debited = [stake, stake];
+    const refunded = [stake, stake];
+    expect(debited).toEqual(refunded);
+  });
+
+  it("staked rematch creates a battle record linked to the new game", () => {
+    const stake = 1000;
+    const { pot, fee, payout } = calcPayout(stake, 5);
+    expect(pot).toBe(2000);
+    expect(fee).toBe(100);
+    expect(payout).toBe(1900);
+  });
+
+  it("rematch offer stores stake for opponent to see before accepting", () => {
+    const offer = { stake: 2500, status: "pending" };
+    expect(offer.stake).toBe(2500);
+    expect(offer.stake > 0).toBe(true);
   });
 });

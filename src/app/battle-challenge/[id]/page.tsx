@@ -38,9 +38,13 @@ export default async function BattleChallengePage({
   const supabase = await createClient();
   const admin = createAdminClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { id: string; email?: string | null } | null = null;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data?.user ?? null;
+  } catch {
+    // Corrupted/expired session — send to login instead of crashing
+  }
 
   if (!user) {
     redirect(`/login?redirect=/battle-challenge/${id}${refCode ? `&ref=${refCode}` : ""}`);

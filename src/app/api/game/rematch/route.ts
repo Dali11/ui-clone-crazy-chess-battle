@@ -6,6 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * POST /api/game/rematch
  * Creates a rematch offer (pending) and notifies the opponent.
  * The game is NOT created yet — only when the opponent accepts.
+ * If the original game was a staked battle, the rematch carries the
+ * same stake — both players must have sufficient balance.
  * Body: { gameId: string }
  */
 export async function POST(req: NextRequest) {
@@ -49,6 +51,41 @@ export async function POST(req: NextRequest) {
     }
 
     const opponentId = isWhite ? game.black_player_id : game.white_player_id;
+
+    // Check if the original game was a staked battle
+    // Use .or() to match either the main game or the armageddon decider
+    let stake = 0;
+    const { data: battle } = await admin
+      .from("battles")
+      .select("stake, status, settled")
+      .or(`game_id.eq.${gameId},armageddon_game_id.eq.${gameId}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (battle && battle.status === "completed" && battle.settled) {
+      // Original game was a settled battle — rematch should carry the same stake
+      stake = battle.stake || 0;
+
+      if (stake > 0) {
+        // Check requester's balance — they need to have enough for the stake
+        const { data: requesterProfile } = await admin
+          .from("profiles")
+          .select("wallet_balance")
+          .eq("id", user.id)
+          .single();
+
+        const balance = requesterProfile?.wallet_balance ?? 0;
+        if (balance < stake) {
+          return NextResponse.json({
+            error: `Insufficient balance for a staked rematch. You need MK ${stake.toLocaleString()}.`,
+            insufficientFunds: true,
+            requiredAmount: stake,
+            balance,
+          }, { status: 402 });
+        }
+      }
+    }
+
     // Create the rematch offer
     const { data: offer, error: offerErr } = await admin
       .from("rematch_offers")
@@ -61,6 +98,7 @@ export async function POST(req: NextRequest) {
         initial_minutes: game.initial_minutes,
         increment_seconds: game.increment_seconds,
         rated: game.rated,
+        stake,
       })
       .select("id")
       .single();
@@ -70,8 +108,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to create rematch offer" }, { status: 500 });
     }
 
-    // No in-app notification — the game client polls for incoming offers in real-time
-    return NextResponse.json({ offerId: offer.id, status: "pending" });
+    return NextResponse.json({ offerId: offer.id, status: "pending", stake });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
   }
@@ -93,7 +130,7 @@ export async function GET(req: NextRequest) {
     const admin = createAdminClient();
     const { data: offer } = await admin
       .from("rematch_offers")
-      .select("id, status, new_game_id, from_game_id, requester_id, opponent_id")
+      .select("id, status, new_game_id, from_game_id, requester_id, opponent_id, stake")
       .eq("id", offerId)
       .single();
 

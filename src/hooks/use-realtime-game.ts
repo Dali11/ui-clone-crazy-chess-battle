@@ -297,7 +297,18 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
           if (updated.status && updated.status !== "playing") {
             setDrawOffer(null);
           }
-          setGame((prev) => ({ ...prev, ...updated } as GameState));
+          setGame((prev) => {
+            // Guard: never let a null fen from a DB row override the current
+            // state. Games created via direct insert (not the create_game RPC)
+          // may have fen: null in the DB. A realtime UPDATE on such a row
+          // (e.g. spectator_count change) would spread null over our state
+          // and crash chess.js's load() → fen.split(/\s+/) on null.
+          const merged = { ...prev, ...updated } as GameState;
+          if (merged.fen == null) {
+            merged.fen = prev.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+          }
+          return merged;
+          });
         }
       )
       .on("presence", { event: "sync" }, () => {

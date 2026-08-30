@@ -31,13 +31,14 @@ import { STATUS_LABELS } from "./types";
 export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo, tournamentId }: GameClientProps) {
   const { game, connected, connectionQuality, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw, spectatorCount } = useRealtimeGame(gameId, initialGame, currentUserId);
   const router = useRouter();
-  const [fen, setFen] = useState(game.fen);
+  const [fen, setFen] = useState(game.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [viewPly, setViewPly] = useState(0);
   const [victoryDismissed, setVictoryDismissed] = useState(false);
   const [rematchState, setRematchState] = useState<RematchState>({ status: "idle" });
-  const [incomingRematch, setIncomingRematch] = useState<{ offerId: string; fromGameId: string } | null>(null);
+  const [rematchStake, setRematchStake] = useState<number>(0);
+  const [incomingRematch, setIncomingRematch] = useState<{ offerId: string; fromGameId: string; stake?: number; error?: string } | null>(null);
   // If the player dismissed the overlay to review the board but an incoming rematch offer
   // arrives, bring the overlay back so they can see Accept/Decline.
   useEffect(() => {
@@ -188,9 +189,14 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   useEffect(() => {
     if (prevFenRef.current !== game.fen && !pendingPromotion) {
+      // Guard: never pass null/undefined fen to chess.js — it calls
+      // fen.split(/\s+/) inside load() and crashes with
+      // "Cannot read properties of null (reading 'split')"
+      const safePrev = prevFenRef.current || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+      const safeFen = game.fen || safePrev;
       try {
-        const tempGame = new Chess(prevFenRef.current);
-        const nextGame = new Chess(game.fen);
+        const tempGame = new Chess(safePrev);
+        const nextGame = new Chess(safeFen);
         const history = nextGame.history({ verbose: true });
         const last = history[history.length - 1];
         if (last) {
@@ -222,7 +228,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   }, [gameEnded, isTournamentGame, isSpectator, victoryDismissed, tournamentId, router]);
 
   useEffect(() => {
-    setFen(game.fen);
+    setFen(game.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     lastFenRef.current = game.fen;
     try {
       if (game.pgn) {
@@ -713,6 +719,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       });
       if (res.ok) {
         const data = await res.json();
+        if (data.stake && data.stake > 0) {
+          setRematchStake(data.stake);
+        }
         if (data.offerId) {
           setRematchState({ status: "waiting", offerId: data.offerId });
           // Poll for offer status
@@ -737,6 +746,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           }, 2000);
         }
       } else {
+        const errData = await res.json().catch(() => ({}));
+        if (errData.insufficientFunds) {
+          alert(errData.error || "Insufficient balance for a staked rematch.");
+        }
         setRematchState({ status: "idle" });
       }
     } catch {
@@ -801,7 +814,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         if (res.ok) {
           const data = await res.json();
           if (data.offer && data.offer.status === "pending") {
-            setIncomingRematch({ offerId: data.offer.id, fromGameId: data.offer.from_game_id });
+            setIncomingRematch({ offerId: data.offer.id, fromGameId: data.offer.from_game_id, stake: data.offer.stake || 0 });
           } else if (data.offer && data.offer.status !== "pending") {
             // Offer was resolved (accepted/declined/expired)
             setIncomingRematch(null);
@@ -842,6 +855,13 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           setIncomingRematch(null);
           window.location.href = `/game/${data.gameId}`;
         }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        if (data.insufficientFunds) {
+          setIncomingRematch({ ...incomingRematch, error: data.error || "Insufficient balance for staked rematch." });
+          return;
+        }
+        setIncomingRematch({ ...incomingRematch, error: data.error || "Failed to accept rematch." });
       }
     } catch {}
   };
@@ -1313,6 +1333,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
           onAcceptRematch={incomingRematch && !isSpectator ? handleAcceptIncomingRematch : undefined}
           onDeclineRematch={incomingRematch && !isSpectator ? handleDeclineIncomingRematch : undefined}
+          rematchStake={rematchStake}
+          incomingRematchStake={incomingRematch?.stake || 0}
+          incomingRematchError={incomingRematch?.error}
           onReview={() => setVictoryDismissed(true)}
           onDismiss={() => setVictoryDismissed(true)}
         />
@@ -1366,6 +1389,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         onCancelRematch={rematchState.status === "waiting" ? handleCancelRematch : undefined}
         onAcceptRematch={incomingRematch ? handleAcceptIncomingRematch : undefined}
         onDeclineRematch={incomingRematch ? handleDeclineIncomingRematch : undefined}
+        rematchStake={rematchStake}
+        incomingRematchStake={incomingRematch?.stake || 0}
+        incomingRematchError={incomingRematch?.error}
         onReview={() => setVictoryDismissed(true)}
         onDismiss={() => setVictoryDismissed(true)}
       />

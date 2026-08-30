@@ -33,6 +33,9 @@ interface VictoryOverlayProps {
   onDeclineRematch?: () => void;
   onDismiss?: () => void;
   rematchState?: RematchState;
+  rematchStake?: number;
+  incomingRematchStake?: number;
+  incomingRematchError?: string;
   newGameLabel?: string;
   playAgainLabel?: string;
   lobbyHref?: string;
@@ -66,6 +69,9 @@ export default function VictoryOverlay({
   onDeclineRematch,
   onDismiss,
   rematchState = { status: "idle" },
+  rematchStake = 0,
+  incomingRematchStake = 0,
+  incomingRematchError,
   newGameLabel = "New Game",
   playAgainLabel = "Play Again",
   lobbyHref = "/play",
@@ -270,14 +276,20 @@ export default function VictoryOverlay({
             </button>
           )}
 
-          {onAcceptRematch && (
+          {onAcceptRematch && !incomingRematchError && (
             <button
               onClick={onAcceptRematch}
               className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
               style={{ backgroundColor: "rgba(34,197,94,0.15)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)" }}
             >
-              <Check className="w-4 h-4" /> Accept Rematch
+              <Check className="w-4 h-4" /> {incomingRematchStake > 0 ? `Accept Staked Rematch · MK ${incomingRematchStake.toLocaleString()}` : "Accept Rematch"}
             </button>
+          )}
+
+          {incomingRematchError && (
+            <div className="mb-3 px-4 py-3 rounded-xl text-center" style={{ backgroundColor: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)" }}>
+              <p className="text-sm text-red-400">{incomingRematchError}</p>
+            </div>
           )}
 
           {onDeclineRematch && (
