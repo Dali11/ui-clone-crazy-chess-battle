@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getLedgerMeta, ledgerDisplayAmount, WITHDRAWAL_META } from "@/lib/wallet-ledger";
 
 /**
  * Unified transaction history for the wallet page.
- * Combines deposits, withdrawals, and battle payouts into a single timeline.
+ * Combines deposits (which is actually a general wallet ledger — real cash
+ * deposits AND battle escrow/payouts/refunds AND tournament entries/prizes
+ * AND admin corrections, all distinguished by `method`) with withdrawals
+ * into a single, correctly-signed timeline. Every row is pre-classified as
+ * inflow ("in") or outflow ("out") via the shared wallet-ledger helper so
+ * the UI can color it green/red consistently without guessing from the
+ * raw stored amount sign (which is NOT reliable — e.g. escrow rows are
+ * stored positive even though they're money leaving the wallet).
  */
 export async function GET(req: NextRequest) {
   try {
@@ -18,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     type Txn = {
       id: string;
-      type: "deposit" | "withdrawal" | "battle_payout" | "battle_stake" | "tournament_entry" | "tournament_prize";
+      direction: "in" | "out";
       amount: number;
       status: string;
       description: string;
@@ -27,63 +35,43 @@ export async function GET(req: NextRequest) {
 
     const transactions: Txn[] = [];
 
-    // Fetch deposits (non-fatal)
+    // All wallet ledger rows (deposits table = real deposits + internal movements)
     try {
-      const { data: deposits } = await admin
+      const { data: rows } = await admin
         .from("deposits")
         .select("id, amount, status, method, created_at, reference")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(limit);
-      for (const d of deposits || []) {
+      for (const r of rows || []) {
+        const meta = getLedgerMeta(r.method);
         transactions.push({
-          id: d.id,
-          type: "deposit",
-          amount: d.amount,
-          status: d.status,
-          description: d.method === "mobile_money" ? "Mobile Money deposit" : d.method === "card" ? "Card deposit" : `Deposit (${d.method || "unknown"})`,
-          created_at: d.created_at,
+          id: r.id,
+          direction: meta.direction,
+          amount: ledgerDisplayAmount(r.amount, meta.direction),
+          status: r.status,
+          description: meta.label,
+          created_at: r.created_at,
         });
       }
     } catch {}
 
-    // Fetch withdrawals (non-fatal)
+    // Withdrawals — always outflow
     try {
       const { data: withdrawals } = await admin
         .from("withdrawals")
-        .select("id, amount, status, operator_name, created_at")
+        .select("id, amount, net_amount, status, operator_name, created_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(limit);
       for (const w of withdrawals || []) {
         transactions.push({
           id: w.id,
-          type: "withdrawal",
-          amount: -w.amount,
+          direction: "out",
+          amount: ledgerDisplayAmount(w.net_amount ?? w.amount, WITHDRAWAL_META.direction),
           status: w.status,
           description: `Withdrawal via ${w.operator_name || "mobile money"}`,
           created_at: w.created_at,
-        });
-      }
-    } catch {}
-
-    // Fetch battle payouts (from deposits table where method = battle_payout)
-    try {
-      const { data: battlePayouts } = await admin
-        .from("deposits")
-        .select("id, amount, status, reference, created_at")
-        .eq("user_id", user.id)
-        .eq("method", "battle_payout")
-        .order("created_at", { ascending: false })
-        .limit(limit);
-      for (const b of battlePayouts || []) {
-        transactions.push({
-          id: b.id,
-          type: "battle_payout",
-          amount: b.amount,
-          status: b.status,
-          description: b.reference || "Battle winnings",
-          created_at: b.created_at,
         });
       }
     } catch {}
