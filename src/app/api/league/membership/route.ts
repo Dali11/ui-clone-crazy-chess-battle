@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getMarketConfig } from "@/lib/league/market-config";
 import { getPlatformConfig } from "@/lib/platform-config";
 
 // GET — Check membership status and pricing (now from market_config table)
@@ -11,25 +10,15 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Get profile for country-based pricing
-    let country = 'MW';
-    if (user) {
-      const { data: profile } = await admin
-        .from('profiles')
-        .select('country')
-        .eq('id', user.id)
-        .single();
-      country = profile?.country || 'MW';
-    }
-
-    const market = await getMarketConfig(country);
+    // Get membership pricing from platform settings (admin-configurable)
+    const mConfig = await getPlatformConfig(admin, 'membership');
 
     const membershipConfig = {
-      country: market.countryCode,
-      currency: market.membershipCurrency || market.currencyCode,
-      price: market.membershipPrice,
+      currency: mConfig.currency || 'MWK',
+      price: mConfig.monthly_price || 10000,
+      yearlyPrice: mConfig.yearly_price || (mConfig.monthly_price || 10000) * 10,
       billingCycle: 'monthly',
-      active: market.membershipActive,
+      active: mConfig.membership_active !== false,
       benefits: [
         'Access to premium Premier League competitions',
         'Priority entry to Swiss qualifier tournaments',
@@ -113,20 +102,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get pricing from market config (not hardcoded)
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('country')
-      .eq('id', user.id)
-      .single();
-
-    const market = await getMarketConfig(profile?.country || 'MW');
-
-    const monthlyPrice = market.membershipPrice;
-    const yearlyPrice = monthlyPrice * 10; // 10 months (2 months free)
+    // Get pricing from platform settings (admin-configurable, already loaded above)
+    const monthlyPrice = mConfig.monthly_price || 10000;
+    const yearlyPrice = mConfig.yearly_price || monthlyPrice * 10;
     const price = billingCycle === 'yearly' ? yearlyPrice : monthlyPrice;
-    const currency = market.membershipCurrency || market.currencyCode;
-    const country = market.countryCode;
+    const currency = mConfig.currency || 'MWK';
+    const country = (mConfig.country || 'MW') as string;
 
     // Check for existing active membership
     const { data: existing } = await admin
