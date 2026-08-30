@@ -189,14 +189,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // same FK-embed limitation as battles, so resolve usernames manually.
     const { data: rawReferralsMade } = await admin
       .from("referrals")
-      .select("id, status, reward_amount, created_at, referred_id")
+      .select("id, status, commission_amount, created_at, referred_id")
       .eq("referrer_id", id)
       .order("created_at", { ascending: false })
       .limit(10);
 
     const { data: rawReferralReceived } = await admin
       .from("referrals")
-      .select("id, status, reward_amount, created_at, referrer_id")
+      .select("id, status, commission_amount, created_at, referrer_id")
       .eq("referred_id", id)
       .order("created_at", { ascending: false })
       .limit(1);
@@ -221,7 +221,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const referralsMade = (rawReferralsMade || []).map((r) => ({
       id: r.id,
       status: r.status,
-      reward_amount: r.reward_amount,
+      reward_amount: r.commission_amount || 0,
       created_at: r.created_at,
       referred: referralProfilesById.get(r.referred_id) || null,
     }));
@@ -231,7 +231,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ? {
           id: referralReceivedRaw.id,
           status: referralReceivedRaw.status,
-          reward_amount: referralReceivedRaw.reward_amount,
+          reward_amount: referralReceivedRaw.commission_amount || 0,
           created_at: referralReceivedRaw.created_at,
           referrer: referralProfilesById.get(referralReceivedRaw.referrer_id) || null,
         }
