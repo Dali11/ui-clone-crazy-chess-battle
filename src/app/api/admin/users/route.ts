@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
 
-// GET — list all users
+// GET — list all users (supports country filter + search)
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -18,11 +18,25 @@ export async function GET(req: NextRequest) {
       .single();
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const { data: users, error } = await admin
+    const { searchParams } = new URL(req.url);
+    const country = searchParams.get("country");
+    const search = searchParams.get("search");
+
+    let query = admin
       .from("profiles")
-      .select("id, username, display_name, email, rating, games_played, wins, losses, draws, wallet_balance, is_admin, is_banned, phone, created_at")
+      .select("id, username, display_name, email, rating, games_played, wins, losses, draws, wallet_balance, is_admin, is_banned, phone, country, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
+
+    if (country) {
+      query = query.eq("country", country);
+    }
+
+    if (search) {
+      query = query.or(`username.ilike.%${search}%,email.ilike.%${search}%,display_name.ilike.%${search}%`);
+    }
+
+    const { data: users, error } = await query;
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -154,7 +168,7 @@ export async function DELETE(req: NextRequest) {
       .in("status", ["waiting", "active"])
       .then(() => {});
 
-    // 2. Remove from active tournaments (refund if paid)
+    // 2. Remove from active tournaments
     const { data: tournamentParticipations } = await admin
       .from("tournament_participants")
       .select("id, tournament_id, paid")
@@ -163,12 +177,10 @@ export async function DELETE(req: NextRequest) {
 
     if (tournamentParticipations && tournamentParticipations.length > 0) {
       for (const p of tournamentParticipations) {
-        // Mark as withdrawn
         await admin.from("tournament_participants")
           .update({ status: "withdrawn" })
           .eq("id", p.id);
         
-        // If they paid, refund the tournament creator's prize pool
         if (p.paid) {
           const { data: tournament } = await admin
             .from("tournaments")
@@ -186,12 +198,7 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
-    // 3. Delete game records (set player IDs to null via FK ON DELETE SET NULL, or delete)
-    // Games table has ON DELETE SET NULL for player IDs, so deleting the profile
-    // will handle this. But we also want to clean up the game records themselves
-    // for bot games where the user is the only human player.
-
-    // 6. Delete referrals (both as referrer and referred)
+    // 6. Delete referrals
     await admin.from("referrals").delete().eq("referrer_id", userId);
     await admin.from("referrals").delete().eq("referred_id", userId);
 
@@ -219,12 +226,11 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Failed to delete profile: " + profileDeleteError.message }, { status: 500 });
     }
 
-    // 13. Delete the auth user (this is the nuclear option)
+    // 13. Delete the auth user
     const { error: authDeleteError } = await admin.auth.admin.deleteUser(userId);
 
     if (authDeleteError) {
       console.error("Auth user delete error:", authDeleteError);
-      // Profile was already deleted, so this is partial — log it
       return NextResponse.json({ 
         success: true, 
         warning: "Profile deleted but auth user removal failed: " + authDeleteError.message 

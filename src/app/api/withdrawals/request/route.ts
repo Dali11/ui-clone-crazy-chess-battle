@@ -121,48 +121,85 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ withdrawalId, status: "pending" });
         }
 
-        // Initiate Paychangu payout (net amount after fees)
+        // Initiate payout (PayChangu by default, PawaPay if specified)
         const chargeId = `wd_${withdrawal.id.slice(0, 8)}_${Date.now()}`;
         const amountMWK = (netAmount || withdrawal.amount);
         let payoutSucceeded = false;
+        const payoutProvider = withdrawal.payment_provider || "paychangu";
 
-        try {
-          const payoutResponse = await fetch("https://api.paychangu.com/mobile-money/payouts/initialize", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${process.env.PAYCHANGU_SECRET_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              mobile: withdrawal.phone,
-              mobile_money_operator_ref_id: withdrawal.operator_ref_id,
+        if (payoutProvider === "pawapay") {
+          try {
+            const { initiatePayout } = await import("@/lib/payments/pawapay");
+            const { randomUUID } = await import("crypto");
+            const payoutId = randomUUID();
+            const payoutResponse = await initiatePayout({
+              payoutId,
               amount: String(amountMWK),
-              charge_id: chargeId,
-            }),
-          });
+              currency: withdrawal.currency || "MWK",
+              phoneNumber: withdrawal.phone,
+              provider: withdrawal.operator_ref_id,
+            });
 
-          const payoutData = await payoutResponse.json();
+            if (payoutResponse.status === "ACCEPTED" || payoutResponse.status === "COMPLETED") {
+              payoutSucceeded = true;
+              await admin
+                .from("withdrawals")
+                .update({ status: "completed", charge_id: chargeId, pawapay_ref: payoutId, updated_at: new Date().toISOString() })
+                .eq("id", withdrawalId);
 
-          if (payoutData.status === "success" || payoutData.status === "pending") {
-            payoutSucceeded = true;
-            await admin
-              .from("withdrawals")
-              .update({ status: "completed", charge_id: chargeId, updated_at: new Date().toISOString() })
-              .eq("id", withdrawalId);
-
-            try {
-              await admin.from("notifications").insert({
-                user_id: withdrawal.user_id,
-                type: "withdrawal_approved",
-                title: "Your withdrawal has been processed",
-                body: `MWK ${amountMWK} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
-                data: { amount: amountMWK, phone: withdrawal.phone, operator: withdrawal.operator_name, auto: true, fees: totalFees },
-                read: false,
-              });
-            } catch {}
+              try {
+                await admin.from("notifications").insert({
+                  user_id: withdrawal.user_id,
+                  type: "withdrawal_approved",
+                  title: "Your withdrawal has been processed",
+                  body: `${amountMWK.toLocaleString()} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
+                  data: { amount: amountMWK, phone: withdrawal.phone, operator: withdrawal.operator_name, auto: true, fees: totalFees, provider: "pawapay" },
+                  read: false,
+                });
+              } catch {}
+            }
+          } catch (payoutErr: any) {
+            console.error("Auto-approve PawaPay payout error:", payoutErr);
           }
-        } catch (payoutErr: any) {
-          console.error("Auto-approve payout error:", payoutErr);
+        } else {
+          try {
+            const payoutResponse = await fetch("https://api.paychangu.com/mobile-money/payouts/initialize", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${process.env.PAYCHANGU_SECRET_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                mobile: withdrawal.phone,
+                mobile_money_operator_ref_id: withdrawal.operator_ref_id,
+                amount: String(amountMWK),
+                charge_id: chargeId,
+              }),
+            });
+
+            const payoutData = await payoutResponse.json();
+
+            if (payoutData.status === "success" || payoutData.status === "pending") {
+              payoutSucceeded = true;
+              await admin
+                .from("withdrawals")
+                .update({ status: "completed", charge_id: chargeId, updated_at: new Date().toISOString() })
+                .eq("id", withdrawalId);
+
+              try {
+                await admin.from("notifications").insert({
+                  user_id: withdrawal.user_id,
+                  type: "withdrawal_approved",
+                  title: "Your withdrawal has been processed",
+                  body: `MWK ${amountMWK} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
+                  data: { amount: amountMWK, phone: withdrawal.phone, operator: withdrawal.operator_name, auto: true, fees: totalFees },
+                  read: false,
+                });
+              } catch {}
+            }
+          } catch (payoutErr: any) {
+            console.error("Auto-approve PayChangu payout error:", payoutErr);
+          }
         }
 
         if (!payoutSucceeded) {

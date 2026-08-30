@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { initiatePayout } from "@/lib/payments/pawapay";
+import { randomUUID } from "crypto";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -32,45 +34,74 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: `Withdrawal is already ${existing.status}` }, { status: 400 });
     }
 
-    // ─── Use net_amount (after fees) for the payout ──────────────────────
-    // The fee was calculated and stored when the withdrawal was requested.
-    // We must send the NET amount to PayChangu, not the gross amount.
     const fee = withdrawal.fee || 0;
     const grossAmount = withdrawal.amount;
     const netAmount = withdrawal.net_amount || (grossAmount - fee);
 
-    // Initiate Paychangu mobile money payout (net amount only)
-    const chargeId = `wd_${withdrawal.id.slice(0, 8)}_${Date.now()}`;
-    const amountMWK = netAmount;
-
     let payoutSucceeded = false;
+    const chargeId = `wd_${withdrawal.id.slice(0, 8)}_${Date.now()}`;
 
-    try {
-      const payoutResponse = await fetch("https://api.paychangu.com/mobile-money/payouts/initialize", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.PAYCHANGU_SECRET_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          mobile: withdrawal.phone,
-          mobile_money_operator_ref_id: withdrawal.operator_ref_id,
-          amount: String(amountMWK),
-          charge_id: chargeId,
-        }),
-      });
+    // ── Determine payout provider ───────────────────────────────────────
+    const provider = withdrawal.payment_provider || "paychangu";
 
-      const payoutData = await payoutResponse.json();
+    if (provider === "pawapay") {
+      // ── PawaPay payout ─────────────────────────────────────────────────
+      const payoutId = randomUUID();
 
-      if (payoutData.status === "success" || payoutData.status === "pending") {
-        payoutSucceeded = true;
-        await admin
-          .from("withdrawals")
-          .update({ status: "completed", charge_id: chargeId, updated_at: new Date().toISOString() })
-          .eq("id", id);
+      try {
+        const response = await initiatePayout({
+          payoutId,
+          amount: String(netAmount),
+          currency: withdrawal.currency || "MWK",
+          phoneNumber: withdrawal.phone,
+          provider: withdrawal.operator_ref_id,
+        });
+
+        if (response.status === "ACCEPTED" || response.status === "COMPLETED") {
+          payoutSucceeded = true;
+          await admin
+            .from("withdrawals")
+            .update({
+              status: "completed",
+              charge_id: chargeId,
+              pawapay_ref: payoutId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", id);
+        }
+      } catch (payoutErr: any) {
+        console.error("PawaPay payout error:", payoutErr);
       }
-    } catch (payoutErr: any) {
-      console.error("Payout API error:", payoutErr);
+
+    } else {
+      // ── PayChangu payout (existing logic) ──────────────────────────────
+      try {
+        const payoutResponse = await fetch("https://api.paychangu.com/mobile-money/payouts/initialize", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.PAYCHANGU_SECRET_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            mobile: withdrawal.phone,
+            mobile_money_operator_ref_id: withdrawal.operator_ref_id,
+            amount: String(netAmount),
+            charge_id: chargeId,
+          }),
+        });
+
+        const payoutData = await payoutResponse.json();
+
+        if (payoutData.status === "success" || payoutData.status === "pending") {
+          payoutSucceeded = true;
+          await admin
+            .from("withdrawals")
+            .update({ status: "completed", charge_id: chargeId, updated_at: new Date().toISOString() })
+            .eq("id", id);
+        }
+      } catch (payoutErr: any) {
+        console.error("PayChangu payout error:", payoutErr);
+      }
     }
 
     if (!payoutSucceeded) {
@@ -82,7 +113,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           user_id: withdrawal.user_id,
           type: "withdrawal_failed",
           title: "Withdrawal payout failed",
-          body: `Your withdrawal for MWK ${grossAmount} could not be processed. Funds returned to your wallet.`,
+          body: `Your withdrawal for ${grossAmount.toLocaleString()} could not be processed. Funds returned to your wallet.`,
           data: { amount: grossAmount },
           read: false,
         });
@@ -104,6 +135,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           net_amount: netAmount,
           phone: withdrawal.phone,
           charge_id: chargeId,
+          provider,
         },
       });
     } catch {}
@@ -114,13 +146,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         user_id: withdrawal.user_id,
         type: "withdrawal_approved",
         title: "Withdrawal approved",
-        body: `Your withdrawal of MWK ${grossAmount} (fee: MWK ${fee}, payout: MWK ${netAmount}) has been processed to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
-        data: { gross_amount: grossAmount, fee, net_amount: netAmount, phone: withdrawal.phone, operator: withdrawal.operator_name },
+        body: `Your withdrawal of ${grossAmount.toLocaleString()} (fee: ${fee.toLocaleString()}, payout: ${netAmount.toLocaleString()}) has been processed to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
+        data: { gross_amount: grossAmount, fee, net_amount: netAmount, phone: withdrawal.phone, operator: withdrawal.operator_name, provider },
         read: false,
       });
     } catch {}
 
-    return NextResponse.json({ status: "completed", chargeId, grossAmount, fee, netAmount });
+    return NextResponse.json({ status: "completed", chargeId, grossAmount, fee, netAmount, provider });
   } catch (err: any) {
     return NextResponse.json({ error: "Failed to approve withdrawal. Please try again." }, { status: 500 });
   }
