@@ -5,7 +5,7 @@
  * Docs: https://docs.pawapay.io/v2/docs/welcome
  *
  * Env vars:
- *   PAWAPAY_API_TOKEN  — Bearer token from PawaPay dashboard
+ *   PAWAPAY_API_KEY    — Bearer token from PawaPay dashboard
  *   PAWAPAY_SANDBOX    — "true" to use sandbox endpoint (default: false)
  */
 
@@ -17,8 +17,8 @@ export function pawapayBaseUrl(): string {
 }
 
 export function pawapayHeaders(): Record<string, string> {
-  const token = process.env.PAWAPAY_API_TOKEN;
-  if (!token) throw new Error("PAWAPAY_API_TOKEN not configured");
+  const token = process.env.PAWAPAY_API_KEY || process.env.PAWAPAY_API_TOKEN;
+  if (!token) throw new Error("PAWAPAY_API_KEY not configured");
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
