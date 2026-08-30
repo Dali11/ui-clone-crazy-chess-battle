@@ -3252,6 +3252,18 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
             <PlatformSettingsHub />
           )}
 
+
+        {/* USER DETAIL MODAL */}
+        {userDetailId && (
+          <UserDetailModal
+            userId={userDetailId}
+            onClose={() => setUserDetailId(null)}
+            onAction={handleUserAction}
+            onDelete={handleDeleteUser}
+            actionLoading={actionLoading}
+            formatMWK={formatMWK}
+          />
+        )}
         </div>
       </div>
     </div>
@@ -3383,23 +3395,6 @@ function PlatformSettingsHub() {
           Settings are stored in the <code className="text-ccb-text font-mono">platform_settings</code> table and synced to legacy config tables (battle_config, withdrawal_config) automatically. All backend routes read from these values.
         </p>
       </div>
-    </div>
-  );
-}
-
-
-        {/* USER DETAIL MODAL */}
-        {userDetailId && (
-          <UserDetailModal
-            userId={userDetailId}
-            onClose={() => setUserDetailId(null)}
-            onAction={handleUserAction}
-            onDelete={handleDeleteUser}
-            actionLoading={actionLoading}
-            formatMWK={formatMWK}
-          />
-        )}
-      </>
     </div>
   );
 }
