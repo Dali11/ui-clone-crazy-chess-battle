@@ -65,13 +65,11 @@ export default async function AffiliatePage() {
   // Get membership pricing for display
   const { data: marketConfig } = await admin
     .from("market_config")
-    .select("membership_price_cents, membership_currency, country_code")
+    .select("membership_price, membership_currency, country_code")
     .eq("country_code", profile?.country || "MW")
     .single();
 
-  const membershipPrice = marketConfig?.membership_price_cents
-    ? Math.floor(marketConfig.membership_price_cents / 100)
-    : 10000; // fallback
+  const membershipPrice = marketConfig?.membership_price || 10000; // MWK, already integer
   const membershipCurrency = marketConfig?.membership_currency || "MWK";
   const yearlyPrice = membershipPrice * 10; // 10 months (2 free)
   const commissionRate = 0.25;
