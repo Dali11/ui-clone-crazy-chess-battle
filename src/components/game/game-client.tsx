@@ -22,48 +22,11 @@ import OpeningBadge from "./opening-badge";
 import GameChat from "./game-chat";
 import PreGameCountdown from "./pre-game-countdown";
 import PlayerProfilePreview from "./player-profile-preview";
+import PlayerBar from "./player-bar";
+import { formatClock } from "./utils";
+import type { BattleInfo, GameClientProps, SheetType } from "./types";
+import { STATUS_LABELS } from "./types";
 
-interface BattleInfo {
-  isBattle: boolean;
-  battleId?: string;
-  stake: number;
-  winnerPayout: number;
-  winnerId: string | null;
-  isArmageddon?: boolean;
-}
-
-interface GameClientProps {
-  gameId: string;
-  initialGame: GameState;
-  currentUserId: string;
-  isSpectator?: boolean;
-  whiteName?: string;
-  blackName?: string;
-  whiteAvatar?: string | null;
-  blackAvatar?: string | null;
-  battleInfo?: BattleInfo | null;
-  tournamentId?: string | null;
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  checkmate: "Checkmate",
-  stalemate: "Stalemate",
-  draw: "Draw",
-  resign: "Resignation",
-  timeout: "Time out",
-  abort: "Game Aborted — first move not made",
-};
-
-type SheetType = "chat" | "theme" | "menu" | null;
-
-function formatClock(ms: number | null): string {
-  if (ms === null || ms === undefined) return "—";
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes > 0) return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  return `0:${seconds.toString().padStart(2, "0")}`;
-}
 
 export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo, tournamentId }: GameClientProps) {
   const { game, connected, connectionQuality, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw, spectatorCount } = useRealtimeGame(gameId, initialGame, currentUserId);
@@ -898,44 +861,20 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   };
 
   const renderPlayerBar = (data: { name: string; userId?: string; avatar?: string | null; rating?: number | string | null; ratingChange?: number | null; captured: string[]; advantage: number; clock: string; isActive: boolean; symbol: string }) => (
-    <div className={`flex items-center justify-between max-w-[600px] mx-auto w-full px-2 py-2 rounded-lg transition-colors ${data.isActive ? "bg-ccb-primary/8" : ""}`}>
-      <div className="flex items-center gap-2.5 min-w-0">
-        {/* Avatar circle — chess.com style */}
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors ${data.isActive ? "border-ccb-primary bg-ccb-primary/15" : "border-ccb-border bg-ccb-surface"}`}>
-          {data.avatar ? (
-            <img src={data.avatar} alt="" className="w-full h-full rounded-full object-cover" />
-          ) : (
-            <span className="text-lg">{data.symbol}</span>
-          )}
-        </div>
-        <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-1.5">
-            <button onClick={() => data.userId && setPreviewUserId(data.userId)} className="text-sm font-semibold leading-tight truncate hover:text-ccb-primary transition-colors cursor-pointer bg-transparent border-0 p-0 m-0 text-inherit text-left">{data.name}</button>
-            {data.rating != null && (
-              <span className="text-sm text-ccb-muted/80 shrink-0 flex items-center gap-0.5 font-medium">
-                ({data.rating}
-                {gameEnded && typeof data.ratingChange === "number" && data.ratingChange !== 0 && (
-                  <span className={data.ratingChange > 0 ? "text-emerald-500 font-semibold" : "text-ccb-danger font-semibold"}>
-                    {data.ratingChange > 0 ? `+${data.ratingChange}` : data.ratingChange}
-                  </span>
-                )}
-                )
-              </span>
-            )}
-          </div>
-          <CapturedPieces pieces={data.captured} advantage={data.advantage} perspective="top" />
-        </div>
-      </div>
-      {/* Clock pill — chess.com style */}
-      <div className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-mono text-xl font-bold transition-all shrink-0 ${
-        data.isActive
-          ? "bg-ccb-surface text-ccb-text shadow-md ring-1 ring-ccb-primary/30"
-          : "bg-ccb-surface/60 text-ccb-muted"
-      }`}>
-        <Clock className={`w-4 h-4 ${data.isActive ? "text-ccb-primary" : "text-ccb-muted"}`} />
-        {data.clock}
-      </div>
-    </div>
+    <PlayerBar
+      name={data.name}
+      userId={data.userId}
+      avatar={data.avatar}
+      rating={data.rating}
+      ratingChange={data.ratingChange}
+      captured={data.captured}
+      advantage={data.advantage}
+      clock={data.clock}
+      isActive={data.isActive}
+      symbol={data.symbol}
+      gameEnded={gameEnded}
+      onPreview={setPreviewUserId}
+    />
   );
 
   // Computed once, above boardColumn's definition, so its closure never hits
