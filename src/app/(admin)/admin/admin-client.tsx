@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import PlatformSettingsPanel from "./platform-settings-panel";
 import LeagueManager from "./league-manager";
+import UserDetailModal from "./user-detail-modal";
 
 interface Withdrawal {
   id: string;
@@ -173,6 +174,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [withdrawalConfigSaving, setWithdrawalConfigSaving] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserInfo | null>(null);
+  const [userDetailId, setUserDetailId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [editingTournament, setEditingTournament] = useState<Tournament | null>(null);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
@@ -1221,7 +1223,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
               ) : (
                 <div className="space-y-2">
                   {filteredUsers.map((u) => (
-                    <div key={u.id} className={`card ${u.is_banned ? "opacity-60" : ""}`}>
+                    <div key={u.id} className={`card ${u.is_banned ? "opacity-60" : ""} cursor-pointer hover:border-ccb-primary/30 transition-colors`} onClick={() => setUserDetailId(u.id)}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center">
@@ -1248,6 +1250,14 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
 
                       {/* Action buttons */}
                       <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-ccb-border">
+                        <ActionButton
+                          onClick={() => setUserDetailId(u.id)}
+                          loading={false}
+                          variant="primary"
+                        >
+                          <UserRound className="w-3.5 h-3.5" /> View Profile
+                        </ActionButton>
+
                         <ActionButton
                           onClick={() => handleUserAction(u.id, u.is_banned ? "unban" : "ban")}
                           loading={actionLoading === `${u.id}_${u.is_banned ? "unban" : "ban"}`}
@@ -3373,6 +3383,23 @@ function PlatformSettingsHub() {
           Settings are stored in the <code className="text-ccb-text font-mono">platform_settings</code> table and synced to legacy config tables (battle_config, withdrawal_config) automatically. All backend routes read from these values.
         </p>
       </div>
+    </div>
+  );
+}
+
+
+        {/* USER DETAIL MODAL */}
+        {userDetailId && (
+          <UserDetailModal
+            userId={userDetailId}
+            onClose={() => setUserDetailId(null)}
+            onAction={handleUserAction}
+            onDelete={handleDeleteUser}
+            actionLoading={actionLoading}
+            formatMWK={formatMWK}
+          />
+        )}
+      </>
     </div>
   );
 }

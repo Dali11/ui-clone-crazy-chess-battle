@@ -32,9 +32,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: `Withdrawal is already ${existing.status}` }, { status: 400 });
     }
 
-    // Initiate Paychangu mobile money payout
+    // ─── Use net_amount (after fees) for the payout ──────────────────────
+    // The fee was calculated and stored when the withdrawal was requested.
+    // We must send the NET amount to PayChangu, not the gross amount.
+    const fee = withdrawal.fee || 0;
+    const grossAmount = withdrawal.amount;
+    const netAmount = withdrawal.net_amount || (grossAmount - fee);
+
+    // Initiate Paychangu mobile money payout (net amount only)
     const chargeId = `wd_${withdrawal.id.slice(0, 8)}_${Date.now()}`;
-    const amountMWK = withdrawal.amount;
+    const amountMWK = netAmount;
 
     let payoutSucceeded = false;
 
@@ -75,8 +82,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           user_id: withdrawal.user_id,
           type: "withdrawal_failed",
           title: "Withdrawal payout failed",
-          body: `Your withdrawal for MWK ${amountMWK} could not be processed. Funds returned to your wallet.`,
-          data: { amount: amountMWK },
+          body: `Your withdrawal for MWK ${grossAmount} could not be processed. Funds returned to your wallet.`,
+          data: { amount: grossAmount },
           read: false,
         });
       } catch {}
@@ -84,18 +91,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Payout failed. Wallet has been refunded." }, { status: 500 });
     }
 
-    // Log action
+    // Log action with fee breakdown
     try {
       await admin.from("admin_logs").insert({
         admin_id: user.id,
         action: "withdrawal_approve",
         target_type: "withdrawal",
         target_id: id,
-        details: { amount: amountMWK, phone: withdrawal.phone, charge_id: chargeId },
+        details: {
+          gross_amount: grossAmount,
+          fee: fee,
+          net_amount: netAmount,
+          phone: withdrawal.phone,
+          charge_id: chargeId,
+        },
       });
     } catch {}
 
-    return NextResponse.json({ status: "completed", chargeId });
+    // Notify the user
+    try {
+      await admin.from("notifications").insert({
+        user_id: withdrawal.user_id,
+        type: "withdrawal_approved",
+        title: "Withdrawal approved",
+        body: `Your withdrawal of MWK ${grossAmount} (fee: MWK ${fee}, payout: MWK ${netAmount}) has been processed to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
+        data: { gross_amount: grossAmount, fee, net_amount: netAmount, phone: withdrawal.phone, operator: withdrawal.operator_name },
+        read: false,
+      });
+    } catch {}
+
+    return NextResponse.json({ status: "completed", chargeId, grossAmount, fee, netAmount });
   } catch (err: any) {
     return NextResponse.json({ error: "Failed to approve withdrawal. Please try again." }, { status: 500 });
   }
