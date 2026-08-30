@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getLedgerMeta, ledgerDisplayAmount, WITHDRAWAL_META } from "@/lib/wallet-ledger";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -37,6 +38,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // ─── Real cash deposited (mobile_money/card, successful only) ────────
+    // This is the number that actually matters for "how much real money has
+    // this user put in" — distinct from the internal ledger (escrow,
+    // payouts, tournament fees) that also lives in the `deposits` table.
+    const { data: cashDepositRows } = await admin
+      .from("deposits")
+      .select("amount")
+      .eq("user_id", id)
+      .in("method", ["mobile_money", "card"])
+      .eq("status", "success");
+    const cashDepositTotal = (cashDepositRows || []).reduce((sum, r) => sum + (r.amount || 0), 0);
+
     // ─── Recent games (last 20) ──────────────────────────────────────────
     const { data: games } = await admin
       .from("games")
@@ -52,25 +65,66 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .order("created_at", { ascending: false })
       .limit(20);
 
-    // ─── Deposits (last 20) ──────────────────────────────────────────────
-    const { data: deposits } = await admin
+    // ─── Wallet ledger (last 30) ──────────────────────────────────────────
+    // The `deposits` table is actually a general wallet ledger: real cash
+    // deposits (mobile_money/card) AND internal movements (battle escrow,
+    // battle payouts/refunds, tournament entries/prizes, admin corrections)
+    // all live here under different `method` values. We classify each row
+    // as inflow/outflow via the shared wallet-ledger helper — the stored
+    // amount sign alone is NOT reliable (e.g. escrow rows are stored positive
+    // even though they're money leaving the wallet).
+    const { data: rawDeposits } = await admin
       .from("deposits")
       .select("id, amount, status, method, charge_id, tx_ref, phone, operator, reference, admin_notes, created_at, updated_at")
       .eq("user_id", id)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(30);
 
-    // ─── Withdrawals (last 20) ───────────────────────────────────────────
-    const { data: withdrawals } = await admin
+    const deposits = (rawDeposits || []).map((d) => {
+      const meta = getLedgerMeta(d.method);
+      return {
+        ...d,
+        label: meta.label,
+        direction: meta.direction,
+        display_amount: ledgerDisplayAmount(d.amount, meta.direction),
+      };
+    });
+
+    // ─── Withdrawals (last 20) — always outflow ──────────────────────────
+    const { data: rawWithdrawals } = await admin
       .from("withdrawals")
       .select("id, amount, fee, net_amount, phone, operator_name, status, charge_id, admin_notes, processed_at, created_at, updated_at")
       .eq("user_id", id)
       .order("created_at", { ascending: false })
       .limit(20);
 
-    // Note: there's no dedicated wallet ledger table — wallet_balance lives on
-    // profiles and is derived from deposits/withdrawals/battle settlements.
-    const transactions: any[] = [];
+    const withdrawals = (rawWithdrawals || []).map((w) => ({
+      ...w,
+      label: WITHDRAWAL_META.label,
+      direction: WITHDRAWAL_META.direction,
+      display_amount: ledgerDisplayAmount(w.net_amount ?? w.amount, WITHDRAWAL_META.direction),
+    }));
+
+    // ─── Unified wallet activity feed — cash deposits + ledger + withdrawals,
+    // all pre-classified in/out so the UI never has to guess ──────────────
+    const transactions = [
+      ...deposits.map((d) => ({
+        id: d.id,
+        label: d.label,
+        direction: d.direction,
+        display_amount: d.display_amount,
+        status: d.status,
+        created_at: d.created_at,
+      })),
+      ...withdrawals.map((w) => ({
+        id: w.id,
+        label: w.label,
+        direction: w.direction,
+        display_amount: w.display_amount,
+        status: w.status,
+        created_at: w.created_at,
+      })),
+    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     // ─── Battles (last 20) ────────────────────────────────────────────────
     // battles.white_player_id / black_player_id / winner_id reference
@@ -194,9 +248,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({
       profile: userProfile,
+      cashDepositTotal,
       games: games || [],
-      deposits: deposits || [],
-      withdrawals: withdrawals || [],
+      deposits,
+      withdrawals,
       transactions,
       battles,
       tournaments: tournaments || [],
