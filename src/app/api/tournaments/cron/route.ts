@@ -110,12 +110,55 @@ async function handleTournamentCron(req: NextRequest) {
       try {
         const { data: participants } = await admin
           .from("tournament_participants")
-          .select("player_id, seed")
+          .select("player_id, seed, paid_entry_fee")
           .eq("tournament_id", tournament.id);
 
         if (!participants || participants.length < (tournament.min_players || 2)) {
-          await admin.from("tournaments").update({ status: "cancelled" }).eq("id", tournament.id);
-          results.errors.push(`${tournament.name}: cancelled (not enough players)`);
+          // Cancel tournament — ATOMIC GUARD: only cancel if still upcoming
+          const { data: claimed } = await admin
+            .from("tournaments")
+            .update({ status: "cancelled", ended_at: now })
+            .eq("id", tournament.id)
+            .eq("status", "upcoming")
+            .select("entry_fee");
+
+          if (claimed && claimed.length > 0) {
+            // Refund entry fees to all paid participants
+            const entryFee = claimed[0].entry_fee || 0;
+            if (entryFee > 0) {
+              for (const p of participants || []) {
+                if (p.paid_entry_fee) {
+                  await admin.rpc("credit_wallet", {
+                    p_user_id: p.player_id,
+                    p_amount: entryFee,
+                  });
+                  await admin.from("deposits").insert({
+                    user_id: p.player_id,
+                    amount: entryFee,
+                    status: "success",
+                    method: "tournament_refund",
+                    reference: `tournament:${tournament.id}:refund:min_players_not_met`,
+                  }).then(() => {}, () => {});
+                }
+              }
+            }
+
+            // Send in-app notifications to all participants
+            for (const p of participants || []) {
+              try {
+                await admin.from("notifications").insert({
+                  user_id: p.player_id,
+                  type: "tournament_cancelled",
+                  title: "Tournament cancelled",
+                  body: `${tournament.name} was cancelled due to insufficient players. Entry fees refunded.`,
+                  data: { tournament_id: tournament.id },
+                  read: false,
+                });
+              } catch {}
+            }
+
+            results.errors.push(`${tournament.name}: cancelled (not enough players, refunds issued)`);
+          }
           continue;
         }
 
