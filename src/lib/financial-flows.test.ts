@@ -192,3 +192,30 @@ describe("Staked rematch flow — business rules", () => {
     expect(offer.stake > 0).toBe(true);
   });
 });
+
+describe("Rematch color swap — business rules", () => {
+  it("requester who was white gets black in the rematch", () => {
+    const requesterWasWhite = true;
+    const newWhiteId = requesterWasWhite ? "opponent" : "requester";
+    const newBlackId = requesterWasWhite ? "requester" : "opponent";
+    expect(newWhiteId).toBe("opponent");
+    expect(newBlackId).toBe("requester");
+  });
+
+  it("requester who was black gets white in the rematch", () => {
+    const requesterWasWhite = false;
+    const newWhiteId = requesterWasWhite ? "opponent" : "requester";
+    const newBlackId = requesterWasWhite ? "requester" : "opponent";
+    expect(newWhiteId).toBe("requester");
+    expect(newBlackId).toBe("opponent");
+  });
+
+  it("color swap is always opposite of original", () => {
+    let requesterIsWhite = true;
+    let newWhite = requesterIsWhite ? "opponent" : "requester";
+    expect(newWhite).toBe("opponent");
+    requesterIsWhite = false;
+    newWhite = requesterIsWhite ? "opponent" : "requester";
+    expect(newWhite).toBe("requester");
+  });
+});

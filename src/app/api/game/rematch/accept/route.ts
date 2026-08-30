@@ -127,11 +127,14 @@ export async function POST(req: NextRequest) {
       admin.from("profiles").select("rating, display_name, username").eq("id", user.id).single(),
     ]);
 
-    // Swap colors: requester was white -> becomes black, opponent was black -> becomes white
-    const newWhiteId = offer.opponent_id;  // opponent gets white
-    const newBlackId = offer.requester_id;  // requester gets black
-    const newWhiteRating = opponentProfile.data?.rating ?? 1500;
-    const newBlackRating = requesterProfile.data?.rating ?? 1500;
+    // Swap colors from the original game:
+    // If requester was white → opponent gets white in the rematch
+    // If requester was black → requester gets white in the rematch
+    const requesterWasWhite = offer.requester_was_white !== false;
+    const newWhiteId = requesterWasWhite ? offer.opponent_id : offer.requester_id;
+    const newBlackId = requesterWasWhite ? offer.requester_id : offer.opponent_id;
+    const newWhiteRating = (requesterWasWhite ? opponentProfile.data : requesterProfile.data)?.rating ?? 1500;
+    const newBlackRating = (requesterWasWhite ? requesterProfile.data : opponentProfile.data)?.rating ?? 1500;
 
     // Create the game
     const { data: newGameId, error: rpcError } = await admin.rpc("create_game", {

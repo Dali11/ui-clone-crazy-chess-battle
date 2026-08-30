@@ -86,7 +86,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Create the rematch offer
+    // Create the rematch offer — store which color the requester had
+    // so the accept route can swap colors correctly
     const { data: offer, error: offerErr } = await admin
       .from("rematch_offers")
       .insert({
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
         increment_seconds: game.increment_seconds,
         rated: game.rated,
         stake,
+        requester_was_white: isWhite,
       })
       .select("id")
       .single();
