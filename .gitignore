@@ -31,3 +31,13 @@ next-env.d.ts
 .idea
 .vercel
 .env*
+
+# Base44 conversation artifacts
+conversations/
+
+# Supabase CLI temp files
+supabase/.temp/
+
+# Compiled binaries
+*.apk
+*.aab
