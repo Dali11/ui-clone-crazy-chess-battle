@@ -26,7 +26,15 @@ export async function activateMembership(
   const autoRenew = mConfig.auto_renew === true;
 
   const billingCycle = reference?.includes('yearly') ? 'yearly' : 'monthly';
-  const price = billingCycle === 'yearly' ? 50000 : 5000;
+
+  // Read the actual payment amount from the deposit record (source of truth)
+  // instead of hardcoding — the membership route uses market_config pricing.
+  const { data: dep } = await admin
+    .from('deposits')
+    .select('amount')
+    .eq('charge_id', chargeId)
+    .single();
+  const price = dep?.amount || (billingCycle === 'yearly' ? 50000 : 5000);
 
   const now = new Date();
   const endDate = new Date(now);
@@ -90,16 +98,16 @@ export async function activateMembership(
     });
   } catch {}
 
-  // ─── Trigger affiliate referral reward ──────────────────────────
-  // The only activation condition: the referred user purchases a
-  // membership subscription.  MK500 is credited to the referrer's wallet.
+  // ─── Trigger affiliate commission (25% of membership fee) ──────
+  // The referrer earns 25% of every membership fee the referred user pays,
+  // credited directly to their wallet. Ongoing — every renewal pays too.
   try {
-    await admin.rpc("check_referral_activation", {
+    await admin.rpc("process_affiliate_commission", {
       p_user_id: userId,
-      p_action: "membership_purchase",
+      p_amount: price,
     });
   } catch (refErr) {
-    console.error("Referral activation (membership) failed:", refErr);
+    console.error("Affiliate commission failed:", refErr);
   }
 
   return membership;
