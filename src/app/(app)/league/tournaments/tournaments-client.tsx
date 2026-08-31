@@ -6,6 +6,7 @@ import {
   Trophy, Crown, Swords, Calendar, Users, RefreshCw, ShieldAlert,
   CheckCircle2, Lock, Zap, Clock, DollarSign, Sparkles, Target, TrendingUp,
 } from 'lucide-react';
+import { useCurrency } from '@/hooks/use-currency';
 
 interface Competition {
   type: 'league' | 'tournament';
@@ -42,13 +43,6 @@ function getStatusLabel(status: string): { label: string; color: string; dot: st
   }
 }
 
-function formatCurrency(cents: number, currencySymbol?: string, currencyCode?: string): string {
-  const amount = cents.toLocaleString();
-  if (currencySymbol) return `${currencySymbol}${amount}`;
-  if (currencyCode) return `${amount} ${currencyCode}`;
-  return amount;
-}
-
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'TBD';
   const d = new Date(dateStr);
@@ -60,6 +54,7 @@ function formatDate(dateStr?: string): string {
 type FilterTab = 'active' | 'upcoming' | 'completed';
 
 export default function TournamentsPage() {
+  const { formatMoney: fmtCurrency } = useCurrency();
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -224,7 +219,7 @@ export default function TournamentsPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map(comp => (
-                <TournamentCard key={comp.id} competition={comp} onJoin={handleJoin} joining={joining === comp.id} />
+                <TournamentCard key={comp.id} competition={comp} onJoin={handleJoin} joining={joining === comp.id} fmtCurrency={fmtCurrency} />
               ))}
             </div>
           )}
@@ -234,7 +229,7 @@ export default function TournamentsPage() {
   );
 }
 
-function TournamentCard({ competition, onJoin, joining }: { competition: Competition; onJoin: (c: Competition) => void; joining: boolean }) {
+function TournamentCard({ competition, onJoin, joining, fmtCurrency }: { competition: Competition; onJoin: (c: Competition) => void; joining: boolean; fmtCurrency: (amt: number) => string }) {
   const statusInfo = getStatusLabel(competition.status);
   const isPaid = competition.entryType === 'paid';
   const canJoin = competition.qualification.canJoin;
@@ -298,7 +293,7 @@ function TournamentCard({ competition, onJoin, joining }: { competition: Competi
         {isPaid && competition.entryFee != null ? (
           <span className="flex items-center gap-1 text-ccb-accent font-medium">
             <DollarSign className="w-3.5 h-3.5" />
-            {formatCurrency(competition.entryFee, competition.currencySymbol, competition.currency)}
+            {fmtCurrency(competition.entryFee)}
           </span>
         ) : null}
       </div>

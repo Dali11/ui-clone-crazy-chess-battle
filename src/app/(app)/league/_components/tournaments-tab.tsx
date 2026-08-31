@@ -7,6 +7,7 @@ import {
   Trophy, Swords, Calendar, Users, RefreshCw, ShieldAlert,
   CheckCircle2, Lock, Zap, Clock, DollarSign,
 } from 'lucide-react';
+import { useCurrency } from '@/hooks/use-currency';
 
 interface Competition {
   id: string;
@@ -36,13 +37,6 @@ function getStatusInfo(status: string) {
   }
 }
 
-function formatCurrency(cents: number, symbol?: string, code?: string) {
-  const amount = cents.toLocaleString();
-  if (symbol) return `${symbol}${amount}`;
-  if (code) return `${amount} ${code}`;
-  return amount;
-}
-
 function formatDate(dateStr?: string) {
   if (!dateStr) return 'TBD';
   const d = new Date(dateStr);
@@ -54,6 +48,7 @@ function formatDate(dateStr?: string) {
 type FilterTab = 'active' | 'upcoming' | 'completed';
 
 export default function TournamentsTab() {
+  const { formatMoney: fmtCurrency } = useCurrency();
   const router = useRouter();
   const [tournaments, setTournaments] = useState<Competition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -251,7 +246,7 @@ export default function TournamentsTab() {
                   ) : null}
                   {isPaid && comp.entryFee != null ? (
                     <span className="flex items-center gap-1 text-ccb-accent font-medium">
-                      <DollarSign className="w-3.5 h-3.5" /> {formatCurrency(comp.entryFee, comp.currencySymbol, comp.currency)}
+                      <DollarSign className="w-3.5 h-3.5" /> {fmtCurrency(comp.entryFee)}
                     </span>
                   ) : null}
                 </div>
