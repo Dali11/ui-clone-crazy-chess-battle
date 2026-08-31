@@ -416,7 +416,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
           </div>
           <p className="text-3xl font-bold">{formatAmt(walletBal)}</p>
           {!isMalawi && (
-            <p className="text-xs text-ccb-muted mt-1">Currency: {currencyCode} · Powered by PawaPay</p>
+            <p className="text-xs text-ccb-muted mt-1">Currency: {currencyCode}</p>
           )}
         </div>
       </div>
@@ -521,7 +521,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 </div>
               ) : (
                 <p className="text-xs text-ccb-muted py-2">
-                  No PawaPay providers available for {country}. Make sure PawaPay is configured.
+                  No mobile money providers available for your region yet. We&apos;re working on adding support.
                 </p>
               )}
             </div>
