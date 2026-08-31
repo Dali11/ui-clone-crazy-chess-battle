@@ -817,6 +817,31 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     }
   };
 
+  const handleGameSetResult = async (gameId: string, winner: "white" | "black" | "draw", whiteName: string, blackName: string) => {
+    const winnerLabel = winner === "white" ? whiteName : winner === "black" ? blackName : "Draw";
+    const correcting = games.find(g => g.id === gameId)?.status === "completed";
+    const msg = correcting
+      ? `CORRECT RESULT: Override this game's result to ${winnerLabel}?\n\nThis will update the game record and settle any linked battle. The previous result will be replaced.`
+      : `Set result: ${winnerLabel}?\n\nThis will end the game and settle any linked battle.`;
+    if (!confirm(msg)) return;
+    setActionLoading(gameId);
+    try {
+      const res = await fetch("/api/admin/games", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId, action: "set_result", winner, note: `Admin manual override: ${winnerLabel}` }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      await fetchGames();
+      showToast(`Result set: ${winnerLabel}`);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const saveBattleConfig = async () => {
     setBattleConfigSaving(true);
     try {
@@ -2444,33 +2469,62 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
               ) : (
                 <div className="space-y-2">
                   {games.map((g) => (
-                    <div key={g.id} className="card flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium">
-                          {g.white_username} ({g.white_rating}) vs {g.black_username} ({g.black_rating})
+                    <div key={g.id} className="card">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium">
+                            {g.white_username} ({g.white_rating}) vs {g.black_username} ({g.black_rating})
+                          </div>
+                          <div className="text-xs text-ccb-muted mt-1">
+                            {g.time_control} · {g.rated ? "Rated" : "Casual"} · {g.move_count} moves · {formatDate(g.created_at)}
+                          </div>
                         </div>
-                        <div className="text-xs text-ccb-muted mt-1">
-                          {g.time_control} · {g.rated ? "Rated" : "Casual"} · {g.move_count} moves · {formatDate(g.created_at)}
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            g.status === "playing" ? "bg-ccb-success/10 text-ccb-success" :
+                            g.status === "completed" ? "bg-ccb-muted/10 text-ccb-muted" :
+                            g.status === "aborted" || g.status === "abort" ? "bg-ccb-danger/10 text-ccb-danger" :
+                            "bg-ccb-surface text-ccb-muted"
+                          }`}>{g.status === "abort" ? "aborted" : g.status}</span>
+                          {g.winner && <span className="text-xs text-ccb-muted">{g.winner} won</span>}
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className={`text-xs px-2 py-1 rounded ${
-                          g.status === "playing" ? "bg-ccb-success/10 text-ccb-success" :
-                          g.status === "completed" ? "bg-ccb-muted/10 text-ccb-muted" :
-                          g.status === "aborted" ? "bg-ccb-danger/10 text-ccb-danger" :
-                          "bg-ccb-surface text-ccb-muted"
-                        }`}>{g.status}</span>
-                        {g.winner && <span className="text-xs text-ccb-muted">{g.winner} won</span>}
-                        {g.status === "playing" && (
+                      {/* Action buttons */}
+                      {(g.status === "playing" || g.status === "completed" || g.status === "draw") && (
+                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-ccb-border">
+                          {g.status === "playing" && (
+                            <button
+                              onClick={() => handleGameAbort(g.id)}
+                              disabled={actionLoading === g.id}
+                              className="text-xs px-2 py-1 rounded bg-ccb-danger/10 text-ccb-danger hover:bg-ccb-danger/20 disabled:opacity-50"
+                            >
+                              {actionLoading === g.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Abort"}
+                            </button>
+                          )}
+                          <span className="text-[10px] text-ccb-muted uppercase tracking-wider mr-1">Override:</span>
                           <button
-                            onClick={() => handleGameAbort(g.id)}
+                            onClick={() => handleGameSetResult(g.id, "white", g.white_username, g.black_username)}
                             disabled={actionLoading === g.id}
-                            className="text-xs px-2 py-1 rounded bg-ccb-danger/10 text-ccb-danger hover:bg-ccb-danger/20 disabled:opacity-50"
+                            className="text-xs px-2 py-1 rounded bg-ccb-surface border border-ccb-border text-ccb-text hover:bg-ccb-accent/10 hover:border-ccb-accent/30 disabled:opacity-50"
                           >
-                            {actionLoading === g.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Abort"}
+                            ⚪ {g.white_username} Wins
                           </button>
-                        )}
-                      </div>
+                          <button
+                            onClick={() => handleGameSetResult(g.id, "black", g.white_username, g.black_username)}
+                            disabled={actionLoading === g.id}
+                            className="text-xs px-2 py-1 rounded bg-ccb-surface border border-ccb-border text-ccb-text hover:bg-ccb-accent/10 hover:border-ccb-accent/30 disabled:opacity-50"
+                          >
+                            ⚫ {g.black_username} Wins
+                          </button>
+                          <button
+                            onClick={() => handleGameSetResult(g.id, "draw", g.white_username, g.black_username)}
+                            disabled={actionLoading === g.id}
+                            className="text-xs px-2 py-1 rounded bg-ccb-surface border border-ccb-border text-ccb-text hover:bg-ccb-accent/10 hover:border-ccb-accent/30 disabled:opacity-50"
+                          >
+                            ½ Draw
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
