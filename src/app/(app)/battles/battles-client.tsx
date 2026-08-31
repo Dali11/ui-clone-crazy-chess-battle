@@ -47,6 +47,7 @@ export default function BattlesPage() {
   const [view, setView] = useState<View>("main");
   const [config, setConfig] = useState<BattleConfig | null>(null);
   const [balance, setBalance] = useState(0);
+  const [userCountry, setUserCountry] = useState<string | null>(null);
   const [gamesPlayed, setGamesPlayed] = useState(0);
   // Battles unlocked for all players — no minimum game requirement
   const [state, setState] = useState<BattleState>("select");
@@ -73,7 +74,7 @@ export default function BattlesPage() {
   const [cancellingStuck, setCancellingStuck] = useState(false);
 
   // Live currency conversion — all money displayed to the user uses this
-  const { formatMoney: fmtCurrency, convert: convertCurrency, currencySymbol: _curSym, rate: fxRate, currencyCode: currencyCode, loaded: currencyLoaded } = useCurrency();
+  const { formatMoney: fmtCurrency, convert: convertCurrency, currencySymbol: _curSym, rate: fxRate, currencyCode: currencyCode, loaded: currencyLoaded } = useCurrency(userCountry);
 
   // Currency state
   // Currency via shared hook — provides formatMoney(), convert(), rate, etc.
@@ -124,7 +125,7 @@ export default function BattlesPage() {
       setMyRating(profile.rating ?? 1200);
       setBalance(profile.wallet_balance ?? 0);
       setGamesPlayed(profile.games_played ?? 0);
-      // Currency symbol handled by useCurrency hook
+      setUserCountry(profile.country);
     }
     setProfileLoaded(true);
   };

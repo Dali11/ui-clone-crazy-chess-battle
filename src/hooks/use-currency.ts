@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { moneySymbol } from "@/lib/geo/format";
-import { DEFAULT_CURRENCY } from "@/lib/geo/currency-map";
+import { COUNTRY_CURRENCY, DEFAULT_CURRENCY } from "@/lib/geo/currency-map";
 
 export interface CurrencyState {
   currencyCode: string;
@@ -18,13 +18,19 @@ export interface UseCurrencyReturn extends CurrencyState {
   convertFormatted: (amountMWK: number) => string;
 }
 
-export function useCurrency(): UseCurrencyReturn {
+export function useCurrency(initialCountryCode?: string | null): UseCurrencyReturn {
+  // If the caller already knows the user's country (e.g. from SSR props),
+  // initialize with the correct currency symbol to avoid a flash of MWK.
+  const initialCurrencyCode = initialCountryCode
+    ? (COUNTRY_CURRENCY[initialCountryCode.toUpperCase()] || DEFAULT_CURRENCY)
+    : DEFAULT_CURRENCY;
+
   const [state, setState] = useState<CurrencyState>({
-    currencyCode: DEFAULT_CURRENCY,
-    currencySymbol: "MK",
+    currencyCode: initialCurrencyCode,
+    currencySymbol: initialCountryCode ? moneySymbol(initialCountryCode) : "MK",
     rate: 1,
     loaded: false,
-    countryCode: null,
+    countryCode: initialCountryCode || null,
   });
 
   useEffect(() => {

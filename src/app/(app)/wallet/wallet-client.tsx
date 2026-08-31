@@ -88,7 +88,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [pawapayLoading, setPawapayLoading] = useState(false);
 
   // Live currency via shared hook — converts MWK to user's local currency
-  const { formatMoney: fmtCurrency, currencySymbol: sym, currencyCode: currencyCode, rate: fxRate } = useCurrency();
+  const { formatMoney: fmtCurrency, currencySymbol: sym, currencyCode: currencyCode, rate: fxRate } = useCurrency(country);
   const isMalawi = !country || country === "MW";
   const usePawaPay = !isMalawi;
 

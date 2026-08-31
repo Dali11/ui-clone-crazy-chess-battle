@@ -26,13 +26,26 @@ function formatMoneyCompact(amountMWK: number, formatFn: (n: number) => string):
 
 export default function HomeStats() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [userCountry, setUserCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const { formatMoney: fmtCurrency, convert: convertCurrency, currencySymbol: _curSym, rate: fxRate } = useCurrency();
+  const { formatMoney: fmtCurrency, convert: convertCurrency, currencySymbol: _curSym, rate: fxRate } = useCurrency(userCountry);
 
   useEffect(() => {
     async function fetchStats() {
       try {
         const supabase = createClient();
+        // Fetch user's country for currency initialization (prevents MWK flash)
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("country")
+              .eq("id", user.id)
+              .single();
+            if (profile?.country) setUserCountry(profile.country);
+          }
+        } catch {}
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayISO = today.toISOString();
