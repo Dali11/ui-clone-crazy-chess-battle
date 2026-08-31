@@ -60,8 +60,15 @@ export function useCurrency(initialCountryCode?: string | null): UseCurrencyRetu
   const formatMoney = useCallback(
     (amountMWK: number) => {
       const value = Math.floor(amountMWK ?? 0);
-      if (state.currencyCode === "MWK" || !state.rate || state.rate === 1) {
+      // Malawian users: no conversion needed, rate is genuinely 1
+      if (state.currencyCode === "MWK") {
         return `${state.currencySymbol} ${value.toLocaleString("en-US")}`;
+      }
+      // Non-Malawian users: only convert once the real rate has loaded.
+      // Before that, show the honest MWK amount so we don't mislead by
+      // slapping a foreign symbol on an unconverted number (1000 MWK ≠ 1000 ZMW).
+      if (!state.loaded || !state.rate || state.rate === 1) {
+        return `MK ${value.toLocaleString("en-US")}`;
       }
       const converted = Math.round(value * state.rate);
       try {
@@ -74,15 +81,17 @@ export function useCurrency(initialCountryCode?: string | null): UseCurrencyRetu
         return `${state.currencySymbol} ${converted.toLocaleString("en-US")}`;
       }
     },
-    [state.currencyCode, state.currencySymbol, state.rate],
+    [state.currencyCode, state.currencySymbol, state.rate, state.loaded],
   );
 
   const convert = useCallback(
     (amountMWK: number) => {
-      if (state.currencyCode === "MWK" || !state.rate || state.rate === 1) return Math.floor(amountMWK ?? 0);
+      if (state.currencyCode === "MWK") return Math.floor(amountMWK ?? 0);
+      // Before the rate loads, return the raw MWK amount (not a fake conversion)
+      if (!state.loaded || !state.rate || state.rate === 1) return Math.floor(amountMWK ?? 0);
       return Math.round((amountMWK ?? 0) * state.rate);
     },
-    [state.currencyCode, state.rate],
+    [state.currencyCode, state.rate, state.loaded],
   );
 
   const convertFormatted = useCallback(
