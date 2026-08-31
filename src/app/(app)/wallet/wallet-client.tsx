@@ -1,7 +1,7 @@
 "use client";
 
 import { detectOperator } from "@/lib/operator";
-import { moneySymbol } from "@/lib/geo/format";
+import { moneySymbol, currencyCodeForCountry } from "@/lib/geo/format";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -9,7 +9,6 @@ import {
   Wallet, Check, Loader2, ArrowDown, ArrowUp, ArrowDownLeft, ArrowUpRight,
   Clock, RefreshCw, History,
 } from "lucide-react";
-import Link from "next/link";
 
 interface Deposit {
   id: string;
@@ -41,6 +40,16 @@ interface Transaction {
   created_at: string;
 }
 
+interface PawaPayProvider {
+  provider: string;
+  displayName: string;
+  logo: string;
+}
+
+interface PawaPayCountryConfig {
+  country: string;
+  providers: PawaPayProvider[];
+}
 
 interface WalletClientProps {
   balance: number;
@@ -50,7 +59,8 @@ interface WalletClientProps {
   country?: string | null;
 }
 
-const QUICK_AMOUNTS = [500, 1000, 2000, 5000, 10000, 25000];
+const QUICK_AMOUNTS_MWK = [500, 1000, 2000, 5000, 10000, 25000];
+const QUICK_AMOUNTS_INTL = [100, 500, 1000, 2000, 5000, 10000];
 
 export default function WalletClient({ balance, email, deposits, phone: savedPhone, country }: WalletClientProps) {
   const router = useRouter();
@@ -72,21 +82,50 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [txnLoading, setTxnLoading] = useState(false);
 
+  // PawaPay state
+  const [pawapayProviders, setPawapayProviders] = useState<PawaPayProvider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string>("");
+  const [pawapayLoading, setPawapayLoading] = useState(false);
 
-  // Fetch withdrawal limits from platform settings (user-facing endpoint)
+  const sym = moneySymbol(country);
+  const currencyCode = currencyCodeForCountry(country);
+  const isMalawi = !country || country === "MW";
+  const usePawaPay = !isMalawi;
+
+  const quickAmounts = isMalawi ? QUICK_AMOUNTS_MWK : QUICK_AMOUNTS_INTL;
+  const formatAmt = (amount: number) => `${sym} ${Math.floor((amount || 0)).toLocaleString()}`;
+  const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+  // Fetch PawaPay providers for the user's country
+  useEffect(() => {
+    if (!usePawaPay || !country) return;
+
+    setPawapayLoading(true);
+    fetch(`/api/payments/pawapay/active-conf?country=${country}&operationType=DEPOSIT`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.countries && data.countries.length > 0) {
+          const providers = data.countries[0].providers || [];
+          setPawapayProviders(providers);
+          if (providers.length > 0) setSelectedProvider(providers[0].provider);
+        }
+      })
+      .catch((e) => console.error("Failed to load PawaPay providers:", e))
+      .finally(() => setPawapayLoading(false));
+  }, [usePawaPay, country]);
+
+  // Fetch withdrawal limits
   useEffect(() => {
     fetch("/api/withdrawals/limits")
       .then((res) => res.json())
       .then((data) => {
         if (data.min_amount) {
           setWithdrawConfig(data);
-          setWithdrawAmount(data.min_amount); // default to min in MWK
+          setWithdrawAmount(data.min_amount);
         }
       })
       .catch(() => {});
   }, []);
-
-// Mobile money operator is auto-detected from phone prefix (08x=TNM, 09x=Airtel) — no manual selector needed.
 
   // Fetch withdrawals
   useEffect(() => {
@@ -105,8 +144,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
       const res = await fetch("/api/wallet/transactions?limit=50");
       const data = await res.json();
       if (data.transactions) setTransactions(data.transactions);
-    } catch {}
-    finally { setTxnLoading(false); }
+    } catch {} finally { setTxnLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -127,8 +165,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
           });
           const data = await res.json();
           if (data.status === "success") {
-            const amt = (data.amount ?? 0).toLocaleString();
-            setSuccess(`MWK ${amt} added to your wallet!`);
+            setSuccess(`${formatAmt(data.amount ?? 0)} added to your wallet!`);
             setPolling(false);
             clearInterval(interval);
             setWalletBal((prev) => prev + data.amount);
@@ -141,23 +178,16 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         } catch {}
       }, 3000);
 
-      const timeout = setTimeout(() => {
-        clearInterval(interval);
-        setPolling(false);
-      }, 120000);
-
-      return () => {
-        clearInterval(interval);
-        clearTimeout(timeout);
-      };
+      const timeout = setTimeout(() => { clearInterval(interval); setPolling(false); }, 120000);
+      return () => { clearInterval(interval); clearTimeout(timeout); };
     }
   }, [searchParams, router]);
 
   // Payment verification polling (from mobile money push)
   useEffect(() => {
     if (!pendingChargeId) return;
-
     setPolling(true);
+
     const interval = setInterval(async () => {
       try {
         const res = await fetch("/api/payments/verify", {
@@ -168,8 +198,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         const data = await res.json();
 
         if (data.status === "success") {
-          const amt = (data.amount ?? 0).toLocaleString();
-          setSuccess(`MWK ${amt} added to your wallet!`);
+          setSuccess(`${formatAmt(data.amount ?? 0)} added to your wallet!`);
           setPolling(false);
           setPendingChargeId(null);
           clearInterval(interval);
@@ -193,13 +222,62 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
       }
     }, 180000);
 
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
+    return () => { clearInterval(interval); clearTimeout(timeout); };
   }, [pendingChargeId, router]);
 
-  const handleDeposit = async () => {
+  // ─── PawaPay deposit (non-Malawi countries) ───────────────────────────
+  const handlePawaPayDeposit = async () => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      if (!phone || phone.length < 8) {
+        setError("Enter a valid mobile money number");
+        setLoading(false);
+        return;
+      }
+      if (!selectedProvider) {
+        setError("Select a mobile money provider");
+        setLoading(false);
+        return;
+      }
+
+      // Normalize phone with country code if needed
+      let normalizedPhone = phone.replace(/\s/g, "");
+      if (!normalizedPhone.startsWith("+") && !normalizedPhone.startsWith("00")) {
+        // Don't prepend country code — PawaPay predict-provider handles it
+      }
+
+      const res = await fetch("/api/payments/pawapay/deposit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: depositAmount,
+          phoneNumber: normalizedPhone,
+          provider: selectedProvider,
+          currency: currencyCode,
+          country: country || undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Payment failed. Please try again.");
+      }
+
+      setPendingChargeId(data.chargeId);
+      setSuccess("Check your phone to authorize the payment. Waiting for confirmation...");
+    } catch (err: any) {
+      setError(err.message && err.message.length < 200 ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── PayChangu deposit (Malawi) ───────────────────────────────────────
+  const handlePayChanguDeposit = async () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -237,26 +315,29 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
     }
   };
 
+  const handleDeposit = usePawaPay ? handlePawaPayDeposit : handlePayChanguDeposit;
+
+  // ─── Withdraw ─────────────────────────────────────────────────────────
   const handleWithdraw = async () => {
     setWithdrawLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
-      if (!phone || phone.length < 9) {
-        setError("Enter a valid Mobile Money number");
+      if (!phone || phone.length < 8) {
+        setError("Enter a valid mobile money number");
         setWithdrawLoading(false);
         return;
       }
-      const minMWK = withdrawConfig ? withdrawConfig.min_amount : 10000;
-      const maxMWK = withdrawConfig ? withdrawConfig.max_amount : 500000;
-      if (withdrawAmount < minMWK) {
-        setError(`Minimum withdrawal is MWK ${minMWK.toLocaleString()}`);
+      const minAmt = withdrawConfig ? withdrawConfig.min_amount : 10000;
+      const maxAmt = withdrawConfig ? withdrawConfig.max_amount : 500000;
+      if (withdrawAmount < minAmt) {
+        setError(`Minimum withdrawal is ${formatAmt(minAmt)}`);
         setWithdrawLoading(false);
         return;
       }
-      if (withdrawAmount > maxMWK) {
-        setError(`Maximum withdrawal is MWK ${maxMWK.toLocaleString()}`);
+      if (withdrawAmount > maxAmt) {
+        setError(`Maximum withdrawal is ${formatAmt(maxAmt)}`);
         setWithdrawLoading(false);
         return;
       }
@@ -266,18 +347,28 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         return;
       }
 
-      const operatorRefId = detectOperator(phone);
-      const opName = operatorRefId === "27494cb5-ba9e-437f-a114-4e7a7686bcca" ? "TNM Mpamba" : "Airtel Money";
+      const body: Record<string, any> = {
+        amount: withdrawAmount,
+        phone,
+        currency: currencyCode,
+        country: country || undefined,
+      };
+
+      if (usePawaPay) {
+        body.payment_provider = "pawapay";
+        body.operatorRefId = selectedProvider;
+        body.operatorName = pawapayProviders.find(p => p.provider === selectedProvider)?.displayName || selectedProvider;
+      } else {
+        const operatorRefId = detectOperator(phone);
+        body.operatorRefId = operatorRefId;
+        body.operatorName = operatorRefId === "27494cb5-ba9e-437f-a114-4e7a7686bcca" ? "TNM Mpamba" : "Airtel Money";
+        body.payment_provider = "paychangu";
+      }
 
       const res = await fetch("/api/withdrawals/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: withdrawAmount,
-          phone,
-          operatorRefId,
-          operatorName: opName,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -286,16 +377,14 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         throw new Error(data.error || "Withdrawal failed. Please try again.");
       }
 
-      // Optimistically update balance
       setWalletBal((prev) => prev - withdrawAmount);
       if (data.status === "completed" || data.auto) {
-        setSuccess(`MWK ${withdrawAmount.toLocaleString()} withdrawal sent! Fees deducted — check your phone for the amount received.`);
+        setSuccess(`${formatAmt(withdrawAmount)} withdrawal sent! Fees deducted — check your phone for the amount received.`);
       } else {
-        setSuccess(`Withdrawal request for MWK ${withdrawAmount.toLocaleString()} submitted. You'll receive it within 30 minutes after admin approval.`);
+        setSuccess(`Withdrawal request for ${formatAmt(withdrawAmount)} submitted. You'll receive it within 30 minutes after admin approval.`);
       }
       router.refresh();
 
-      // Refresh withdrawal list
       fetch("/api/withdrawals/list")
         .then((r) => r.json())
         .then((d) => { if (d.withdrawals) setWithdrawals(d.withdrawals); });
@@ -305,10 +394,6 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
       setWithdrawLoading(false);
     }
   };
-
-  const sym = moneySymbol(country);
-  const formatMWK = (amount: number) => `${sym} ${Math.floor((amount || 0)).toLocaleString()}`;
-  const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="space-y-4 pb-20 sm:pb-0">
@@ -329,7 +414,10 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               <RefreshCw className="w-4 h-4" />
             </button>
           </div>
-          <p className="text-3xl font-bold">{formatMWK(walletBal)}</p>
+          <p className="text-3xl font-bold">{formatAmt(walletBal)}</p>
+          {!isMalawi && (
+            <p className="text-xs text-ccb-muted mt-1">Currency: {currencyCode} · Powered by PawaPay</p>
+          )}
         </div>
       </div>
 
@@ -383,7 +471,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
       {tab === "deposit" && (
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-ccb-muted mb-2 block">Amount (MWK)</label>
+            <label className="text-sm font-medium text-ccb-muted mb-2 block">Amount ({currencyCode})</label>
             <input
               type="number"
               value={depositAmount}
@@ -391,7 +479,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
             />
             <div className="flex gap-2 mt-2 flex-wrap">
-              {QUICK_AMOUNTS.map((amt) => (
+              {quickAmounts.map((amt) => (
                 <button
                   key={amt}
                   onClick={() => setDepositAmount(amt)}
@@ -405,20 +493,58 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
             </div>
           </div>
 
+          {/* PawaPay provider selector (non-Malawi) */}
+          {usePawaPay && (
+            <div>
+              <label className="text-sm font-medium text-ccb-muted mb-2 block">Mobile Money Provider</label>
+              {pawapayLoading ? (
+                <div className="flex items-center gap-2 text-sm text-ccb-muted py-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading providers...
+                </div>
+              ) : pawapayProviders.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {pawapayProviders.map((p) => (
+                    <button
+                      key={p.provider}
+                      onClick={() => setSelectedProvider(p.provider)}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-colors text-sm font-medium ${
+                        selectedProvider === p.provider
+                          ? "border-ccb-primary bg-ccb-primary/10 text-ccb-text"
+                          : "border-ccb-border bg-ccb-surface text-ccb-muted"
+                      }`}
+                    >
+                      {p.logo && <img src={p.logo} alt="" className="w-6 h-6 rounded" />}
+                      <span className="truncate">{p.displayName}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-ccb-muted py-2">
+                  No PawaPay providers available for {country}. Make sure PawaPay is configured.
+                </p>
+              )}
+            </div>
+          )}
+
           <div>
-            <label className="text-sm font-medium text-ccb-muted mb-2 block">Mobile Money Number (Airtel Money or Mpamba)</label>
+            <label className="text-sm font-medium text-ccb-muted mb-2 block">
+              {isMalawi
+                ? "Mobile Money Number (Airtel Money or Mpamba)"
+                : "Mobile Money Number"}
+            </label>
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="0991234567"
+              placeholder={isMalawi ? "0991234567" : "e.g. +260971234567"}
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border"
             />
           </div>
 
           <button
             onClick={handleDeposit}
-            disabled={loading || polling}
+            disabled={loading || polling || (usePawaPay && !selectedProvider)}
             className="w-full py-3.5 rounded-xl bg-ccb-primary text-white font-semibold flex items-center justify-center gap-2 hover:bg-ccb-primary/90 disabled:opacity-50"
           >
             {loading || polling ? (
@@ -427,7 +553,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 {polling ? "Waiting for payment..." : "Processing..."}
               </>
             ) : (
-              <>Deposit {formatMWK(depositAmount)}</>
+              <>Deposit {formatAmt(depositAmount)}</>
             )}
           </button>
         </div>
@@ -437,7 +563,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
       {tab === "withdraw" && (
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-ccb-muted mb-2 block">Amount (MWK)</label>
+            <label className="text-sm font-medium text-ccb-muted mb-2 block">Amount ({currencyCode})</label>
             <input
               type="number"
               value={withdrawAmount}
@@ -464,17 +590,39 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               })()}
             </div>
             <p className="text-xs text-ccb-muted mt-2">
-              Available: {formatMWK(walletBal)} · Min: {sym} {(withdrawConfig ? withdrawConfig.min_amount : 10000).toLocaleString()}
+              Available: {formatAmt(walletBal)} · Min: {formatAmt(withdrawConfig ? withdrawConfig.min_amount : 10000)}
             </p>
           </div>
 
+          {/* PawaPay provider selector for withdrawals */}
+          {usePawaPay && (
+            <div>
+              <label className="text-sm font-medium text-ccb-muted mb-2 block">Withdraw To</label>
+              {pawapayProviders.length > 0 ? (
+                <select
+                  value={selectedProvider}
+                  onChange={(e) => setSelectedProvider(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-sm"
+                >
+                  {pawapayProviders.map((p) => (
+                    <option key={p.provider} value={p.provider}>{p.displayName}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs text-ccb-muted">No providers available</p>
+              )}
+            </div>
+          )}
+
           <div>
-            <label className="text-sm font-medium text-ccb-muted mb-2 block">Mobile Money Number (Airtel Money or Mpamba)</label>
+            <label className="text-sm font-medium text-ccb-muted mb-2 block">
+              {isMalawi ? "Mobile Money Number (Airtel Money or Mpamba)" : "Mobile Money Number"}
+            </label>
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="0991234567"
+              placeholder={isMalawi ? "0991234567" : "e.g. +260971234567"}
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border"
             />
           </div>
@@ -490,17 +638,17 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               <div className="space-y-1.5 p-3.5 rounded-xl bg-ccb-surface border border-ccb-border">
                 <div className="flex justify-between text-sm">
                   <span className="text-ccb-muted">Withdrawal amount</span>
-                  <span className="font-medium">{formatMWK(withdrawAmount)}</span>
+                  <span className="font-medium">{formatAmt(withdrawAmount)}</span>
                 </div>
                 {pctFee > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-ccb-muted">Processing fee ({pctFee}%)</span>
-                    <span className="text-ccb-muted">−{formatMWK(processingFee)}</span>
+                    <span className="text-ccb-muted">−{formatAmt(processingFee)}</span>
                   </div>
                 )}
                 <div className="border-t border-ccb-border pt-1.5 flex justify-between text-sm font-semibold">
                   <span>You receive</span>
-                  <span className="text-ccb-primary">{formatMWK(netAmount)}</span>
+                  <span className="text-ccb-primary">{formatAmt(netAmount)}</span>
                 </div>
               </div>
             );
@@ -517,7 +665,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 Processing...
               </>
             ) : (
-              <>Withdraw {formatMWK(withdrawAmount)}</>
+              <>Withdraw {formatAmt(withdrawAmount)}</>
             )}
           </button>
 
@@ -528,9 +676,9 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 {withdrawals.slice(0, 5).map((w) => (
                   <div key={w.id} className="flex items-center justify-between p-3 rounded-lg bg-ccb-surface border border-ccb-border">
                     <div>
-                      <p className="text-sm font-medium">{formatMWK(w.amount)}</p>
+                      <p className="text-sm font-medium">{formatAmt(w.amount)}</p>
                       {w.fee != null && w.fee > 0 && w.net_amount != null && (
-                        <p className="text-xs text-ccb-muted">Fee: {formatMWK(w.fee)} · Net: {formatMWK(w.net_amount)}</p>
+                        <p className="text-xs text-ccb-muted">Fee: {formatAmt(w.fee)} · Net: {formatAmt(w.net_amount)}</p>
                       )}
                       <p className="text-xs text-ccb-muted">{w.operator_name} · {formatDate(w.created_at)}</p>
                     </div>
@@ -580,7 +728,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                     </div>
                     <div className="text-right">
                       <p className={`text-sm font-semibold ${isIn ? "text-ccb-success" : "text-ccb-danger"}`}>
-                        {isIn ? "+" : ""}{formatMWK(txn.amount)}
+                        {isIn ? "+" : ""}{formatAmt(txn.amount)}
                       </p>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${
                         txn.status === "success" || txn.status === "completed" || txn.status === "approved" ? "bg-green-500/10 text-green-600" :
@@ -605,8 +753,8 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 {deposits.slice(0, 8).map((d) => (
                   <div key={d.id} className="flex items-center justify-between p-3 rounded-lg bg-ccb-surface border border-ccb-border">
                     <div>
-                      <p className="text-sm font-medium">{formatMWK(d.amount)}</p>
-                      <p className="text-xs text-ccb-muted">{d.method === "mobile_money" ? "Mobile Money" : "Card"} · {formatDate(d.created_at)}</p>
+                      <p className="text-sm font-medium">{formatAmt(d.amount)}</p>
+                      <p className="text-xs text-ccb-muted">{d.method === "mobile_money" ? "Mobile Money" : d.method === "pawapay" ? "PawaPay" : "Card"} · {formatDate(d.created_at)}</p>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       d.status === "success" ? "bg-green-500/10 text-green-600" :

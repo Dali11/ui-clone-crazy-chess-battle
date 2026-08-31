@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { amount, phone, operatorRefId, operatorName } = await req.json();
+    const { amount, phone, operatorRefId, operatorName, payment_provider, currency, country } = await req.json();
 
     // ─── Load platform config ──────────────────────────────────────────
     const admin = createAdminClient();
@@ -49,18 +49,26 @@ export async function POST(req: NextRequest) {
       const todayTotal = (todayWithdrawals || []).reduce((sum, w) => sum + w.amount, 0);
       if (todayTotal + amount > dailyLimit) {
         const remaining = Math.max(0, dailyLimit - todayTotal).toLocaleString();
-        return NextResponse.json({ error: `Daily withdrawal limit reached. Remaining: MWK ${remaining}` }, { status: 400 });
+        return NextResponse.json({ error: `Daily withdrawal limit reached. Remaining: ${remaining}` }, { status: 400 });
       }
     }
 
-    // Validate phone format (Malawi: 08x, 09x, +265, 265)
+    // Validate phone format
     if (!phone || !operatorRefId || !operatorName) {
       return NextResponse.json({ error: "Phone, operator required" }, { status: 400 });
     }
+    const isMalawi = !country || country === "MW";
     const phoneDigits = phone.replace(/\D/g, "");
-    const localPhone = phoneDigits.startsWith("265") ? "0" + phoneDigits.slice(3) : phoneDigits;
-    if (localPhone.length < 9 || !localPhone.match(/^0[89]/)) {
-      return NextResponse.json({ error: "Invalid Malawi mobile money number" }, { status: 400 });
+    if (isMalawi) {
+      const localPhone = phoneDigits.startsWith("265") ? "0" + phoneDigits.slice(3) : phoneDigits;
+      if (localPhone.length < 9 || !localPhone.match(/^0[89]/)) {
+        return NextResponse.json({ error: "Invalid Malawi mobile money number" }, { status: 400 });
+      }
+    } else {
+      // International: just require at least 8 digits
+      if (phoneDigits.length < 8) {
+        return NextResponse.json({ error: "Invalid mobile money number" }, { status: 400 });
+      }
     }
 
     // Check for existing pending withdrawal (prevent spam)
@@ -83,6 +91,9 @@ export async function POST(req: NextRequest) {
     const netAmount = amount - totalFees;
 
     // Call the atomic request_withdrawal RPC (debits wallet)
+    // Determine payment provider
+    const provider = payment_provider || (isMalawi ? "paychangu" : "pawapay");
+
     const { data: withdrawalId, error } = await admin.rpc("request_withdrawal", {
       p_user_id: user.id,
       p_amount: amount,
@@ -90,6 +101,15 @@ export async function POST(req: NextRequest) {
       p_operator_ref_id: operatorRefId,
       p_operator_name: operatorName,
     });
+
+    // Store payment provider, currency, and country on the withdrawal record
+    await admin
+      .from("withdrawals")
+      .update({
+        payment_provider: provider,
+        country: country || null,
+      })
+      .eq("id", withdrawalId);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
