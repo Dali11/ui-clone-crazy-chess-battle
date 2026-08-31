@@ -144,6 +144,7 @@ export async function POST(req: NextRequest) {
         status: "pending",
         white_rating: whitePlayer === user.id ? acceptorProfile.rating ?? 1200 : challengerProfile?.rating ?? 1200,
         black_rating: blackPlayer === user.id ? acceptorProfile.rating ?? 1200 : challengerProfile?.rating ?? 1200,
+        time_control: challenge.time_control || "rapid15",
       })
       .select("id")
       .single();

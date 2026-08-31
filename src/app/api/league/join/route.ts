@@ -10,6 +10,8 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
+      return NextResponse.json({ error: 'You must be logged in to join a competition' }, { status: 401 });
+    }
 
   // Fetch user's country for currency display
   const { data: _profile } = await supabase
@@ -18,8 +20,6 @@ export async function POST(request: NextRequest) {
     .eq("id", user.id)
     .single();
   const sym = moneySymbol(_profile?.country);
-      return NextResponse.json({ error: 'You must be logged in to join a competition' }, { status: 401 });
-    }
 
     const { leagueId, competitionType, tournamentId } = await request.json();
 

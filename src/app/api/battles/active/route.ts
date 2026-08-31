@@ -189,11 +189,25 @@ export async function GET() {
       return NextResponse.json({ active: true, battleId: battle.id, status: battle.status, stuck: false });
     }
 
-    // Stuck pending, no game — self-heal by retrying game creation now that
-    // the RPC signature / time_control constraint bug is fixed.
-    const { data: config } = await admin.from("battle_config").select("*").limit(1).single();
-    const minutes = config?.initial_minutes ?? 5;
-    const increment = config?.increment_seconds ?? 2;
+    // Stuck pending, no game — self-heal by retrying game creation.
+    // Use the battle's stored time_control, fall back to config defaults.
+    const TIME_CONTROLS: Record<string, { minutes: number; increment: number }> = {
+      bullet: { minutes: 1, increment: 0 }, blitz3: { minutes: 3, increment: 2 },
+      blitz: { minutes: 5, increment: 0 }, rapid: { minutes: 10, increment: 0 },
+      rapid15: { minutes: 15, increment: 10 }, classical: { minutes: 30, increment: 0 },
+    };
+    const battleTC = (battle as any).time_control;
+    const tcConfig = battleTC && TIME_CONTROLS[battleTC];
+    let minutes: number;
+    let increment: number;
+    if (tcConfig) {
+      minutes = tcConfig.minutes;
+      increment = tcConfig.increment;
+    } else {
+      const { data: config } = await admin.from("battle_config").select("*").limit(1).single();
+      minutes = config?.initial_minutes ?? 5;
+      increment = config?.increment_seconds ?? 2;
+    }
 
     const { data: gameId, error: gameErr } = await admin.rpc("create_game", {
       p_white_id: battle.white_player_id,

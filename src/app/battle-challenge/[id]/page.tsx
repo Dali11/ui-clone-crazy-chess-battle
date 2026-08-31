@@ -61,12 +61,12 @@ export default async function BattleChallengePage({
     notFound();
   }
   // Fetch challenger's country for currency display
-  const { data: challengerProfile } = await admin
+  const { data: challengerCountry } = await admin
     .from("profiles")
     .select("country")
     .eq("id", challenge.challenger_id)
     .single();
-  const _sym = moneySymbol(challengerProfile?.country);
+  const _sym = moneySymbol(challengerCountry?.country);
 
   // If already accepted and battle/game exists, check if the game is still in progress
   if (challenge.status === "accepted" && challenge.battle_id) {

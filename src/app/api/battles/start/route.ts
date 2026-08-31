@@ -72,25 +72,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Battle is already being started — try again in a moment" }, { status: 409 });
     }
 
-    // Determine time control: client-provided > battle record > config default
+    // Determine time control: battle record > client-provided > config default
+    // The battle record is the source of truth — it was set when the battle
+    // was created (matchmaking or challenge accept). The client-provided
+    // value is a fallback for legacy battles without a stored time_control.
     let minutes = 5;
     let increment = 2;
 
-    if (timeControl && TIME_CONTROLS[timeControl]) {
+    const battleTC = (battle as any).time_control;
+    if (battleTC && TIME_CONTROLS[battleTC]) {
+      minutes = TIME_CONTROLS[battleTC].minutes;
+      increment = TIME_CONTROLS[battleTC].increment;
+    } else if (timeControl && TIME_CONTROLS[timeControl]) {
       minutes = TIME_CONTROLS[timeControl].minutes;
       increment = TIME_CONTROLS[timeControl].increment;
     } else {
-      // Try reading from battle record (may have time_control field)
-      const battleTC = (battle as any).time_control;
-      if (battleTC && TIME_CONTROLS[battleTC]) {
-        minutes = TIME_CONTROLS[battleTC].minutes;
-        increment = TIME_CONTROLS[battleTC].increment;
-      } else {
-        // Fall back to config
-        const { data: config } = await admin.from("battle_config").select("*").limit(1).single();
-        minutes = config?.initial_minutes ?? 5;
-        increment = config?.increment_seconds ?? 2;
-      }
+      // Fall back to config
+      const { data: config } = await admin.from("battle_config").select("*").limit(1).single();
+      minutes = config?.initial_minutes ?? 5;
+      increment = config?.increment_seconds ?? 2;
     }
 
     const { data: gameId, error: gameErr } = await admin.rpc("create_game", {

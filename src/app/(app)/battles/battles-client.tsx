@@ -12,13 +12,8 @@ import {
 // Single fixed stake for matchmaking battles: MK 1,000
 const BATTLE_STAKE = 1000;
 
-// Single fixed time control for all battles: Rapid 15+10
-const BATTLE_TIME_CONTROL = "rapid15";
-const BATTLE_TC_LABEL = "Rapid";
-const BATTLE_TC_DESC = "15+10";
-
-// Time controls available for Challenge a Friend (main battles use the fixed default)
-const CHALLENGE_TIME_CONTROLS = [
+// Time controls available for both matchmaking battles and challenges
+const BATTLE_TIME_CONTROLS = [
   { id: "bullet", label: "Bullet", desc: "1+0" },
   { id: "blitz3", label: "Blitz", desc: "3+2" },
   { id: "blitz", label: "Blitz", desc: "5+0" },
@@ -26,6 +21,9 @@ const CHALLENGE_TIME_CONTROLS = [
   { id: "rapid15", label: "Rapid", desc: "15+10" },
   { id: "classical", label: "Classical", desc: "30+0" },
 ];
+
+// Keep for backward compat with any references
+const CHALLENGE_TIME_CONTROLS = BATTLE_TIME_CONTROLS;
 
 // Currency symbol — set from the user's profile country, defaults to MK
 let _currencySymbol = "MK";
@@ -79,6 +77,7 @@ export default function BattlesPage() {
   const [challengeUrl, setChallengeUrl] = useState<string | null>(null);
   const [creatingChallenge, setCreatingChallenge] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
+  const [selectedBattleTC, setSelectedBattleTC] = useState("rapid15");
   const [selectedChallengeTC, setSelectedChallengeTC] = useState("rapid15");
   const [adminNotified, setAdminNotified] = useState(false);
   const [checkingActive, setCheckingActive] = useState(true);
@@ -258,7 +257,7 @@ export default function BattlesPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            timeControl: BATTLE_TIME_CONTROL,
+            timeControl: selectedBattleTC,
             rated: true,
             context: "battle",
             stake: BATTLE_STAKE,
@@ -287,7 +286,7 @@ export default function BattlesPage() {
       const res = await fetch("/api/battles/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stake: BATTLE_STAKE, timeControl: BATTLE_TIME_CONTROL }),
+        body: JSON.stringify({ stake: BATTLE_STAKE, timeControl: selectedBattleTC }),
       });
 
       const data = await res.json();
@@ -358,7 +357,7 @@ export default function BattlesPage() {
       const res = await fetch("/api/battles/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ battleId, timeControl: BATTLE_TIME_CONTROL }),
+        body: JSON.stringify({ battleId, timeControl: selectedBattleTC }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Failed to start game"); return; }
@@ -446,7 +445,7 @@ export default function BattlesPage() {
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-1">{formatMKK(BATTLE_STAKE)} Battle</h2>
           <p className="text-sm text-ccb-muted">
-            {BATTLE_TC_DESC} · Searching for opponent...
+            {(BATTLE_TIME_CONTROLS.find(tc => tc.id === selectedBattleTC)?.desc || "15+10")} · Searching for opponent...
           </p>
           <p className="text-xs text-ccb-muted mt-2 tabular-nums">{searchSeconds}s elapsed</p>
         </div>
@@ -689,14 +688,27 @@ export default function BattlesPage() {
           <span className="px-2.5 py-1 rounded-full bg-ccb-primary/10 text-ccb-primary text-xs font-medium">Standard</span>
         </div>
 
-        {/* Time control */}
-        <div className="flex items-center gap-3 mb-4 pb-4 border-b border-ccb-border">
-          <div className="w-10 h-10 rounded-xl bg-ccb-primary/10 flex items-center justify-center">
-            <Clock className="w-5 h-5 text-ccb-primary" />
+        {/* Time control — selectable */}
+        <div className="mb-4 pb-4 border-b border-ccb-border">
+          <div className="flex items-center gap-2 mb-3">
+            <Clock className="w-4 h-4 text-ccb-primary" />
+            <p className="text-xs font-medium text-ccb-muted">Time Control</p>
           </div>
-          <div className="flex-1">
-            <p className="text-xs text-ccb-muted">Time Control</p>
-            <p className="text-sm font-semibold">{BATTLE_TC_LABEL} · {BATTLE_TC_DESC}</p>
+          <div className="grid grid-cols-3 gap-2">
+            {BATTLE_TIME_CONTROLS.map((tc) => (
+              <button
+                key={tc.id}
+                onClick={() => setSelectedBattleTC(tc.id)}
+                className={`flex flex-col items-center gap-0.5 px-2 py-2.5 rounded-lg border-2 transition-all ${
+                  selectedBattleTC === tc.id
+                    ? "border-ccb-primary bg-ccb-primary/10"
+                    : "border-ccb-border bg-ccb-surface hover:border-ccb-primary/50"
+                }`}
+              >
+                <span className={`text-xs font-semibold ${selectedBattleTC === tc.id ? "text-ccb-primary" : "text-ccb-text"}`}>{tc.label}</span>
+                <span className="text-[10px] text-ccb-muted">{tc.desc}</span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -770,7 +782,7 @@ export default function BattlesPage() {
           </li>
           <li className="flex gap-2">
             <span className="font-semibold text-ccb-text">2.</span>
-            <span>Play a {BATTLE_TC_DESC} {BATTLE_TC_LABEL} game — winner takes the pot</span>
+            <span>Play a {(BATTLE_TIME_CONTROLS.find(tc => tc.id === selectedBattleTC)?.desc || "15+10")} {(BATTLE_TIME_CONTROLS.find(tc => tc.id === selectedBattleTC)?.label || "Rapid")} game — winner takes the pot</span>
           </li>
           <li className="flex gap-2">
             <span className="font-semibold text-ccb-text">3.</span>

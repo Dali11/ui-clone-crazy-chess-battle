@@ -39,10 +39,10 @@ export async function tryMatch(
       .neq("player_id", playerId)
       .order("created_at", { ascending: true });
 
-    return attemptMatch(admin, fallback, playerId, stake, playerRating, config);
+    return attemptMatch(admin, fallback, playerId, stake, playerRating, config, timeControl);
   }
 
-  return attemptMatch(admin, candidates, playerId, stake, playerRating, config);
+  return attemptMatch(admin, candidates, playerId, stake, playerRating, config, timeControl);
 }
 
 async function attemptMatch(
@@ -51,7 +51,8 @@ async function attemptMatch(
   playerId: string,
   stake: number,
   playerRating: number,
-  config: typeof DEFAULT_CONFIG
+  config: typeof DEFAULT_CONFIG,
+  timeControl?: string
 ): Promise<{ matched: boolean; battleId?: string } | null> {
   if (!candidates || candidates.length === 0) return { matched: false };
 
@@ -94,6 +95,7 @@ async function attemptMatch(
         status: "pending",
         white_rating: playerRating,
         black_rating: opponent.rating,
+        time_control: timeControl || "rapid15",
       })
       .select()
       .single();
