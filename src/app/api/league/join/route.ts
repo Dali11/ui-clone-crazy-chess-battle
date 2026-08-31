@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPlatformConfig } from '@/lib/platform-config';
+import { moneySymbol } from "@/lib/geo/format";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +10,14 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
+
+  // Fetch user's country for currency display
+  const { data: _profile } = await supabase
+    .from("profiles")
+    .select("country")
+    .eq("id", user.id)
+    .single();
+  const sym = moneySymbol(_profile?.country);
       return NextResponse.json({ error: 'You must be logged in to join a competition' }, { status: 401 });
     }
 
@@ -320,7 +329,7 @@ export async function POST(request: NextRequest) {
         if (currentBalance < entryFee) {
           const feeMwk = entryFee;
           return NextResponse.json({
-            error: `Insufficient wallet balance. Entry fee is MK ${feeMwk.toLocaleString()}. You have MK ${currentBalance.toLocaleString()}. Please deposit funds first.`,
+            error: `Insufficient wallet balance. Entry fee is ${sym} ${feeMwk.toLocaleString()}. You have ${sym} ${currentBalance.toLocaleString()}. Please deposit funds first.`,
           }, { status: 402 });
         }
 

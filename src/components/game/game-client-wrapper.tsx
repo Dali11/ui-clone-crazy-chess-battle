@@ -33,6 +33,7 @@ export default function GameClientWrapper(props: {
   blackAvatar?: string | null;
   battleInfo?: BattleInfo | null;
   tournamentId?: string | null;
+  countryCode?: string | null;
 }) {
   return <GameClient {...props} />;
 }

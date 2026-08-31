@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { Swords, Loader2, Wallet, Smartphone, Check, AlertCircle, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { detectOperator } from "@/lib/operator";
+import { moneySymbol } from "@/lib/geo/format";
 
+let _sym = "MK";
+function setSym(s: string) { _sym = s; }
 function formatMKK(amount: number): string {
-  return `MK ${Math.floor(amount).toLocaleString("en-US")}`;
+  return `${_sym} ${Math.floor(amount).toLocaleString("en-US")}`;
 }
 
 const TIME_CONTROL_LABELS: Record<string, string> = {
@@ -68,10 +71,10 @@ export default function BattleChallengeAccept({
     if (!user) return;
     const { data: profile } = await supabase
       .from("profiles")
-      .select("wallet_balance")
+      .select("wallet_balance, country")
       .eq("id", user.id)
       .single();
-    if (profile) setBalance(profile.wallet_balance ?? 0);
+    if (profile) { setBalance(profile.wallet_balance ?? 0); setSym(moneySymbol(profile.country)); }
   }, [supabase]);
 
   // Poll deposit verification once a mobile money payment is initiated
@@ -126,7 +129,7 @@ export default function BattleChallengeAccept({
         return;
       }
       if (depositAmount < shortfall) {
-        setDepositErr(`Deposit at least MK ${Math.ceil(shortfall).toLocaleString()} to cover the stake.`);
+        setDepositErr(`Deposit at least ${_sym} ${Math.ceil(shortfall).toLocaleString()} to cover the stake.`);
         setDepositing(false);
         return;
       }
@@ -302,7 +305,7 @@ export default function BattleChallengeAccept({
               ) : (
                 <>
                   <Wallet className="w-4 h-4" />
-                  <span>Deposit MK {depositAmount.toLocaleString()}</span>
+                  <span>Deposit {_sym} {depositAmount.toLocaleString()}</span>
                 </>
               )}
             </button>

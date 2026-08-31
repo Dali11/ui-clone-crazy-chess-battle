@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateSwissPairings, extractPreviousByes } from "@/lib/tournament/swiss-pairing";
+import { roundAlreadyExists, atomicAdvanceRound } from "@/lib/tournament/guards";
 
 // Can be triggered by cron-job.org or Vercel cron (with CRON_SECRET)
 // Finds all active tournaments where the current round is complete and
@@ -134,7 +135,12 @@ async function handleAutoAdvance(req: NextRequest) {
         const scheduledStart = new Date(Date.now() + restMinutes * 60 * 1000);
 
         // Create round entry with scheduled start time
-        await admin.from("tournament_rounds").insert({
+        // Guard: skip if round already exists (prevents duplicate game creation)
+        if (await roundAlreadyExists(admin, tournament.id, nextRound)) {
+          console.log(`[auto-advance] Round ${nextRound} already exists for tournament, skipping`);
+          continue;
+        }
+                await admin.from("tournament_rounds").insert({
           tournament_id: tournament.id,
           round_number: nextRound,
           pairings: pairings.map((p, i) => ({
@@ -209,10 +215,8 @@ async function handleAutoAdvance(req: NextRequest) {
         );
 
         // Update tournament current round
-        await admin
-          .from("tournaments")
-          .update({ current_round: nextRound })
-          .eq("id", tournament.id);
+        const _advanced = await atomicAdvanceRound(admin, tournament.id, tournament.current_round || 1, nextRound);
+          if (!_advanced) continue;
 
         // Notify participants
         for (const p of participants) {

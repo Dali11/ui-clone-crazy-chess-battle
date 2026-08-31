@@ -3,10 +3,7 @@ import SignupClient from "./signup-client";
 
 import { pageMetadata } from "@/lib/seo/metadata";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-function formatMKK(amount: number): string {
-  return `MK ${Math.floor(amount).toLocaleString("en-US")}`;
-}
+import { moneySymbol } from "@/lib/geo/format";
 
 const TC_LABELS: Record<string, string> = {
   bullet: "Bullet",
@@ -49,12 +46,12 @@ export async function generateMetadata({
         if (challenge && challenge.status === "pending") {
           const { data: profile } = await admin
             .from("profiles")
-            .select("username, display_name")
+            .select("username, display_name, country")
             .eq("id", challenge.challenger_id)
             .single();
 
           const name = profile?.display_name || profile?.username || "A player";
-          const stake = formatMKK(challenge.stake);
+          const stake = `${moneySymbol(profile?.country)} ${Math.floor(challenge.stake).toLocaleString("en-US")}`;
 
           return pageMetadata({
             title: `⚔️ ${name} challenged you to a ${stake} chess battle!`,
@@ -74,7 +71,7 @@ export async function generateMetadata({
         if (challenge && challenge.status === "pending") {
           const { data: profile } = await admin
             .from("profiles")
-            .select("username, display_name")
+            .select("username, display_name, country")
             .eq("id", challenge.challenger_id)
             .single();
 

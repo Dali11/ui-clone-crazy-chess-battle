@@ -36,7 +36,7 @@ async function _processTournamentGameResult(result: GameResult) {
     .from("games")
     .select("tournament_id, tournament_round, status")
     .eq("id", result.gameId)
-    .single();
+    .maybeSingle();
 
   if (gameErr) {
     console.error("[processTournamentGameResult] Failed to fetch game", result.gameId, gameErr.message);
@@ -70,7 +70,7 @@ async function _processTournamentGameResult(result: GameResult) {
     .select("id, pairings")
     .eq("tournament_id", tournamentId)
     .eq("round_number", roundNumber)
-    .single();
+    .maybeSingle();
 
   if (roundErr) {
     console.error("[processTournamentGameResult] Failed to fetch round", tournamentId, roundNumber, roundErr.message);

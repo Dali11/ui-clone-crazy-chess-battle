@@ -21,6 +21,7 @@ export interface GameClientProps {
   blackAvatar?: string | null;
   battleInfo?: BattleInfo | null;
   tournamentId?: string | null;
+  countryCode?: string | null;
 }
 
 export const STATUS_LABELS: Record<string, string> = {

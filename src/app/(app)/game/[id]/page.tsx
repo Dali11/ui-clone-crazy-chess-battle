@@ -60,6 +60,13 @@ export default async function GamePage({
 
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Fetch current user's country for currency display
+  const { data: myProfile } = await supabase
+    .from("profiles")
+    .select("country")
+    .eq("id", user?.id || "")
+    .single();
+
   const { data: game } = await supabase
     .from("games")
     .select("*")
@@ -134,6 +141,7 @@ export default async function GamePage({
         blackAvatar={blackProfile.data?.avatar_url}
         battleInfo={battleInfo}
         tournamentId={game.tournament_id}
+        countryCode={myProfile?.country}
       />
     </>
   );

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_CONFIG, calcPayout } from "@/lib/battles/battle-helpers";
+import { moneySymbol } from "@/lib/geo/format";
 
 /**
  * POST /api/game/rematch/accept
@@ -17,6 +18,14 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Fetch user's country for currency display
+  const { data: _profile } = await supabase
+    .from("profiles")
+    .select("country")
+    .eq("id", user.id)
+    .single();
+  const sym = moneySymbol(_profile?.country);
 
     const { offerId } = await req.json();
     if (!offerId) return NextResponse.json({ error: "offerId required" }, { status: 400 });
@@ -61,7 +70,7 @@ export async function POST(req: NextRequest) {
       const acceptorBalance = acceptorProfile?.wallet_balance ?? 0;
       if (acceptorBalance < stake) {
         return NextResponse.json({
-          error: `Insufficient balance for a staked rematch. You need MK ${stake.toLocaleString()}.`,
+          error: `Insufficient balance for a staked rematch. You need ${sym} ${stake.toLocaleString()}.`,
           insufficientFunds: true,
           requiredAmount: stake,
           balance: acceptorBalance,

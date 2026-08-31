@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_CONFIG, calcPayout } from "@/lib/battles/battle-helpers";
+import { moneySymbol } from "@/lib/geo/format";
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Fetch user's country for currency display
+  const { data: _profile } = await supabase
+    .from("profiles")
+    .select("country")
+    .eq("id", user.id)
+    .single();
+  const sym = moneySymbol(_profile?.country);
 
     const { challengeId } = await req.json();
     if (!challengeId) return NextResponse.json({ error: "Challenge ID required" }, { status: 400 });
@@ -67,7 +76,7 @@ export async function POST(req: NextRequest) {
     if (balance < challenge.stake) {
       return NextResponse.json(
         {
-          error: `Insufficient balance. You need MK ${challenge.stake.toLocaleString()}.`,
+          error: `Insufficient balance. You need ${sym} ${challenge.stake.toLocaleString()}.`,
           insufficientFunds: true,
           requiredAmount: challenge.stake,
           balance: balance,
@@ -153,7 +162,7 @@ export async function POST(req: NextRequest) {
         user_id: challenge.challenger_id,
         type: "challenge_accepted",
         title: "Challenge accepted!",
-        body: `Your battle challenge (MK ${challenge.stake.toLocaleString()}) was accepted. Game starting now!`,
+        body: `Your battle challenge (${sym} ${challenge.stake.toLocaleString()}) was accepted. Game starting now!`,
         data: { battle_id: battle.id, stake: challenge.stake },
         read: false,
       });

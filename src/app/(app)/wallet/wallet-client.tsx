@@ -1,6 +1,7 @@
 "use client";
 
 import { detectOperator } from "@/lib/operator";
+import { moneySymbol } from "@/lib/geo/format";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -46,11 +47,12 @@ interface WalletClientProps {
   email: string;
   deposits: Deposit[];
   phone?: string | null;
+  country?: string | null;
 }
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000, 10000, 25000];
 
-export default function WalletClient({ balance, email, deposits, phone: savedPhone }: WalletClientProps) {
+export default function WalletClient({ balance, email, deposits, phone: savedPhone, country }: WalletClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<"deposit" | "withdraw" | "history">("deposit");
@@ -304,7 +306,8 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
     }
   };
 
-  const formatMWK = (amount: number) => `MWK ${Math.floor((amount || 0)).toLocaleString()}`;
+  const sym = moneySymbol(country);
+  const formatMWK = (amount: number) => `${sym} ${Math.floor((amount || 0)).toLocaleString()}`;
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
   return (
@@ -461,7 +464,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               })()}
             </div>
             <p className="text-xs text-ccb-muted mt-2">
-              Available: {formatMWK(walletBal)} · Min: MWK {(withdrawConfig ? withdrawConfig.min_amount : 10000).toLocaleString()}
+              Available: {formatMWK(walletBal)} · Min: {sym} {(withdrawConfig ? withdrawConfig.min_amount : 10000).toLocaleString()}
             </p>
           </div>
 

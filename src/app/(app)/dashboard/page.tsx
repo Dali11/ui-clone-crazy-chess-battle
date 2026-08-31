@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight } from "lucide-react";
 import WhatsAppBanner from "@/components/layout/whatsapp-banner";
+import { moneySymbol } from "@/lib/geo/format";
 
 const LEVEL_RATINGS: Record<string, number> = {
   beginner: 400,
@@ -50,7 +51,7 @@ export default async function DashboardPage() {
   // Fetch profile first (needed for rating init logic)
   const { data: profile } = await supabase
     .from("profiles")
-    .select("*")
+    .select("*, country")
     .eq("id", user!.id)
     .single();
 
@@ -87,9 +88,10 @@ export default async function DashboardPage() {
     ? Math.round(((profile.wins ?? 0) / profile.games_played) * 100)
     : 0;
 
+  const walletSymbol = moneySymbol(profile?.country);
   const walletBalance = profile?.wallet_balance
-    ? `MK ${profile.wallet_balance.toLocaleString("en-US")}`
-    : "MK 0";
+    ? `${walletSymbol} ${profile.wallet_balance.toLocaleString("en-US")}`
+    : `${walletSymbol} 0`;
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-24 sm:pb-6">
@@ -167,7 +169,7 @@ export default async function DashboardPage() {
                       <div className="text-sm font-medium truncate">{t.name}</div>
                       <div className="text-xs text-ccb-muted">
                         {new Date(t.starts_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}, {new Date(t.starts_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                        {t.entry_fee ? ` · MK ${t.entry_fee}` : " · Free"}
+                        {t.entry_fee ? ` · ${moneySymbol(profile?.country)} ${t.entry_fee}` : " · Free"}
                       </div>
                     </div>
                   </div>

@@ -24,11 +24,12 @@ import PreGameCountdown from "./pre-game-countdown";
 import PlayerProfilePreview from "./player-profile-preview";
 import PlayerBar from "./player-bar";
 import { formatClock } from "./utils";
+import { moneySymbol } from "@/lib/geo/format";
 import type { BattleInfo, GameClientProps, SheetType } from "./types";
 import { STATUS_LABELS } from "./types";
 
 
-export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo, tournamentId }: GameClientProps) {
+export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo, tournamentId, countryCode }: GameClientProps) {
   const { game, connected, connectionQuality, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw, spectatorCount } = useRealtimeGame(gameId, initialGame, currentUserId);
   const router = useRouter();
   const [fen, setFen] = useState(game.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");

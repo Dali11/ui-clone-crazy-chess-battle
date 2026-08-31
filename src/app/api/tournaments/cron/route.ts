@@ -7,6 +7,7 @@ import { processTournamentGameResult } from "@/lib/tournament/results";
 import { finishTournament } from "@/lib/tournament/finish";
 import { sendEmail } from "@/lib/email";
 import { generateKnockoutBracket, knockoutRoundCount, advanceKnockoutRound, generateGroups, generateGroupRoundRobin, getGroupAdvancers, isKnockoutComplete } from "@/lib/tournament/knockout";
+import { roundAlreadyExists, atomicAdvanceRound } from "@/lib/tournament/guards";
 
 // Combined tournament cron — does auto-start + auto-advance + start-scheduled in one call.
 // Triggered by Base44 workflow (every 5 min) or cron-job.org. No auth required.
@@ -289,7 +290,15 @@ async function handleTournamentCron(req: NextRequest) {
         const r1Start = new Date(Date.now() + countdownMin1 * 60 * 1000);
 
         if (tournament.type !== "arena") {
-          await admin.from("tournament_rounds").insert({
+          // Atomic claim: only proceed if still "upcoming" (prevents concurrent auto-start)
+          const { data: claimed } = await admin
+            .from("tournaments")
+            .update({ status: "active", current_round: 1 })
+            .eq("id", tournament.id)
+            .eq("status", "upcoming")
+            .select("id");
+          if (!claimed || claimed.length === 0) continue;
+                    await admin.from("tournament_rounds").insert({
             tournament_id: tournament.id,
             round_number: 1,
             pairings: pairings.map((p, i) => ({
@@ -435,7 +444,7 @@ async function handleTournamentCron(req: NextRequest) {
           .select("id, is_complete")
           .eq("tournament_id", tournament.id)
           .eq("round_number", currentRound)
-          .single();
+          .maybeSingle();
 
         if (!round?.is_complete) continue;
 
@@ -461,7 +470,7 @@ async function handleTournamentCron(req: NextRequest) {
             .select("pairings")
             .eq("tournament_id", tournament.id)
             .eq("round_number", currentRound)
-            .single();
+            .maybeSingle();
 
           if (!prevRound?.pairings) continue;
           const prevPairings = prevRound.pairings as Array<Record<string, any>>;
@@ -625,7 +634,12 @@ async function handleTournamentCron(req: NextRequest) {
           const { data: koProfiles } = await admin.from("profiles").select("id, rating").in("id", koPlayerIds);
           const koRatingMap = new Map((koProfiles || []).map((p: any) => [p.id, p.rating || 1200]));
 
-          await admin.from("tournament_rounds").insert({
+          // Guard: skip if round already exists (prevents duplicate game creation)
+          if (await roundAlreadyExists(admin, tournament.id, nextRound)) {
+            console.log(`[cron] Round ${nextRound} already exists for tournament ${tournament.id}, skipping`);
+            continue;
+          }
+                    await admin.from("tournament_rounds").insert({
             tournament_id: tournament.id,
             round_number: nextRound,
             pairings: koPairings.map((p, i) => ({
@@ -714,7 +728,8 @@ async function handleTournamentCron(req: NextRequest) {
             }
           }
 
-          await admin.from("tournaments").update({ current_round: nextRound }).eq("id", tournament.id);
+          const _advanced = await atomicAdvanceRound(admin, tournament.id, tournament.current_round, nextRound);
+          if (!_advanced) { console.log(`[cron] Tournament ${tournament.id} already advanced to ${nextRound}, skipping`); continue; }
 
           // Notify participants
           const { data: koParticipants } = await admin
@@ -778,7 +793,12 @@ async function handleTournamentCron(req: NextRequest) {
         const restMin = tournament.rest_minutes || 1;
         const rnStart = new Date(Date.now() + restMin * 60 * 1000);
 
-        await admin.from("tournament_rounds").insert({
+        // Guard: skip if round already exists (prevents duplicate game creation)
+        if (await roundAlreadyExists(admin, tournament.id, nextRound)) {
+          console.log(`[cron] Round ${nextRound} already exists for tournament ${tournament.id}, skipping`);
+          continue;
+        }
+                await admin.from("tournament_rounds").insert({
           tournament_id: tournament.id,
           round_number: nextRound,
           pairings: pairings.map((p, i) => ({
@@ -861,7 +881,8 @@ async function handleTournamentCron(req: NextRequest) {
           );
         }
 
-        await admin.from("tournaments").update({ current_round: nextRound }).eq("id", tournament.id);
+        const _advanced = await atomicAdvanceRound(admin, tournament.id, tournament.current_round, nextRound);
+        if (!_advanced) { console.log(`[cron] Tournament ${tournament.id} already advanced to ${nextRound}, skipping`); continue; }
 
         // Notify participants
         for (const p of participants) {
@@ -1089,7 +1110,7 @@ async function handleTournamentCron(req: NextRequest) {
             .select("id, is_complete")
             .eq("tournament_id", tournament.id)
             .eq("round_number", currentRound)
-            .single();
+            .maybeSingle();
 
           if (!round?.is_complete) continue;
 
@@ -1142,7 +1163,12 @@ async function handleTournamentCron(req: NextRequest) {
               previousByes2,
             );
 
-            await admin.from("tournament_rounds").insert({
+            // Guard: skip if round already exists (prevents duplicate game creation)
+            if (await roundAlreadyExists(admin, tournament.id, nextRound)) {
+              console.log(`[cron] Round ${nextRound} already exists for tournament ${tournament.id}, skipping`);
+              continue;
+            }
+                        await admin.from("tournament_rounds").insert({
               tournament_id: tournament.id,
               round_number: nextRound,
               pairings: pairings.map((p, i) => ({
@@ -1215,7 +1241,8 @@ async function handleTournamentCron(req: NextRequest) {
               );
             }
 
-            await admin.from("tournaments").update({ current_round: nextRound }).eq("id", tournament.id);
+            const _advanced = await atomicAdvanceRound(admin, tournament.id, tournament.current_round, nextRound);
+            if (!_advanced) { console.log(`[cron] Tournament ${tournament.id} already advanced to ${nextRound}, skipping`); continue; }
 
             for (const p of participants) {
               try {

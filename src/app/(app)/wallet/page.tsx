@@ -59,6 +59,7 @@ export default async function WalletPage() {
       email={user.email || ""}
       deposits={deposits}
       phone={null}
+      country={profile?.country || null}
     />
   );
 }

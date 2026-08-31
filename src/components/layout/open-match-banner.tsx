@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Swords, Zap, X, Trophy } from "lucide-react";
+import { moneySymbol } from "@/lib/geo/format";
 
 interface OpenMatch {
   id: string;
@@ -35,7 +36,14 @@ export default function OpenMatchBanner() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [accepting, setAccepting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sym, setSym] = useState("MK");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    fetch("/api/currency").then(r => r.json()).then(d => {
+      if (d.countryCode) setSym(moneySymbol(d.countryCode));
+    }).catch(() => {});
+  }, []);
 
   // Don't show on game pages, challenge pages, or battle-challenge pages
   const skip =
@@ -138,7 +146,7 @@ export default function OpenMatchBanner() {
           const waitLabel = waitSecs < 60 ? `${waitSecs}s` : `${Math.floor(waitSecs / 60)}m`;
           const initials = match.playerName.slice(0, 2).toUpperCase();
           const meta = match.type === "battle"
-            ? `MK ${match.stake?.toLocaleString()} · ${match.timeControlLabel}`
+            ? `${sym} ${match.stake?.toLocaleString()} · ${match.timeControlLabel}`
             : `${match.timeControlLabel}${match.rated ? " · Ranked" : ""}`;
 
           return (

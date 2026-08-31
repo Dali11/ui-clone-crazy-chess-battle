@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { settleBattle } from "@/lib/battles/settle";
+import { moneySymbol } from "@/lib/geo/format";
 
 /**
  * Check if the current user has an active battle (pending/playing/draw_armageddon)
@@ -18,6 +19,14 @@ export async function GET() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Fetch user's country for currency display
+  const { data: _profile } = await supabase
+    .from("profiles")
+    .select("country")
+    .eq("id", user.id)
+    .single();
+  const sym = moneySymbol(_profile?.country);
 
     const admin = createAdminClient();
 
@@ -79,7 +88,7 @@ export async function GET() {
                 active: false,
                 queueExpired: true,
                 refunded: claimed.stake,
-                message: `Your previous search timed out — MK ${claimed.stake.toLocaleString()} was refunded.`,
+                message: `Your previous search timed out — ${sym} ${claimed.stake.toLocaleString()} was refunded.`,
               });
             } else {
               // Refund failed — revert status so it can be retried

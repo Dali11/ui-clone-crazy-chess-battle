@@ -9,6 +9,7 @@ import {
   Crown, Disc3, Menu, X, Trophy, Radio, Clock, Play, Settings,
 } from "lucide-react";
 import NotificationBell from "./notification-bell";
+import { moneySymbol } from "@/lib/geo/format";
 
 interface Profile {
   username: string | null;
@@ -17,6 +18,7 @@ interface Profile {
   avatar_url: string | null;
   is_admin: boolean | null;
   wallet_balance: number | null;
+  country: string | null;
 }
 
 // Exact active check — avoids /league matching /league/tournaments etc.
@@ -108,7 +110,8 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
   const formatBalance = (cents: number | null | undefined) => {
     const value = cents ?? 0;
     const kwacha = Math.floor(value);
-    return `MK ${kwacha.toLocaleString()}`;
+    const symbol = moneySymbol(profile?.country);
+    return `${symbol} ${kwacha.toLocaleString()}`;
   };
 
   return (

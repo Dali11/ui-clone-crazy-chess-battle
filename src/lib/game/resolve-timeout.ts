@@ -134,20 +134,20 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
       });
     } catch (e) {
       console.error("[timeout] Tournament processing failed for game", game.id, e);
+    }
+  }
 
-    // League fixture processing
-    try {
-      await processLeagueGameResult({
-        gameId: game.id,
-        whitePlayerId: game.white_player_id,
-        blackPlayerId: game.black_player_id,
-        winner: winner as "white" | "black",
-        status: "timeout",
-      });
-    } catch (e) {
-      console.error("[timeout] League processing failed for game", game.id, e);
-    }
-    }
+  // League fixture processing
+  try {
+    await processLeagueGameResult({
+      gameId: game.id,
+      whitePlayerId: game.white_player_id,
+      blackPlayerId: game.black_player_id,
+      winner: winner as "white" | "black",
+      status: "timeout",
+    });
+  } catch (e) {
+    console.error("[timeout] League processing failed for game", game.id, e);
   }
 
   // Battle settlement

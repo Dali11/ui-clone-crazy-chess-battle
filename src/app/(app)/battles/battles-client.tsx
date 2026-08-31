@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { moneySymbol } from "@/lib/geo/format";
 import {
   Swords, Clock, Coins, Zap, AlertCircle, Loader2, Link2, Copy, Check,
   RefreshCw, XCircle, ChevronRight, Users, Target, Sparkles,
@@ -26,8 +27,15 @@ const CHALLENGE_TIME_CONTROLS = [
   { id: "classical", label: "Classical", desc: "30+0" },
 ];
 
+// Currency symbol — set from the user's profile country, defaults to MK
+let _currencySymbol = "MK";
+
+function setCurrencySymbol(symbol: string) {
+  _currencySymbol = symbol;
+}
+
 function formatMKK(amount: number): string {
-  return `MK ${Math.floor(amount).toLocaleString("en-US")}`;
+  return `${_currencySymbol} ${Math.floor(amount).toLocaleString("en-US")}`;
 }
 
 function formatCurrency(amount: number, currencyCode: string, rate: number): string {
@@ -127,13 +135,14 @@ export default function BattlesPage() {
     if (!user) return;
     const { data: profile } = await supabase
       .from("profiles")
-      .select("rating, wallet_balance, games_played")
+      .select("rating, wallet_balance, games_played, country")
       .eq("id", user.id)
       .single();
     if (profile) {
       setMyRating(profile.rating ?? 1200);
       setBalance(profile.wallet_balance ?? 0);
       setGamesPlayed(profile.games_played ?? 0);
+      setCurrencySymbol(moneySymbol(profile.country));
     }
     setProfileLoaded(true);
   };
@@ -313,7 +322,7 @@ export default function BattlesPage() {
     const stake = stakeValue; // user enters in MWK
 
     if (balance < stake) {
-      setStakeError(`Insufficient balance. You need MK ${stakeValue.toLocaleString()}.`);
+      setStakeError(`Insufficient balance. You need ${_currencySymbol} ${stakeValue.toLocaleString()}.`);
       return;
     }
 
@@ -606,7 +615,7 @@ export default function BattlesPage() {
             <div className="mt-3 p-4 rounded-xl bg-ccb-card border border-ccb-border">
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="text-ccb-muted">Your stake</span>
-                <span className="font-semibold">MK {parseInt(customStake).toLocaleString()}</span>
+                <span className="font-semibold">{_currencySymbol} {parseInt(customStake).toLocaleString()}</span>
               </div>
               {currencyCode !== "MWK" && (
                 <div className="flex items-center justify-between text-xs text-ccb-muted mb-2">
@@ -621,7 +630,7 @@ export default function BattlesPage() {
               <div className="flex items-center justify-between text-sm pt-2 border-t border-ccb-border">
                 <span className="text-ccb-muted">Winner receives</span>
                 <span className="font-bold text-ccb-accent text-lg">
-                  MK {(parseInt(customStake) * 2 - Math.round(parseInt(customStake) * 2 * (feePct / 100))).toLocaleString()}
+                  {_currencySymbol} {(parseInt(customStake) * 2 - Math.round(parseInt(customStake) * 2 * (feePct / 100))).toLocaleString()}
                 </span>
               </div>
             </div>

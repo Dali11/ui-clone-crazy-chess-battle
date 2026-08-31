@@ -196,9 +196,12 @@ export async function POST(req: NextRequest) {
         });
       } catch (e) {
         console.error("[move] Tournament processing failed for game", gameId, e);
+      }
+    }
 
-      // Process league game result if this is a league fixture game
-      const { data: leagueGame } = await admin.from("games").select("league_fixture_id").eq("id", gameId).single();
+    // Process league game result if this is a league fixture game
+    if (gameEnded && result.winner) {
+      const { data: leagueGame } = await admin.from("games").select("league_fixture_id").eq("id", gameId).maybeSingle();
       if (leagueGame?.league_fixture_id) {
         try {
           await processLeagueGameResult({
@@ -211,7 +214,6 @@ export async function POST(req: NextRequest) {
         } catch (e) {
           console.error("[move] League processing failed for game", gameId, e);
         }
-      }
       }
     }
 

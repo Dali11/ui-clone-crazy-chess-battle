@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Trophy, Handshake, Frown, RefreshCw, Home, Swords, ScanSearch, Clock, Wallet, Check, X, Loader2 } from "lucide-react";
 import FireworksCanvas from "./fireworks-canvas";
+import { moneySymbol } from "@/lib/geo/format";
 
 export type GameOutcome = "win" | "loss" | "draw" | "abort";
 
@@ -36,6 +37,7 @@ interface VictoryOverlayProps {
   rematchStake?: number;
   incomingRematchStake?: number;
   incomingRematchError?: string;
+  countryCode?: string | null;
   newGameLabel?: string;
   playAgainLabel?: string;
   lobbyHref?: string;
@@ -71,6 +73,7 @@ export default function VictoryOverlay({
   rematchState = { status: "idle" },
   rematchStake = 0,
   incomingRematchStake = 0,
+  countryCode,
   incomingRematchError,
   newGameLabel = "New Game",
   playAgainLabel = "Play Again",
@@ -190,7 +193,7 @@ export default function VictoryOverlay({
                 <span className="text-[10px] uppercase tracking-wider text-emerald-400/70 font-semibold mb-0.5 flex items-center gap-1">
                   <Wallet className="w-3 h-3" /> {moneyLabel}
                 </span>
-                <span className="text-lg font-extrabold text-emerald-400">MK {moneyEarned.toLocaleString()}</span>
+                <span className="text-lg font-extrabold text-emerald-400">{moneySymbol(countryCode)} {moneyEarned.toLocaleString()}</span>
               </div>
             )}
           </div>
@@ -282,7 +285,7 @@ export default function VictoryOverlay({
               className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
               style={{ backgroundColor: "rgba(34,197,94,0.15)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.3)" }}
             >
-              <Check className="w-4 h-4" /> {incomingRematchStake > 0 ? `Accept Staked Rematch · MK ${incomingRematchStake.toLocaleString()}` : "Accept Rematch"}
+              <Check className="w-4 h-4" /> {incomingRematchStake > 0 ? `Accept Staked Rematch · ${moneySymbol(countryCode)} ${incomingRematchStake.toLocaleString()}` : "Accept Rematch"}
             </button>
           )}
 
