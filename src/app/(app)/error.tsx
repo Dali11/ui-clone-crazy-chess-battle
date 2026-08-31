@@ -1,11 +1,19 @@
 "use client";
 
-export default function Error({ error, reset }: { error: Error; reset: () => void }) {
+import { ErrorPage } from "@/components/error-page";
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  // Nested error — the app layout (nav, sidebar) still renders around this.
+  // Use min-h to fill only the content area, not full screen.
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-      <p className="text-ccb-text/60">Something went wrong.</p>
-      <p className="text-sm text-ccb-text/40 max-w-md text-center">{error.message}</p>
-      <button onClick={reset} className="btn-primary">Try again</button>
+    <div className="min-h-[60vh]">
+      <ErrorPage variant="error" error={error} reset={reset} />
     </div>
   );
 }
