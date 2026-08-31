@@ -11,7 +11,7 @@ interface SettingField {
   type: "toggle" | "number" | "text" | "select";
   options?: { value: string; label: string }[];
   help?: string;
-  group?: "control" | "display";
+  group?: "control" | "pricing" | "display";
   unit?: string;
 }
 
@@ -79,6 +79,16 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "require_approval", label: "Require Approval", type: "toggle", group: "control", help: "Tournaments need admin approval before going live" },
     { key: "auto_approve_below_players", label: "Auto-Approve Under", type: "number", group: "control", unit: "players", help: "Auto-approve tournaments with fewer than N players" },
     { key: "max_players", label: "Max Players", type: "number", group: "control" },
+    { key: "default_entry_fee", label: "Default Entry Fee", type: "number", group: "pricing", help: "Base currency entry fee for auto-created tournaments (0 = free)" },
+    { key: "max_entry_fee", label: "Max Entry Fee", type: "number", group: "pricing", help: "Maximum entry fee users can set when creating a tournament" },
+    { key: "min_entry_fee", label: "Min Entry Fee", type: "number", group: "pricing", help: "Minimum entry fee (0 allows free tournaments)" },
+    { key: "default_creator_profit_pct", label: "Default Creator Profit %", type: "number", group: "pricing", help: "Default % of entry fees taken as platform/creator cut" },
+    { key: "auto_create_time_control", label: "Auto-Create Time Control", type: "text", group: "pricing", help: "Time control for auto-created tournaments (rapid/blitz/bullet)" },
+    { key: "auto_create_initial_minutes", label: "Auto-Create Minutes", type: "number", group: "pricing", help: "Initial minutes for auto-created tournament games" },
+    { key: "auto_create_increment_seconds", label: "Auto-Create Increment (s)", type: "number", group: "pricing", help: "Increment seconds for auto-created tournament games" },
+    { key: "auto_create_max_players", label: "Auto-Create Max Players", type: "number", group: "pricing" },
+    { key: "auto_create_min_players", label: "Auto-Create Min Players", type: "number", group: "pricing" },
+    { key: "auto_create_creator_profit_pct", label: "Auto-Create Creator Profit %", type: "number", group: "pricing" },
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
     { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],

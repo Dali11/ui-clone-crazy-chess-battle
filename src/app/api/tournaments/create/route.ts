@@ -29,16 +29,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tournament name and start time are required" }, { status: 400 });
     }
 
-    // Cap entry fee at MK5000
-    const fee = Number(entryFee || 0);
-    if (fee > 5000) {
-      return NextResponse.json({ error: "Entry fee cannot exceed MK 5,000" }, { status: 400 });
-    }
-
     const admin = createAdminClient();
 
     // ─── Load platform config ──────────────────────────────────────────
     const tConfig = await getPlatformConfig(admin, "tournaments");
+
+    // Enforce entry fee limits from platform config
+    const fee = Number(entryFee || 0);
+    const maxFee = tConfig.max_entry_fee ?? 5000;
+    const minFee = tConfig.min_entry_fee ?? 0;
+    if (fee > maxFee) {
+      return NextResponse.json({ error: `Entry fee cannot exceed ${maxFee.toLocaleString()}` }, { status: 400 });
+    }
+    if (fee < minFee) {
+      return NextResponse.json({ error: `Entry fee must be at least ${minFee.toLocaleString()}` }, { status: 400 });
+    }
 
     // Enforce max players limit from platform settings
     const configMaxPlayers = tConfig.max_players || 128;

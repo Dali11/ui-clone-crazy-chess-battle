@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PRIZE_SPLITS_BY_TYPE } from "@/lib/tournament/prizes";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 /**
  * Weekly tournament creator — creates ONE tournament per week on Mondays.
@@ -67,23 +68,34 @@ async function handleCreate(req: NextRequest) {
     startsAt.setUTCDate(now.getUTCDate() + daysUntilMonday);
     startsAt.setUTCHours(18, 0, 0, 0);
 
+    // ── Load tournament pricing from platform config ──────────────────
+    const tConfig = await getPlatformConfig(admin, "tournaments");
+
+    const tcTimeControl = tConfig.auto_create_time_control || "rapid";
+    const tcInitialMinutes = Number(tConfig.auto_create_initial_minutes) || 10;
+    const tcIncrementSeconds = Number(tConfig.auto_create_increment_seconds) || 5;
+    const tcMaxPlayers = Number(tConfig.auto_create_max_players) || 128;
+    const tcMinPlayers = Number(tConfig.auto_create_min_players) || 6;
+    const tcEntryFee = Number(tConfig.default_entry_fee) || 1000;
+    const tcCreatorProfit = Number(tConfig.auto_create_creator_profit_pct ?? tConfig.default_creator_profit_pct) ?? 10;
+
     const payouts = PRIZE_SPLITS_BY_TYPE[tType] || PRIZE_SPLITS_BY_TYPE["swiss"];
 
     const base: Record<string, any> = {
       name: tournamentName,
-      description: `Weekly ${tType} tournament — Rapid 10+5. MK1000 entry. One tournament per week.`,
+      description: `Weekly ${tType} tournament — ${tcTimeControl} ${tcInitialMinutes}+${tcIncrementSeconds}. ${tcEntryFee > 0 ? `${tcEntryFee} entry` : "Free entry"}. One tournament per week.`,
       type: tType,
-      time_control: "rapid",
-      initial_minutes: 10,
-      increment_seconds: 5,
-      max_players: 128,
-      min_players: 6,
+      time_control: tcTimeControl,
+      initial_minutes: tcInitialMinutes,
+      increment_seconds: tcIncrementSeconds,
+      max_players: tcMaxPlayers,
+      min_players: tcMinPlayers,
       starts_at: startsAt.toISOString(),
       ends_at: null,
-      entry_fee: 1000,
+      entry_fee: tcEntryFee,
       prize_pool: 0,
       pool_source: "entry_fees",
-      creator_profit_percent: 10,
+      creator_profit_percent: tcCreatorProfit,
       prize_distribution: { type: "percentage", payouts },
       min_rating: 0,
       max_rating: null,

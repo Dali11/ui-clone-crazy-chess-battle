@@ -69,6 +69,18 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     require_approval: true,
     auto_approve_below_players: 0,
     max_players: 128,
+    // ── Pricing ──
+    default_entry_fee: 1000,        // base currency (MWK)
+    max_entry_fee: 5000,            // cap for user-created tournaments
+    min_entry_fee: 0,               // 0 = free tournaments allowed
+    default_creator_profit_pct: 10, // default house/creator cut on paid tournaments
+    // ── Auto-create defaults (weekly cron) ──
+    auto_create_time_control: "rapid",
+    auto_create_initial_minutes: 10,
+    auto_create_increment_seconds: 5,
+    auto_create_max_players: 128,
+    auto_create_min_players: 6,
+    auto_create_creator_profit_pct: 10,
     show_kpi_cards: true,
     page_size: 20,
   },
