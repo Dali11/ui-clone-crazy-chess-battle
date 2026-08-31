@@ -40,11 +40,17 @@ export async function POST(req: NextRequest) {
     const winner = isWhite ? "black" : "white";
     const admin = createAdminClient();
 
-    await admin.from("draughts_games").update({
+    // Atomic claim: only succeed if still "playing". Prevents race with
+    // timeout cron or duplicate client requests double-processing the same game.
+    const { data: claimed, error: claimErr } = await admin.from("draughts_games").update({
       status: "resign",
       winner,
       ended_at: new Date().toISOString(),
-    }).eq("id", gameId);
+    }).eq("id", gameId).eq("status", "playing").select("id").single();
+
+    if (claimErr || !claimed) {
+      return NextResponse.json({ error: "Game already resolved" }, { status: 409 });
+    }
 
     // Update ratings
     const { data: whiteProfile } = await admin

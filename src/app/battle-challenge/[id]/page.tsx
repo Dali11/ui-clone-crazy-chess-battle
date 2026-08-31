@@ -6,13 +6,11 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import BattleChallengeAccept from "./battle-challenge-accept";
-import { moneySymbol } from "@/lib/geo/format";
+import { getServerCurrency } from "@/lib/geo/server-currency";
 import ChallengeTaken from "@/app/challenge/[id]/challenge-taken";
 import BattleChallengeWaiting from "./battle-challenge-waiting";
 
-function formatMKK(amount: number, sym = "MK"): string {
-  return `${sym} ${Math.floor(amount).toLocaleString("en-US")}`;
-}
+// Currency formatting via getServerCurrency
 
 
 import { pageMetadata } from "@/lib/seo/metadata";
@@ -66,7 +64,7 @@ export default async function BattleChallengePage({
     .select("country")
     .eq("id", challenge.challenger_id)
     .single();
-  const _sym = moneySymbol(challengerCountry?.country);
+  const { formatMoney: fmtCurrency } = await getServerCurrency(challengerCountry?.country);
 
   // If already accepted and battle/game exists, check if the game is still in progress
   if (challenge.status === "accepted" && challenge.battle_id) {
@@ -149,7 +147,7 @@ export default async function BattleChallengePage({
       <BattleChallengeWaiting
         challengeId={id}
         url={url}
-        stakeLabel={formatMKK(challenge.stake, _sym)}
+        stakeLabel={fmtCurrency(challenge.stake)}
         expiresAt={challenge.expires_at}
       />
     );
@@ -199,7 +197,7 @@ export default async function BattleChallengePage({
             <h1 className="text-2xl font-bold">Challenge Expired</h1>
             <p className="text-ccb-muted">
               Your challenge was not accepted in time. Your stake of{" "}
-              <span className="font-semibold text-ccb-text">{formatMKK(challenge.stake, _sym)}</span>{" "}
+              <span className="font-semibold text-ccb-text">{fmtCurrency(challenge.stake)}</span>{" "}
               has been refunded to your wallet.
             </p>
             <a href="/wallet" className="btn-primary inline-block mr-2">View Wallet</a>

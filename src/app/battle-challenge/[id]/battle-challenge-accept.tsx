@@ -5,13 +5,9 @@ import { useRouter } from "next/navigation";
 import { Swords, Loader2, Wallet, Smartphone, Check, AlertCircle, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { detectOperator } from "@/lib/operator";
-import { moneySymbol } from "@/lib/geo/format";
+import { useCurrency } from "@/hooks/use-currency";
 
-let _sym = "MK";
-function setSym(s: string) { _sym = s; }
-function formatMKK(amount: number): string {
-  return `${_sym} ${Math.floor(amount).toLocaleString("en-US")}`;
-}
+// Currency handled by useCurrency hook inside the component.
 
 const TIME_CONTROL_LABELS: Record<string, string> = {
   bullet: "Bullet · 1+0",
@@ -49,6 +45,7 @@ export default function BattleChallengeAccept({
   const supabase = useMemo(() => createClient(), []);
   const [balance, setBalance] = useState(initialBalance);
   const [loading, setLoading] = useState(false);
+  const { formatMoney: fmtCurrency, currencySymbol: _sym } = useCurrency();
   const [error, setError] = useState<string | null>(null);
 
   const shortfall = Math.max(0, stake - balance);
@@ -74,7 +71,7 @@ export default function BattleChallengeAccept({
       .select("wallet_balance, country")
       .eq("id", user.id)
       .single();
-    if (profile) { setBalance(profile.wallet_balance ?? 0); setSym(moneySymbol(profile.country)); }
+    if (profile) { setBalance(profile.wallet_balance ?? 0); }
   }, [supabase]);
 
   // Poll deposit verification once a mobile money payment is initiated
@@ -217,14 +214,14 @@ export default function BattleChallengeAccept({
           <h1 className="text-xl font-bold">You've Been Challenged to a Battle!</h1>
           <p className="text-sm text-ccb-muted">
             <span className="font-semibold text-foreground">{challengerName}</span> ({challengerRating}) staked{" "}
-            <span className="font-semibold text-foreground">{formatMKK(stake)}</span> and wants to battle
+            <span className="font-semibold text-foreground">{fmtCurrency(stake)}</span> and wants to battle
           </p>
         </div>
 
         <div className="p-4 rounded-xl bg-ccb-surface border border-ccb-border">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Stake (each)</span>
-            <span className="font-semibold text-ccb-text">{formatMKK(stake)}</span>
+            <span className="font-semibold text-ccb-text">{fmtCurrency(stake)}</span>
           </div>
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Time control</span>
@@ -232,17 +229,17 @@ export default function BattleChallengeAccept({
           </div>
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Platform fee ({feePct}%)</span>
-            <span className="font-semibold text-red-400">−{formatMKK(fee)}</span>
+            <span className="font-semibold text-red-400">−{fmtCurrency(fee)}</span>
           </div>
           <div className="flex items-center justify-between text-sm pt-2 border-t border-ccb-border">
             <span className="text-ccb-muted">Winner receives</span>
-            <span className="font-bold text-ccb-primary text-lg">{formatMKK(payout)}</span>
+            <span className="font-bold text-ccb-primary text-lg">{fmtCurrency(payout)}</span>
           </div>
         </div>
 
         <div className="flex items-center justify-between text-sm px-1">
           <span className="text-ccb-muted">Your balance</span>
-          <span className={`font-semibold ${canAfford ? "text-ccb-text" : "text-red-400"}`}>{formatMKK(balance)}</span>
+          <span className={`font-semibold ${canAfford ? "text-ccb-text" : "text-red-400"}`}>{fmtCurrency(balance)}</span>
         </div>
 
         {error && (
@@ -256,7 +253,7 @@ export default function BattleChallengeAccept({
           <div className="space-y-4 p-4 rounded-xl bg-ccb-primary/5 border border-ccb-primary/20">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Wallet className="w-4 h-4 text-ccb-primary" />
-              <span>You need {formatMKK(shortfall)} more to accept</span>
+              <span>You need {fmtCurrency(shortfall)} more to accept</span>
             </div>
             <p className="text-xs text-ccb-muted">Top up now — your balance updates automatically the moment payment confirms.</p>
 

@@ -11,7 +11,7 @@ import {
   Loader2, Upload, Clock, Smartphone, MapPin,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { moneySymbol } from "@/lib/geo/format";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Profile {
   id: string;
@@ -196,6 +196,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeTab, setActiveTab] = useState<Tab>("profile");
+  const { formatMoney: fmtCurrency } = useCurrency();
   const [displayName, setDisplayName] = useState(profile?.display_name || "");
   const [bio, setBio] = useState(profile?.bio || "");
   const [phone, setPhone] = useState(profile?.phone || profile?.phone_number || "");
@@ -329,7 +330,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push("/"); router.refresh(); };
 
-  const walletBalance = profile?.wallet_balance ? `${moneySymbol(profile?.country)} ${Math.floor(profile.wallet_balance/100).toLocaleString("en-US")}` : `${moneySymbol(profile?.country)} 0`;
+  const walletBalance = fmtCurrency(profile?.wallet_balance ?? 0);
   const winRate = profile?.games_played && profile.games_played > 0 ? Math.round(((profile.wins||0)/profile.games_played)*100) : 0;
 
 

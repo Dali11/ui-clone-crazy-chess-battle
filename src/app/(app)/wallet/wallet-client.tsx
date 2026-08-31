@@ -1,7 +1,7 @@
 "use client";
 
 import { detectOperator } from "@/lib/operator";
-import { moneySymbol, currencyCodeForCountry } from "@/lib/geo/format";
+import { useCurrency } from "@/hooks/use-currency";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -87,13 +87,13 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [pawapayLoading, setPawapayLoading] = useState(false);
 
-  const sym = moneySymbol(country);
-  const currencyCode = currencyCodeForCountry(country);
+  // Live currency via shared hook — converts MWK to user's local currency
+  const { formatMoney: fmtCurrency, currencySymbol: sym, currencyCode: currencyCode, rate: fxRate } = useCurrency();
   const isMalawi = !country || country === "MW";
   const usePawaPay = !isMalawi;
 
   const quickAmounts = isMalawi ? QUICK_AMOUNTS_MWK : QUICK_AMOUNTS_INTL;
-  const formatAmt = (amount: number) => `${sym} ${Math.floor((amount || 0)).toLocaleString()}`;
+  const formatAmt = (amount: number) => fmtCurrency(amount || 0);
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
   // Fetch PawaPay providers for the user's country

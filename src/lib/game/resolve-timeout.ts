@@ -44,7 +44,7 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
     .or(`game_id.eq.${game.id},armageddon_game_id.eq.${game.id}`)
     .in("status", ["playing", "draw_armageddon"])
     .limit(1)
-    .single();
+    .maybeSingle();
 
   const isNoShow = game.move_count === 0 && !game.tournament_id && !battle;
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { moneySymbol } from "@/lib/geo/format";
+import { useCurrency } from "@/hooks/use-currency";
 import {
   Swords, Clock, Coins, Zap, AlertCircle, Loader2, Link2, Copy, Check,
   RefreshCw, XCircle, ChevronRight, Users, Target, Sparkles,
@@ -25,26 +25,7 @@ const BATTLE_TIME_CONTROLS = [
 // Keep for backward compat with any references
 const CHALLENGE_TIME_CONTROLS = BATTLE_TIME_CONTROLS;
 
-// Currency symbol — set from the user's profile country, defaults to MK
-let _currencySymbol = "MK";
-
-function setCurrencySymbol(symbol: string) {
-  _currencySymbol = symbol;
-}
-
-function formatMKK(amount: number): string {
-  return `${_currencySymbol} ${Math.floor(amount).toLocaleString("en-US")}`;
-}
-
-function formatCurrency(amount: number, currencyCode: string, rate: number): string {
-  if (currencyCode === "MWK" || !rate || rate === 1) return formatMKK(amount);
-  const converted = Math.round(amount * rate);
-  try {
-    return new Intl.NumberFormat("en", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(converted);
-  } catch {
-    return formatMKK(amount);
-  }
-}
+// Currency formatting is handled by the useCurrency hook inside the component.
 
 interface BattleConfig {
   enabled: boolean;
@@ -91,9 +72,11 @@ export default function BattlesPage() {
   } | null>(null);
   const [cancellingStuck, setCancellingStuck] = useState(false);
 
+  // Live currency conversion — all money displayed to the user uses this
+  const { formatMoney: fmtCurrency, convert: convertCurrency, currencySymbol: _curSym, rate: fxRate, currencyCode: currencyCode, loaded: currencyLoaded } = useCurrency();
+
   // Currency state
-  const [currencyCode, setCurrencyCode] = useState("MWK");
-  const [fxRate, setFxRate] = useState(1);
+  // Currency via shared hook — provides formatMoney(), convert(), rate, etc.
 
   // Challenge a Friend — custom stake
   const [customStake, setCustomStake] = useState<string>("");
@@ -141,7 +124,7 @@ export default function BattlesPage() {
       setMyRating(profile.rating ?? 1200);
       setBalance(profile.wallet_balance ?? 0);
       setGamesPlayed(profile.games_played ?? 0);
-      setCurrencySymbol(moneySymbol(profile.country));
+      // Currency symbol handled by useCurrency hook
     }
     setProfileLoaded(true);
   };
@@ -157,15 +140,7 @@ export default function BattlesPage() {
         setConfig(d);
       })
       .catch(() => {});
-    // Fetch user's currency
-    fetch("/api/currency")
-      .then(async (r) => {
-        if (!r.ok) return;
-        const d = await r.json();
-        setCurrencyCode(d.currencyCode || "MWK");
-        setFxRate(d.rate || 1);
-      })
-      .catch(() => {});
+    // Currency is loaded via useCurrency hook — no manual fetch needed.
   }, [checkActiveBattle]);
 
   useEffect(() => {
@@ -278,7 +253,7 @@ export default function BattlesPage() {
     setError(null);
 
     if (balance < BATTLE_STAKE) {
-      setError(`Insufficient balance. You need ${formatMKK(BATTLE_STAKE)} (${formatCurrency(BATTLE_STAKE, currencyCode, fxRate)}). Deposit funds first.`);
+      setError(`Insufficient balance. You need ${fmtCurrency(BATTLE_STAKE)} (${fmtCurrency(BATTLE_STAKE)}). Deposit funds first.`);
       return;
     }
 
@@ -321,7 +296,7 @@ export default function BattlesPage() {
     const stake = stakeValue; // user enters in MWK
 
     if (balance < stake) {
-      setStakeError(`Insufficient balance. You need ${_currencySymbol} ${stakeValue.toLocaleString()}.`);
+      setStakeError(`Insufficient balance. You need ${_curSym} ${stakeValue.toLocaleString()}.`);
       return;
     }
 
@@ -443,7 +418,7 @@ export default function BattlesPage() {
         </div>
 
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-1">{formatMKK(BATTLE_STAKE)} Battle</h2>
+          <h2 className="text-2xl font-bold mb-1">{fmtCurrency(BATTLE_STAKE)} Battle</h2>
           <p className="text-sm text-ccb-muted">
             {(BATTLE_TIME_CONTROLS.find(tc => tc.id === selectedBattleTC)?.desc || "15+10")} · Searching for opponent...
           </p>
@@ -460,18 +435,18 @@ export default function BattlesPage() {
         <div className="w-full max-w-xs p-4 rounded-xl bg-ccb-card border border-ccb-border">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Your stake locked</span>
-            <span className="font-semibold">{formatMKK(BATTLE_STAKE)}</span>
+            <span className="font-semibold">{fmtCurrency(BATTLE_STAKE)}</span>
           </div>
           {currencyCode !== "MWK" && (
             <div className="flex items-center justify-between text-xs text-ccb-muted mb-2">
               <span>≈ in your currency</span>
-              <span>{formatCurrency(BATTLE_STAKE, currencyCode, fxRate)}</span>
+              <span>{fmtCurrency(BATTLE_STAKE)}</span>
             </div>
           )}
           <div className="flex items-center justify-between text-sm">
             <span className="text-ccb-muted">Win potential</span>
             <span className="font-bold text-ccb-primary">
-              {formatMKK(payout)}
+              {fmtCurrency(payout)}
             </span>
           </div>
         </div>
@@ -520,18 +495,18 @@ export default function BattlesPage() {
         <div className="p-4 rounded-xl bg-ccb-card border border-ccb-border max-w-xs mx-auto">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Stake</span>
-            <span className="font-semibold">{formatMKK(BATTLE_STAKE)} each</span>
+            <span className="font-semibold">{fmtCurrency(BATTLE_STAKE)} each</span>
           </div>
           {currencyCode !== "MWK" && (
             <div className="flex items-center justify-between text-xs text-ccb-muted mb-2">
               <span>≈ in your currency</span>
-              <span>{formatCurrency(BATTLE_STAKE, currencyCode, fxRate)}</span>
+              <span>{fmtCurrency(BATTLE_STAKE)}</span>
             </div>
           )}
           <div className="flex items-center justify-between text-sm">
             <span className="text-ccb-muted">Winner receives</span>
             <span className="font-bold text-ccb-primary">
-              {formatMKK(payout)}
+              {fmtCurrency(payout)}
             </span>
           </div>
         </div>
@@ -614,12 +589,12 @@ export default function BattlesPage() {
             <div className="mt-3 p-4 rounded-xl bg-ccb-card border border-ccb-border">
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="text-ccb-muted">Your stake</span>
-                <span className="font-semibold">{_currencySymbol} {parseInt(customStake).toLocaleString()}</span>
+                <span className="font-semibold">{_curSym} {parseInt(customStake).toLocaleString()}</span>
               </div>
               {currencyCode !== "MWK" && (
                 <div className="flex items-center justify-between text-xs text-ccb-muted mb-2">
                   <span>≈ in your currency</span>
-                  <span>{formatCurrency(parseInt(customStake), currencyCode, fxRate)}</span>
+                  <span>{fmtCurrency(parseInt(customStake))}</span>
                 </div>
               )}
               <div className="flex items-center justify-between text-sm mb-2">
@@ -629,7 +604,7 @@ export default function BattlesPage() {
               <div className="flex items-center justify-between text-sm pt-2 border-t border-ccb-border">
                 <span className="text-ccb-muted">Winner receives</span>
                 <span className="font-bold text-ccb-accent text-lg">
-                  {_currencySymbol} {(parseInt(customStake) * 2 - Math.round(parseInt(customStake) * 2 * (feePct / 100))).toLocaleString()}
+                  {_curSym} {(parseInt(customStake) * 2 - Math.round(parseInt(customStake) * 2 * (feePct / 100))).toLocaleString()}
                 </span>
               </div>
             </div>
@@ -655,7 +630,7 @@ export default function BattlesPage() {
           <h1 className="text-2xl font-bold">Chess Battles</h1>
         </div>
         <div className="flex items-center gap-4 text-sm">
-          <span className="text-ccb-muted">Balance: <span className="font-semibold text-ccb-text">{formatMKK(balance)}</span></span>
+          <span className="text-ccb-muted">Balance: <span className="font-semibold text-ccb-text">{fmtCurrency(balance)}</span></span>
           <span className="text-ccb-muted">Rating: <span className="font-semibold text-ccb-text">{myRating}</span></span>
         </div>
       </div>
@@ -719,9 +694,9 @@ export default function BattlesPage() {
           </div>
           <div className="flex-1">
             <p className="text-xs text-ccb-muted">Stake</p>
-            <p className="text-sm font-semibold">{formatMKK(BATTLE_STAKE)}</p>
+            <p className="text-sm font-semibold">{fmtCurrency(BATTLE_STAKE)}</p>
             {currencyCode !== "MWK" && (
-              <p className="text-xs text-ccb-muted mt-0.5">≈ {formatCurrency(BATTLE_STAKE, currencyCode, fxRate)}</p>
+              <p className="text-xs text-ccb-muted mt-0.5">≈ {fmtCurrency(BATTLE_STAKE)}</p>
             )}
           </div>
         </div>
@@ -730,16 +705,16 @@ export default function BattlesPage() {
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-ccb-muted">Total pot</span>
-            <span className="font-semibold">{formatMKK(BATTLE_STAKE * 2)}</span>
+            <span className="font-semibold">{fmtCurrency(BATTLE_STAKE * 2)}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-ccb-muted">Platform fee ({feePct}%)</span>
-            <span className="font-semibold text-red-400">−{formatMKK(Math.round(BATTLE_STAKE * 2 * (feePct / 100)))}</span>
+            <span className="font-semibold text-red-400">−{fmtCurrency(Math.round(BATTLE_STAKE * 2 * (feePct / 100)))}</span>
           </div>
           <div className="flex items-center justify-between text-sm pt-2 border-t border-ccb-border">
             <span className="text-ccb-muted">Winner receives</span>
             <span className="font-bold text-ccb-primary text-lg">
-              {formatMKK(payout)}
+              {fmtCurrency(payout)}
             </span>
           </div>
         </div>
@@ -749,7 +724,7 @@ export default function BattlesPage() {
       {balance < BATTLE_STAKE && (
         <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>Insufficient balance. You need {formatMKK(BATTLE_STAKE)}.
+          <span>Insufficient balance. You need {fmtCurrency(BATTLE_STAKE)}.
             <a href="/wallet" className="underline font-medium ml-1">Deposit funds →</a>
           </span>
         </div>
@@ -760,7 +735,7 @@ export default function BattlesPage() {
         onClick={handleEnterBattle}
         disabled={balance < BATTLE_STAKE}
         className="btn-primary w-full text-base py-4 disabled:opacity-50 disabled:cursor-not-allowed">
-        <Swords className="w-5 h-5 mr-2" /> Find Battle · {formatMKK(BATTLE_STAKE)}
+        <Swords className="w-5 h-5 mr-2" /> Find Battle · {fmtCurrency(BATTLE_STAKE)}
       </button>
 
       {/* Challenge a friend */}
@@ -778,7 +753,7 @@ export default function BattlesPage() {
         <ol className="space-y-2 text-xs text-ccb-muted">
           <li className="flex gap-2">
             <span className="font-semibold text-ccb-text">1.</span>
-            <span>Both players lock {formatMKK(BATTLE_STAKE)} in escrow</span>
+            <span>Both players lock {fmtCurrency(BATTLE_STAKE)} in escrow</span>
           </li>
           <li className="flex gap-2">
             <span className="font-semibold text-ccb-text">2.</span>
@@ -786,7 +761,7 @@ export default function BattlesPage() {
           </li>
           <li className="flex gap-2">
             <span className="font-semibold text-ccb-text">3.</span>
-            <span>Platform takes {feePct}% fee. Winner receives {formatMKK(payout)}</span>
+            <span>Platform takes {feePct}% fee. Winner receives {fmtCurrency(payout)}</span>
           </li>
           <li className="flex gap-2">
             <span className="font-semibold text-ccb-text">4.</span>

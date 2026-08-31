@@ -9,7 +9,7 @@ import {
   Crown, Disc3, Menu, X, Trophy, Radio, Clock, Play, Settings,
 } from "lucide-react";
 import NotificationBell from "./notification-bell";
-import { moneySymbol } from "@/lib/geo/format";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Profile {
   username: string | null;
@@ -31,6 +31,7 @@ function isPathActive(pathname: string, href: string): boolean {
 
 export default function AppNav({ profile }: { profile: Profile | null }) {
   const pathname = usePathname();
+  const { formatMoney: fmtCurrency } = useCurrency();
   const isGameRoute = pathname.startsWith("/game/") || pathname.startsWith("/play/computer") || pathname.startsWith("/draughts/game/");
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -108,10 +109,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
   }
 
   const formatBalance = (cents: number | null | undefined) => {
-    const value = cents ?? 0;
-    const kwacha = Math.floor(value);
-    const symbol = moneySymbol(profile?.country);
-    return `${symbol} ${kwacha.toLocaleString()}`;
+    return fmtCurrency(cents ?? 0);
   };
 
   return (

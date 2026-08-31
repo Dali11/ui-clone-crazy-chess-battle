@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
       .or(`game_id.eq.${gameId},armageddon_game_id.eq.${gameId}`)
       .in("status", ["playing", "draw_armageddon"])
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (battle) {
       const isArmageddon = fullGame?.tournament_id === null && battle.armageddon_game_id === gameId;

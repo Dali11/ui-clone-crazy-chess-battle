@@ -25,6 +25,10 @@
     {
       "path": "/api/league/weekend-cron",
       "schedule": "0 6 * * 6,0"
+    },
+    {
+      "path": "/api/cron/refresh-fx",
+      "schedule": "0 3 * * *"
     }
   ],
   "headers": [

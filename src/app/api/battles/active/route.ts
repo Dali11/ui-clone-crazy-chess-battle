@@ -144,37 +144,60 @@ export async function GET() {
         // Re-check battle status after settlement
         const { data: updatedBattle } = await admin
           .from("battles")
-          .select("status, settled")
+          .select("id, status, settled, game_id, armageddon_game_id")
           .eq("id", battle.id)
-          .single();
+          .maybeSingle();
 
         if (updatedBattle?.settled || updatedBattle?.status === "completed") {
           // Battle is done — not active anymore
           return NextResponse.json({ active: false });
         }
 
-        // If settlement triggered armageddon, the battle is now in draw_armageddon
-        // with a new game. Re-query to get the updated battle.
-        const { data: refreshedBattle } = await admin
-          .from("battles")
-          .select("*")
-          .eq("id", battle.id)
-          .single();
-
-        if (refreshedBattle && (refreshedBattle.status === "playing" || refreshedBattle.status === "draw_armageddon")) {
-          const newGameId = refreshedBattle.status === "draw_armageddon"
-            ? refreshedBattle.armageddon_game_id
-            : refreshedBattle.game_id;
-          if (newGameId) {
-            return NextResponse.json({
-              active: true,
-              battleId: refreshedBattle.id,
-              gameId: newGameId,
-              status: refreshedBattle.status,
-            });
-          }
+        // Settlement may have triggered armageddon (new game) — redirect
+        // the player to it.
+        if (updatedBattle?.status === "draw_armageddon" && updatedBattle.armageddon_game_id) {
+          return NextResponse.json({
+            active: true,
+            battleId: updatedBattle.id,
+            gameId: updatedBattle.armageddon_game_id,
+            status: "draw_armageddon",
+          });
         }
 
+        // If the battle is somehow still "playing" but the ORIGINAL game is
+        // over, settlement failed. Force-settle so the player isn't trapped:
+        // mark the battle completed and refund both players (safer than
+        // leaving money locked in escrow forever).
+        if (updatedBattle?.status === "playing" && updatedBattle.game_id === currentGameId) {
+          console.error("[active] Force-settling stuck battle", battle.id, "- original game", currentGameId, "is over but settlement failed");
+
+          const { data: forceClaimed } = await admin
+            .from("battles")
+            .update({
+              status: "completed",
+              result: "force_settled_game_over",
+              settled: true,
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", battle.id)
+            .eq("settled", false)
+            .select("id, stake, white_player_id, black_player_id");
+
+          if (forceClaimed && forceClaimed.length > 0) {
+            const fb = forceClaimed[0];
+            // Refund both players — we can't reliably determine the winner
+            // if settleBattle already failed, so a refund is the safe path.
+            await admin.rpc("credit_wallet", { p_user_id: fb.white_player_id, p_amount: fb.stake });
+            await admin.rpc("credit_wallet", { p_user_id: fb.black_player_id, p_amount: fb.stake });
+            await admin.from("battle_escrow")
+              .update({ status: "refunded", released_at: new Date().toISOString() })
+              .eq("battle_id", battle.id);
+            console.log("[active] Force-settled and refunded battle", battle.id);
+          }
+          return NextResponse.json({ active: false });
+        }
+
+        // Battle moved to a new state we don't recognize — don't trap the player
         return NextResponse.json({ active: false });
       }
     }

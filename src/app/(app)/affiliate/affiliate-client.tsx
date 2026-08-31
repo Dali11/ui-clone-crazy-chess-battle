@@ -42,7 +42,8 @@ const ACTIVATION_LABELS: Record<string, string> = {
   membership_purchase: "Purchased membership",
 };
 
-const formatMWK = (amount: number) => `${Math.floor(amount || 0).toLocaleString()}`;
+import { useCurrency } from "@/hooks/use-currency";
+
 
 export default function AffiliateClient({
   refCode,
@@ -57,6 +58,7 @@ export default function AffiliateClient({
 }: AffiliateClientProps) {
   const [copied, setCopied] = useState(false);
   const [copyLink, setCopyLink] = useState(false);
+  const { formatMoney: fmtCurrency } = useCurrency();
 
   const referralLink = `${baseUrl}/signup?ref=${refCode}`;
   const commissionPct = Math.round(commissionRate * 100);
@@ -116,16 +118,16 @@ export default function AffiliateClient({
               <Crown className="w-3 h-3 text-ccb-accent" />
               <span className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Monthly</span>
             </div>
-            <p className="text-sm font-bold">{membershipCurrency} {formatMWK(membershipPrice)}</p>
-            <p className="text-xs text-ccb-success font-semibold mt-0.5">You earn {membershipCurrency} {formatMWK(membershipPrice * commissionRate)}</p>
+            <p className="text-sm font-bold">{fmtCurrency(membershipPrice)}</p>
+            <p className="text-xs text-ccb-success font-semibold mt-0.5">You earn {fmtCurrency(membershipPrice * commissionRate)}</p>
           </div>
           <div className="bg-ccb-surface/50 rounded-xl p-3 border border-ccb-border/50">
             <div className="flex items-center gap-1 mb-1">
               <Sparkles className="w-3 h-3 text-ccb-primary" />
               <span className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Yearly</span>
             </div>
-            <p className="text-sm font-bold">{membershipCurrency} {formatMWK(yearlyPrice)}</p>
-            <p className="text-xs text-ccb-success font-semibold mt-0.5">You earn {membershipCurrency} {formatMWK(yearlyPrice * commissionRate)}</p>
+            <p className="text-sm font-bold">{membershipCurrency} {fmtCurrency(yearlyPrice)}</p>
+            <p className="text-xs text-ccb-success font-semibold mt-0.5">You earn {fmtCurrency(yearlyPrice * commissionRate)}</p>
           </div>
         </div>
 
@@ -199,7 +201,7 @@ export default function AffiliateClient({
         </div>
         <div className="bg-ccb-card border border-ccb-primary/30 rounded-xl p-3 text-center">
           <Wallet className="w-4 h-4 text-ccb-primary mx-auto mb-1" />
-          <p className="text-base font-bold text-ccb-primary leading-tight">{membershipCurrency} {formatMWK(totalCommissionEarned)}</p>
+          <p className="text-base font-bold text-ccb-primary leading-tight">{membershipCurrency} {fmtCurrency(totalCommissionEarned)}</p>
           <p className="text-[10px] text-ccb-muted uppercase tracking-wider">Earned</p>
         </div>
       </div>
@@ -229,7 +231,7 @@ export default function AffiliateClient({
             <div>
               <p className="text-sm font-medium">You earn {commissionPct}% — every renewal</p>
               <p className="text-xs text-ccb-muted mt-0.5">
-                {membershipCurrency} {formatMWK(membershipPrice * commissionRate)} per monthly sub, {membershipCurrency} {formatMWK(yearlyPrice * commissionRate)} per yearly. Credited to your wallet automatically.
+                {fmtCurrency(membershipPrice * commissionRate)} per monthly sub, {fmtCurrency(yearlyPrice * commissionRate)} per yearly. Credited to your wallet automatically.
               </p>
             </div>
           </div>
@@ -288,7 +290,7 @@ export default function AffiliateClient({
                   {/* Commission badge or pending */}
                   {isActive && ref.commission_amount > 0 ? (
                     <div className="text-right shrink-0">
-                      <p className="text-xs font-bold text-ccb-success">+{membershipCurrency} {formatMWK(ref.commission_amount)}</p>
+                      <p className="text-xs font-bold text-ccb-success">+{membershipCurrency} {fmtCurrency(ref.commission_amount)}</p>
                       <p className="text-[9px] text-ccb-muted">commission</p>
                     </div>
                   ) : isActive ? (
@@ -311,7 +313,7 @@ export default function AffiliateClient({
       <div className="bg-ccb-surface border border-ccb-border rounded-xl p-4 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Current Wallet Balance</p>
-          <p className="text-lg font-bold mt-0.5">{membershipCurrency} {formatMWK(walletBalance)}</p>
+          <p className="text-lg font-bold mt-0.5">{fmtCurrency(walletBalance)}</p>
         </div>
         <a href="/wallet" className="text-xs font-bold text-ccb-primary hover:underline flex items-center gap-1">
           View Wallet <ChevronRight className="w-3.5 h-3.5" />

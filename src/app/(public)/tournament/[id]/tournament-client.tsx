@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, use, useRef } from 'react';
 import Link from 'next/link';
-import { moneySymbol } from "@/lib/geo/format";
+import { useCurrency } from "@/hooks/use-currency";
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Trophy, Users, Calendar, Clock, DollarSign, RefreshCw, AlertCircle,
@@ -107,9 +107,7 @@ interface TournamentData {
   participantCount: number;
 }
 
-function formatMoney(amount: number, sym = "MK") {
-  return `${sym}${amount.toLocaleString()}`;
-}
+// Currency formatting via useCurrency hook
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -194,14 +192,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [sym, setSym] = useState("MK");
-
-  // Fetch user's currency
-  useEffect(() => {
-    fetch("/api/currency").then(r => r.json()).then(d => {
-      if (d.countryCode) setSym(moneySymbol(d.countryCode));
-    }).catch(() => {});
-  }, []);
+  const { formatMoney: fmtCurrency, currencySymbol: sym } = useCurrency();
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -553,14 +544,14 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               {hasPrizePool && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ccb-accent/10 border border-ccb-accent/30">
                   <Trophy className="w-3.5 h-3.5 text-ccb-accent" />
-                  <span className="text-xs font-bold text-ccb-accent">{formatMoney(displayPrizePool, sym)} Pool</span>
+                  <span className="text-xs font-bold text-ccb-accent">{fmtCurrency(displayPrizePool)} Pool</span>
                 </div>
               )}
               
               {hasEntryFee ? (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ccb-surface border border-ccb-border">
                   <DollarSign className="w-3.5 h-3.5 text-ccb-muted" />
-                  <span className="text-xs font-bold">{formatMoney(t.entry_fee, sym)} Entry</span>
+                  <span className="text-xs font-bold">{fmtCurrency(t.entry_fee)} Entry</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ccb-success/10 border border-ccb-success/30">
@@ -597,7 +588,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                         className="w-full py-3 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20 flex items-center justify-center gap-2"
                       >
                         {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> :
-                          hasEntryFee ? <><DollarSign className="w-4 h-4" /> Join — {formatMoney(t.entry_fee, sym)}</> :
+                          hasEntryFee ? <><DollarSign className="w-4 h-4" /> Join — {fmtCurrency(t.entry_fee)}</> :
                           <><Swords className="w-4 h-4" /> Join Tournament</>
                         }
                       </button>
@@ -612,7 +603,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                         className="w-full py-3 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-ccb-primary/20 flex items-center justify-center gap-2"
                       >
                         <UserPlus className="w-4 h-4" />
-                        {hasEntryFee ? `Sign Up to Join — ${formatMoney(t.entry_fee, sym)}` : 'Sign Up to Join Tournament'}
+                        {hasEntryFee ? `Sign Up to Join — ${fmtCurrency(t.entry_fee)}` : 'Sign Up to Join Tournament'}
                       </Link>
                       <Link
                         href={`/login?redirect=${encodeURIComponent(`/tournament/${resolvedParams.id}`)}&action=join`}
@@ -711,7 +702,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       {/* PRIZE DISTRIBUTION */}
       {hasPrizePool && (
         <div className="px-3 sm:px-6 lg:px-8 mb-4">
-          <PrizeDistribution t={t} formatMoney={formatMoney} sym={sym} />
+          <PrizeDistribution t={t} formatMoney={fmtCurrency} />
         </div>
       )}
 
@@ -1328,9 +1319,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 <Trophy className="w-3.5 h-3.5" /> Prizes &amp; Entry
               </h4>
               <div className="space-y-3">
-                {hasPrizePool && <InfoRow icon={Trophy} label={t.pool_source === 'fixed' ? "Cash Prize Pool (Fixed)" : "Cash Prize Pool (Entry Fees)"} value={formatMoney(displayPrizePool, sym)} />}
+                {hasPrizePool && <InfoRow icon={Trophy} label={t.pool_source === 'fixed' ? "Cash Prize Pool (Fixed)" : "Cash Prize Pool (Entry Fees)"} value={fmtCurrency(displayPrizePool)} />}
                 {hasEntryFee ? (
-                  <InfoRow icon={DollarSign} label="Entry Fee" value={formatMoney(t.entry_fee, sym)} />
+                  <InfoRow icon={DollarSign} label="Entry Fee" value={fmtCurrency(t.entry_fee)} />
                 ) : (
                   <InfoRow icon={CheckCircle} label="Entry Fee" value="Free" />
                 )}
@@ -1366,7 +1357,7 @@ function StatTile({ icon: Icon, label, value, sub }: { icon: any; label: string;
   );
 }
 
-function PrizeDistribution({ t, formatMoney, sym }: { t: any; formatMoney: (c: number, sym?: string) => string; sym: string }) {
+function PrizeDistribution({ t, formatMoney }: { t: any; formatMoney: (c: number) => string }) {
   const dist = t.prize_distribution;
   if (!dist || !dist.payouts || dist.payouts.length === 0) return null;
 
@@ -1399,7 +1390,7 @@ function PrizeDistribution({ t, formatMoney, sym }: { t: any; formatMoney: (c: n
                   <span className="text-[10px] text-ccb-muted font-medium">{payout.percentage}%</span>
                 )}
                 <span className="text-sm font-bold text-ccb-accent">
-                  {pool > 0 ? formatMoney(amount, sym) : isFlat ? formatMoney(amount, sym) : '—'}
+                  {pool > 0 ? formatMoney(amount) : isFlat ? formatMoney(amount) : '—'}
                 </span>
               </div>
             </div>
