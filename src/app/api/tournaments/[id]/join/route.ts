@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { moneySymbol } from "@/lib/geo/format";
 import { runArenaMatchmakingWave } from "@/lib/tournament/arena";
 
 export async function POST(
@@ -32,6 +33,14 @@ export async function POST(
     if (tErr || !tournament) {
       return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
     }
+
+    // Get user's currency symbol for error messages
+    const { data: _userProfile } = await admin
+      .from("profiles")
+      .select("country")
+      .eq("id", user.id)
+      .single();
+    const sym = moneySymbol(_userProfile?.country);
 
     if (tournament.status !== "upcoming" && tournament.status !== "active") {
       return NextResponse.json(
@@ -104,10 +113,9 @@ export async function POST(
       // First-time payment — debit wallet
       const currentBalance = profile.wallet_balance ?? 0;
       if (currentBalance < entryFee) {
-        const feeMwk = entryFee;
         return NextResponse.json(
           {
-            error: `Insufficient wallet balance. Entry fee is MWK ${feeMwk.toLocaleString()}. You have MWK ${currentBalance.toLocaleString()}. Please deposit funds first.`,
+            error: `Insufficient wallet balance. Entry fee is ${sym} ${entryFee.toLocaleString()}. You have ${sym} ${currentBalance.toLocaleString()}. Please deposit funds first.`,
           },
           { status: 402 }
         );

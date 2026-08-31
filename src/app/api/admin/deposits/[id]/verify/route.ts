@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moneySymbol } from "@/lib/geo/format";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -65,12 +66,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           .eq("id", id);
 
         const amountMWK = deposit.amount;
+
+    // Get user's currency symbol
+    const { data: _up } = await admin.from("profiles").select("country").eq("id", deposit.user_id).single();
+    const sym = moneySymbol(_up?.country);
         try {
           await admin.from("notifications").insert({
             user_id: deposit.user_id,
             type: "deposit_success",
             title: "Deposit confirmed",
-            body: `Your deposit of MWK ${amountMWK.toLocaleString()} has been credited to your wallet.`,
+            body: `Your deposit of ${sym} ${amountMWK.toLocaleString()} has been credited to your wallet.`,
             data: { amount: amountMWK, method: deposit.method },
             read: false,
           });

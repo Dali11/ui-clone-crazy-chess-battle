@@ -68,7 +68,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [tab, setTab] = useState<"deposit" | "withdraw" | "history">("deposit");
   const [depositAmount, setDepositAmount] = useState(1000);
   const [withdrawAmount, setWithdrawAmount] = useState(0);
-  const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number; processing_fee_pct: number } | null>(null);
+  const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number; processing_fee_pct: number; currency_symbol?: string } | null>(null);
   const [phone, setPhone] = useState(savedPhone || "");
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -567,7 +567,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
             <input
               type="number"
               value={withdrawAmount}
-              onChange={(e) => setWithdrawAmount(Math.max(withdrawConfig ? withdrawConfig.min_amount : 10000, parseInt(e.target.value) || 0))}
+              onChange={(e) => setWithdrawAmount(parseInt(e.target.value) || 0)}
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
             />
             <div className="flex gap-2 mt-2 flex-wrap">

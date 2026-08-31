@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moneySymbol } from "@/lib/geo/format";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -13,6 +14,7 @@ export async function POST(req: NextRequest) {
     if (!chargeId) return NextResponse.json({ error: "Charge ID required" }, { status: 400 });
 
     const admin = createAdminClient();
+
     let { data: deposit } = await admin
       .from("deposits")
       .select("id, user_id, amount, status, method")
@@ -87,12 +89,14 @@ export async function POST(req: NextRequest) {
 
       // Notify user
       const amountMWK = deposit.amount;
+    const { data: _up } = await admin.from("profiles").select("country").eq("id", deposit.user_id).single();
+    const sym = moneySymbol(_up?.country);
       try {
         await admin.from("notifications").insert({
           user_id: user.id,
           type: "deposit_success",
           title: "Deposit confirmed",
-          body: `Your deposit of MWK ${amountMWK.toLocaleString()} has been credited to your wallet.`,
+          body: `Your deposit of ${sym} ${amountMWK.toLocaleString()} has been credited to your wallet.`,
           data: { amount: amountMWK, method: deposit.method },
           read: false,
         });

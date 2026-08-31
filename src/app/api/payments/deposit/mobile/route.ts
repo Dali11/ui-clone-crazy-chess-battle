@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
+import { moneySymbol } from "@/lib/geo/format";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,6 +17,10 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient();
     const dConfig = await getPlatformConfig(admin, "deposits");
 
+    // Get user's currency symbol
+    const { data: _profile } = await admin.from("profiles").select("country").eq("id", user.id).single();
+    const sym = moneySymbol(_profile?.country);
+
     // Check if deposits are enabled
     if (!dConfig.enabled) {
       return NextResponse.json({ error: "Deposits are currently disabled" }, { status: 403 });
@@ -25,14 +30,14 @@ export async function POST(req: NextRequest) {
     const minAmount = dConfig.min_amount || 1000;
     if (!amount || amount < minAmount) {
       const minDisplay = minAmount.toLocaleString();
-      return NextResponse.json({ error: `Minimum deposit is MWK ${minDisplay}` }, { status: 400 });
+      return NextResponse.json({ error: `Minimum deposit is ${sym} ${minDisplay}` }, { status: 400 });
     }
 
     // Enforce maximum amount
     const maxAmount = dConfig.max_amount || 10_000_000;
     if (amount > maxAmount) {
       const maxDisplay = maxAmount.toLocaleString();
-      return NextResponse.json({ error: `Maximum deposit is MWK ${maxDisplay}` }, { status: 400 });
+      return NextResponse.json({ error: `Maximum deposit is ${sym} ${maxDisplay}` }, { status: 400 });
     }
 
     if (!phone || !operatorRefId) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
+import { moneySymbol } from "@/lib/geo/format";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,6 +16,10 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient();
     const wConfig = await getPlatformConfig(admin, "withdrawals");
 
+    // Get user's currency symbol
+    const { data: _profile } = await admin.from("profiles").select("country").eq("id", user.id).single();
+    const sym = moneySymbol(_profile?.country);
+
     // Check if withdrawals are enabled
     if (!wConfig.enabled) {
       return NextResponse.json({ error: "Withdrawals are currently disabled" }, { status: 403 });
@@ -24,14 +29,14 @@ export async function POST(req: NextRequest) {
     const minAmount = wConfig.min_amount || 10_000;
     if (!amount || amount < minAmount) {
       const minDisplay = minAmount.toLocaleString();
-      return NextResponse.json({ error: `Minimum withdrawal is MWK ${minDisplay}` }, { status: 400 });
+      return NextResponse.json({ error: `Minimum withdrawal is ${sym} ${minDisplay}` }, { status: 400 });
     }
 
     // Enforce maximum amount
     const maxAmount = wConfig.max_amount || 500_000;
     if (amount > maxAmount) {
       const maxDisplay = maxAmount.toLocaleString();
-      return NextResponse.json({ error: `Maximum withdrawal is MWK ${maxDisplay}` }, { status: 400 });
+      return NextResponse.json({ error: `Maximum withdrawal is ${sym} ${maxDisplay}` }, { status: 400 });
     }
 
     // Enforce daily limit
@@ -211,7 +216,7 @@ export async function POST(req: NextRequest) {
                   user_id: withdrawal.user_id,
                   type: "withdrawal_approved",
                   title: "Your withdrawal has been processed",
-                  body: `MWK ${amountMWK} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
+                  body: `${sym} ${amountMWK.toLocaleString()} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
                   data: { amount: amountMWK, phone: withdrawal.phone, operator: withdrawal.operator_name, auto: true, fees: totalFees },
                   read: false,
                 });
@@ -229,7 +234,7 @@ export async function POST(req: NextRequest) {
               user_id: withdrawal.user_id,
               type: "withdrawal_failed",
               title: "Withdrawal payout failed",
-              body: `Your withdrawal for MWK ${amountMWK} could not be processed. Funds returned to your wallet.`,
+              body: `Your withdrawal for ${sym} ${amountMWK.toLocaleString()} could not be processed. Funds returned to your wallet.`,
               data: { amount: amountMWK, auto: true },
               read: false,
             });

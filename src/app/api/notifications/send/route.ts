@@ -39,11 +39,11 @@ export async function POST(req: NextRequest) {
         break;
       case "withdrawal_approved":
         subject = "Your withdrawal has been approved";
-        body = `MWK ${data.amount} has been sent to ${data.phone} via ${data.operator}.`;
+        body = `${data.amount} has been sent to ${data.phone} via ${data.operator}.`;
         break;
       case "withdrawal_rejected":
         subject = "Your withdrawal request was rejected";
-        body = `Your withdrawal for MWK ${data.amount} was rejected. Funds returned to wallet. Reason: ${data.reason || "Not specified"}`;
+        body = `Your withdrawal for ${data.amount} was rejected. Funds returned to wallet. Reason: ${data.reason || "Not specified"}`;
         break;
       case "challenge_received":
         subject = `${data.challengerName} challenged you to a game!`;
