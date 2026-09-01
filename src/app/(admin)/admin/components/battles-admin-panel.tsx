@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, Swords, Search, RefreshCw, AlertTriangle, CheckCircle2,
   XCircle, Play, Gavel, ChevronLeft, ChevronRight, MapPin, Clock,
-  TrendingUp, DollarSign, Hourglass, Ban,
+  TrendingUp, DollarSign, Hourglass, Ban, Trophy, ExternalLink,
 } from "lucide-react";
 
 interface BattleRow {
@@ -305,30 +305,62 @@ function BattleCard({ battle: b, expanded, onToggle, formatMWK, formatDate, acti
   const canCancel = b.status === "pending";
   const canRetry = b.status === "pending" && !b.game_id;
   const canSettle = !b.settled && b.status !== "completed" && b.status !== "cancelled";
+  const viewableGameId = b.armageddon_game_id || b.game_id;
+  const isWhiteWinner = b.winner_id === b.white_player_id;
+  const isBlackWinner = b.winner_id === b.black_player_id;
 
   return (
     <div className={`card overflow-hidden ${isStuck ? "border-ccb-danger/40" : ""}`}>
-      <button onClick={onToggle} className="w-full flex items-center justify-between gap-2 text-left p-3 hover:bg-ccb-surface/50 transition-colors">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className={`text-xs px-2 py-1 rounded font-medium shrink-0 border ${statusBadge(b.status, isStuck)}`}>
-            {isStuck ? "⚠ STUCK" : b.status}
+      <div className="p-3">
+        {/* Row 1: status + time control + date */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={`text-xs px-2 py-0.5 rounded font-medium shrink-0 border ${statusBadge(b.status, isStuck)}`}>
+              {isStuck ? "⚠ STUCK" : b.status}
+            </span>
+            {b.time_control && <span className="text-xs text-ccb-muted shrink-0">{b.time_control}</span>}
+            {b.armageddon_round > 0 && <span className="text-xs text-ccb-accent shrink-0">AG{b.armageddon_round}</span>}
+            {b.stuck && b.pending_age_seconds != null && (
+              <span className="text-xs text-ccb-danger font-medium shrink-0">{b.pending_age_seconds > 60 ? `${Math.floor(b.pending_age_seconds / 60)}m` : `${b.pending_age_seconds}s`} stuck</span>
+            )}
+          </div>
+          <span className="text-xs text-ccb-muted shrink-0">{formatDate(b.created_at)}</span>
+        </div>
+
+        {/* Row 2: players */}
+        <div className="flex items-center gap-1.5 text-sm font-medium mb-2 flex-wrap">
+          <span className={`inline-flex items-center gap-1 ${isWhiteWinner ? "text-ccb-success" : ""}`}>
+            {isWhiteWinner && <Trophy className="w-3.5 h-3.5" />}{playerName(b.white_player)}
           </span>
-          <div className="min-w-0">
-            <p className="text-sm font-medium truncate">{playerName(b.white_player)} <span className="text-ccb-muted">vs</span> {playerName(b.black_player)}</p>
-            <p className="text-xs text-ccb-muted">{formatMWK(b.stake)} stake · {formatDate(b.created_at)}{b.armageddon_round > 0 && ` · AG${b.armageddon_round}`}{b.time_control && ` · ${b.time_control}`}</p>
+          <span className="text-ccb-muted text-xs">vs</span>
+          <span className={`inline-flex items-center gap-1 ${isBlackWinner ? "text-ccb-success" : ""}`}>
+            {isBlackWinner && <Trophy className="w-3.5 h-3.5" />}{playerName(b.black_player)}
+          </span>
+        </div>
+
+        {/* Row 3: stake/pot + actions */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs text-ccb-muted">
+            {formatMWK(b.stake)} stake <span className="mx-1">·</span> <span className="font-semibold text-foreground">{formatMWK(b.pot)}</span> pot
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {viewableGameId && (
+              <a
+                href={`/game/${viewableGameId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ccb-accent/10 text-ccb-accent hover:bg-ccb-accent/20 text-xs font-medium"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> View Game
+              </a>
+            )}
+            <button onClick={onToggle} className="p-1.5 rounded-lg hover:bg-ccb-surface transition-colors">
+              <ChevronRight className={`w-4 h-4 text-ccb-muted transition-transform ${expanded ? "rotate-90" : ""}`} />
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          {b.stuck && b.pending_age_seconds != null && (
-            <span className="text-xs text-ccb-danger font-medium">{b.pending_age_seconds > 60 ? `${Math.floor(b.pending_age_seconds / 60)}m` : `${b.pending_age_seconds}s`} stuck</span>
-          )}
-          {b.status === "completed" && b.winner && (
-            <span className="text-xs text-ccb-success font-medium hidden sm:inline">{playerName(b.winner)} won</span>
-          )}
-          <span className="text-sm font-medium">{formatMWK(b.pot)}</span>
-          <ChevronRight className={`w-4 h-4 text-ccb-muted transition-transform ${expanded ? "rotate-90" : ""}`} />
-        </div>
-      </button>
+      </div>
 
       {expanded && (
         <div className="border-t border-ccb-border p-3 space-y-3 bg-ccb-surface/30">
