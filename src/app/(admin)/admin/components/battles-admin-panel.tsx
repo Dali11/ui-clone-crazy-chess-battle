@@ -6,6 +6,7 @@ import {
   XCircle, Play, Gavel, ChevronLeft, ChevronRight, MapPin, Clock,
   TrendingUp, DollarSign, Hourglass, Ban, Trophy, ExternalLink,
 } from "lucide-react";
+import { COUNTRY_FLAGS } from "./country-flags";
 
 interface BattleRow {
   id: string;
@@ -72,11 +73,6 @@ const STATUS_FILTERS = [
   { id: "disputed", label: "Disputed", color: "text-ccb-danger" },
   { id: "cancelled", label: "Cancelled", color: "text-ccb-muted" },
 ] as const;
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  MW: "🇲🇼", ZM: "🇿🇲", KE: "🇰🇪", GH: "🇬🇭", NG: "🇳🇬", UG: "🇺🇬", TZ: "🇹🇿",
-  RW: "🇷🇼", SN: "🇸🇳", CI: "🇨🇮", CM: "🇨🇲", CD: "🇨🇩", BJ: "🇧🇯", ZA: "🇿🇦",
-};
 
 export default function BattlesAdminPanel({ formatMWK, formatDate }: { formatMWK: (n: number) => string; formatDate: (d: string) => string }) {
   const [battles, setBattles] = useState<BattleRow[]>([]);

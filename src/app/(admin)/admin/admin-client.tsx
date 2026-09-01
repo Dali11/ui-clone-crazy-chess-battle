@@ -15,9 +15,10 @@ import LeagueManager from "./league-manager";
 import PlatformSettingsPanel from "./platform-settings-panel";
 import UserDetailModal from "./user-detail-modal";
 import { type Withdrawal, type Stats, type UserInfo, type Deposit, type Tournament, type GameInfo, type AdminLog, type Tab, localToUTC, utcToLocalInput } from "./types";
-import { StatCard, ActionButton, ConfigInput } from "./components/shared";
+import { ActionButton, ConfigInput } from "./components/shared";
 import PlatformSettingsHub from "./components/platform-settings-hub";
 import BattlesAdminPanel from "./components/battles-admin-panel";
+import OverviewPanel from "./components/overview-panel";
 
 
 export default function AdminDashboard({ adminName }: { adminName: string }) {
@@ -1051,49 +1052,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {tab === "overview" && stats && (
             <div className="space-y-4">
               <PlatformSettingsPanel section="overview" />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
-                <StatCard icon={Users} label="Total Users" value={stats.totalUsers || 0} color="text-ccb-primary" />
-                <StatCard icon={Trophy} label="Active Tournaments" value={stats.activeTournaments || 0} color="text-ccb-accent" />
-                <StatCard icon={TrendingUp} label="Games Today" value={stats.gamesToday || 0} color="text-ccb-success" />
-                <StatCard icon={AlertCircle} label="Pending Withdrawals" value={stats.pendingWithdrawals || 0} color="text-ccb-danger" />
-                <StatCard icon={Gamepad2} label="Total Games" value={stats.totalGames || 0} color="text-ccb-primary" />
-                <StatCard icon={Trophy} label="Pending Approvals" value={stats.pendingTournamentApprovals || 0} color="text-amber-500" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-4">
-                <StatCard icon={DollarSign} label="Total Deposits" value={formatMWK(stats.totalDeposits)} color="text-ccb-success" />
-                <StatCard icon={ArrowDownUp} label="Total Withdrawals" value={formatMWK(stats.totalWithdrawals)} color="text-ccb-accent" />
-                <StatCard icon={Wallet} label="Wallet Liquidity" value={formatMWK(stats.walletLiquidity)} color="text-ccb-primary" />
-                <StatCard icon={Swords} label="Battle Volume" value={formatMWK(stats.totalBattleVolume || 0)} color="text-ccb-accent" />
-                <StatCard icon={Coins} label="Platform Revenue" value={formatMWK(stats.platformRevenue || 0)} color="text-ccb-success" />
-              </div>
-
-              <div className="card">
-                <h3 className="font-medium text-sm text-ccb-muted uppercase tracking-wide mb-3">Platform Summary</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-ccb-muted">Total Tournament Prize Pools</span>
-                    <span className="font-medium">{formatMWK(stats.totalPrizePools)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-ccb-muted">Net Flow (Deposits - Withdrawals)</span>
-                    <span className="font-medium text-ccb-success">{formatMWK(stats.totalDeposits - stats.totalWithdrawals)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {stats.pendingWithdrawals > 0 && (
-                <button
-                  onClick={() => setTab("withdrawals")}
-                  className="card w-full flex items-center justify-between p-4 border-ccb-accent/30 hover:border-ccb-accent/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-ccb-accent" />
-                    <span className="font-medium">{stats.pendingWithdrawals} pending withdrawal{stats.pendingWithdrawals !== 1 ? "s" : ""} need review</span>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-ccb-muted" />
-                </button>
-              )}
+              <OverviewPanel formatMWK={formatMWK} onNavigate={(t) => setTab(t as Tab)} />
             </div>
           )}
 
