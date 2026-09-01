@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Trophy, Swords, TrendingUp, Shield, Download, Smartphone, Zap, Users, Check, ChevronRight } from "lucide-react";
+import { Trophy, Swords, TrendingUp, Shield, Smartphone, Zap, Users, Check, ChevronRight } from "lucide-react";
 import { pageMetadata } from "@/lib/seo/metadata";
+import DownloadClient from "./download-client";
 
 export const metadata: Metadata = pageMetadata({
   title: "Download Crazy Chess Battles — Android App",
@@ -27,28 +28,9 @@ export default function DownloadPage() {
 
       {/* Hero */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-        <div className="flex flex-col items-center text-center">
-          {/* App icon */}
-          <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-ccb-primary to-ccb-accent flex items-center justify-center mb-6 shadow-xl shadow-ccb-primary/30 animate-pulse-glow">
-            <span className="text-4xl">♞</span>
-          </div>
+        <DownloadClient />
 
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2">Crazy Chess Battles</h1>
-          <p className="text-ccb-muted text-base sm:text-lg mb-1">Malawi's competitive chess arena</p>
-          <p className="text-ccb-muted/70 text-sm mb-8">Android App · Version 1.0.0 · 4.1 MB</p>
-
-          {/* Download button */}
-          <a
-            href="/CCB.apk"
-            download="CCB.apk"
-            className="inline-flex items-center gap-2.5 px-8 py-4 rounded-xl bg-ccb-primary hover:bg-ccb-primaryHover text-white font-bold text-lg transition-all hover:scale-105 shadow-lg shadow-ccb-primary/30 mb-3"
-          >
-            <Download className="w-5 h-5" />
-            Download APK
-          </a>
-          <p className="text-xs text-ccb-muted/60 mb-12">Free download · No registration required to install</p>
-
-          {/* Features grid */}
+        {/* Features grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-2xl mb-12">
             {[
               { icon: Trophy, title: "Tournaments", desc: "Live cash-prize tournaments" },
@@ -119,6 +101,5 @@ export default function DownloadPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

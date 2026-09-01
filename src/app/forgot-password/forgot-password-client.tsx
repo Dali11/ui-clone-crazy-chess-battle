@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import Link from "next/link";
 
@@ -44,7 +45,7 @@ export default function ForgotPasswordPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="w-10 h-10 rounded-lg bg-ccb-primary flex items-center justify-center">
-              <span className="text-white font-bold text-xl">♞</span>
+              <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={28} height={28} className="rounded-full" />
             </div>
             <span className="text-lg font-bold">Crazy Chess Battles</span>
           </Link>

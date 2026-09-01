@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Download, X, Smartphone } from "lucide-react";
@@ -36,8 +37,8 @@ export default function AppBanner() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-md animate-slide-up">
       <div className="bg-ccb-card border border-ccb-border sm:rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-ccb-primary to-ccb-accent flex items-center justify-center shrink-0">
-          <span className="text-lg">♞</span>
+        <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0">
+          <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={40} height={40} className="rounded-xl" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold">Get the Crazy Chess Battles app</div>
