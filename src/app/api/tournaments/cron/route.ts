@@ -555,6 +555,8 @@ async function handleTournamentCron(req: NextRequest) {
                   if (p.result === "white") { winners.push(p.white as string); losers.push(p.black as string); }
                   else if (p.result === "black") { winners.push(p.black as string); losers.push(p.white as string); }
                   else if (p.result === "draw") {
+                    // Fallback: Armageddon should have resolved this. Higher seed advances.
+                    console.warn("[cron] Knockout pairing still has result=draw (Armageddon may have failed). Seed fallback.");
                     const wSeed = postGroupSeedLookup.get(p.white as string) || 0;
                     const bSeed = postGroupSeedLookup.get(p.black as string) || 0;
                     if (wSeed <= bSeed) { winners.push(p.white as string); losers.push(p.black as string); }
@@ -591,6 +593,8 @@ async function handleTournamentCron(req: NextRequest) {
                 if (p.result === "white") { winners.push(p.white as string); losers.push(p.black as string); }
                 else if (p.result === "black") { winners.push(p.black as string); losers.push(p.white as string); }
                 else if (p.result === "draw") {
+                  // Fallback: Armageddon should have resolved this. Higher seed advances.
+                  console.warn("[cron] Pure knockout pairing still has result=draw (Armageddon may have failed). Seed fallback.");
                   const wSeed = seedLookup.get(p.white as string) || 0;
                   const bSeed = seedLookup.get(p.black as string) || 0;
                   if (wSeed <= bSeed) { winners.push(p.white as string); losers.push(p.black as string); }

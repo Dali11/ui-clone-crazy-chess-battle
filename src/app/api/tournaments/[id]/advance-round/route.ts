@@ -120,7 +120,10 @@ export async function POST(
             winners.push(p.black as string);
             losers.push(p.white as string);
           } else if (p.result === "draw") {
-            // In knockout, draws need a tiebreak — for now, higher seed advances
+            // Fallback: Armageddon tiebreak should have resolved this to a decisive
+            // result. If we still see "draw" here, the tiebreak failed to create or
+            // resolve — fall back to higher seed advancing.
+            console.warn("[advance-round] Knockout pairing still has result=draw (Armageddon tiebreak may have failed). Falling back to seed-based advancement.");
             const whiteSeed = participants.find((p2: any) => p2.player_id === p.white)?.seed || 0;
             const blackSeed = participants.find((p2: any) => p2.player_id === p.black)?.seed || 0;
             if (whiteSeed <= blackSeed) {

@@ -185,13 +185,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Process tournament game result (non-blocking — game is already saved)
-    if (gameEnded && result.winner && game.tournament_id) {
+    // Include draws/stalemates (result.winner is null) — tiebreak games need this
+    if (gameEnded && game.tournament_id) {
       try {
         await processTournamentGameResult({
           gameId,
           whitePlayerId: game.white_player_id,
           blackPlayerId: game.black_player_id,
-          winner: result.winner as "white" | "black" | "draw",
+          winner: (result.winner || "draw") as "white" | "black" | "draw",
           status: result.status || "playing",
         });
       } catch (e) {
@@ -225,7 +226,7 @@ export async function POST(req: NextRequest) {
         .or(`game_id.eq.${gameId},armageddon_game_id.eq.${gameId}`)
         .in("status", ["playing", "draw_armageddon"])
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (battle) {
         const isArmageddon = battle.armageddon_game_id === gameId;

@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
         .or(`game_id.eq.${gameId},armageddon_game_id.eq.${gameId}`)
         .in("status", ["playing", "draw_armageddon"])
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (battle) {
         settleBattle(battle.id, null, "draw").catch((e) => console.error("Battle settlement failed:", e));
@@ -134,18 +134,20 @@ export async function POST(req: NextRequest) {
       // Process tournament game result if this is a tournament game
       if (game.tournament_id) {
         try {
-        await processTournamentGameResult({
-          gameId,
-          whitePlayerId: game.white_player_id,
-          blackPlayerId: game.black_player_id,
-          winner: "draw",
-          status: chess.isStalemate() ? "stalemate" : "draw",
-        });
-      } catch (e) {
-        console.error("[draw] Tournament processing failed for game", gameId, e);
+          await processTournamentGameResult({
+            gameId,
+            whitePlayerId: game.white_player_id,
+            blackPlayerId: game.black_player_id,
+            winner: "draw",
+            status: chess.isStalemate() ? "stalemate" : "draw",
+          });
+        } catch (e) {
+          console.error("[draw] Tournament processing failed for game", gameId, e);
+        }
+      }
 
       // Process league game result if this is a league fixture game
-      const { data: leagueGame } = await admin.from("games").select("league_fixture_id").eq("id", gameId).single();
+      const { data: leagueGame } = await admin.from("games").select("league_fixture_id").eq("id", gameId).maybeSingle();
       if (leagueGame?.league_fixture_id) {
         try {
           await processLeagueGameResult({
@@ -158,8 +160,6 @@ export async function POST(req: NextRequest) {
         } catch (e) {
           console.error("[draw] League processing failed for game", gameId, e);
         }
-      }
-      }
       }
 
       return NextResponse.json({ success: true, status: "draw" });
