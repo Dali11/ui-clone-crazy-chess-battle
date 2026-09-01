@@ -254,7 +254,7 @@ export default function BattlesPage() {
     setError(null);
 
     if (balance < BATTLE_STAKE) {
-      setError(`Insufficient balance. You need ${fmtCurrency(BATTLE_STAKE)} (${fmtCurrency(BATTLE_STAKE)}). Deposit funds first.`);
+      setError(`Insufficient balance. You need ${fmtCurrency(BATTLE_STAKE)}. Deposit funds first.`);
       return;
     }
 
@@ -297,7 +297,7 @@ export default function BattlesPage() {
     const stake = stakeValue; // user enters in MWK
 
     if (balance < stake) {
-      setStakeError(`Insufficient balance. You need ${_curSym} ${stakeValue.toLocaleString()}.`);
+      setStakeError(`Insufficient balance. You need ${fmtCurrency(stakeValue)}.`);
       return;
     }
 

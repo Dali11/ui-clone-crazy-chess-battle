@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { moneySymbol } from "@/lib/geo/format";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,14 +31,14 @@ export async function POST(req: NextRequest) {
     const minAmount = dConfig.min_amount || 1000;
     if (!amount || amount < minAmount) {
       const minDisplay = minAmount.toLocaleString();
-      return NextResponse.json({ error: `Minimum deposit is ${sym} ${minDisplay}` }, { status: 400 });
+      return NextResponse.json({ error: `Minimum deposit is ${await formatMoneyConverted(minAmount, _profile?.country)}` }, { status: 400 });
     }
 
     // Enforce maximum amount
     const maxAmount = dConfig.max_amount || 10_000_000;
     if (amount > maxAmount) {
       const maxDisplay = maxAmount.toLocaleString();
-      return NextResponse.json({ error: `Maximum deposit is ${sym} ${maxDisplay}` }, { status: 400 });
+      return NextResponse.json({ error: `Maximum deposit is ${await formatMoneyConverted(maxAmount, _profile?.country)}` }, { status: 400 });
     }
 
     if (!phone || !operatorRefId) {

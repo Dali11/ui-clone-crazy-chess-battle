@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { moneySymbol } from "@/lib/geo/format";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 import { runArenaMatchmakingWave } from "@/lib/tournament/arena";
 
 export async function POST(
@@ -115,7 +116,7 @@ export async function POST(
       if (currentBalance < entryFee) {
         return NextResponse.json(
           {
-            error: `Insufficient wallet balance. Entry fee is ${sym} ${entryFee.toLocaleString()}. You have ${sym} ${currentBalance.toLocaleString()}. Please deposit funds first.`,
+            error: `Insufficient wallet balance. Entry fee is ${await formatMoneyConverted(entryFee, _userProfile?.country)}. You have ${await formatMoneyConverted(currentBalance, _userProfile?.country)}. Please deposit funds first.`,
           },
           { status: 402 }
         );

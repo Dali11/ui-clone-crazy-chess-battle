@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_CONFIG, calcPayout } from "@/lib/battles/battle-helpers";
 import { moneySymbol } from "@/lib/geo/format";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 
 const TIME_CONTROLS: Record<string, { minutes: number; increment: number; base: string }> = {
   bullet:    { minutes: 1,  increment: 0, base: "bullet" },
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
       const balance = acceptor.wallet_balance ?? 0;
       if (balance < entry.stake) {
         return NextResponse.json({
-          error: `Insufficient balance. You need ${sym} ${entry.stake.toLocaleString()}.`,
+          error: `Insufficient balance. You need ${await formatMoneyConverted(entry.stake, _profile?.country)}.`,
           insufficientFunds: true,
           requiredAmount: entry.stake,
         }, { status: 402 });

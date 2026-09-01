@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_CONFIG } from "@/lib/battles/battle-helpers";
 import { tryMatch } from "@/lib/battles/matchmaker";
 import { moneySymbol } from "@/lib/geo/format";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 
 const TIME_CONTROLS: Record<string, { minutes: number; increment: number }> = {
   bullet:    { minutes: 1,  increment: 0 },
@@ -138,7 +139,7 @@ export async function POST(req: NextRequest) {
     const balance = profile.wallet_balance ?? 0;
     if (balance < stake) {
       return NextResponse.json(
-        { error: `Insufficient balance. You need at least ${sym} ${stake.toLocaleString()}.` },
+        { error: `Insufficient balance. You need at least ${await formatMoneyConverted(stake, _profile?.country)}.` },
         { status: 402 }
       );
     }

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_CONFIG, calcPayout } from "@/lib/battles/battle-helpers";
 import { moneySymbol } from "@/lib/geo/format";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 
 export async function POST(req: NextRequest) {
   try {
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
     if (balance < challenge.stake) {
       return NextResponse.json(
         {
-          error: `Insufficient balance. You need ${sym} ${challenge.stake.toLocaleString()}.`,
+          error: `Insufficient balance. You need ${await formatMoneyConverted(challenge.stake, _profile?.country)}.`,
           insufficientFunds: true,
           requiredAmount: challenge.stake,
           balance: balance,
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
         user_id: challenge.challenger_id,
         type: "challenge_accepted",
         title: "Challenge accepted!",
-        body: `Your battle challenge (${sym} ${challenge.stake.toLocaleString()}) was accepted. Game starting now!`,
+        body: `Your battle challenge (${await formatMoneyConverted(challenge.stake, _profile?.country)}) was accepted. Game starting now!`,
         data: { battle_id: battle.id, stake: challenge.stake },
         read: false,
       });

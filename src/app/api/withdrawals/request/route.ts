@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { moneySymbol } from "@/lib/geo/format";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,14 +30,14 @@ export async function POST(req: NextRequest) {
     const minAmount = wConfig.min_amount || 10_000;
     if (!amount || amount < minAmount) {
       const minDisplay = minAmount.toLocaleString();
-      return NextResponse.json({ error: `Minimum withdrawal is ${sym} ${minDisplay}` }, { status: 400 });
+      return NextResponse.json({ error: `Minimum withdrawal is ${await formatMoneyConverted(minAmount, _profile?.country)}` }, { status: 400 });
     }
 
     // Enforce maximum amount
     const maxAmount = wConfig.max_amount || 500_000;
     if (amount > maxAmount) {
       const maxDisplay = maxAmount.toLocaleString();
-      return NextResponse.json({ error: `Maximum withdrawal is ${sym} ${maxDisplay}` }, { status: 400 });
+      return NextResponse.json({ error: `Maximum withdrawal is ${await formatMoneyConverted(maxAmount, _profile?.country)}` }, { status: 400 });
     }
 
     // Enforce daily limit
@@ -216,7 +217,7 @@ export async function POST(req: NextRequest) {
                   user_id: withdrawal.user_id,
                   type: "withdrawal_approved",
                   title: "Your withdrawal has been processed",
-                  body: `${sym} ${amountMWK.toLocaleString()} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
+                  body: `${await formatMoneyConverted(amountMWK, _profile?.country)} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
                   data: { amount: amountMWK, phone: withdrawal.phone, operator: withdrawal.operator_name, auto: true, fees: totalFees },
                   read: false,
                 });
@@ -234,7 +235,7 @@ export async function POST(req: NextRequest) {
               user_id: withdrawal.user_id,
               type: "withdrawal_failed",
               title: "Withdrawal payout failed",
-              body: `Your withdrawal for ${sym} ${amountMWK.toLocaleString()} could not be processed. Funds returned to your wallet.`,
+              body: `Your withdrawal for ${await formatMoneyConverted(amountMWK, _profile?.country)} could not be processed. Funds returned to your wallet.`,
               data: { amount: amountMWK, auto: true },
               read: false,
             });

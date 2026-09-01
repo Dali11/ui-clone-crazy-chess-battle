@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { moneySymbol } from "@/lib/geo/format";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 
 /**
  * POST /api/game/rematch
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
         const balance = requesterProfile?.wallet_balance ?? 0;
         if (balance < stake) {
           return NextResponse.json({
-            error: `Insufficient balance for a staked rematch. You need ${sym} ${stake.toLocaleString()}.`,
+            error: `Insufficient balance for a staked rematch. You need ${await formatMoneyConverted(stake, _profile?.country)}.`,
             insufficientFunds: true,
             requiredAmount: stake,
             balance,

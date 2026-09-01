@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_CONFIG, calcPayout } from "@/lib/battles/battle-helpers";
 import { moneySymbol } from "@/lib/geo/format";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 
 /**
  * POST /api/game/rematch/accept
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
       const acceptorBalance = acceptorProfile?.wallet_balance ?? 0;
       if (acceptorBalance < stake) {
         return NextResponse.json({
-          error: `Insufficient balance for a staked rematch. You need ${sym} ${stake.toLocaleString()}.`,
+          error: `Insufficient balance for a staked rematch. You need ${await formatMoneyConverted(stake, _profile?.country)}.`,
           insufficientFunds: true,
           requiredAmount: stake,
           balance: acceptorBalance,

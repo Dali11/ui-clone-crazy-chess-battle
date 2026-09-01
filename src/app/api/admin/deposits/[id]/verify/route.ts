@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { moneySymbol } from "@/lib/geo/format";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             user_id: deposit.user_id,
             type: "deposit_success",
             title: "Deposit confirmed",
-            body: `Your deposit of ${sym} ${amountMWK.toLocaleString()} has been credited to your wallet.`,
+            body: `Your deposit of ${await formatMoneyConverted(amountMWK, _up?.country)} has been credited to your wallet.`,
             data: { amount: amountMWK, method: deposit.method },
             read: false,
           });

@@ -41,3 +41,4 @@ supabase/.temp/
 # Compiled binaries
 *.apk
 *.aab
+coverage/

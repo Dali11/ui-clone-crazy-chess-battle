@@ -23,6 +23,6 @@ export const COUNTRY_CURRENCY: Record<string, string> = {
 
 export const DEFAULT_CURRENCY = "MWK";
 
-export function currencyForCountry(countryCode: string): string {
-  return COUNTRY_CURRENCY[countryCode?.toUpperCase()] || DEFAULT_CURRENCY;
+export function currencyForCountry(countryCode: string | null | undefined): string {
+  return COUNTRY_CURRENCY[(countryCode || "").toUpperCase()] || DEFAULT_CURRENCY;
 }

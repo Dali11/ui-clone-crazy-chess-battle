@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPlatformConfig } from '@/lib/platform-config';
 import { moneySymbol } from "@/lib/geo/format";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 
 export async function POST(request: NextRequest) {
   try {
@@ -329,7 +330,7 @@ export async function POST(request: NextRequest) {
         if (currentBalance < entryFee) {
           const feeMwk = entryFee;
           return NextResponse.json({
-            error: `Insufficient wallet balance. Entry fee is ${sym} ${feeMwk.toLocaleString()}. You have ${sym} ${currentBalance.toLocaleString()}. Please deposit funds first.`,
+            error: `Insufficient wallet balance. Entry fee is ${await formatMoneyConverted(feeMwk, _profile?.country)}. You have ${await formatMoneyConverted(currentBalance, _profile?.country)}. Please deposit funds first.`,
           }, { status: 402 });
         }
 
