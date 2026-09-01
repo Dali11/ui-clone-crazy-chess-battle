@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Clock, Trophy, Bot } from "lucide-react";
+import { Clock, Trophy, Bot, Search } from "lucide-react";
 
 interface GameRecord {
   id: string;
@@ -38,7 +38,7 @@ interface HistoryClientProps {
   currentUserId: string;
 }
 
-type FilterType = "all" | "wins" | "losses" | "draws" | "tournaments" | "bot";
+type FilterType = "all" | "wins" | "losses" | "draws" | "tournaments" | "bot" | "review";
 
 export default function HistoryClient({ profile, games, opponentMap, currentUserId }: HistoryClientProps) {
   const [filter, setFilter] = useState<FilterType>("all");
@@ -60,6 +60,7 @@ export default function HistoryClient({ profile, games, opponentMap, currentUser
       if (filter === "draws") return drew;
       if (filter === "tournaments") return !!g.tournament_id;
       if (filter === "bot") return isBotGame(g) && g.status !== "playing";
+      if (filter === "review") return !won && !drew && !aborted && g.status !== "playing";
       return g.status !== "playing"; // "all" — exclude active games
     });
   }, [games, filter, currentUserId]);
@@ -99,9 +100,9 @@ export default function HistoryClient({ profile, games, opponentMap, currentUser
     if (won) return { label: "Win", color: "text-ccb-success", bg: "bg-ccb-success/10" };
     if (drew) return { label: "Draw", color: "text-ccb-muted", bg: "bg-ccb-muted/10" };
 
-    const reason = g.status === "timeout" ? "Timeout" :
-                   g.status === "resign" ? "Resign" :
-                   g.status === "checkmate" ? "Checkmate" :
+    const reason = g.status === "timeout" ? "⏱ Timeout" :
+                   g.status === "resign" ? "🏳 Resigned" :
+                   g.status === "checkmate" ? "♚ Checkmate" :
                    g.status === "stalemate" ? "Stalemate" :
                    g.status === "draw" ? "Draw" : "Loss";
     return { label: reason, color: "text-ccb-danger", bg: "bg-ccb-danger/10" };
@@ -111,6 +112,7 @@ export default function HistoryClient({ profile, games, opponentMap, currentUser
     { id: "all", label: "All", count: stats.total },
     { id: "wins", label: "Wins", count: stats.wins },
     { id: "losses", label: "Losses", count: stats.losses },
+    { id: "review", label: "🔍 Review", count: stats.losses },
     { id: "draws", label: "Draws", count: stats.draws },
     { id: "bot", label: "vs Bot", count: games.filter((g) => isBotGame(g) && g.status !== "playing").length },
     { id: "tournaments", label: "Tournaments", count: games.filter((g) => g.tournament_id).length },
@@ -120,7 +122,7 @@ export default function HistoryClient({ profile, games, opponentMap, currentUser
     <div className="space-y-6 pb-20 sm:pb-0">
       <div>
         <h1 className="text-xl sm:text-lg sm:text-2xl font-bold">Game History</h1>
-        <p className="text-sm text-ccb-muted mt-1">{profile?.games_played || 0} games played</p>
+        <p className="text-sm text-ccb-muted mt-1">{profile?.games_played || 0} games played · tap any game to review moves</p>
       </div>
 
       {/* Stats summary */}
@@ -159,6 +161,21 @@ export default function HistoryClient({ profile, games, opponentMap, currentUser
           </button>
         ))}
       </div>
+
+      {/* Review hint */}
+      {filter === "review" && (
+        <div className="card p-3 sm:p-4 border-ccb-primary/20 bg-ccb-primary/5">
+          <div className="flex items-start gap-2.5">
+            <Search className="w-4 h-4 text-ccb-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">Review your losses</p>
+              <p className="text-xs text-ccb-muted mt-0.5">
+                Tap any game to replay every move on the board. Look for where it turned — was it a blunder under time pressure, or did you miss a tactic?
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Game list */}
       {filteredGames.length === 0 ? (

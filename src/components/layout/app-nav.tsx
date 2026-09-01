@@ -48,13 +48,13 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     return () => { document.body.style.overflow = ""; };
   }, [menuOpen]);
 
-  // Bottom nav: Play · Battles · Leagues · Tournaments · Live
+  // Bottom nav: Play · Battles · History · Tournaments · Leagues
   const bottomNav = [
     { href: "/play", label: "Play", icon: Swords },
     { href: "/battles", label: "Battles", icon: Coins },
-    { href: "/league", label: "Leagues", icon: Crown },
+    { href: "/history", label: "History", icon: Clock },
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
-    { href: "/live", label: "Live", icon: Radio },
+    { href: "/league", label: "Leagues", icon: Crown },
   ];
 
   // Desktop nav — primary actions
@@ -62,6 +62,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/dashboard", label: "Home", icon: Home },
     { href: "/play", label: "Play", icon: Swords },
     { href: "/battles", label: "Battles", icon: Coins },
+    { href: "/history", label: "History", icon: Clock },
     { href: "/league", label: "Leagues", icon: Crown },
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/live", label: "Live", icon: Radio },
