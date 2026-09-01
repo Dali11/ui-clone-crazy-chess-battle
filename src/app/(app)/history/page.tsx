@@ -25,7 +25,7 @@ export default async function HistoryPage() {
   const [profileRes, gamesRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, username, display_name, rating, wins, losses, draws, games_played")
+      .select("id, username, display_name, rating, wins, losses, draws, games_played, avatar_url")
       .eq("id", user.id)
       .single(),
     supabase
@@ -53,7 +53,7 @@ export default async function HistoryPage() {
 
   const { data: opponents } = await supabase
     .from("profiles")
-    .select("id, username, display_name, rating")
+    .select("id, username, display_name, rating, avatar_url")
     .in("id", Array.from(opponentIds));
 
   const opponentMap = new Map((opponents || []).map((o) => [o.id, o]));
