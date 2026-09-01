@@ -198,8 +198,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Failed to create battle for rematch" }, { status: 500 });
       }
 
-      // Link battle to the new game
-      await admin.from("battles").update({ game_id: newGameId }).eq("id", battle.id);
+      // Link battle to the new game AND flip status to "playing" — without
+      // this, the battle stays "pending" for the entire game (game_id set
+      // but status never advances), which means the /api/battles/active
+      // self-heal (which only watches status="playing"/"draw_armageddon")
+      // can never catch a failed fire-and-forget settleBattle() call. The
+      // battle would then sit "pending" forever even after the game ends.
+      await admin
+        .from("battles")
+        .update({ game_id: newGameId, status: "playing", started_at: new Date().toISOString() })
+        .eq("id", battle.id);
     }
 
     // Update the offer

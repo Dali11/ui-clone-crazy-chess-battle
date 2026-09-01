@@ -7,6 +7,10 @@
   },
   "crons": [
     {
+      "path": "/api/battles/heal-stuck",
+      "schedule": "*/2 * * * *"
+    },
+    {
       "path": "/api/battles/challenge/cleanup-expired",
       "schedule": "0 0 * * *"
     },

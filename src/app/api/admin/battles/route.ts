@@ -1,0 +1,171 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+
+/**
+ * GET /api/admin/battles
+ * Robust admin listing + stats for Chess Battles, with time-range,
+ * status, country, and search filters.
+ *
+ * Query params:
+ *   range    - "1d" | "7d" | "30d" | "3m" | "6m" | "1y" | "all" (default "7d")
+ *   status   - "all" | "stuck" | "pending" | "playing" | "completed" |
+ *              "disputed" | "cancelled" (default "all")
+ *   country  - ISO 3166-1 alpha-2 country code, or "all" (default "all")
+ *   search   - username/display_name substring match
+ *   page     - 1-indexed page number (default 1)
+ *   limit    - page size (default 25, max 100)
+ */
+
+const RANGE_MS: Record<string, number | null> = {
+  "1d": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+  "30d": 30 * 24 * 60 * 60 * 1000,
+  "3m": 90 * 24 * 60 * 60 * 1000,
+  "6m": 180 * 24 * 60 * 60 * 1000,
+  "1y": 365 * 24 * 60 * 60 * 1000,
+  all: null,
+};
+
+export async function GET(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const admin = createAdminClient();
+    const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
+    if (!profile?.is_admin) return NextResponse.json({ error: "Admin only" }, { status: 403 });
+
+    const { searchParams } = new URL(req.url);
+    const range = searchParams.get("range") || "7d";
+    const statusFilter = searchParams.get("status") || "all";
+    const country = searchParams.get("country") || "all";
+    const search = (searchParams.get("search") || "").trim();
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "25", 10) || 25));
+
+    const rangeMs = RANGE_MS[range] ?? RANGE_MS["7d"];
+    const sinceISO = rangeMs ? new Date(Date.now() - rangeMs).toISOString() : null;
+    const stuckCutoffISO = new Date(Date.now() - 60_000).toISOString();
+
+    // Resolve player-id restriction from country/search filters
+    let restrictToPlayerIds: string[] | null = null;
+    if (country !== "all" || search) {
+      let profileQuery = admin.from("profiles").select("id");
+      if (country !== "all") profileQuery = profileQuery.eq("country", country);
+      if (search) profileQuery = profileQuery.or(`username.ilike.%${search}%,display_name.ilike.%${search}%`);
+      const { data: matchedProfiles } = await profileQuery.limit(5000);
+      restrictToPlayerIds = (matchedProfiles ?? []).map((p) => p.id);
+      if (restrictToPlayerIds.length === 0) {
+        return NextResponse.json({
+          battles: [], total: 0, page, limit,
+          stats: { total: 0, pending: 0, stuck: 0, playing: 0, completed: 0, disputed: 0, cancelled: 0, totalVolume: 0, totalRevenue: 0 },
+          availableCountries: [],
+        });
+      }
+    }
+
+    function applyCommonFilters(q: any) {
+      if (sinceISO) q = q.gte("created_at", sinceISO);
+      if (restrictToPlayerIds) {
+        const idList = restrictToPlayerIds.join(",");
+        q = q.or(`white_player_id.in.(${idList}),black_player_id.in.(${idList})`);
+      }
+      return q;
+    }
+
+    let listQuery = admin.from("battles").select(
+      `id, status, stake, pot, platform_fee, winner_payout, result,
+       white_player_id, black_player_id, winner_id, white_rating, black_rating,
+       game_id, armageddon_game_id, armageddon_round, settled,
+       created_at, started_at, completed_at, time_control, notes`,
+      { count: "exact" }
+    );
+    listQuery = applyCommonFilters(listQuery);
+    listQuery = applyStatusFilter(listQuery, statusFilter, stuckCutoffISO);
+    listQuery = listQuery.order("created_at", { ascending: false }).range((page - 1) * limit, page * limit - 1);
+
+    const { data: battles, count, error: listErr } = await listQuery;
+    if (listErr) return NextResponse.json({ error: "Query failed" }, { status: 500 });
+
+    // Resolve player usernames/countries
+    const playerIds = new Set<string>();
+    for (const b of battles ?? []) {
+      playerIds.add(b.white_player_id);
+      playerIds.add(b.black_player_id);
+      if (b.winner_id) playerIds.add(b.winner_id);
+    }
+    const { data: players } = await admin.from("profiles").select("id, username, display_name, country").in("id", Array.from(playerIds));
+    const playerMap = new Map((players ?? []).map((p) => [p.id, p]));
+
+    const now = Date.now();
+    const enrichedBattles = (battles ?? []).map((b) => {
+      const isStuck = b.status === "pending" && (b.game_id ? true : new Date(b.created_at).getTime() < now - 60_000);
+      return {
+        ...b,
+        white_player: playerMap.get(b.white_player_id) || null,
+        black_player: playerMap.get(b.black_player_id) || null,
+        winner: b.winner_id ? playerMap.get(b.winner_id) || null : null,
+        stuck: isStuck,
+        pending_age_seconds: b.status === "pending" ? Math.floor((now - new Date(b.created_at).getTime()) / 1000) : null,
+      };
+    });
+
+    const stats = await computeStats(admin, applyCommonFilters, stuckCutoffISO);
+    const availableCountries = await getAvailableCountries(admin, sinceISO);
+
+    return NextResponse.json({ battles: enrichedBattles, total: count ?? 0, page, limit, stats, availableCountries });
+  } catch (e: any) {
+    console.error("[admin/battles] error:", e);
+    return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });
+  }
+}
+
+function applyStatusFilter(q: any, statusFilter: string, stuckCutoffISO: string) {
+  switch (statusFilter) {
+    case "pending": return q.eq("status", "pending");
+    case "stuck": return q.eq("status", "pending").or(`game_id.not.is.null,created_at.lt.${stuckCutoffISO}`);
+    case "playing": return q.in("status", ["playing", "draw_armageddon"]);
+    case "completed": return q.eq("status", "completed");
+    case "disputed": return q.eq("status", "disputed");
+    case "cancelled": return q.eq("status", "cancelled");
+    default: return q;
+  }
+}
+
+async function computeStats(admin: ReturnType<typeof createAdminClient>, applyCommonFilters: (q: any) => any, stuckCutoffISO: string) {
+  const countFor = async (statusFilter: string) => {
+    let q = admin.from("battles").select("id", { count: "exact", head: true });
+    q = applyCommonFilters(q);
+    q = applyStatusFilter(q, statusFilter, stuckCutoffISO);
+    const { count } = await q;
+    return count ?? 0;
+  };
+
+  const [total, pending, stuck, playing, completed, disputed, cancelled] = await Promise.all([
+    countFor("all"), countFor("pending"), countFor("stuck"), countFor("playing"),
+    countFor("completed"), countFor("disputed"), countFor("cancelled"),
+  ]);
+
+  let revenueQuery = admin.from("battles").select("pot, platform_fee").eq("status", "completed").eq("settled", true);
+  revenueQuery = applyCommonFilters(revenueQuery);
+  const { data: revenueRows } = await revenueQuery;
+  const totalVolume = (revenueRows ?? []).reduce((sum: number, b: any) => sum + (b.pot || 0), 0);
+  const totalRevenue = (revenueRows ?? []).reduce((sum: number, b: any) => sum + (b.platform_fee || 0), 0);
+
+  return { total, pending, stuck, playing, completed, disputed, cancelled, totalVolume, totalRevenue };
+}
+
+async function getAvailableCountries(admin: ReturnType<typeof createAdminClient>, sinceISO: string | null) {
+  let battleQuery = admin.from("battles").select("white_player_id, black_player_id").limit(5000);
+  if (sinceISO) battleQuery = battleQuery.gte("created_at", sinceISO);
+  const { data: rows } = await battleQuery;
+  const ids = new Set<string>();
+  for (const r of rows ?? []) { ids.add(r.white_player_id); ids.add(r.black_player_id); }
+  if (ids.size === 0) return [];
+  const { data: countryRows } = await admin.from("profiles").select("country").in("id", Array.from(ids)).not("country", "is", null);
+  const counts = new Map<string, number>();
+  for (const r of countryRows ?? []) { if (r.country) counts.set(r.country, (counts.get(r.country) || 0) + 1); }
+  return Array.from(counts.entries()).map(([code, count]) => ({ code, count })).sort((a, b) => b.count - a.count);
+}
