@@ -852,6 +852,18 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
               overlay
             />
           )}
+
+          {/* Live position indicator — anchored to the board itself so it never covers the toolbar below */}
+          {!isLiveView && moveHistory.length > 0 && (
+            <div className="absolute inset-x-0 bottom-2 z-40 flex justify-center pointer-events-none">
+              <button
+                onClick={() => { setReviewFen(null); setViewPly(moveHistory.length); }}
+                className="pointer-events-auto px-4 py-1.5 rounded-full bg-ccb-primary text-white text-xs font-medium shadow-lg hover:bg-ccb-primary/90 transition-colors"
+              >
+                ← Return to live position
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -881,18 +893,6 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
             <span className="text-sm text-ccb-muted">Waiting for opponent to respond…</span>
             <button onClick={declineDraw} className="ml-auto text-sm text-ccb-muted hover:text-ccb-danger underline">Cancel</button>
           </div>
-        </div>
-      )}
-
-      {/* Live position indicator — floats over the board, never affects layout */}
-      {!isLiveView && moveHistory.length > 0 && (
-        <div className="absolute inset-x-0 bottom-2 z-40 flex justify-center pointer-events-none">
-          <button
-            onClick={() => { setReviewFen(null); setViewPly(moveHistory.length); }}
-            className="pointer-events-auto px-4 py-1.5 rounded-full bg-ccb-primary text-white text-xs font-medium shadow-lg hover:bg-ccb-primary/90 transition-colors"
-          >
-            ← Return to live position
-          </button>
         </div>
       )}
 
