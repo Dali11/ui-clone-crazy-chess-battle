@@ -118,7 +118,7 @@ export async function GET() {
     // handlers can fail silently, leaving the battle stuck in "playing"
     // even though the game is done. Check the game status and settle now.
     const currentGameId = battle.status === "draw_armageddon" ? battle.armageddon_game_id : battle.game_id;
-    if (currentGameId && (battle.status === "playing" || battle.status === "draw_armageddon")) {
+    if (currentGameId && (battle.status === "playing" || battle.status === "draw_armageddon" || battle.status === "pending")) {
       const { data: game } = await admin
         .from("games")
         .select("status, winner")
@@ -203,6 +203,38 @@ export async function GET() {
     }
 
     // Already has a live/armageddon game — just point the client at it.
+    // But if the battle is "pending" with a game_id (rematch bug), verify
+    // the game isn't already finished before sending the player there.
+    if (currentGameId && battle.status === "pending") {
+      const { data: gameCheck } = await admin
+        .from("games")
+        .select("status")
+        .eq("id", currentGameId)
+        .single();
+      if (gameCheck && gameCheck.status !== "playing" && gameCheck.status !== "waiting") {
+        // Game is over but battle stuck in pending — the self-heal above
+        // should have settled it. If we reach here, settlement failed.
+        // Force-settle and refund rather than trapping the player.
+        console.error("[active] Battle", battle.id, "stuck in pending with finished game", currentGameId);
+        const { data: forceClaimed } = await admin
+          .from("battles")
+          .update({ status: "completed", result: "force_settled_pending_game_over", settled: true, completed_at: new Date().toISOString() })
+          .eq("id", battle.id).eq("settled", false)
+          .select("id, stake, white_player_id, black_player_id");
+        if (forceClaimed && forceClaimed.length > 0) {
+          const fb = forceClaimed[0];
+          await admin.rpc("credit_wallet", { p_user_id: fb.white_player_id, p_amount: fb.stake });
+          await admin.rpc("credit_wallet", { p_user_id: fb.black_player_id, p_amount: fb.stake });
+          await admin.from("battle_escrow").update({ status: "refunded", released_at: new Date().toISOString() }).eq("battle_id", battle.id);
+          console.log("[active] Force-settled stuck-pending battle", battle.id, "with refund");
+        }
+        return NextResponse.json({ active: false });
+      }
+      // Game is actually still playing — correct the battle status and send the player in.
+      await admin.from("battles").update({ status: "playing" }).eq("id", battle.id).eq("status", "pending");
+      return NextResponse.json({ active: true, battleId: battle.id, gameId: currentGameId, status: "playing" });
+    }
+
     if (currentGameId) {
       return NextResponse.json({ active: true, battleId: battle.id, gameId: currentGameId, status: battle.status });
     }

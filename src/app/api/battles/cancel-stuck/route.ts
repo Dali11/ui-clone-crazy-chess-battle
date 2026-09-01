@@ -28,13 +28,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not a battle participant" }, { status: 403 });
     }
 
-    if (battle.status !== "pending" || battle.game_id) {
+    if (battle.status !== "pending") {
       return NextResponse.json(
-        { error: "This battle isn't stuck — it already has a game or has been settled." },
+        { error: "This battle isn't stuck — it has been settled or is actively playing." },
         { status: 400 }
       );
     }
 
+    // If the battle has a game_id, check if the game is already finished.
+    // If it is, settle via the self-heal path instead of cancelling — the
+    // game result should determine the winner, not a blind refund.
+    if (battle.game_id) {
+      const { data: game } = await admin
+        .from("games")
+        .select("status, winner")
+        .eq("id", battle.game_id)
+        .single();
+
+      if (game && game.status !== "playing" && game.status !== "waiting") {
+        // Game is over — tell the player to refresh, the self-heal in
+        // /api/battles/active will settle it on next check.
+        return NextResponse.json(
+          { error: "The game has already finished. Go back and refresh — it will be settled automatically." },
+          { status: 400 }
+        );
+      }
+
+      if (game && (game.status === "playing" || game.status === "waiting")) {
+        // Game is still live — the battle status is just wrong. Correct it
+        // instead of cancelling, then redirect the player to the game.
+        await admin
+          .from("battles")
+          .update({ status: "playing", started_at: battle.started_at || new Date().toISOString() })
+          .eq("id", battleId)
+          .eq("status", "pending");
+        return NextResponse.json({ corrected: true, gameId: battle.game_id });
+      }
+    }
+
+    // No game_id — safe to cancel and refund.
     // Atomic claim so two simultaneous cancel clicks (one from each player) don't double-refund.
     const { data: claimed } = await admin
       .from("battles")

@@ -94,7 +94,7 @@ export default function BattlesPage() {
       const data = await res.json();
       if (data.active) {
         setActiveBattle(data);
-        if (data.gameId && data.status === "playing") {
+        if (data.gameId && (data.status === "playing" || data.status === "draw_armageddon")) {
           router.push(`/game/${data.gameId}`);
           return;
         }
@@ -168,6 +168,11 @@ export default function BattlesPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Failed to cancel"); setCancellingStuck(false); return; }
+      if (data.corrected && data.gameId) {
+        // Battle status was corrected (game was still live) — redirect to the game.
+        router.push(`/game/${data.gameId}`);
+        return;
+      }
       setActiveBattle(null);
       loadProfile();
     } catch { setError("Failed to cancel"); }
