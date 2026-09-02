@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
-import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight } from "lucide-react";
+import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight, Target, Gamepad2, Crown } from "lucide-react";
 import WhatsAppBanner from "@/components/layout/whatsapp-banner";
 import { moneySymbol } from "@/lib/geo/format";
 
@@ -100,6 +100,8 @@ export default async function DashboardPage() {
     ? Math.round(((profile.wins ?? 0) / profile.games_played) * 100)
     : 0;
 
+  const isNewUser = (profile?.games_played ?? 0) === 0 && (profile?.wins ?? 0) === 0 && (profile?.losses ?? 0) === 0 && (profile?.draws ?? 0) === 0;
+
   const walletSymbol = moneySymbol(profile?.country);
   const walletBalance = profile?.wallet_balance
     ? `${walletSymbol} ${profile.wallet_balance.toLocaleString("en-US")}`
@@ -110,38 +112,95 @@ export default async function DashboardPage() {
       {/* Welcome */}
       <div>
         <h1 className="text-xl sm:text-2xl font-bold">
-          Welcome back, {profile?.display_name || profile?.username || "Player"}
+          {isNewUser ? "Welcome to Crazy Chess Battles" : `Welcome back, ${profile?.display_name || profile?.username || "Player"}`}
         </h1>
-        <p className="text-sm text-ccb-muted mt-1">Ready for a battle?</p>
+        <p className="text-sm text-ccb-muted mt-1">
+          {isNewUser ? "Let\'s get you playing — here\'s where to start." : "Ready for a battle?"}
+        </p>
       </div>
 
       {/* WhatsApp group invite — shows once daily until joined */}
       <WhatsAppBanner />
 
-      {/* Stats — compact strip */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="card p-2.5 sm:p-4">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <TrendingUp className="w-3.5 h-3.5 text-ccb-primary" />
-            <span className="text-xs text-ccb-muted">Rating</span>
+      {/* Stats — compact strip (hidden for brand-new users) */}
+      {!isNewUser && (
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="card p-2.5 sm:p-4">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <TrendingUp className="w-3.5 h-3.5 text-ccb-primary" />
+              <span className="text-xs text-ccb-muted">Rating</span>
+            </div>
+            <div className="text-lg sm:text-2xl font-bold text-ccb-primary">{profile?.rating ?? "—"}</div>
           </div>
-          <div className="text-lg sm:text-2xl font-bold text-ccb-primary">{profile?.rating ?? "—"}</div>
-        </div>
-        <div className="card p-2.5 sm:p-4">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <Swords className="w-3.5 h-3.5 text-ccb-text" />
-            <span className="text-xs text-ccb-muted">Games</span>
+          <div className="card p-2.5 sm:p-4">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Swords className="w-3.5 h-3.5 text-ccb-text" />
+              <span className="text-xs text-ccb-muted">Games</span>
+            </div>
+            <div className="text-lg sm:text-2xl font-bold">{profile?.games_played ?? 0}</div>
           </div>
-          <div className="text-lg sm:text-2xl font-bold">{profile?.games_played ?? 0}</div>
-        </div>
-        <div className="card p-2.5 sm:p-4">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <Zap className="w-3.5 h-3.5 text-ccb-success" />
-            <span className="text-xs text-ccb-muted">Win %</span>
+          <div className="card p-2.5 sm:p-4">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Zap className="w-3.5 h-3.5 text-ccb-success" />
+              <span className="text-xs text-ccb-muted">Win %</span>
+            </div>
+            <div className="text-lg sm:text-2xl font-bold text-ccb-success">{winRate}%</div>
           </div>
-          <div className="text-lg sm:text-2xl font-bold text-ccb-success">{winRate}%</div>
         </div>
-      </div>
+      )}
+
+      {/* Getting Started card — only for brand-new users */}
+      {isNewUser && (
+        <div className="rounded-2xl border border-ccb-border bg-ccb-card p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="w-4 h-4 text-ccb-primary" />
+            <h3 className="text-sm font-bold uppercase tracking-wide text-ccb-text">Getting Started</h3>
+          </div>
+          <div className="space-y-2">
+            {/* Step 1: Play */}
+            <Link href="/play" className="flex items-center gap-3 rounded-xl bg-ccb-surface border border-ccb-border p-3 hover:border-ccb-primary/30 transition-colors group">
+              <div className="w-9 h-9 rounded-xl bg-ccb-primary/15 flex items-center justify-center shrink-0">
+                <Gamepad2 className="w-4.5 h-4.5 text-ccb-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-ccb-text">Play your first game</p>
+                <p className="text-xs text-ccb-muted">Quick match vs a human, or practice vs the computer</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:translate-x-1 transition-transform shrink-0" />
+            </Link>
+            {/* Step 2: Join a league */}
+            <Link href="/league" className="flex items-center gap-3 rounded-xl bg-ccb-surface border border-ccb-border p-3 hover:border-ccb-primary/30 transition-colors group">
+              <div className="w-9 h-9 rounded-xl bg-ccb-accent/15 flex items-center justify-center shrink-0">
+                <Crown className="w-4.5 h-4.5 text-ccb-accent" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-ccb-text">Join a league</p>
+                <p className="text-xs text-ccb-muted">Compete in seasonal leagues with players at your level</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:translate-x-1 transition-transform shrink-0" />
+            </Link>
+            {/* Step 3: Wallet */}
+            <Link href="/wallet" className="flex items-center gap-3 rounded-xl bg-ccb-surface border border-ccb-border p-3 hover:border-ccb-primary/30 transition-colors group">
+              <div className="w-9 h-9 rounded-xl bg-ccb-success/15 flex items-center justify-center shrink-0">
+                <Wallet className="w-4.5 h-4.5 text-ccb-success" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-ccb-text">Set up your wallet</p>
+                <p className="text-xs text-ccb-muted">Deposit to play staked battles and win real money</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:translate-x-1 transition-transform shrink-0" />
+            </Link>
+          </div>
+          {/* Rating badge */}
+          <div className="mt-3 flex items-center justify-between rounded-xl bg-ccb-primary/10 border border-ccb-primary/20 px-3.5 py-2.5">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-3.5 h-3.5 text-ccb-primary" />
+              <span className="text-xs text-ccb-muted">Your starting rating</span>
+            </div>
+            <span className="text-lg font-black text-ccb-primary">{profile?.rating ?? "—"}</span>
+          </div>
+        </div>
+      )}
 
       {/* Quick Match — big primary CTA */}
       <Link href="/play" className="block relative overflow-hidden rounded-xl bg-gradient-to-r from-ccb-primary to-purple-600 p-4 sm:p-6 group active:scale-[0.98] transition-transform">
@@ -249,7 +308,14 @@ export default async function DashboardPage() {
               })}
             </div>
           ) : (
-            <p className="text-sm text-ccb-muted">No games yet. Start playing!</p>
+            <div className="text-center py-4">
+              <p className="text-sm text-ccb-muted mb-3">No games yet — your stats will appear here after your first match.</p>
+              <Link href="/play" className="inline-flex items-center gap-2 text-xs font-bold text-ccb-primary hover:text-ccb-primary/80 transition-colors">
+                <Swords className="w-3.5 h-3.5" />
+                Play your first game
+                <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
           )}
         </div>
       </div>

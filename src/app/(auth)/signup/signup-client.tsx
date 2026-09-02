@@ -246,9 +246,12 @@ export default function SignupPage() {
         console.error("Post-signup error:", postErr);
       }
 
+      // Send brand-new users to /play so they immediately see action options
+      // (the dashboard also detects new users and shows a Getting Started card,
+      //  but /play is more actionable and less "admin panel" feeling)
       const fullRedirect = actionParam
         ? `${redirectPath}?action=${actionParam}`
-        : redirectPath;
+        : "/play";
       router.push(fullRedirect);
       router.refresh();
     } catch (err: any) {
