@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import {
   Crown, ChevronDown, ChevronRight, Users, Calendar, Trophy,
   Settings, Play, RotateCcw, Loader2, UserMinus, RefreshCw,
-  ArrowRight, CheckCircle, XCircle, Clock, AlertTriangle, Save,
+  ArrowRight, CheckCircle, XCircle, Clock, AlertTriangle, Save, Shield,
 } from "lucide-react";
 
 // ============================================================
@@ -61,11 +61,14 @@ type Fixture = {
   result: string;
   played: boolean;
   scheduled_date: string | null;
+  admin_override: boolean;
   home_player: { id: string; username: string | null; display_name: string | null; avatar_url: string | null; rating: number; country: string | null } | null;
   away_player: { id: string; username: string | null; display_name: string | null; avatar_url: string | null; rating: number; country: string | null } | null;
 };
 
 type Tab = "overview" | "roster" | "fixtures" | "settings";
+
+const playerName = (p: any) => p?.display_name || p?.username || (p?.id ? p.id.slice(0, 8) : "—");
 
 // ============================================================
 // Component
@@ -82,6 +85,9 @@ export default function LeagueManager() {
   const [editState, setEditState] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<{ leagueId: string; type: "success" | "error"; msg: string } | null>(null);
+  const [overrideTarget, setOverrideTarget] = useState<{ leagueId: string; fixture: Fixture } | null>(null);
+  const [overrideResult, setOverrideResult] = useState<string>("home_win");
+  const [overrideSaving, setOverrideSaving] = useState(false);
 
   const fetchLeagues = useCallback(async () => {
     setLoading(true);
@@ -256,17 +262,46 @@ export default function LeagueManager() {
     setSaving(null);
   };
 
-  const overrideResult = async (leagueId: string, fixtureId: string, result: string) => {
+  const openOverride = (leagueId: string, fixture: Fixture) => {
+    setOverrideTarget({ leagueId, fixture });
+    setOverrideResult(fixture.result === "pending" ? "home_win" : fixture.result);
+  };
+
+  const closeOverride = () => {
+    setOverrideTarget(null);
+    setOverrideSaving(false);
+  };
+
+  const confirmOverride = async () => {
+    if (!overrideTarget) return;
+    const { leagueId, fixture } = overrideTarget;
+    setOverrideSaving(true);
     try {
       const res = await fetch(`/api/admin/leagues/${leagueId}/fixtures`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fixtureId, result }),
+        body: JSON.stringify({ fixtureId: fixture.id, result: overrideResult }),
       });
       if (res.ok) {
+        const resultLabel: Record<string, string> = {
+          home_win: `${playerName(fixture.home_player)} wins`,
+          away_win: `${playerName(fixture.away_player)} wins`,
+          draw: "Draw",
+          double_forfeit: "Double forfeit",
+          pending: "Reset to pending",
+        };
+        setActionMsg({ leagueId, type: "success", msg: `Result set: ${resultLabel[overrideResult] || overrideResult}` });
         fetchFixtures(leagueId);
+        closeOverride();
+        setTimeout(() => setActionMsg(null), 3000);
+      } else {
+        const err = await res.json();
+        setActionMsg({ leagueId, type: "error", msg: err.error || "Failed to override" });
       }
-    } catch {}
+    } catch (e: any) {
+      setActionMsg({ leagueId, type: "error", msg: e.message });
+    }
+    setOverrideSaving(false);
   };
 
   const statusColor = (status: string) => {
@@ -286,7 +321,7 @@ export default function LeagueManager() {
     return "bg-ccb-surface text-ccb-muted";
   };
 
-  const playerName = (p: any) => p?.display_name || p?.username || (p?.id ? p.id.slice(0, 8) : "—");
+
 
   if (loading) {
     return (
@@ -500,41 +535,53 @@ export default function LeagueManager() {
                                     </span>
                                   </div>
                                   <div className="divide-y divide-ccb-border">
-                                    {mdFixtures.map((f) => (
-                                      <div key={f.id} className="flex items-center gap-2 px-3 py-2 text-xs">
-                                        <div className="flex-1 flex items-center gap-2 min-w-0">
-                                          <span className={`truncate ${f.result === "home_win" ? "font-bold text-ccb-success" : f.result === "away_win" ? "text-ccb-muted" : ""}`}>
-                                            {playerName(f.home_player)}
+                                    {mdFixtures.map((f) => {
+                                      const resultBadge: Record<string, { label: string; class: string }> = {
+                                        home_win: { label: "1-0", class: "bg-ccb-success/10 text-ccb-success" },
+                                        away_win: { label: "0-1", class: "bg-ccb-success/10 text-ccb-success" },
+                                        draw: { label: "½-½", class: "bg-ccb-silver/10 text-ccb-silver" },
+                                        double_forfeit: { label: "FF", class: "bg-ccb-danger/10 text-ccb-danger" },
+                                        pending: { label: "—", class: "bg-ccb-surface text-ccb-muted" },
+                                      };
+                                      const badge = resultBadge[f.result] || resultBadge.pending;
+                                      return (
+                                        <div key={f.id} className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-ccb-surface/30">
+                                          <div className="flex-1 flex items-center gap-2 min-w-0">
+                                            <span className={`truncate ${f.result === "home_win" ? "font-bold text-ccb-success" : f.result === "away_win" ? "text-ccb-muted" : ""}`}>
+                                              {playerName(f.home_player)}
+                                            </span>
+                                            <span className="text-ccb-muted shrink-0 text-[10px]">vs</span>
+                                            <span className={`truncate ${f.result === "away_win" ? "font-bold text-ccb-success" : f.result === "home_win" ? "text-ccb-muted" : ""}`}>
+                                              {playerName(f.away_player)}
+                                            </span>
+                                          </div>
+                                          {/* Result badge */}
+                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${badge.class}`}>
+                                            {badge.label}
                                           </span>
-                                          <span className="text-ccb-muted shrink-0 text-[10px]">vs</span>
-                                          <span className={`truncate ${f.result === "away_win" ? "font-bold text-ccb-success" : f.result === "home_win" ? "text-ccb-muted" : ""}`}>
-                                            {playerName(f.away_player)}
-                                          </span>
+                                          {/* Admin override indicator */}
+                                          {f.admin_override && (
+                                            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-ccb-primary/10 text-ccb-primary shrink-0" title="Admin override">
+                                              <Shield className="w-2.5 h-2.5" />
+                                            </span>
+                                          )}
+                                          {f.scheduled_date && (
+                                            <span className="text-[9px] text-ccb-muted shrink-0 hidden sm:inline">
+                                              {new Date(f.scheduled_date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                                            </span>
+                                          )}
+                                          {/* Override button */}
+                                          <button
+                                            onClick={() => openOverride(league.id, f)}
+                                            className="text-[10px] px-2 py-1 rounded border border-ccb-border bg-ccb-surface text-ccb-muted hover:text-ccb-primary hover:border-ccb-primary/30 transition-colors shrink-0 flex items-center gap-1"
+                                            title="Set/override result"
+                                          >
+                                            <Settings className="w-3 h-3" />
+                                            {f.played ? "Edit" : "Set"}
+                                          </button>
                                         </div>
-                                        {f.played && (
-                                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-surface text-ccb-muted shrink-0">
-                                            {f.result === "home_win" ? "1-0" : f.result === "away_win" ? "0-1" : "½-½"}
-                                          </span>
-                                        )}
-                                        {f.scheduled_date && (
-                                          <span className="text-[9px] text-ccb-muted shrink-0 hidden sm:inline">
-                                            {new Date(f.scheduled_date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
-                                          </span>
-                                        )}
-                                        {/* Admin override dropdown */}
-                                        <select
-                                          value={f.result}
-                                          onChange={(e) => overrideResult(league.id, f.id, e.target.value)}
-                                          className="text-[10px] px-1.5 py-1 rounded border border-ccb-border bg-ccb-surface text-ccb-text shrink-0"
-                                          title="Override result"
-                                        >
-                                          <option value="pending">—</option>
-                                          <option value="home_win">Home Win</option>
-                                          <option value="away_win">Away Win</option>
-                                          <option value="draw">Draw</option>
-                                        </select>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               );
@@ -589,6 +636,162 @@ export default function LeagueManager() {
           );
         })
       )}
+      {/* Override Modal */}
+      {overrideTarget && (
+        <OverrideModal
+          fixture={overrideTarget.fixture}
+          currentResult={overrideResult}
+          onResultChange={setOverrideResult}
+          onConfirm={confirmOverride}
+          onClose={closeOverride}
+          saving={overrideSaving}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Override Modal
+// ============================================================
+function OverrideModal({
+  fixture,
+  currentResult,
+  onResultChange,
+  onConfirm,
+  onClose,
+  saving,
+}: {
+  fixture: Fixture;
+  currentResult: string;
+  onResultChange: (r: string) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+  saving: boolean;
+}) {
+  const homeName = playerName(fixture.home_player);
+  const awayName = playerName(fixture.away_player);
+  const resultLabel: Record<string, string> = {
+    home_win: `${homeName} wins`,
+    away_win: `${awayName} wins`,
+    draw: "Draw",
+    double_forfeit: "Double forfeit (0 pts each)",
+    pending: "Reset to pending (unplay)",
+  };
+  const isReset = currentResult === "pending";
+  const wasPlayed = fixture.played;
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-[90%] max-w-[380px] rounded-2xl border border-ccb-border bg-ccb-card shadow-2xl p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold">Override Result</h3>
+          <button onClick={onClose} className="text-ccb-muted hover:text-ccb-text p-1">
+            <XCircle className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Match info */}
+        <div className="rounded-lg bg-ccb-surface/50 border border-ccb-border p-3 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="text-center flex-1">
+              {fixture.home_player?.avatar_url ? (
+                <img src={fixture.home_player.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover mx-auto mb-1" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-ccb-primary/10 flex items-center justify-center mx-auto mb-1">
+                  <span className="text-[10px] font-bold text-ccb-primary">{homeName.slice(0, 2).toUpperCase()}</span>
+                </div>
+              )}
+              <p className="text-xs font-semibold truncate">{homeName}</p>
+              <p className="text-[9px] text-ccb-muted">Home</p>
+            </div>
+            <span className="text-[10px] text-ccb-muted px-2">vs</span>
+            <div className="text-center flex-1">
+              {fixture.away_player?.avatar_url ? (
+                <img src={fixture.away_player.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover mx-auto mb-1" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-ccb-primary/10 flex items-center justify-center mx-auto mb-1">
+                  <span className="text-[10px] font-bold text-ccb-primary">{awayName.slice(0, 2).toUpperCase()}</span>
+                </div>
+              )}
+              <p className="text-xs font-semibold truncate">{awayName}</p>
+              <p className="text-[9px] text-ccb-muted">Away</p>
+            </div>
+          </div>
+          <div className="text-center mt-2">
+            <span className="text-[10px] text-ccb-muted">Matchday {fixture.matchday}</span>
+            {wasPlayed && (
+              <span className="text-[10px] text-ccb-muted ml-2">
+                Current: <span className="font-semibold text-ccb-text">{resultLabel[fixture.result] || fixture.result}</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Result options */}
+        <div className="space-y-1.5 mb-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted mb-2">Select result</p>
+          {[
+            { value: "home_win", label: `${homeName} wins`, icon: Trophy },
+            { value: "away_win", label: `${awayName} wins`, icon: Trophy },
+            { value: "draw", label: "Draw", icon: CheckCircle },
+            { value: "double_forfeit", label: "Double forfeit (0 pts each)", icon: XCircle },
+            ...(wasPlayed ? [{ value: "pending", label: "Reset to pending (unplay)", icon: RotateCcw }] : []),
+          ].map((opt) => {
+            const Icon = opt.icon;
+            const active = currentResult === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => onResultChange(opt.value)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  active
+                    ? "bg-ccb-primary/15 text-ccb-primary border border-ccb-primary/40"
+                    : "bg-ccb-surface border border-ccb-border text-ccb-text hover:bg-ccb-surface/70"
+                }`}
+              >
+                <Icon className={`w-4 h-4 shrink-0 ${active ? "text-ccb-primary" : "text-ccb-muted"}`} />
+                <span>{opt.label}</span>
+                {active && <CheckCircle className="w-3.5 h-3.5 ml-auto text-ccb-primary" />}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Warning for reset */}
+        {isReset && wasPlayed && (
+          <div className="mb-3 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-500 flex items-start gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>Resetting will mark this fixture as unplayed and recalculate standings. Player stats will be updated.</span>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 px-3 py-2.5 rounded-lg bg-ccb-surface border border-ccb-border text-sm font-medium text-ccb-muted hover:text-ccb-text"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={saving}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50 ${
+              isReset
+                ? "bg-amber-500 text-white hover:opacity-90"
+                : "bg-ccb-primary text-white hover:opacity-90"
+            }`}
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {isReset ? "Reset" : "Confirm"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

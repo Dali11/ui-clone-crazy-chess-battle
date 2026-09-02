@@ -86,7 +86,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id: leagueId } = await params;
     const { fixtureId, result } = await req.json();
     if (!fixtureId) return NextResponse.json({ error: "Missing fixtureId" }, { status: 400 });
-    if (!result || !["home_win", "away_win", "draw", "pending"].includes(result)) {
+    if (!result || !["home_win", "away_win", "draw", "double_forfeit", "pending"].includes(result)) {
       return NextResponse.json({ error: "Invalid result" }, { status: 400 });
     }
 
@@ -98,6 +98,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .update({
         result,
         played,
+        admin_override: played,
         updated_at: new Date().toISOString(),
       })
       .eq("id", fixtureId)
@@ -105,11 +106,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Recalculate standings if a result was set
-    if (played) {
-      const { recalcStandings } = await import("@/lib/league/engine");
-      await recalcStandings(admin as any, leagueId);
-    }
+    // Recalculate standings whenever a result changes (set or reset)
+    const { recalcStandings } = await import("@/lib/league/engine");
+    await recalcStandings(admin as any, leagueId);
 
     try {
       await admin.from("admin_logs").insert({
