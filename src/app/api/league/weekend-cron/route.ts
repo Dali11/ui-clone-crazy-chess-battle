@@ -24,6 +24,21 @@ export async function POST(req: NextRequest) {
 
 async function handleWeekendCron(req: NextRequest) {
   try {
+    // ── Auth: only Vercel cron or admin can trigger this ──
+    const authHeader = req.headers.get("authorization");
+    const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+    
+    if (!isCron) {
+      // Also allow authenticated admin requests
+      const { createClient } = await import("@/lib/supabase/server");
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const admin = createAdminClient();
+      const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).single();
+      if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const admin = createAdminClient();
 
     // ── One-time migration: add league columns to games table ──

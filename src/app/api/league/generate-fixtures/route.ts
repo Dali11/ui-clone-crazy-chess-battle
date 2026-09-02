@@ -49,6 +49,11 @@ export async function POST(request: NextRequest) {
     const ids = playerIds || league.player_ids;
     if (!ids || ids.length < 2) return NextResponse.json({ error: "Need at least 2 players" }, { status: 400 });
 
+    // ── Idempotency: clear existing fixtures & standings before re-generating ──
+    // Prevents duplicate rows if fixture generation is triggered more than once.
+    await supabase.from("league_fixtures").delete().eq("league_id", league.id);
+    await supabase.from("league_standings").delete().eq("league_id", league.id);
+
     // Generate fixtures
     const fixturesData = generateRoundRobin(ids);
     const totalMatchdays = ids.length % 2 === 0 ? ids.length - 1 : ids.length;

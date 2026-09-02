@@ -112,15 +112,16 @@ export async function advanceLeagueMatchday(leagueId: string): Promise<{
     .eq("played", false);
 
   if (unplayed && unplayed.length > 0) {
-    // Mark unplayed fixtures as draws (could also be double-forfeit)
+    // Mark unplayed fixtures as double forfeit — neither player gets points.
+    // This is standard in competitive chess: non-appearance = loss for both.
     const fixtureIds = unplayed.map(f => f.id);
     for (const fid of fixtureIds) {
       await supabase
         .from("league_fixtures")
-        .update({ result: "draw", played: true, updated_at: new Date().toISOString() })
+        .update({ result: "double_forfeit", played: true, updated_at: new Date().toISOString() })
         .eq("id", fid);
     }
-    console.log(`[league] Auto-resolved ${fixtureIds.length} unplayed fixtures in matchday ${current} as draws`);
+    console.log(`[league] Auto-resolved ${fixtureIds.length} unplayed fixtures in matchday ${current} as double forfeits`);
   }
 
   // Advance to next matchday

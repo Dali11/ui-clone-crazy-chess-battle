@@ -127,6 +127,10 @@ function calcStandings(
     } else if (f.result === 'draw') {
       hs.draws++; hs.points += scoringConfig.drawPoints; as.draws++; as.points += scoringConfig.drawPoints;
       formMap.get(f.home_player_id)!.push('D'); formMap.get(f.away_player_id)!.push('D');
+    } else if (f.result === 'double_forfeit') {
+      // Both players played a game but neither gets points — non-appearance penalty
+      hs.played--; as.played--; // undo the played++ since double_forfeit shouldn't count as a game played
+      formMap.get(f.home_player_id)!.push('F'); formMap.get(f.away_player_id)!.push('F');
     }
   }
   for (const [pid, form] of formMap.entries()) {

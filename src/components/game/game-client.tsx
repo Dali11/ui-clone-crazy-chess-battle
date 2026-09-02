@@ -6,7 +6,7 @@ import { Chessboard } from "react-chessboard";
 import { customPieces } from "@/lib/game/piece-styles";
 import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
-import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Swords, RefreshCw } from "lucide-react";
+import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Swords, RefreshCw, Radio } from "lucide-react";
 import Link from "next/link";
 import { getCapturedPieces, getCheckSquare } from "@/lib/game/board-helpers";
 import { playSound, detectMoveSound, setSoundEnabled } from "@/lib/game/sound";
@@ -853,17 +853,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
             />
           )}
 
-          {/* Live position indicator — anchored to the board itself so it never covers the toolbar below */}
-          {!isLiveView && moveHistory.length > 0 && (
-            <div className="absolute inset-x-0 bottom-2 z-40 flex justify-center pointer-events-none">
-              <button
-                onClick={() => { setReviewFen(null); setViewPly(moveHistory.length); }}
-                className="pointer-events-auto px-4 py-1.5 rounded-full bg-ccb-primary text-white text-xs font-medium shadow-lg hover:bg-ccb-primary/90 transition-colors"
-              >
-                ← Return to live position
-              </button>
-            </div>
-          )}
+          {/* "Return to live" now lives in the toolbar — no floating overlay to block buttons */}
         </div>
       </div>
 
@@ -993,6 +983,14 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
             >
               <ChevronRight className="w-5 h-5" /><span className="text-[10px]">Forward</span>
             </button>
+            {!isLiveView && (
+              <button
+                onClick={() => { setReviewFen(null); setViewPly(moveHistory.length); }}
+                className="flex flex-col items-center gap-0.5 flex-1 py-1 text-ccb-primary"
+              >
+                <Radio className="w-5 h-5" /><span className="text-[10px] font-bold">Live</span>
+              </button>
+            )}
             <button
               onClick={() => toggleSheet("chat")}
               className={`relative flex flex-col items-center gap-0.5 flex-1 py-1 ${activeSheet === "chat" ? "text-ccb-primary" : "text-ccb-muted"}`}
