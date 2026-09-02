@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Crown, Trophy, ArrowUp, ArrowDown, Users, Calendar, RefreshCw,
   AlertCircle, Lock, Star, Award, Shield, ChevronRight, Sparkles,
-  TrendingUp, Medal, Swords, Target, CheckCircle, XCircle, Loader2,
+  TrendingUp, Medal, Swords, CheckCircle, XCircle, Loader2,
 } from 'lucide-react';
 
 interface LeagueStanding {
@@ -257,7 +257,7 @@ export default function PremiumLeaguesTab() {
   const hasMembershipGatedLeague = allLeagues.some(l => l.entry_type === 'membership');
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 space-y-4">
       {/* MEMBERSHIP GATE */}
       {!hasMembership && hasMembershipGatedLeague && !loading && (
         <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
@@ -280,28 +280,6 @@ export default function PremiumLeaguesTab() {
         </div>
       )}
 
-      {/* PLAYER JOURNEY */}
-      <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-3 flex items-center gap-1.5">
-          <Target className="w-3.5 h-3.5" /> Player Journey
-        </h3>
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-          {['Open Tournaments', 'Open League', 'Amateur', 'Bronze', 'Championship', 'Premier', 'Champion'].map((step, i, arr) => (
-            <div key={step} className="flex items-center gap-1.5 shrink-0">
-              <span className={`text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${
-                i === 0 ? 'bg-ccb-accent/10 text-ccb-accent' :
-                i === 1 ? 'bg-ccb-primary/10 text-ccb-primary' :
-                i === arr.length - 1 ? 'bg-ccb-primary text-white' :
-                'bg-ccb-surface text-ccb-muted'
-              }`}>
-                {step}
-              </span>
-              {i < arr.length - 1 && <ChevronRight className="w-3 h-3 text-ccb-muted shrink-0" />}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* LEAGUE CARDS */}
       {loading ? (
         <div className="space-y-4 animate-pulse">
@@ -322,6 +300,9 @@ export default function PremiumLeaguesTab() {
         </div>
       ) : (
         <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-ccb-muted px-1">
+            {leagues.length} League{leagues.length === 1 ? '' : 's'} Available
+          </h2>
           {leagues.map((league) => {
             const meta = getLeagueMeta(league.tier);
             const Icon = meta.icon;

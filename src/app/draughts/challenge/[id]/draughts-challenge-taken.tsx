@@ -9,7 +9,7 @@ interface PlayerInfo {
   rating?: number | null;
 }
 
-interface ChallengeTakenProps {
+interface DraughtsChallengeTakenProps {
   gameId: string;
   white: PlayerInfo;
   black: PlayerInfo;
@@ -17,32 +17,25 @@ interface ChallengeTakenProps {
   moveCount?: number;
 }
 
-/**
- * Spectator landing shown when a visitor opens a challenge link for a
- * game that's already in progress between two other players. Redesigned
- * to match the SpectatorLanding visual language used inside the live
- * game view: matchup with avatars/ratings, crossed swords, live pulse.
- */
-export default function ChallengeTaken({
+/** Spectator landing for a draughts challenge link whose game is already in progress. */
+export default function DraughtsChallengeTaken({
   gameId,
   white,
   black,
   timeControl,
   moveCount,
-}: ChallengeTakenProps) {
+}: DraughtsChallengeTakenProps) {
   const router = useRouter();
 
   return (
     <div className="flex items-center justify-center min-h-[60vh] px-4 py-8">
       <div className="w-full max-w-sm rounded-2xl border border-ccb-border bg-ccb-card shadow-2xl p-5">
-        {/* Spectator badge */}
         <div className="flex items-center justify-center gap-1.5 mb-4">
           <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-ccb-primary/10 text-ccb-primary">
             <Eye className="w-3 h-3" /> Spectating
           </span>
         </div>
 
-        {/* Matchup — crossed swords */}
         <div className="flex items-center justify-center gap-3 mb-4">
           <div className="flex flex-col items-center gap-1.5 flex-1">
             <div className="w-12 h-12 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden">
@@ -75,7 +68,6 @@ export default function ChallengeTaken({
           </div>
         </div>
 
-        {/* Meta row */}
         <div className="flex items-center justify-center gap-3 mb-5 text-[10px] text-ccb-muted">
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" /> {timeControl}
@@ -88,35 +80,18 @@ export default function ChallengeTaken({
           </span>
         </div>
 
-        {/* Primary action */}
         <button
-          onClick={() => router.push(`/game/${gameId}`)}
+          onClick={() => router.push(`/draughts/game/${gameId}`)}
           className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold bg-ccb-primary text-white hover:opacity-90 active:scale-[0.98] transition-all"
         >
           <Eye className="w-4 h-4" /> Watch Match
         </button>
 
-        {/* Secondary actions */}
-        <div className="flex gap-2 mt-2">
-          <button
-            onClick={() => router.push("/play")}
-            className="flex-1 flex items-center justify-center rounded-xl py-2.5 text-xs font-semibold bg-ccb-surface border border-ccb-border text-ccb-text hover:bg-ccb-surface/70 transition-colors"
-          >
-            New Game
-          </button>
-          <button
-            onClick={() => router.push("/battles")}
-            className="flex-1 flex items-center justify-center rounded-xl py-2.5 text-xs font-semibold bg-ccb-surface border border-ccb-border text-ccb-text hover:bg-ccb-surface/70 transition-colors"
-          >
-            Staked Battle
-          </button>
-        </div>
-
         <button
-          onClick={() => router.push("/")}
+          onClick={() => router.push("/draughts")}
           className="w-full flex items-center justify-center gap-2 text-xs text-ccb-muted hover:text-ccb-text transition-colors mt-4"
         >
-          <Home className="w-3.5 h-3.5" /> Back to Home
+          <Home className="w-3.5 h-3.5" /> Back to Draughts
         </button>
       </div>
     </div>

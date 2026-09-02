@@ -8,6 +8,7 @@ import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import ChallengeAccept from "./challenge-accept";
 import ChallengeTaken from "./challenge-taken";
+import ChallengeFinished from "./challenge-finished";
 import ChallengeWaiting from "./challenge-waiting";
 
 
@@ -66,7 +67,7 @@ export default async function ChallengePage({
     // Fetch the game to check its status
     const { data: game } = await admin
       .from("games")
-      .select("status, white_player_id, black_player_id")
+      .select("status, winner, move_count, white_player_id, black_player_id")
       .eq("id", challenge.game_id)
       .single();
 
@@ -75,31 +76,56 @@ export default async function ChallengePage({
       redirect(`/game/${challenge.game_id}`);
     }
 
-    // If the game is still in progress, show the "taken" view with options
-    if (game && game.status === "playing") {
-      // Fetch both player profiles for display
+    if (game) {
+      // Fetch both player profiles for display — avatars + ratings included
       const { data: whiteProfile } = await admin
         .from("profiles")
-        .select("username, display_name")
+        .select("username, display_name, rating, avatar_url")
         .eq("id", game.white_player_id)
         .single();
       const { data: blackProfile } = await admin
         .from("profiles")
-        .select("username, display_name")
+        .select("username, display_name, rating, avatar_url")
         .eq("id", game.black_player_id)
         .single();
 
+      const white = {
+        name: whiteProfile?.display_name || whiteProfile?.username || "Player 1",
+        avatarUrl: whiteProfile?.avatar_url || null,
+        rating: whiteProfile?.rating || null,
+      };
+      const black = {
+        name: blackProfile?.display_name || blackProfile?.username || "Player 2",
+        avatarUrl: blackProfile?.avatar_url || null,
+        rating: blackProfile?.rating || null,
+      };
+      const timeControl = `${challenge.initial_minutes}+${challenge.increment_seconds}`;
+
+      // Game still in progress — spectator landing
+      if (game.status === "playing") {
+        return (
+          <ChallengeTaken
+            gameId={challenge.game_id}
+            white={white}
+            black={black}
+            timeControl={timeControl}
+            moveCount={game.move_count || 0}
+          />
+        );
+      }
+
+      // Game already finished — show the result instead of a dead-end "expired" screen
       return (
-        <ChallengeTaken
+        <ChallengeFinished
           gameId={challenge.game_id}
-          challengerName={whiteProfile?.display_name || whiteProfile?.username || "Player 1"}
-          acceptorName={blackProfile?.display_name || blackProfile?.username || "Player 2"}
-          timeControl={`${challenge.initial_minutes}+${challenge.increment_seconds}`}
+          white={white}
+          black={black}
+          winnerSide={game.winner as "white" | "black" | null}
+          status={game.status}
+          timeControl={timeControl}
         />
       );
     }
-
-    // Game is finished — fall through to expired/unavailable view
   }
 
   if (challenge.status === "expired" || challenge.status === "cancelled") {

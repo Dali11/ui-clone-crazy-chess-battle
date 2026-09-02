@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import BattleChallengeAccept from "./battle-challenge-accept";
 import { getServerCurrency } from "@/lib/geo/server-currency";
 import ChallengeTaken from "@/app/challenge/[id]/challenge-taken";
+import ChallengeFinished from "@/app/challenge/[id]/challenge-finished";
 import BattleChallengeWaiting from "./battle-challenge-waiting";
 
 // Currency formatting via getServerCurrency
@@ -80,30 +81,55 @@ export default async function BattleChallengePage({
         redirect(`/game/${battle.game_id}`);
       }
 
-      // Check if the game is still in progress
+      // Check the game's current status — in progress or finished
       const { data: game } = await admin
         .from("games")
-        .select("status, white_player_id, black_player_id")
+        .select("status, winner, move_count, white_player_id, black_player_id")
         .eq("id", battle.game_id)
         .single();
 
-      if (game && game.status === "playing") {
+      if (game) {
         const { data: whiteProfile } = await admin
           .from("profiles")
-          .select("username, display_name")
+          .select("username, display_name, rating, avatar_url")
           .eq("id", game.white_player_id)
           .single();
         const { data: blackProfile } = await admin
           .from("profiles")
-          .select("username, display_name")
+          .select("username, display_name, rating, avatar_url")
           .eq("id", game.black_player_id)
           .single();
 
+        const white = {
+          name: whiteProfile?.display_name || whiteProfile?.username || "Player 1",
+          avatarUrl: whiteProfile?.avatar_url || null,
+          rating: whiteProfile?.rating || null,
+        };
+        const black = {
+          name: blackProfile?.display_name || blackProfile?.username || "Player 2",
+          avatarUrl: blackProfile?.avatar_url || null,
+          rating: blackProfile?.rating || null,
+        };
+
+        if (game.status === "playing") {
+          return (
+            <ChallengeTaken
+              gameId={battle.game_id}
+              white={white}
+              black={black}
+              timeControl="Battle"
+              moveCount={game.move_count || 0}
+            />
+          );
+        }
+
         return (
-          <ChallengeTaken
+          <ChallengeFinished
             gameId={battle.game_id}
-            challengerName={whiteProfile?.display_name || whiteProfile?.username || "Player 1"}
-            acceptorName={blackProfile?.display_name || blackProfile?.username || "Player 2"}
+            white={white}
+            black={black}
+            winnerSide={game.winner as "white" | "black" | null}
+            status={game.status}
             timeControl="Battle"
           />
         );

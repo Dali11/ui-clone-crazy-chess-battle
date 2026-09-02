@@ -18,6 +18,8 @@ import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import DraughtsChallengeAccept from "./draughts-challenge-accept";
 import DraughtsChallengeWaiting from "./draughts-challenge-waiting";
+import DraughtsChallengeTaken from "./draughts-challenge-taken";
+import DraughtsChallengeFinished from "./draughts-challenge-finished";
 
 export default async function DraughtsChallengePage({
   params,
@@ -51,7 +53,7 @@ export default async function DraughtsChallengePage({
   if (challenge.status === "accepted" && challenge.game_id) {
     const { data: game } = await admin
       .from("draughts_games")
-      .select("status, white_player_id, black_player_id")
+      .select("status, winner, move_count, white_player_id, black_player_id")
       .eq("id", challenge.game_id)
       .single();
 
@@ -59,22 +61,51 @@ export default async function DraughtsChallengePage({
       redirect(`/draughts/game/${challenge.game_id}`);
     }
 
-    if (game && game.status === "playing") {
-      const { data: whiteProfile } = await admin.from("profiles").select("username, display_name").eq("id", game.white_player_id).single();
-      const { data: blackProfile } = await admin.from("profiles").select("username, display_name").eq("id", game.black_player_id).single();
+    if (game) {
+      const { data: whiteProfile } = await admin
+        .from("profiles")
+        .select("username, display_name, draughts_rating, avatar_url")
+        .eq("id", game.white_player_id)
+        .single();
+      const { data: blackProfile } = await admin
+        .from("profiles")
+        .select("username, display_name, draughts_rating, avatar_url")
+        .eq("id", game.black_player_id)
+        .single();
+
+      const white = {
+        name: whiteProfile?.display_name || whiteProfile?.username || "Player 1",
+        avatarUrl: whiteProfile?.avatar_url || null,
+        rating: whiteProfile?.draughts_rating || null,
+      };
+      const black = {
+        name: blackProfile?.display_name || blackProfile?.username || "Player 2",
+        avatarUrl: blackProfile?.avatar_url || null,
+        rating: blackProfile?.draughts_rating || null,
+      };
+      const timeControl = `${challenge.initial_minutes}+${challenge.increment_seconds}`;
+
+      if (game.status === "playing") {
+        return (
+          <DraughtsChallengeTaken
+            gameId={challenge.game_id}
+            white={white}
+            black={black}
+            timeControl={timeControl}
+            moveCount={game.move_count || 0}
+          />
+        );
+      }
 
       return (
-        <div className="flex items-center justify-center min-h-[60vh] px-4">
-          <div className="card max-w-md w-full text-center space-y-4">
-            <h1 className="text-xl font-bold">Game Already Started!</h1>
-            <p className="text-sm text-ccb-muted">
-              {whiteProfile?.display_name || whiteProfile?.username || "Player 1"} vs{" "}
-              {blackProfile?.display_name || blackProfile?.username || "Player 2"} · {challenge.initial_minutes}+{challenge.increment_seconds}
-            </p>
-            <button onClick={() => window.location.href = `/draughts/game/${challenge.game_id}`} className="btn-primary">Watch the Match</button>
-            <button onClick={() => window.location.href = "/draughts"} className="btn-secondary w-full">Back to Draughts</button>
-          </div>
-        </div>
+        <DraughtsChallengeFinished
+          gameId={challenge.game_id}
+          white={white}
+          black={black}
+          winnerSide={game.winner as "white" | "black" | null}
+          status={game.status}
+          timeControl={timeControl}
+        />
       );
     }
   }
