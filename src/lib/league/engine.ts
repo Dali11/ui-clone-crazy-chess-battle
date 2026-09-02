@@ -140,23 +140,45 @@ function calcStandings(
   return standings;
 }
 
-function sortAndRank(standings: Map<string, any>, fixtures: LeagueFixture[]): any[] {
+function sortAndRank(
+  standings: Map<string, any>,
+  fixtures: LeagueFixture[],
+  scoringConfig: { winPoints: number; drawPoints: number; lossPoints: number }
+): any[] {
   const sorted = Array.from(standings.values());
   sorted.sort((a, b) => {
+    // 1. Points (descending)
     if (b.points !== a.points) return b.points - a.points;
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    if (a.points === b.points) {
-      const h2h = fixtures.filter(f => f.played && ((f.home_player_id === a.player_id && f.away_player_id === b.player_id) || (f.home_player_id === b.player_id && f.away_player_id === a.player_id)));
-      let aS = 0, bS = 0;
-      for (const f of h2h) {
-        if (f.result === 'home_win') { if (f.home_player_id === a.player_id) aS += 3; else bS += 3; }
-        else if (f.result === 'away_win') { if (f.away_player_id === a.player_id) aS += 3; else bS += 3; }
-        else if (f.result === 'draw') { aS++; bS++; }
+
+    // 2. Head-to-head — primary tiebreaker when points are equal
+    //    Uses the league's actual scoring config, not hardcoded values
+    const h2h = fixtures.filter(f => f.played && (
+      (f.home_player_id === a.player_id && f.away_player_id === b.player_id) ||
+      (f.home_player_id === b.player_id && f.away_player_id === a.player_id)
+    ));
+    let aS = 0, bS = 0;
+    for (const f of h2h) {
+      if (f.result === 'home_win') {
+        if (f.home_player_id === a.player_id) { aS += scoringConfig.winPoints; bS += scoringConfig.lossPoints; }
+        else { bS += scoringConfig.winPoints; aS += scoringConfig.lossPoints; }
+      } else if (f.result === 'away_win') {
+        if (f.away_player_id === a.player_id) { aS += scoringConfig.winPoints; bS += scoringConfig.lossPoints; }
+        else { bS += scoringConfig.winPoints; aS += scoringConfig.lossPoints; }
+      } else if (f.result === 'draw') {
+        aS += scoringConfig.drawPoints; bS += scoringConfig.drawPoints;
       }
-      if (aS !== bS) return bS - aS;
+      // double_forfeit: no points to either side — correct
     }
+    if (aS !== bS) return bS - aS;
+
+    // 3. Wins (descending)
+    if (b.wins !== a.wins) return b.wins - a.wins;
+
+    // 4. Goal difference = wins - losses (descending)
     const aGD = a.wins - a.losses, bGD = b.wins - b.losses;
     if (bGD !== aGD) return bGD - aGD;
+
+    // 5. Player ID (alphabetical — deterministic final tiebreaker)
     return a.player_id.localeCompare(b.player_id);
   });
   sorted.forEach((s, i) => { s.position = i + 1; });
@@ -178,7 +200,7 @@ export async function recalcStandings(supabase: SupabaseClient, leagueId: string
   const prevPositions = new Map<string, number>();
   (prevStandings || []).forEach((ps: any) => prevPositions.set(ps.player_id, ps.position || 0));
   const standings = calcStandings(playerIds, fixtures, sc);
-  const sorted = sortAndRank(standings, fixtures);
+  const sorted = sortAndRank(standings, fixtures, sc);
   for (const st of sorted) {
     st.league_id = leagueId;
     st.previous_position = prevPositions.get(st.player_id) || 0;
