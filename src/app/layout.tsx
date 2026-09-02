@@ -18,11 +18,11 @@ export const metadata: Metadata = {
     default: "Crazy Chess Battles — Play Competitive Chess Online & Win Prizes",
     template: "%s — Crazy Chess Battles",
   },
-  description: "Play competitive chess online in ranked battles, tournaments, and leagues. Challenge players worldwide in blitz, bullet, and rapid chess. Climb the leaderboard and win prizes.",
+  description: "Play competitive chess online in ranked battles, tournaments, and leagues. Challenge players worldwide in blitz, bullet, and rapid chess. Climb the league standings and win prizes.",
   keywords: [
     "online chess", "chess tournaments", "competitive chess", "play chess online",
     "chess battles", "chess league", "blitz chess", "bullet chess", "rapid chess",
-    "chess ranking", "chess prizes", "chess leaderboard", "chess app",
+    "chess ranking", "chess prizes", "chess leagues", "chess app",
     "international checkers", "draughts online",
   ],
   authors: [{ name: "Crazy Chess Battles" }],
@@ -92,7 +92,7 @@ const websiteSchema = {
   url: BASE_URL,
   potentialAction: {
     "@type": "SearchAction",
-    target: `${BASE_URL}/leaderboard?q={search_term_string}`,
+    target: `${BASE_URL}/league?q={search_term_string}`,
     "query-input": "required name=search_term_string",
   },
 };

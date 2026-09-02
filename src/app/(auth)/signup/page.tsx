@@ -92,7 +92,7 @@ export async function generateMetadata({
 
   return pageMetadata({
     title: "Sign Up — Join Crazy Chess Battles",
-    description: "Create your free Crazy Chess Battles account. Start playing competitive chess, join tournaments, and climb the global leaderboard.",
+    description: "Create your free Crazy Chess Battles account. Start playing competitive chess, join tournaments, and climb the league standings.",
     path: "/signup",
   });
 }

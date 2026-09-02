@@ -145,8 +145,8 @@ export default function TournamentsPage() {
             <Link href="/league" className="text-xs font-bold text-ccb-accent hover:underline flex items-center gap-1">
               <Crown className="w-3.5 h-3.5" /> Premium Leagues
             </Link>
-            <Link href="/leaderboard" className="text-xs font-bold text-ccb-muted hover:text-ccb-text flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5" /> Rankings
+            <Link href="/league" className="text-xs font-bold text-ccb-muted hover:text-ccb-text flex items-center gap-1">
+              <Crown className="w-3.5 h-3.5" /> Leagues
             </Link>
           </div>
         </div>

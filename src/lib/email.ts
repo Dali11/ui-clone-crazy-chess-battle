@@ -119,7 +119,7 @@ function wrapContent(title: string, bodyHtml: string, previewText?: string): str
                       &nbsp;\u00b7&nbsp;
                       <a href="${BASE_URL}/tournaments" style="color:#7c3aed;text-decoration:none;">Tournaments</a>
                       &nbsp;\u00b7&nbsp;
-                      <a href="${BASE_URL}/leaderboard" style="color:#7c3aed;text-decoration:none;">Leaderboard</a>
+                      <a href="${BASE_URL}/league" style="color:#7c3aed;text-decoration:none;">Leagues</a>
                     </p>
                     <p style="margin:0;font-size:11px;color:#6b7280;line-height:1.5;">
                       You received this email because you have an account at Crazy Chess Battles.<br>
@@ -190,7 +190,7 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
         body: `
           <h2 style="margin:0 0 16px;font-size:20px;color:#ffffff;">Welcome to the battlefield, ${data.username || "Player"}! \u2694\ufe0f</h2>
           <p style="margin:0 0 16px;font-size:15px;color:#9ca3af;line-height:1.6;">
-            Your account is ready. Join tournaments, challenge players worldwide, and climb the leaderboard.
+            Your account is ready. Join tournaments, challenge players worldwide, and climb the league standings.
           </p>
           ${infoBox("Your Username", data.username || "Player", "#7c3aed")}
           ${infoBox("Starting Rating", String(rating), "#f59e0b")}

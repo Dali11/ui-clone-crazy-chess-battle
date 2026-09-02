@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
-  Home, Swords, TrendingUp, User, Wallet, Shield, Coins, Gift,
+  Home, Swords, User, Wallet, Shield, Coins, Gift,
   Crown, Disc3, Menu, X, Trophy, Radio, Clock, Play, Settings,
 } from "lucide-react";
 import NotificationBell from "./notification-bell";
@@ -66,7 +66,6 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/league", label: "Leagues", icon: Crown },
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/live", label: "Live", icon: Radio },
-    { href: "/leaderboard", label: "Ranks", icon: TrendingUp },
   ];
 
   // Menu — categorized, ordered by relevance
@@ -86,7 +85,6 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         { href: "/league", label: "Premium Leagues", icon: Crown },
         { href: "/tournaments", label: "Tournaments", icon: Trophy },
         { href: "/live", label: "Live Matches", icon: Radio },
-        { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp },
       ],
     },
     {

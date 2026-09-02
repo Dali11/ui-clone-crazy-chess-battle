@@ -41,7 +41,7 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-5 space-y-1">
               <li>To provide and improve chess and draughts gameplay, matchmaking, and tournament features</li>
               <li>To process wallet deposits, entry fees, and withdrawals</li>
-              <li>To maintain leaderboards, ratings, league standings, and season rankings</li>
+              <li>To maintain league standings, ratings, and season rankings</li>
               <li>To verify identity and enforce division eligibility rules for competitive integrity</li>
               <li>To detect and prevent cheating and fraud</li>
               <li>To send essential account notifications (password resets, tournament updates)</li>

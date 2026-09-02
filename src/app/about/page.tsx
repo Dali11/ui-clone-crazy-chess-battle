@@ -24,7 +24,7 @@ export default function AboutPage() {
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <Link href="/league" className="btn-ghost text-sm hidden sm:inline-flex">Tournaments</Link>
-            <Link href="/leaderboard" className="btn-ghost text-sm">Leaderboard</Link>
+            <Link href="/league" className="btn-ghost text-sm">Leagues</Link>
             <Link href="/signup" className="btn-primary text-sm px-3 sm:px-4">Sign up</Link>
           </div>
         </div>
@@ -228,7 +228,7 @@ export default function AboutPage() {
           <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-ccb-muted flex-wrap justify-center">
             <Link href="/" className="hover:text-ccb-text transition-colors">Home</Link>
             <Link href="/how-it-works" className="hover:text-ccb-text transition-colors">How it Works</Link>
-            <Link href="/leaderboard" className="hover:text-ccb-text transition-colors">Leaderboard</Link>
+            <Link href="/league" className="hover:text-ccb-text transition-colors">Leagues</Link>
             <Link href="/league" className="hover:text-ccb-text transition-colors">Tournaments</Link>
             <Link href="/faq" className="hover:text-ccb-text transition-colors">FAQ</Link>
             <Link href="/about" className="hover:text-ccb-text transition-colors">About</Link>

@@ -12,7 +12,7 @@ import { pageMetadata } from "@/lib/seo/metadata";
 
 export const metadata = pageMetadata({
   title: "How It Works — Start Playing Competitive Chess",
-  description: "Learn how to join Crazy Chess Battles: create an account, play your first game, enter tournaments, climb the leaderboard, and prove your rank. A step-by-step guide.",
+  description: "Learn how to join Crazy Chess Battles: create an account, play your first game, enter tournaments, climb the league standings, and prove your rank. A step-by-step guide.",
   path: "/how-it-works",
 });
 
@@ -28,7 +28,7 @@ export default function HowItWorksPage() {
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <Link href="/league" className="btn-ghost text-sm hidden sm:inline-flex">Tournaments</Link>
-            <Link href="/leaderboard" className="btn-ghost text-sm">Leaderboard</Link>
+            <Link href="/league" className="btn-ghost text-sm">Leagues</Link>
             <Link href="/signup" className="btn-primary text-sm px-3 sm:px-4">Sign up</Link>
           </div>
         </div>
@@ -282,7 +282,7 @@ export default function HowItWorksPage() {
           </div>
           <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-ccb-muted flex-wrap justify-center">
             <Link href="/" className="hover:text-ccb-text transition-colors">Home</Link>
-            <Link href="/leaderboard" className="hover:text-ccb-text transition-colors">Leaderboard</Link>
+            <Link href="/league" className="hover:text-ccb-text transition-colors">Leagues</Link>
             <Link href="/league" className="hover:text-ccb-text transition-colors">Tournaments</Link>
             <Link href="/faq" className="hover:text-ccb-text transition-colors">FAQ</Link>
             <Link href="/about" className="hover:text-ccb-text transition-colors">About</Link>

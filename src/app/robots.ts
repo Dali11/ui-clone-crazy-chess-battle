@@ -12,7 +12,7 @@ export default function robots(): MetadataRoute.Robots {
           "/about",
           "/how-it-works",
           "/faq",
-          "/leaderboard",
+          "/league",
           "/league",
           "/tournaments",
           "/league/subscribe",

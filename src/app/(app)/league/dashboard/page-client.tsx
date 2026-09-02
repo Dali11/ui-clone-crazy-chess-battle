@@ -4,9 +4,8 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import {
-
-
   Trophy,
+  Crown,
   Swords,
   TrendingUp,
   Calendar,
@@ -310,11 +309,11 @@ export default function LeagueDashboardPage() {
             <span>Notifications</span>
           </Link>
           <Link
-            href="/leaderboard"
+            href="/league"
             className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-ccb-text bg-ccb-card hover:bg-ccb-surface border border-ccb-border rounded-xl transition-colors shadow-sm"
           >
-            <Trophy className="w-4 h-4 text-ccb-gold" />
-            <span>Leaderboard</span>
+            <Crown className="w-4 h-4 text-ccb-gold" />
+            <span>Leagues</span>
           </Link>
         </div>
       </div>

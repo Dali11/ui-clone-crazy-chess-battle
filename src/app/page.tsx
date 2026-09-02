@@ -18,7 +18,7 @@ import { pageMetadata } from "@/lib/seo/metadata";
 
 export const metadata = pageMetadata({
   title: "Crazy Chess Battles — Play Competitive Chess Online & Win Prizes",
-  description: "Compete in live chess tournaments, ranked battles, and leagues. Play blitz, bullet, and rapid chess against players worldwide. Climb the leaderboard and win real prizes.",
+  description: "Compete in live chess tournaments, ranked battles, and leagues. Play blitz, bullet, and rapid chess against players worldwide. Climb the league standings and win real prizes.",
   path: "/",
 });
 
@@ -63,7 +63,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <Link href="/league" className="btn-ghost text-sm hidden sm:inline-flex">Compete</Link>
-            <Link href="/leaderboard" className="btn-ghost text-sm">Ranks</Link>
+            <Link href="/league" className="btn-ghost text-sm">Leagues</Link>
             <Link href="/download" className="btn-ghost text-sm hidden sm:inline-flex items-center gap-1.5"><Download className="w-3.5 h-3.5" />App</Link>
             <Link href="/how-it-works" className="btn-ghost text-sm hidden sm:inline-flex">How it Works</Link>
             <Link href={signupUrl} className="btn-primary text-sm px-3 sm:px-4">Sign up</Link>
@@ -288,7 +288,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           </div>
           <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-ccb-muted">
             <Link href="/league" className="hover:text-ccb-text transition-colors">Compete</Link>
-            <Link href="/leaderboard" className="hover:text-ccb-text transition-colors">Ranks</Link>
+            <Link href="/league" className="hover:text-ccb-text transition-colors">Leagues</Link>
             <Link href="/how-it-works" className="hover:text-ccb-text transition-colors">How it Works</Link>
             <span>·</span>
             <Link href="/dashboard" className="hover:text-ccb-text transition-colors">Dashboard</Link>
