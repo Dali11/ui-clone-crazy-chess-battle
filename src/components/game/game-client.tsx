@@ -86,8 +86,15 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const [premovePromotion, setPremovePromotion] = useState<{ from: string; to: string } | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [legalMoveSquares, setLegalMoveSquares] = useState<string[]>([]);
-  const [premove, setPremove] = useState<{ from: string; to: string } | null>(null);
-  const premoveGuardRef = useRef(false);
+  // Premove queue — chess.com-style, unlimited length. Each entry plays on
+  // its own turn (first entry plays now, the rest stay queued for our
+  // subsequent turns as the opponent replies).
+  const [premoves, setPremoves] = useState<{ from: string; to: string }[]>([]);
+  // True once we've auto-played a premove this turn — prevents the queue
+  // effect from firing the whole chain back-to-back while the realtime
+  // hook's myTurn is still stale-true (it only flips after the server
+  // broadcast confirms the opponent replied).
+  const playedThisTurnRef = useRef(false);
   const [activeSheet, setActiveSheet] = useState<SheetType>(null);
   const [clockTick, setClockTick] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -343,21 +350,22 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         background: "radial-gradient(circle, rgba(139,92,246,0.4) 70%, transparent 72%)",
       };
     }
-    const activePremove = premove || premovePromotion;
-    if (activePremove) {
-      styles[activePremove.from] = {
-        ...styles[activePremove.from],
+    // Premove queue — every queued premove gets the amber highlight
+    const queuedPremoves = premovePromotion ? [...premoves, { from: premovePromotion.from, to: premovePromotion.to }] : premoves;
+    for (const p of queuedPremoves) {
+      styles[p.from] = {
+        ...styles[p.from],
         background: "radial-gradient(circle, rgba(251,191,36,0.4) 70%, transparent 72%)",
         boxShadow: "inset 0 0 0 3px rgba(251,191,36,0.6)",
       };
-      styles[activePremove.to] = {
-        ...styles[activePremove.to],
+      styles[p.to] = {
+        ...styles[p.to],
         background: "radial-gradient(circle, rgba(251,191,36,0.35) 70%, transparent 72%)",
         boxShadow: "inset 0 0 0 3px rgba(251,191,36,0.5)",
       };
     }
     return styles;
-  }, [lastMove, checkSquare, legalMoveSquares, selectedSquare, premove, premovePromotion, isLiveView]);
+  }, [lastMove, checkSquare, legalMoveSquares, selectedSquare, premoves, premovePromotion, isLiveView]);
 
   const getLiveClock = (player: "white" | "black") => {
     if (!game.last_move_at || !game.white_clock_ms || !game.black_clock_ms) return "—";
@@ -400,100 +408,94 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     return (piece.color === "w" && rank === "8") || (piece.color === "b" && rank === "1");
   }, [fen]);
 
+  // Generate OUR piece's move destinations even when it's not our turn.
+  // chess.js moves() only returns moves for the side to move, so during
+  // the opponent's turn our pieces would get an EMPTY move list — which is
+  // exactly why tap-to-move premoves never worked (drag premoves bypass
+  // the legal-move list entirely). Fix: swap the turn field in the FEN
+  // (and strip en-passant, which belongs to the opponent) and ask "if it
+  // were my turn right now, where could this piece go?" These are premove
+  // CANDIDATES only — every premove is re-validated against the real
+  // position when it actually executes, so pseudo-legal is fine here.
+  const getPremoveMoves = useCallback((square: string): string[] => {
+    try {
+      const parts = fen.split(" ");
+      parts[1] = isWhite ? "w" : "b";
+      parts[3] = "-";
+      const game = new Chess(parts.join(" "));
+      return game.moves({ square: square as any, verbose: true }).map((m: any) => m.to);
+    } catch {
+      return [];
+    }
+  }, [fen, isWhite]);
+
+  // PURE SELECTION LOGIC — never executes moves. react-chessboard fires
+  // onPieceClick AND the bubbled onSquareClick for the same piece tap on
+  // desktop, so executing here would double-fire every capture tap. All
+  // move and premove execution lives in handleSquareClick, which fires
+  // exactly once per tap.
   const handlePieceClick = useCallback(({ square, piece }: { square: string | null; piece: { pieceType: string } | null }) => {
     if (isSpectator || gameEnded || !isLiveView) return;
 
-    // Cancel premove by clicking anywhere (chess.com behavior)
-    if (premove && !square) {
-      setPremove(null);
-      setPremovePromotion(null);
-      return;
-    }
-
     if (!piece || !square) {
-      // Clicked empty board — cancel premove if set
-      if (premove) {
-        setPremove(null);
+      // Clicked empty board — clear selection, cancel queued premoves
+      if (premoves.length > 0 || premovePromotion) {
+        setPremoves([]);
         setPremovePromotion(null);
-      }
-      return;
-    }
-
-    // If we have a piece selected and click on a legal move target (capture), make the move
-    if (selectedSquare && square !== selectedSquare && legalMoveSquares.includes(square)) {
-      if (isPromotionMove(selectedSquare, square)) {
-        setPendingPromotion({ from: selectedSquare, to: square });
-      } else {
-        const prevFen = fen;
-        try {
-          const tempGame = new Chess(fen);
-          const move = tempGame.move({ from: selectedSquare, to: square, promotion: "q" });
-          if (move !== null) {
-            setFen(tempGame.fen());
-            setMoveHistory((prev) => [...prev, move.san]);
-            setViewPly((prev) => prev + 1);
-            setLastMove({ from: selectedSquare, to: square });
-            playSound(detectMoveSound(move));
-            if (tempGame.inCheck() && !tempGame.isCheckmate()) {
-              setTimeout(() => playSound("check"), 100);
-            }
-            makeMove(selectedSquare, square).then((res: any) => {
-              if (!res?.success) {
-                setFen(prevFen);
-                setMoveHistory((prev) => prev.slice(0, -1));
-                setViewPly((prev) => Math.max(0, prev - 1));
-                setLastMove(null);
-              }
-            });
-          }
-        } catch {}
       }
       setSelectedSquare(null);
       setLegalMoveSquares([]);
       return;
     }
 
-    // Premove via tap-to-move (when it's not our turn)
+    // Legal move target of the current selection — defer. The bubbled
+    // onSquareClick (handleSquareClick) executes it exactly once.
+    if (selectedSquare && square !== selectedSquare && legalMoveSquares.includes(square)) {
+      return;
+    }
+
+    // Premove selection via tap-to-move (when it's not our turn)
     if (!myTurn) {
       const game = new Chess(fen);
       const squarePiece = game.get(square as any);
       if (!squarePiece) return;
       const isMyPiece = (isWhite && squarePiece.color === "w") || (isBlack && squarePiece.color === "b");
       if (!isMyPiece) {
-        // Clicked opponent piece — cancel any existing premove
-        if (premove) {
-          setPremove(null);
+        // Clicked opponent piece — cancel any queued premoves
+        if (premoves.length > 0 || premovePromotion) {
+          setPremoves([]);
           setPremovePromotion(null);
         }
         return;
       }
-      // If we already have a premove set, and we click one of our pieces, start setting a new premove
-      // If we click the same piece that's part of premove, cancel the premove
-      if (premove && premove.from === square) {
-        setPremove(null);
+      // Clicked a piece that's part of a queued premove — cancel the whole
+      // queue (chess.com behavior: tap the premove piece to clear it).
+      if (premoves.some((p) => p.from === square || p.to === square)) {
+        setPremoves([]);
         setPremovePromotion(null);
         return;
       }
-      // Select piece for premove (tap-to-move)
+      // Select piece for a new premove. getPremoveMoves() generates our
+      // piece's destinations even though it's the opponent's turn —
+      // chess.js would otherwise return an empty list here, which is why
+      // tap premoves never registered.
       setSelectedSquare(square);
-      const moves = game.moves({ square: square as any, verbose: true });
-      setLegalMoveSquares(moves.map((m: any) => m.to));
+      setLegalMoveSquares(getPremoveMoves(square));
       return;
     }
 
-    // Not a legal move target — select the piece if it's ours
-    if (!myTurn) return;
+    // It's our turn — select the piece if it's ours
     const game = new Chess(fen);
     const squarePiece = game.get(square as any);
     if (!squarePiece) return;
     const isMyPiece = (isWhite && squarePiece.color === "w") || (isBlack && squarePiece.color === "b");
     if (!isMyPiece) {
-      // Clicked opponent piece without it being a legal capture — clear selection
+      // Clicked an opponent piece that isn't a capture target — deselect
       setSelectedSquare(null);
       setLegalMoveSquares([]);
       return;
     }
-    // Toggle: if clicking the same piece, deselect; otherwise select new piece
+    // Toggle: clicking the same piece deselects; otherwise select
     if (selectedSquare === square) {
       setSelectedSquare(null);
       setLegalMoveSquares([]);
@@ -502,47 +504,61 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     setSelectedSquare(square);
     const moves = game.moves({ square: square as any, verbose: true });
     setLegalMoveSquares(moves.map((m: any) => m.to));
-  }, [isSpectator, myTurn, gameEnded, fen, isWhite, isBlack, isLiveView, selectedSquare, legalMoveSquares, isPromotionMove, makeMove, premove]);
+  }, [isSpectator, myTurn, gameEnded, fen, isWhite, isBlack, isLiveView, selectedSquare, legalMoveSquares, premoves, premovePromotion, getPremoveMoves]);
 
+  // ALL move and premove execution lives here. react-chessboard fires
+  // onSquareClick exactly once per tap — for empty squares directly, and
+  // for piece squares via bubbling (on mobile the touch handler fires it
+  // directly and suppresses the synthetic click). Making this the single
+  // execution point guarantees a tap can never double-fire a move.
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
-    if (selectedSquare && square !== selectedSquare) {
-      if (legalMoveSquares.includes(square)) {
-        // If it's our turn, make the move; if not, set as premove
-        if (myTurn) {
-          if (isPromotionMove(selectedSquare, square)) {
-            setPendingPromotion({ from: selectedSquare, to: square });
-          } else {
-            try {
-              const tempGame = new Chess(fen);
-              const move = tempGame.move({ from: selectedSquare, to: square, promotion: "q" });
-              if (move !== null) {
-                setFen(tempGame.fen());
-                setMoveHistory((prev) => [...prev, move.san]);
-                setViewPly((prev) => prev + 1);
-                setLastMove({ from: selectedSquare, to: square });
-                playSound(detectMoveSound(move));
-                if (tempGame.inCheck() && !tempGame.isCheckmate()) {
-                  setTimeout(() => playSound("check"), 100);
-                }
-                makeMove(selectedSquare, square);
-              }
-            } catch {}
-          }
+    // Legal move target of the current selection — execute or queue
+    if (selectedSquare && square !== selectedSquare && legalMoveSquares.includes(square)) {
+      if (myTurn) {
+        if (isPromotionMove(selectedSquare, square)) {
+          setPendingPromotion({ from: selectedSquare, to: square });
         } else {
-          // Set premove via tap-to-move
-          if (isPromotionMove(selectedSquare, square)) {
-            setPremovePromotion({ from: selectedSquare, to: square });
-          } else {
-            setPremove({ from: selectedSquare, to: square });
-          }
+          const prevFen = fen;
+          try {
+            const tempGame = new Chess(fen);
+            const move = tempGame.move({ from: selectedSquare, to: square, promotion: "q" });
+            if (move !== null) {
+              setFen(tempGame.fen());
+              setMoveHistory((prev) => [...prev, move.san]);
+              setViewPly((prev) => prev + 1);
+              setLastMove({ from: selectedSquare, to: square });
+              playSound(detectMoveSound(move));
+              if (tempGame.inCheck() && !tempGame.isCheckmate()) {
+                setTimeout(() => playSound("check"), 100);
+              }
+              makeMove(selectedSquare, square).then((res: any) => {
+                if (!res?.success) {
+                  setFen(prevFen);
+                  setMoveHistory((prev) => prev.slice(0, -1));
+                  setViewPly((prev) => Math.max(0, prev - 1));
+                  setLastMove(null);
+                }
+              });
+            }
+          } catch {}
+        }
+      } else {
+        // Not our turn — queue a premove via tap-to-move. No limit on
+        // chain length (chess.com-style: keep stacking, each plays on its
+        // own turn).
+        if (isPromotionMove(selectedSquare, square)) {
+          setPremovePromotion({ from: selectedSquare, to: square });
+        } else {
+          setPremoves((prev) => [...prev, { from: selectedSquare, to: square }]);
         }
       }
       setSelectedSquare(null);
       setLegalMoveSquares([]);
-    } else {
-      handlePieceClick({ square, piece });
+      return;
     }
-  }, [selectedSquare, legalMoveSquares, isPromotionMove, fen, makeMove, handlePieceClick, myTurn]);
+    // Everything else (selection, deselect, premove cancel) — defer
+    handlePieceClick({ square, piece });
+  }, [selectedSquare, legalMoveSquares, myTurn, isPromotionMove, fen, makeMove, handlePieceClick]);
 
   const onDrop = useCallback(
     (sourceSquare: string, targetSquare: string): boolean => {
@@ -581,9 +597,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         return true;
       }
       if (!targetSquare) return false;
-      // Cancel existing premove if dragging the same piece back to its origin
-      if (premove && premove.from === sourceSquare && premove.to === targetSquare) {
-        setPremove(null);
+      // Dragging a piece onto its own queued premove target cancels the
+      // whole queue ("undo the premove")
+      if (premoves.some((p) => p.from === sourceSquare && p.to === targetSquare)) {
+        setPremoves([]);
         setPremovePromotion(null);
         return false;
       }
@@ -595,11 +612,17 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       if (isPromotionMove(sourceSquare, targetSquare)) {
         setPremovePromotion({ from: sourceSquare, to: targetSquare });
       } else {
-        setPremove({ from: sourceSquare, to: targetSquare });
+        // Queue the drag as a premove — no limit (chess.com-style chain).
+        // If this piece already has a queued premove, the new drag
+        // replaces it instead of leaving two destinations for one piece.
+        setPremoves((prev) => [
+          ...prev.filter((p) => p.from !== sourceSquare),
+          { from: sourceSquare, to: targetSquare },
+        ]);
       }
       return true;
     },
-    [isSpectator, myTurn, gameEnded, fen, makeMove, isPromotionMove, isWhite, isBlack, isLiveView, premove]
+    [isSpectator, myTurn, gameEnded, fen, makeMove, isPromotionMove, isWhite, isBlack, isLiveView, premoves]
   );
 
   const handlePromotionSelect = useCallback((piece: "q" | "r" | "b" | "n") => {
@@ -641,50 +664,71 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     setSoundEnabled(newVal);
   };
 
-  // Auto-execute premove when it becomes our turn.
+  // Auto-execute the premove queue when it becomes our turn — chess.com
+  // behavior: only the FIRST queued premove plays; the rest stay queued for
+  // our subsequent turns as the opponent replies. If the first premove is
+  // no longer legal (piece captured, self-check, etc.) the whole chain is
+  // cancelled — a broken chain shouldn't half-execute.
+  //
   // CRITICAL: use game.fen (from the realtime hook) not local fen.
   // When the opponent moves, game.fen is already updated in the same render
   // that flips myTurn to true, but local fen won't sync until a separate
   // effect runs on the NEXT render. Using local fen here means chess.js sees
   // the position where it's still the opponent's turn → move() returns null →
-  // premove is silently discarded before fen ever catches up.
+  // the premove is silently discarded before fen ever catches up.
+  //
+  // playedThisTurnRef guarantees we never play two of our own moves in one
+  // turn: myTurn stays true until the server broadcast confirms the opponent
+  // replied, and without this guard the effect would happily fire the whole
+  // queue back-to-back the moment setPremoves() re-triggers it.
   useEffect(() => {
-    if (myTurn && premove && !gameEnded && !premoveGuardRef.current) {
-      premoveGuardRef.current = true;
-      try {
-        const chess = new Chess(game.fen);
-        const move = chess.move({ from: premove.from, to: premove.to, promotion: "q" });
-        if (move !== null) {
-          setFen(chess.fen());
-          setMoveHistory((prev) => [...prev, move.san]);
-          setViewPly((prev) => prev + 1);
-          setLastMove({ from: premove.from, to: premove.to });
-          playSound(detectMoveSound(move));
-          if (chess.inCheck() && !chess.isCheckmate()) {
-            setTimeout(() => playSound("check"), 100);
-          }
-          makeMove(premove.from, premove.to).then((res: any) => {
-            if (!res?.success) {
-              // Premove rejected by server — board will auto-correct from server state
-            }
-          });
-        }
-        // If move === null, the premove is no longer legal on the new position
-        // (e.g. the piece was captured, or the move would be self-check).
-        // Silently cancel it — standard chess.com behavior.
-      } catch {
-        // Invalid position or move — cancel premove
-      }
-      setPremove(null);
-      // Reset guard after state update so future premoves work
-      setTimeout(() => { premoveGuardRef.current = false; }, 0);
+    if (!myTurn) {
+      playedThisTurnRef.current = false;
+      return;
     }
-    if (myTurn && premovePromotion && !gameEnded) {
-      // Premove was a promotion — show the promotion dialog now that it's our turn
+    if (gameEnded) return;
+    if (premovePromotion) {
+      // The queued premove is a promotion — show the picker now that it's
+      // actually our turn (same dialog as a normal promotion move).
       setPendingPromotion({ from: premovePromotion.from, to: premovePromotion.to });
       setPremovePromotion(null);
+      return;
     }
-  }, [myTurn, premove, premovePromotion, game.fen, gameEnded, makeMove]);
+    const first = premoves[0];
+    if (!first || playedThisTurnRef.current) return;
+    playedThisTurnRef.current = true;
+    try {
+      const chess = new Chess(game.fen);
+      const move = chess.move({ from: first.from, to: first.to, promotion: "q" });
+      if (move !== null) {
+        setFen(chess.fen());
+        setMoveHistory((prev) => [...prev, move.san]);
+        setViewPly((prev) => prev + 1);
+        setLastMove({ from: first.from, to: first.to });
+        playSound(detectMoveSound(move));
+        if (chess.inCheck() && !chess.isCheckmate()) {
+          setTimeout(() => playSound("check"), 100);
+        }
+        makeMove(first.from, first.to).then((res: any) => {
+          if (!res?.success) {
+            // Premove rejected by server — board will auto-correct from server state
+          }
+        });
+        // Executed — keep the rest of the queue for our next turns. Chained
+        // promotions beyond the first are auto-queened here (the picker only
+        // applies to a premove detectable at queue time; deeper chain entries
+        // can't be detected until their position actually exists).
+        setPremoves((prev) => prev.slice(1));
+        return;
+      }
+      // move === null → the premove is no longer legal on the new position
+      // (e.g. the piece was captured, or the move would be self-check).
+      // The chain is broken — cancel everything, standard chess.com behavior.
+    } catch {
+      // Invalid position or move — cancel the queue
+    }
+    setPremoves([]);
+  }, [myTurn, premoves, premovePromotion, game.fen, gameEnded, makeMove]);
 
   useEffect(() => {
     playSound("gameStart");

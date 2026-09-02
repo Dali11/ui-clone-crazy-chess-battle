@@ -79,8 +79,15 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [legalMoveSquares, setLegalMoveSquares] = useState<string[]>([]);
-  const [premove, setPremove] = useState<{ from: string; to: string } | null>(null);
+  // Premove queue — chess.com-style, unlimited length. Each entry plays on
+  // its own turn (first entry plays now, the rest stay queued as the engine
+  // replies between them).
+  const [premoves, setPremoves] = useState<{ from: string; to: string }[]>([]);
   const [premovePromotion, setPremovePromotion] = useState<{ from: string; to: string } | null>(null);
+  // True once we've auto-played a premove this turn — prevents the queue
+  // effect from firing the whole chain back-to-back while isPlayerTurn is
+  // still true before the engine's reply lands.
+  const playedThisTurnRef = useRef(false);
   const [activeSheet, setActiveSheet] = useState<SheetType>(null);
   const [viewPly, setViewPly] = useState(0);
   const [overlayDismissed, setOverlayDismissed] = useState(false);
@@ -131,21 +138,22 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
         background: "radial-gradient(circle, rgba(139,92,246,0.4) 70%, transparent 72%)",
       };
     }
-    // Premove highlight — amber/orange
-    if (premove) {
-      styles[premove.from] = {
-        ...styles[premove.from],
+    // Premove queue highlight — amber/orange on every queued premove
+    const queuedPremoves = premovePromotion ? [...premoves, { from: premovePromotion.from, to: premovePromotion.to }] : premoves;
+    for (const p of queuedPremoves) {
+      styles[p.from] = {
+        ...styles[p.from],
         background: "radial-gradient(circle, rgba(251,191,36,0.4) 70%, transparent 72%)",
         boxShadow: "inset 0 0 0 3px rgba(251,191,36,0.6)",
       };
-      styles[premove.to] = {
-        ...styles[premove.to],
+      styles[p.to] = {
+        ...styles[p.to],
         background: "radial-gradient(circle, rgba(251,191,36,0.35) 70%, transparent 72%)",
         boxShadow: "inset 0 0 0 3px rgba(251,191,36,0.5)",
       };
     }
     return styles;
-  }, [lastMove, checkSquare, legalMoveSquares, selectedSquare, premove, isLiveView]);
+  }, [lastMove, checkSquare, legalMoveSquares, selectedSquare, premoves, premovePromotion, isLiveView]);
 
   // Live clock tick
   useEffect(() => {
@@ -280,67 +288,113 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
     return (piece.color === "w" && rank === "8") || (piece.color === "b" && rank === "1");
   }, [fen]);
 
-  // Auto-execute premove when it becomes our turn
+  // Auto-execute the premove queue when it becomes our turn — chess.com
+  // behavior: only the FIRST queued premove plays; the rest stay queued for
+  // our subsequent turns as the engine replies. If the first premove is no
+  // longer legal, the whole chain is cancelled.
   useEffect(() => {
-    if (isPlayerTurn && premove && !gameEnded) {
-      try {
-        const game = new Chess(fen);
-        const move = game.move({ from: premove.from, to: premove.to, promotion: "q" });
-        if (move !== null) {
-          applyMove(premove.from, premove.to, "q");
-        }
-      } catch {}
-      setPremove(null);
+    if (!isPlayerTurn) {
+      playedThisTurnRef.current = false;
+      return;
     }
-    if (isPlayerTurn && premovePromotion && !gameEnded) {
+    if (gameEnded) return;
+    if (premovePromotion) {
+      // The queued premove is a promotion — show the picker now
       setPendingPromotion({ from: premovePromotion.from, to: premovePromotion.to });
       setPremovePromotion(null);
+      return;
     }
-  }, [isPlayerTurn, premove, premovePromotion, fen, gameEnded, applyMove, isPromotionMove]);
+    const first = premoves[0];
+    if (!first || playedThisTurnRef.current) return;
+    playedThisTurnRef.current = true;
+    try {
+      const game = new Chess(fen);
+      const move = game.move({ from: first.from, to: first.to, promotion: "q" });
+      if (move !== null) {
+        applyMove(first.from, first.to, "q");
+        // Executed — keep the rest of the queue for our next turns
+        setPremoves((prev) => prev.slice(1));
+        return;
+      }
+      // No longer legal — chain is broken, cancel everything
+    } catch {}
+    setPremoves([]);
+  }, [isPlayerTurn, premoves, premovePromotion, fen, gameEnded, applyMove]);
 
   // Handle piece click — show legal moves or capture (Tap-to-move)
+  // Generate OUR piece's move destinations even when it's not our turn.
+  // chess.js moves() only returns moves for the side to move, so during
+  // the engine's turn our pieces would get an EMPTY move list — which is
+  // exactly why tap-to-move premoves never worked (drag premoves bypass
+  // the legal-move list entirely). Swap the turn field in the FEN (and
+  // strip en-passant) to ask "if it were my turn right now, where could
+  // this piece go?" Premove candidates are re-validated against the real
+  // position when they execute, so pseudo-legal is fine here.
+  const getPremoveMoves = useCallback((square: string): string[] => {
+    try {
+      const parts = fen.split(" ");
+      parts[1] = isPlayerWhite ? "w" : "b";
+      parts[3] = "-";
+      const game = new Chess(parts.join(" "));
+      return game.moves({ square: square as any, verbose: true }).map((m: any) => m.to);
+    } catch {
+      return [];
+    }
+  }, [fen, isPlayerWhite]);
+
+  // PURE SELECTION LOGIC — never executes moves. react-chessboard fires
+  // onPieceClick AND the bubbled onSquareClick for the same piece tap on
+  // desktop, so executing here would double-fire every capture tap. All
+  // move/premove execution lives in handleSquareClick, which fires
+  // exactly once per tap.
+  // Handle piece click — show legal moves or premove selection (tap-to-move)
   const handlePieceClick = useCallback(({ square, piece }: { square: string | null; piece: { pieceType: string } | null }) => {
     if (gameEnded || !isLiveView) return;
-    if (!piece || !square) return;
 
-    // If we already have a piece selected and target square is a legal capture
-    if (selectedSquare && square !== selectedSquare && legalMoveSquares.includes(square)) {
-      if (isPromotionMove(selectedSquare, square)) {
-        setPendingPromotion({ from: selectedSquare, to: square });
-      } else {
-        applyMove(selectedSquare, square, "q");
-      }
+    if (!piece || !square) {
+      // Clicked empty board — clear selection, cancel queued premoves
+      if (premoves.length > 0 || premovePromotion) { setPremoves([]); setPremovePromotion(null); }
       setSelectedSquare(null);
       setLegalMoveSquares([]);
       return;
     }
 
-    // Premove via tap-to-move (when it's not our turn)
+    // Legal move target of the current selection — defer. The bubbled
+    // onSquareClick (handleSquareClick) executes it exactly once.
+    if (selectedSquare && square !== selectedSquare && legalMoveSquares.includes(square)) {
+      return;
+    }
+
+    // Premove selection via tap-to-move (when it's not our turn)
     if (!isPlayerTurn) {
       const game = new Chess(fen);
       const squarePiece = game.get(square as any);
       if (!squarePiece) {
-        if (premove) { setPremove(null); setPremovePromotion(null); }
+        if (premoves.length > 0 || premovePromotion) { setPremoves([]); setPremovePromotion(null); }
         return;
       }
       const isMyPiece = (isPlayerWhite && squarePiece.color === "w") || (!isPlayerWhite && squarePiece.color === "b");
       if (!isMyPiece) {
-        if (premove) { setPremove(null); setPremovePromotion(null); }
+        if (premoves.length > 0 || premovePromotion) { setPremoves([]); setPremovePromotion(null); }
         return;
       }
-      if (premove && premove.from === square) {
-        setPremove(null);
+      // Clicked a piece that's part of a queued premove — cancel the whole
+      // queue (chess.com behavior: tap the premove piece to clear it).
+      if (premoves.some((p) => p.from === square || p.to === square)) {
+        setPremoves([]);
         setPremovePromotion(null);
         return;
       }
+      // Select piece for a new premove. getPremoveMoves() generates our
+      // piece's destinations even though it's the engine's turn —
+      // chess.js would otherwise return an empty list here, which is why
+      // tap premoves never registered.
       setSelectedSquare(square);
-      const moves = game.moves({ square: square as any, verbose: true });
-      setLegalMoveSquares(moves.map((m: any) => m.to));
+      setLegalMoveSquares(getPremoveMoves(square));
       return;
     }
 
-    // Select the piece if it belongs to the player and it's their turn
-    if (!isPlayerTurn) return;
+    // Our turn — select the piece if it's ours
     const game = new Chess(fen);
     const squarePiece = game.get(square as any);
     if (!squarePiece) return;
@@ -350,7 +404,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
       setLegalMoveSquares([]);
       return;
     }
-    // Toggle: if clicking the same piece, deselect; otherwise select
+    // Toggle: clicking the same piece deselects; otherwise select
     if (selectedSquare === square) {
       setSelectedSquare(null);
       setLegalMoveSquares([]);
@@ -359,25 +413,40 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
     setSelectedSquare(square);
     const moves = game.moves({ square: square as any, verbose: true });
     setLegalMoveSquares(moves.map((m: any) => m.to));
-  }, [isPlayerTurn, gameEnded, fen, isPlayerWhite, isLiveView, selectedSquare, legalMoveSquares, isPromotionMove, applyMove, premove]);
+  }, [isPlayerTurn, gameEnded, fen, isPlayerWhite, isLiveView, selectedSquare, legalMoveSquares, premoves, premovePromotion, getPremoveMoves]);
 
+  // Handle square click — tap to move or delegate to piece click
+  // ALL move and premove execution lives here. react-chessboard fires
+  // onSquareClick exactly once per tap — for empty squares directly, and
+  // for piece squares via bubbling (on mobile the touch handler fires it
+  // directly and suppresses the synthetic click). Making this the single
+  // execution point guarantees a tap can never double-fire a move.
   // Handle square click — tap to move or delegate to piece click
   const handleSquareClick = useCallback(({ square, piece }: { square: string; piece: { pieceType: string } | null }) => {
     if (gameEnded || !isLiveView) return;
-    if (selectedSquare && square !== selectedSquare) {
-      if (legalMoveSquares.includes(square)) {
+    // Legal move target of the current selection — execute or queue
+    if (selectedSquare && square !== selectedSquare && legalMoveSquares.includes(square)) {
+      if (isPlayerTurn) {
         if (isPromotionMove(selectedSquare, square)) {
           setPendingPromotion({ from: selectedSquare, to: square });
         } else {
           applyMove(selectedSquare, square, "q");
         }
+      } else {
+        // Not our turn — queue a premove, unlimited chain length
+        if (isPromotionMove(selectedSquare, square)) {
+          setPremovePromotion({ from: selectedSquare, to: square });
+        } else {
+          setPremoves((prev) => [...prev, { from: selectedSquare, to: square }]);
+        }
       }
       setSelectedSquare(null);
       setLegalMoveSquares([]);
-    } else {
-      handlePieceClick({ square, piece });
+      return;
     }
-  }, [selectedSquare, legalMoveSquares, isPromotionMove, applyMove, handlePieceClick, gameEnded, isLiveView]);
+    // Everything else (selection, deselect, premove cancel) — defer
+    handlePieceClick({ square, piece });
+  }, [selectedSquare, legalMoveSquares, isPlayerTurn, isPromotionMove, applyMove, handlePieceClick, gameEnded, isLiveView]);
 
   // Player drop handler — drag and drop
   const onDrop = useCallback((sourceSquare: string, targetSquare: string): boolean => {
@@ -392,10 +461,12 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
       }
       return applyMove(sourceSquare, targetSquare, "q");
     }
-    // Not our turn — set a premove
+    // Not our turn — queue a premove
     if (!targetSquare) return false;
-    if (premove && premove.from === sourceSquare && premove.to === targetSquare) {
-      setPremove(null);
+    // Dragging a piece onto its own queued premove target cancels the
+    // whole queue ("undo the premove")
+    if (premoves.some((p) => p.from === sourceSquare && p.to === targetSquare)) {
+      setPremoves([]);
       setPremovePromotion(null);
       return false;
     }
@@ -407,10 +478,15 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
     if (isPromotionMove(sourceSquare, targetSquare)) {
       setPremovePromotion({ from: sourceSquare, to: targetSquare });
     } else {
-      setPremove({ from: sourceSquare, to: targetSquare });
+      // Queue the drag as a premove — no limit (chess.com-style chain).
+      // If this piece already has a queued premove, the new drag replaces it.
+      setPremoves((prev) => [
+        ...prev.filter((p) => p.from !== sourceSquare),
+        { from: sourceSquare, to: targetSquare },
+      ]);
     }
     return true;
-  }, [isPlayerTurn, gameEnded, isPromotionMove, applyMove, fen, isPlayerWhite, isLiveView, premove]);
+  }, [isPlayerTurn, gameEnded, isPromotionMove, applyMove, fen, isPlayerWhite, isLiveView, premoves]);
 
   // Handle promotion selection
   const handlePromotionSelect = useCallback((piece: "q" | "r" | "b" | "n") => {
@@ -468,7 +544,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
     setLastMove(null);
     setSelectedSquare(null);
     setLegalMoveSquares([]);
-    setPremove(null);
+    setPremoves([]);
     setPremovePromotion(null);
     setWhiteClock(initialMinutes * 60 * 1000);
     setBlackClock(initialMinutes * 60 * 1000);
