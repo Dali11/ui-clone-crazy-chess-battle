@@ -6,7 +6,7 @@ import { Chessboard } from "react-chessboard";
 import { customPieces } from "@/lib/game/piece-styles";
 import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
-import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Swords, RefreshCw, Radio } from "lucide-react";
+import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Swords, RefreshCw, Radio, Wifi, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { getCapturedPieces, getCheckSquare } from "@/lib/game/board-helpers";
 import { playSound, detectMoveSound, setSoundEnabled } from "@/lib/game/sound";
@@ -29,6 +29,38 @@ import { formatClock } from "./utils";
 import { moneySymbol } from "@/lib/geo/format";
 import type { BattleInfo, GameClientProps, SheetType } from "./types";
 import { STATUS_LABELS } from "./types";
+
+// Connection status indicator — chess.com-style: a tiny live icon in the
+// game header, nothing more. Green when the realtime socket is healthy,
+// amber-pulsing while it reconnects, red when the browser itself reports
+// no network (navigator.onLine + online/offline events, so it reacts to
+// the device's actual connection state, not just our socket heuristics).
+// Deliberately subtle: no banner, no pill, no text.
+function ConnectionStatus({ quality }: { quality: "online" | "reconnecting" | "offline" }) {
+  const [browserOnline, setBrowserOnline] = useState(true);
+
+  useEffect(() => {
+    setBrowserOnline(navigator.onLine);
+    const goOnline = () => setBrowserOnline(true);
+    const goOffline = () => setBrowserOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
+
+  const effective = !browserOnline ? "offline" : quality;
+
+  if (effective === "offline") {
+    return <WifiOff className="w-3.5 h-3.5 text-red-500 animate-pulse shrink-0" aria-label="No internet connection" />;
+  }
+  if (effective === "reconnecting") {
+    return <WifiOff className="w-3.5 h-3.5 text-amber-500 animate-pulse shrink-0" aria-label="Reconnecting" />;
+  }
+  return <Wifi className="w-3.5 h-3.5 text-emerald-500/70 shrink-0" aria-label="Connected" />;
+}
 
 
 export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo, tournamentId, countryCode }: GameClientProps) {
@@ -759,13 +791,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           {isSpectator && <Eye className="w-3.5 h-3.5 text-ccb-muted" />}
           <Swords className="w-3.5 h-3.5 text-ccb-primary" />
           <span className="text-sm font-bold text-ccb-text">Crazy Chess Battles</span>
-          {spectatorCount > 0 && !gameEnded && (
-            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-surface border border-ccb-border text-ccb-muted">
-              <Eye className="w-3 h-3" /> {spectatorCount}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-0.5">
+          <ConnectionStatus quality={connectionQuality} />
           <button
             onClick={() => window.location.reload()}
             className="p-1.5 -mr-1 text-ccb-muted hover:text-ccb-primary"
@@ -786,17 +814,12 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           <MoveScroller moves={moveHistory} currentPly={viewPly} onPlyChange={setViewPly} />
         </div>
 
-        {/* Reconnecting overlay — small pill, doesn't cover the whole bar */}
-        {connectionQuality === "reconnecting" && (
-          <div className="absolute top-0.5 right-3 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/95 border border-amber-500 text-black text-[11px] shadow-md">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
-            <span className="font-medium">Reconnecting…</span>
-            <button
-              onClick={() => window.location.reload()}
-              className="underline font-semibold shrink-0"
-            >
-              Refresh
-            </button>
+        {/* Spectator count — subtle muted text in the top of the moves slot
+            (the move scroller itself is pinned to the bottom). Moved out of
+            the game header to keep the header clean, chess.com-style. */}
+        {spectatorCount > 0 && !gameEnded && (
+          <div className="absolute top-0.5 right-3 z-10 flex items-center gap-1 text-[11px] text-ccb-muted pointer-events-none">
+            <Eye className="w-3 h-3" /> {spectatorCount} watching
           </div>
         )}
 
@@ -1089,11 +1112,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           </div>
           <div className="flex items-center gap-1.5">
             {isSpectator && <span className="flex items-center gap-1 text-xs text-ccb-muted"><Eye className="w-3.5 h-3.5" />Spectating</span>}
-            {spectatorCount > 0 && !gameEnded && (
-              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-surface border border-ccb-border text-ccb-muted">
-                <Eye className="w-3 h-3" /> {spectatorCount} {spectatorCount === 1 ? 'watching' : 'watching'}
-              </span>
-            )}
+            <ConnectionStatus quality={connectionQuality} />
             <Swords className="w-4 h-4 text-ccb-primary" />
             <span className="text-sm font-bold text-ccb-text">Crazy Chess Battles</span>
           </div>
