@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Chessboard } from "react-chessboard";
 import { customPieces } from "@/lib/game/piece-styles";
 import { Chess } from "chess.js";
@@ -34,12 +34,17 @@ import { STATUS_LABELS } from "./types";
 export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo, tournamentId, countryCode }: GameClientProps) {
   const { game, connected, connectionQuality, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw, spectatorCount } = useRealtimeGame(gameId, initialGame, currentUserId);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Skip the redundant spectator landing gate if the user already confirmed
+  // "Watch Match" once upstream (e.g. from the challenge-taken screen) —
+  // arriving here with ?spectate=1 means don't ask them to click again.
+  const skipSpectatorLanding = searchParams.get("spectate") === "1";
   const [fen, setFen] = useState(game.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [viewPly, setViewPly] = useState(0);
   const [victoryDismissed, setVictoryDismissed] = useState(false);
-  const [spectatorLandingDismissed, setSpectatorLandingDismissed] = useState(false);
+  const [spectatorLandingDismissed, setSpectatorLandingDismissed] = useState(skipSpectatorLanding);
 
   const [reviewFen, setReviewFen] = useState<string | null>(null);
   const [showResignConfirm, setShowResignConfirm] = useState(false);

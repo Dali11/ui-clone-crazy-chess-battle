@@ -90,7 +90,7 @@ export default function ChallengeTaken({
 
         {/* Primary action */}
         <button
-          onClick={() => router.push(`/game/${gameId}`)}
+          onClick={() => router.push(`/game/${gameId}?spectate=1`)}
           className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold bg-ccb-primary text-white hover:opacity-90 active:scale-[0.98] transition-all"
         >
           <Eye className="w-4 h-4" /> Watch Match
