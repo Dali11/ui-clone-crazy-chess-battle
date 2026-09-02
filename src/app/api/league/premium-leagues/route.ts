@@ -82,14 +82,15 @@ export async function GET(req: Request) {
       (leagues || []).map(async (league: any) => {
         let standings: any[] = [];
         let registrationCount = 0;
-        const playerCount = league.player_ids?.length || 0;
-
         const { count } = await admin
           .from('league_registrations')
           .select('*', { count: 'exact', head: true })
           .eq('league_id', league.id)
           .in('status', ['pending', 'approved']);
         registrationCount = count || 0;
+
+        // Use registration count as source of truth (player_ids can lag due to race conditions)
+        const playerCount = registrationCount;
 
         if (league.status === 'active' || league.status === 'completed') {
           const { data: standingRows } = await admin

@@ -164,13 +164,12 @@ export async function POST(request: NextRequest) {
 
       if (regError) throw regError;
 
-      // Add to player_ids
-      const currentPlayerIds = league.player_ids || [];
-      const updatedPlayerIds = [...currentPlayerIds, user.id];
-      await admin
-        .from('premier_leagues')
-        .update({ player_ids: updatedPlayerIds, updated_at: new Date().toISOString() })
-        .eq('id', leagueId);
+      // Atomically append to player_ids (avoids race condition with concurrent joins)
+      const { error: appendErr } = await admin.rpc('atomic_join_league', {
+        p_league_id: leagueId,
+        p_player_id: user.id,
+      });
+      if (appendErr) console.error('atomic_join_league failed:', appendErr);
 
       // ── MID-SEASON JOIN: generate fixtures for remaining matchdays ──
       if (isMidSeasonJoin) {
@@ -192,7 +191,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Get all current player IDs (including the new joiner)
-        const allPlayers = updatedPlayerIds;
+        // Re-fetch player_ids after the atomic append to get the full array
+        const { data: refreshedLeague } = await admin
+          .from('premier_leagues')
+          .select('player_ids')
+          .eq('id', leagueId)
+          .single();
+        const allPlayers = refreshedLeague?.player_ids || [...(league.player_ids || []), user.id];
 
         // Generate new fixtures: new player vs each existing player, for matchdays >= current
         // Only for matchdays that haven't been fully played yet

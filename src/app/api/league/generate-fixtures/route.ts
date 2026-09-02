@@ -46,6 +46,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
+
+    // Sync player_ids from registrations to ensure we have the latest roster
+    if (!playerIds) {
+      await supabase.rpc('sync_league_player_ids');
+      const { data: refreshed } = await supabase.from("premier_leagues").select("player_ids").eq("id", leagueId).single();
+      if (refreshed) league.player_ids = refreshed.player_ids;
+    }
+
     const ids = playerIds || league.player_ids;
     if (!ids || ids.length < 2) return NextResponse.json({ error: "Need at least 2 players" }, { status: 400 });
 

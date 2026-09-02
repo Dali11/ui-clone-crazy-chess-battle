@@ -60,11 +60,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       player: playersMap.get(r.player_id) || null,
     }));
 
+    const regCount = (registrations || []).filter((r: any) => r.status === 'pending' || r.status === 'approved').length;
+
     return NextResponse.json({
       success: true,
       league: { id: league.id, name: league.name, status: league.status, leagueSize: league.league_size },
       roster,
-      playerCount: (league.player_ids || []).length,
+      playerCount: regCount,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to fetch players" }, { status: 500 });

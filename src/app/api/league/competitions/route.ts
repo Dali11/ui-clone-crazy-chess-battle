@@ -52,8 +52,6 @@ export async function GET(request: NextRequest) {
     const tiered: Record<number, { men: any[]; women: any[]; open: any[] }> = {};
 
     for (const league of (leagues || [])) {
-      const playerCount = league.player_ids?.length || 0;
-
       let registrationCount = 0;
       if (league.status === 'registration') {
         const { count } = await admin
@@ -63,6 +61,8 @@ export async function GET(request: NextRequest) {
           .in('status', ['pending', 'approved']);
         registrationCount = count || 0;
       }
+      // Use registration count as source of truth
+      const playerCount = registrationCount || league.player_ids?.length || 0;
 
       // Build qualification checklist for logged-in users
       let qualification: any = { canJoin: false, reason: 'not_authenticated', status: 'guest' };

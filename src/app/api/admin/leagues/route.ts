@@ -23,9 +23,23 @@ export async function GET(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    const formatted = (leagues || []).map((league) => ({
+    // Fetch registration counts per league (source of truth)
+    const leagueIds = (leagues || []).map((l: any) => l.id);
+    let regCounts: Record<string, number> = {};
+    if (leagueIds.length > 0) {
+      const { data: regs } = await admin
+        .from("league_registrations")
+        .select("league_id")
+        .in("league_id", leagueIds)
+        .in("status", ["pending", "approved"]);
+      for (const r of regs || []) {
+        regCounts[r.league_id] = (regCounts[r.league_id] || 0) + 1;
+      }
+    }
+
+    const formatted = (leagues || []).map((league: any) => ({
       ...league,
-      participant_count: Array.isArray(league.player_ids) ? league.player_ids.length : 0,
+      participant_count: regCounts[league.id] || 0,
     }));
 
     return NextResponse.json(formatted);
