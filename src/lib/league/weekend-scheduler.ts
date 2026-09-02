@@ -1,3 +1,4 @@
+import { finalizeLeagueSeason } from "@/lib/league/season-end";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recalcStandings } from "@/lib/league/engine";
 
@@ -97,6 +98,9 @@ export async function advanceLeagueMatchday(leagueId: string): Promise<{
 
     // Recalculate final standings
     await recalcStandings(supabase as any, leagueId);
+
+    // Finalize season (promotions, relegations, payouts, archive, auto-renew)
+    await finalizeLeagueSeason(leagueId);
 
     return { success: true, leagueId, currentMatchday: total, status: "completed", message: "League season completed!" };
   }

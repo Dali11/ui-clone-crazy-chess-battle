@@ -76,7 +76,13 @@ async function getPlayers(supabase: SupabaseClient, playerIds: string[]): Promis
 // Round Robin Generation
 // ============================================================
 
-export function generateRoundRobin(playerIds: string[]): { matchday: number; home_player_id: string; away_player_id: string }[] {
+export function generateRoundRobin(
+  playerIds: string[],
+  doubleRoundRobin: boolean = false
+): { matchday: number; home_player_id: string; away_player_id: string }[] {
+  if (doubleRoundRobin) {
+    return generateDoubleRoundRobin(playerIds);
+  }
   const n = playerIds.length;
   if (n < 2) return [];
   const players = [...playerIds];
@@ -97,6 +103,24 @@ export function generateRoundRobin(playerIds: string[]): { matchday: number; hom
     arr.splice(1, 0, last);
   }
   return fixtures;
+}
+
+export function generateDoubleRoundRobin(
+  playerIds: string[]
+): { matchday: number; home_player_id: string; away_player_id: string }[] {
+  const firstLeg = generateRoundRobin(playerIds, false);
+  if (firstLeg.length === 0) return [];
+
+  const n = playerIds.length;
+  const totalRounds = n % 2 === 0 ? n - 1 : n;
+
+  const secondLeg = firstLeg.map((f) => ({
+    matchday: f.matchday + totalRounds,
+    home_player_id: f.away_player_id,
+    away_player_id: f.home_player_id,
+  }));
+
+  return [...firstLeg, ...secondLeg];
 }
 
 // ============================================================

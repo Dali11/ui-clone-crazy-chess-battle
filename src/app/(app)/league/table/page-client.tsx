@@ -15,8 +15,6 @@ import {
 } from 'lucide-react';
 import LeagueSubNav from '@/components/league/league-sub-nav';
 
-
-
 interface Player {
   id: string;
   username?: string;
@@ -46,6 +44,8 @@ interface LeagueInfo {
   name?: string;
   season_id?: string;
   qualifying_spots?: number;
+  promotes_count?: number;
+  relegates_count?: number;
   currentMatchday?: number;
   totalMatchdays?: number;
   status?: string;
@@ -91,7 +91,9 @@ export default function StandingsTablePage() {
   }, []);
 
   const league = data?.league;
-  const qualifyingSpots = league?.qualifying_spots ?? 4;
+  const promotesCount = league?.promotes_count ?? league?.qualifying_spots ?? 4;
+  const relegatesCount = league?.relegates_count ?? 0;
+  const totalPlayers = data?.standings?.length ?? 0;
   const currentMatchday = league?.currentMatchday ?? 1;
   const totalMatchdays = league?.totalMatchdays ?? 38;
 
@@ -167,7 +169,19 @@ export default function StandingsTablePage() {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-ccb-success inline-block" />
-            <span className="text-ccb-muted">Qualifying Zone (Top {qualifyingSpots})</span>
+            <span className="text-ccb-muted">
+              Promotion {promotesCount > 0 ? `(Top ${promotesCount})` : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-ccb-muted/40 border border-ccb-muted/40 inline-block" />
+            <span className="text-ccb-muted">Mid-table</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-ccb-danger inline-block" />
+            <span className="text-ccb-muted">
+              Relegation{relegatesCount > 0 ? ` (Bottom ${relegatesCount})` : ''}
+            </span>
           </div>
           <div className="h-3 w-px bg-ccb-surface hidden sm:block" />
           <div className="flex items-center gap-1">
@@ -269,18 +283,27 @@ export default function StandingsTablePage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-ccb-surface/60 text-xs sm:text-sm font-medium">
-              {filteredStandings.map((standing) => {
+              {filteredStandings.map((standing, index) => {
                 const pos = standing.position;
                 const prevPos = standing.previous_position;
-                const isChampion = pos === 1;
-                const isQualifying = !isChampion && pos <= qualifyingSpots;
+                const prevPosInStandings = index > 0 ? filteredStandings[index - 1].position : null;
 
-                // Border highlighting: Gold left border for 1st, Green left border for top N qualification spots
+                const isChampion = pos === 1;
+                const isPromotion = pos <= promotesCount;
+                const relegationStart = totalPlayers > 0 && relegatesCount > 0 ? totalPlayers - relegatesCount + 1 : null;
+                const isRelegation = relegationStart !== null && pos >= relegationStart;
+
+                const showPromotionSeparator = promotesCount > 0 && prevPosInStandings !== null && prevPosInStandings <= promotesCount && pos > promotesCount;
+                const showRelegationSeparator = relegationStart !== null && prevPosInStandings !== null && prevPosInStandings < relegationStart && pos >= relegationStart;
+
+                // Border highlighting: Gold left border for 1st, Green left border for promotion, Red left border for relegation
                 let borderClass = 'border-l-4 border-transparent';
                 if (isChampion) {
                   borderClass = 'border-l-4 border-ccb-accent bg-ccb-accent/[0.04]';
-                } else if (isQualifying) {
+                } else if (isPromotion) {
                   borderClass = 'border-l-4 border-ccb-success bg-ccb-success/[0.03]';
+                } else if (isRelegation) {
+                  borderClass = 'border-l-4 border-ccb-danger bg-ccb-danger/[0.03]';
                 }
 
                 // Movement calculation
@@ -312,116 +335,143 @@ export default function StandingsTablePage() {
                 const formList = (standing.form || []).slice(-5);
 
                 return (
-                  <tr
-                    key={standing.id || standing.player_id}
-                    onClick={() => handleRowClick(playerId)}
-                    className={`group hover:bg-ccb-surface/60 transition-colors cursor-pointer ${borderClass}`}
-                  >
-                    {/* Position */}
-                    <td className="py-3.5 px-3 text-center font-bold">
-                      {isChampion ? (
-                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-ccb-accent/20 text-ccb-accent border border-ccb-accent/40 text-xs font-black shadow-sm">
-                          1
-                        </span>
-                      ) : pos === 2 ? (
-                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-ccb-muted/20 text-ccb-text border border-ccb-muted/40 text-xs font-black">
-                          2
-                        </span>
-                      ) : pos === 3 ? (
-                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-ccb-accent/20 text-ccb-accent border border-ccb-accent/40 text-xs font-black">
-                          3
-                        </span>
-                      ) : (
-                        <span className="text-ccb-muted text-xs font-semibold">{pos}</span>
-                      )}
-                    </td>
-
-                    {/* Player Info */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-3">
-                        {/* Avatar */}
-                        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-ccb-surface border border-ccb-border shrink-0 flex items-center justify-center text-ccb-muted font-bold text-xs">
-                          {avatarUrl ? (
-                            <img
-                              src={avatarUrl}
-                              alt={displayName}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span>{displayName.charAt(0).toUpperCase()}</span>
-                          )}
-                        </div>
-
-                        {/* Name & Details */}
-                        <div className="flex flex-col min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-ccb-text group-hover:text-ccb-accent transition-colors truncate">
-                              {displayName}
+                  <React.Fragment key={standing.id || standing.player_id || index}>
+                    {showPromotionSeparator && (
+                      <tr className="bg-ccb-surface/30 border-y border-ccb-success/20 select-none">
+                        <td colSpan={9} className="py-2 px-4">
+                          <div className="flex items-center gap-3 text-[11px] font-bold text-ccb-success tracking-wider uppercase">
+                            <div className="h-px bg-ccb-success/30 flex-1" />
+                            <span className="shrink-0 flex items-center gap-1.5 bg-ccb-success/10 px-2.5 py-0.5 rounded-full border border-ccb-success/30">
+                              <ArrowUp className="w-3.5 h-3.5 text-ccb-success" /> Promotion Zone
                             </span>
-                            {country && (
-                              <span className="text-[10px] text-ccb-muted bg-ccb-surface px-1.5 py-0.5 rounded uppercase font-mono">
-                                {country}
+                            <div className="h-px bg-ccb-success/30 flex-1" />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {showRelegationSeparator && (
+                      <tr className="bg-ccb-surface/30 border-y border-ccb-danger/20 select-none">
+                        <td colSpan={9} className="py-2 px-4">
+                          <div className="flex items-center gap-3 text-[11px] font-bold text-ccb-danger tracking-wider uppercase">
+                            <div className="h-px bg-ccb-danger/30 flex-1" />
+                            <span className="shrink-0 flex items-center gap-1.5 bg-ccb-danger/10 px-2.5 py-0.5 rounded-full border border-ccb-danger/30">
+                              <ArrowDown className="w-3.5 h-3.5 text-ccb-danger" /> Relegation Zone
+                            </span>
+                            <div className="h-px bg-ccb-danger/30 flex-1" />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    <tr
+                      onClick={() => handleRowClick(playerId)}
+                      className={`group hover:bg-ccb-surface/60 transition-colors cursor-pointer ${borderClass}`}
+                    >
+                      {/* Position */}
+                      <td className="py-3.5 px-3 text-center font-bold">
+                        {isChampion ? (
+                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-ccb-accent/20 text-ccb-accent border border-ccb-accent/40 text-xs font-black shadow-sm">
+                            1
+                          </span>
+                        ) : pos === 2 ? (
+                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-ccb-muted/20 text-ccb-text border border-ccb-muted/40 text-xs font-black">
+                            2
+                          </span>
+                        ) : pos === 3 ? (
+                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-ccb-accent/20 text-ccb-accent border border-ccb-accent/40 text-xs font-black">
+                            3
+                          </span>
+                        ) : (
+                          <span className="text-ccb-muted text-xs font-semibold">{pos}</span>
+                        )}
+                      </td>
+
+                      {/* Player Info */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          {/* Avatar */}
+                          <div className="relative w-8 h-8 rounded-full overflow-hidden bg-ccb-surface border border-ccb-border shrink-0 flex items-center justify-center text-ccb-muted font-bold text-xs">
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={displayName}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span>{displayName.charAt(0).toUpperCase()}</span>
+                            )}
+                          </div>
+
+                          {/* Name & Details */}
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-ccb-text group-hover:text-ccb-accent transition-colors truncate">
+                                {displayName}
+                              </span>
+                              {country && (
+                                <span className="text-[10px] text-ccb-muted bg-ccb-surface px-1.5 py-0.5 rounded uppercase font-mono">
+                                  {country}
+                                </span>
+                              )}
+                            </div>
+                            {rating !== undefined && rating !== null && (
+                              <span className="text-[11px] text-ccb-accent/80 font-mono">
+                                {rating} ELO
                               </span>
                             )}
                           </div>
-                          {rating !== undefined && rating !== null && (
-                            <span className="text-[11px] text-ccb-accent/80 font-mono">
-                              {rating} ELO
-                            </span>
+                        </div>
+                      </td>
+
+                      {/* Played */}
+                      <td className="py-3.5 px-3 text-center text-ccb-muted font-semibold">{standing.played}</td>
+
+                      {/* Wins */}
+                      <td className="py-3.5 px-3 text-center text-ccb-success font-semibold">{standing.wins}</td>
+
+                      {/* Draws */}
+                      <td className="py-3.5 px-3 text-center text-ccb-muted font-semibold">{standing.draws}</td>
+
+                      {/* Losses */}
+                      <td className="py-3.5 px-3 text-center text-ccb-danger font-semibold">{standing.losses}</td>
+
+                      {/* Points */}
+                      <td className="py-3.5 px-3 text-center font-black text-ccb-accent text-base bg-ccb-accent/5">
+                        {standing.points}
+                      </td>
+
+                      {/* Form Pills */}
+                      <td className="py-3.5 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {formList.length === 0 ? (
+                            <span className="text-ccb-border text-xs font-mono">-</span>
+                          ) : (
+                            formList.map((res, i) => {
+                              const upperRes = (res || '').toUpperCase();
+                              let bg = 'bg-ccb-border text-white';
+                              if (upperRes === 'W') bg = 'bg-ccb-success text-white shadow-ccb-success/30';
+                              else if (upperRes === 'D') bg = 'bg-ccb-muted text-white shadow-ccb-muted/30';
+                              else if (upperRes === 'L') bg = 'bg-ccb-danger text-white shadow-ccb-danger/30';
+
+                              return (
+                                <span
+                                  key={i}
+                                  className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full font-extrabold text-[10px] sm:text-xs flex items-center justify-center shadow-sm ${bg}`}
+                                  title={upperRes === 'W' ? 'Win' : upperRes === 'D' ? 'Draw' : upperRes === 'L' ? 'Loss' : upperRes}
+                                >
+                                  {upperRes}
+                                </span>
+                              );
+                            })
                           )}
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Played */}
-                    <td className="py-3.5 px-3 text-center text-ccb-muted font-semibold">{standing.played}</td>
-
-                    {/* Wins */}
-                    <td className="py-3.5 px-3 text-center text-ccb-success font-semibold">{standing.wins}</td>
-
-                    {/* Draws */}
-                    <td className="py-3.5 px-3 text-center text-ccb-muted font-semibold">{standing.draws}</td>
-
-                    {/* Losses */}
-                    <td className="py-3.5 px-3 text-center text-ccb-danger font-semibold">{standing.losses}</td>
-
-                    {/* Points */}
-                    <td className="py-3.5 px-3 text-center font-black text-ccb-accent text-base bg-ccb-accent/5">
-                      {standing.points}
-                    </td>
-
-                    {/* Form Pills */}
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {formList.length === 0 ? (
-                          <span className="text-ccb-border text-xs font-mono">-</span>
-                        ) : (
-                          formList.map((res, i) => {
-                            const upperRes = (res || '').toUpperCase();
-                            let bg = 'bg-ccb-border text-white';
-                            if (upperRes === 'W') bg = 'bg-ccb-success text-white shadow-ccb-success/30';
-                            else if (upperRes === 'D') bg = 'bg-ccb-muted text-white shadow-ccb-muted/30';
-                            else if (upperRes === 'L') bg = 'bg-ccb-danger text-white shadow-ccb-danger/30';
-
-                            return (
-                              <span
-                                key={i}
-                                className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full font-extrabold text-[10px] sm:text-xs flex items-center justify-center shadow-sm ${bg}`}
-                                title={upperRes === 'W' ? 'Win' : upperRes === 'D' ? 'Draw' : upperRes === 'L' ? 'Loss' : upperRes}
-                              >
-                                {upperRes}
-                              </span>
-                            );
-                          })
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Position Movement */}
-                    <td className="py-3.5 px-3 text-center">
-                      {moveIcon}
-                    </td>
-                  </tr>
+                      {/* Position Movement */}
+                      <td className="py-3.5 px-3 text-center">
+                        {moveIcon}
+                      </td>
+                    </tr>
+                  </React.Fragment>
                 );
               })}
             </tbody>

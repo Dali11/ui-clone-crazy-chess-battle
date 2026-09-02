@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
-    const { leagueId, playerIds, name, country, seasonId, scoringConfig, seasonStartDate } = body;
+    const { leagueId, playerIds, name, country, seasonId, scoringConfig, seasonStartDate, doubleRoundRobin } = body;
 
     const supabase = createAdminClient();
 
@@ -55,8 +55,10 @@ export async function POST(request: NextRequest) {
     await supabase.from("league_standings").delete().eq("league_id", league.id);
 
     // Generate fixtures
-    const fixturesData = generateRoundRobin(ids);
-    const totalMatchdays = ids.length % 2 === 0 ? ids.length - 1 : ids.length;
+    const isDouble = !!doubleRoundRobin;
+    const fixturesData = generateRoundRobin(ids, isDouble);
+    const singleRounds = ids.length % 2 === 0 ? ids.length - 1 : ids.length;
+    const totalMatchdays = isDouble ? singleRounds * 2 : singleRounds;
 
     // Assign weekend dates to matchdays (4 matchdays per day, Sat + Sun)
     const startDate = seasonStartDate || DEFAULT_SEASON_START;

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Table2, CalendarDays } from "lucide-react";
+import { Table2, CalendarDays, History } from "lucide-react";
 
 const subNavItems = [
   { href: "/league/table", label: "Table", icon: Table2 },
   { href: "/league/matchday/1", label: "Fixtures", icon: CalendarDays },
+  { href: "/league/seasons", label: "Seasons", icon: History },
 ];
 
 export default function LeagueSubNav() {
@@ -16,9 +17,12 @@ export default function LeagueSubNav() {
     <div className="flex items-center gap-1">
       {subNavItems.map((item) => {
         const Icon = item.icon;
-        const isActive = item.href === "/league/table"
-          ? pathname === "/league/table"
-          : pathname.startsWith("/league/matchday");
+        const isActive =
+          item.href === "/league/table"
+            ? pathname === "/league/table"
+            : item.href === "/league/seasons"
+            ? pathname === "/league/seasons" || pathname.startsWith("/league/seasons/")
+            : pathname.startsWith("/league/matchday");
         return (
           <Link
             key={item.href}
