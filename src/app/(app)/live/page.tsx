@@ -192,7 +192,11 @@ function GameCard({ game, priority = false }: { game: LiveGame; priority?: boole
   const black = game.black_player;
   const whiteName = white?.display_name || white?.username || "White";
   const blackName = black?.display_name || black?.username || "Black";
-  const watchHref = `/game/${game.id}`;
+  // ?spectate=1 skips the in-game spectator landing gate — the user
+  // already expressed watch intent by clicking "Watch" here, so showing
+  // them a second "Watch Match" screen (with ad slot) felt like the page
+  // bounced back and forced a redundant second click.
+  const watchHref = `/game/${game.id}?spectate=1`;
 
   return (
     <div

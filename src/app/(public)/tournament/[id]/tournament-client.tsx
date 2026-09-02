@@ -946,7 +946,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       return (
                         <Link
                           key={g.id}
-                          href={`/game/${g.id}`}
+                          href={`/game/${g.id}?spectate=1`}
                           className={`group block relative overflow-hidden bg-ccb-card border rounded-2xl transition-all active:scale-[0.99] ${
                             isMyGame ? 'border-ccb-primary/50 shadow-lg shadow-ccb-primary/10' : 'border-ccb-border hover:border-ccb-primary/30'
                           }`}
@@ -1029,7 +1029,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                             return (
                               <Link
                                 key={r.id}
-                                href={`/game/${r.id}`}
+                                href={`/game/${r.id}?spectate=1`}
                                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-ccb-card border border-ccb-border hover:border-ccb-primary/30 transition-all group"
                               >
                                 <div className={`text-xs font-bold truncate flex-1 text-right ${whiteWon ? 'text-ccb-text' : isDraw ? 'text-ccb-muted' : 'text-ccb-muted/60'}`}>
@@ -1192,7 +1192,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                                     {pairing.result === 'draw' ? '½-½' : pairing.result === 'white' ? '1-0' : '0-1'}
                                   </span>
                                 ) : pairing.game_id ? (
-                                  <Link href={`/game/${pairing.game_id}`} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-ccb-primary text-white hover:bg-ccb-primary/90 transition-colors flex items-center gap-1">
+                                  <Link href={`/game/${pairing.game_id}?spectate=1`} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-ccb-primary text-white hover:bg-ccb-primary/90 transition-colors flex items-center gap-1">
                                     {currentPlayerId && (pairing.white === currentPlayerId || pairing.black === currentPlayerId) ? (
                                       <><Gamepad2 className="w-3.5 h-3.5" /> Play</>
                                     ) : (
@@ -1242,7 +1242,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                                   </span>
                                 ) : pairing.game_id ? (
                                   <Link
-                                    href={`/game/${pairing.game_id}`}
+                                    href={`/game/${pairing.game_id}?spectate=1`}
                                     className="text-xs font-bold px-3 py-1.5 rounded-lg bg-ccb-primary text-white hover:bg-ccb-primary/90 transition-colors flex items-center gap-1"
                                   >
                                     {currentPlayerId && (pairing.white === currentPlayerId || pairing.black === currentPlayerId) ? (

@@ -342,7 +342,7 @@ function BattleCard({ battle: b, expanded, onToggle, formatMWK, formatDate, acti
           <div className="flex items-center gap-2 shrink-0">
             {viewableGameId && (
               <a
-                href={`/game/${viewableGameId}`}
+                href={`/game/${viewableGameId}?spectate=1`}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
