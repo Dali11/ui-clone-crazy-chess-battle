@@ -18,6 +18,7 @@ import { type Withdrawal, type Stats, type UserInfo, type Deposit, type Tourname
 import { ActionButton, ConfigInput } from "./components/shared";
 import PlatformSettingsHub from "./components/platform-settings-hub";
 import BattlesAdminPanel from "./components/battles-admin-panel";
+import ResultOverrideModal from "./components/result-override-modal";
 import OverviewPanel from "./components/overview-panel";
 import TournamentsPanel from "./components/tournaments-panel";
 import WithdrawalsPanel from "./components/withdrawals-panel";
@@ -35,6 +36,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [overrideGame, setOverrideGame] = useState<GameInfo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminLeagues, setAdminLeagues] = useState<any[]>([]);
   const [marketConfigs, setMarketConfigs] = useState<any[]>([]);
@@ -803,26 +805,20 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     }
   };
 
-  const handleGameSetResult = async (gameId: string, winner: "white" | "black" | "draw", whiteName: string, blackName: string) => {
-    const winnerLabel = winner === "white" ? whiteName : winner === "black" ? blackName : "Draw";
-    const correcting = games.find(g => g.id === gameId)?.status === "completed";
-    const msg = correcting
-      ? `CORRECT RESULT: Override this game's result to ${winnerLabel}?\n\nThis will update the game record and settle any linked battle. The previous result will be replaced.`
-      : `Set result: ${winnerLabel}?\n\nThis will end the game and settle any linked battle.`;
-    if (!confirm(msg)) return;
-    setActionLoading(gameId);
+  const handleOverrideConfirm = async (winner: "white" | "black" | "draw") => {
+    if (!overrideGame) return;
+    const winnerLabel = winner === "white" ? overrideGame.white_username : winner === "black" ? overrideGame.black_username : "Draw";
+    setActionLoading(overrideGame.id);
     try {
       const res = await fetch("/api/admin/games", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gameId, action: "set_result", winner, note: `Admin manual override: ${winnerLabel}` }),
+        body: JSON.stringify({ gameId: overrideGame.id, action: "set_result", winner, note: `Admin manual override: ${winnerLabel}` }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       await fetchGames();
       showToast(`Result set: ${winnerLabel}`);
-    } catch (err: any) {
-      alert(err.message);
     } finally {
       setActionLoading(null);
     }
@@ -1286,27 +1282,12 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                               {actionLoading === g.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Abort"}
                             </button>
                           )}
-                          <span className="text-[10px] text-ccb-muted uppercase tracking-wider mr-1">Override:</span>
                           <button
-                            onClick={() => handleGameSetResult(g.id, "white", g.white_username, g.black_username)}
+                            onClick={() => setOverrideGame(g)}
                             disabled={actionLoading === g.id}
-                            className="text-xs px-2 py-1 rounded bg-ccb-surface border border-ccb-border text-ccb-text hover:bg-ccb-accent/10 hover:border-ccb-accent/30 disabled:opacity-50"
+                            className="text-xs px-3 py-1.5 rounded-lg bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/20 hover:bg-ccb-primary/20 disabled:opacity-50 font-semibold"
                           >
-                            ⚪ {g.white_username} Wins
-                          </button>
-                          <button
-                            onClick={() => handleGameSetResult(g.id, "black", g.white_username, g.black_username)}
-                            disabled={actionLoading === g.id}
-                            className="text-xs px-2 py-1 rounded bg-ccb-surface border border-ccb-border text-ccb-text hover:bg-ccb-accent/10 hover:border-ccb-accent/30 disabled:opacity-50"
-                          >
-                            ⚫ {g.black_username} Wins
-                          </button>
-                          <button
-                            onClick={() => handleGameSetResult(g.id, "draw", g.white_username, g.black_username)}
-                            disabled={actionLoading === g.id}
-                            className="text-xs px-2 py-1 rounded bg-ccb-surface border border-ccb-border text-ccb-text hover:bg-ccb-accent/10 hover:border-ccb-accent/30 disabled:opacity-50"
-                          >
-                            ½ Draw
+                            {actionLoading === g.id ? <Loader2 className="w-3 h-3 animate-spin" /> : (g.status === "completed" || g.status === "draw") ? "Correct Result" : "Set Result"}
                           </button>
                         </div>
                       )}
@@ -1624,6 +1605,12 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
         )}
         </div>
       </div>
+
+      <ResultOverrideModal
+        game={overrideGame}
+        onClose={() => setOverrideGame(null)}
+        onConfirm={handleOverrideConfirm}
+      />
     </div>
   );
 }
