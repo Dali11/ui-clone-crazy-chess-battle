@@ -21,8 +21,8 @@ export default async function HistoryPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?redirect=/history");
 
-  // Parallelize profile + games queries
-  const [profileRes, gamesRes] = await Promise.all([
+  // Parallelize profile + games + count queries
+  const [profileRes, gamesRes, countRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, username, display_name, rating, wins, losses, draws, games_played, avatar_url")
@@ -39,10 +39,15 @@ export default async function HistoryPage() {
       .or(`white_player_id.eq.${user.id},black_player_id.eq.${user.id}`)
       .order("created_at", { ascending: false })
       .limit(50),
+    supabase
+      .from("games")
+      .select("id", { count: "exact", head: true })
+      .or(`white_player_id.eq.${user.id},black_player_id.eq.${user.id}`),
   ]);
 
   const profile = profileRes.data;
   const games = gamesRes.data;
+  const totalCount = countRes.count ?? 0;
 
   // Get opponent profiles
   const opponentIds = new Set<string>();
@@ -64,6 +69,7 @@ export default async function HistoryPage() {
       games={games || []}
       opponentMap={Object.fromEntries(opponentMap)}
       currentUserId={user.id}
+      totalCount={totalCount}
     />
   );
 }

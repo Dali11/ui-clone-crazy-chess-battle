@@ -37,6 +37,7 @@ interface HistoryClientProps {
   games: GameRecord[];
   opponentMap: Record<string, Opponent>;
   currentUserId: string;
+  totalCount?: number;
 }
 
 type FilterType = "all" | "wins" | "losses" | "draws" | "tournaments" | "bot" | "review";
@@ -56,14 +57,21 @@ function gradientForName(name: string) {
   return AVATAR_GRADIENTS[hash];
 }
 
-export default function HistoryClient({ profile, games, opponentMap, currentUserId }: HistoryClientProps) {
+export default function HistoryClient({ profile, games, opponentMap, currentUserId, totalCount = 0 }: HistoryClientProps) {
   const [filter, setFilter] = useState<FilterType>("all");
+  const [extraGames, setExtraGames] = useState<GameRecord[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [extraOpponents, setExtraOpponents] = useState<Record<string, Opponent>>({});
+
+  const allGames = [...games, ...extraGames];
+  const allOpponents = { ...opponentMap, ...extraOpponents };
+  const hasMore = (games.length + extraGames.length) < totalCount;
 
   const BOT_USER_ID = "3699502b-57bf-498a-bc2d-11385fd9d317";
   const isBotGame = (g: GameRecord) => g.white_player_id === BOT_USER_ID || g.black_player_id === BOT_USER_ID;
 
   const filteredGames = useMemo(() => {
-    return games.filter((g) => {
+    return allGames.filter((g) => {
       const isWhite = g.white_player_id === currentUserId;
       const won = g.winner === (isWhite ? "white" : "black");
       const drew = g.status === "draw" || g.winner === "draw";
@@ -80,7 +88,7 @@ export default function HistoryClient({ profile, games, opponentMap, currentUser
   }, [games, filter, currentUserId]);
 
   const stats = useMemo(() => {
-    const completed = games.filter((g) => g.status !== "playing" && g.status !== "abort");
+    const completed = allGames.filter((g) => g.status !== "playing" && g.status !== "abort");
     const wins = completed.filter((g) => {
       const isWhite = g.white_player_id === currentUserId;
       return g.winner === (isWhite ? "white" : "black");
@@ -120,7 +128,7 @@ export default function HistoryClient({ profile, games, opponentMap, currentUser
     { id: "losses", label: "Losses", count: stats.losses },
     { id: "review", label: "🔍 Review", count: stats.losses },
     { id: "draws", label: "Draws", count: stats.draws },
-    { id: "bot", label: "vs Bot", count: games.filter((g) => isBotGame(g) && g.status !== "playing").length },
+    { id: "bot", label: "vs Bot", count: allGames.filter((g) => isBotGame(g) && g.status !== "playing").length },
     { id: "tournaments", label: "Tournaments", count: games.filter((g) => g.tournament_id).length },
   ];
 
@@ -194,7 +202,7 @@ export default function HistoryClient({ profile, games, opponentMap, currentUser
           {filteredGames.map((g) => {
             const isWhite = g.white_player_id === currentUserId;
             const oppId = isWhite ? g.black_player_id : g.white_player_id;
-            const opp = opponentMap[oppId];
+            const opp = allOpponents[oppId];
             const result = getResultInfo(g);
             const myRatingChange = isWhite ? g.white_rating_change : g.black_rating_change;
             const botGame = isBotGame(g);
@@ -243,6 +251,36 @@ export default function HistoryClient({ profile, games, opponentMap, currentUser
               </Link>
             );
           })}
+        </div>
+      )}
+
+      {/* Load more button */}
+      {hasMore && (
+        <div className="pt-2">
+          <button
+            onClick={async () => {
+              setLoadingMore(true);
+              try {
+                const offset = games.length + extraGames.length;
+                const res = await fetch(`/api/games/history?offset=${offset}&limit=50`);
+                const data = await res.json();
+                if (data.games) {
+                  setExtraGames((prev) => [...prev, ...data.games]);
+                  if (data.opponents) {
+                    setExtraOpponents((prev) => ({ ...prev, ...data.opponents }));
+                  }
+                }
+              } catch (e) {
+                console.error("Failed to load more games", e);
+              } finally {
+                setLoadingMore(false);
+              }
+            }}
+            disabled={loadingMore}
+            className="w-full py-3 rounded-xl bg-ccb-surface border border-ccb-border text-sm font-medium text-ccb-muted hover:text-ccb-text hover:bg-ccb-card transition-colors disabled:opacity-50"
+          >
+            {loadingMore ? "Loading..." : `Load more (${totalCount - games.length - extraGames.length} left)`}
+          </button>
         </div>
       )}
     </div>

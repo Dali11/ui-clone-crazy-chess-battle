@@ -1056,6 +1056,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
               <span>Board Theme</span>
               <Palette className="w-4 h-4 text-ccb-muted" />
             </button>
+            <Link href="/history" className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-ccb-surface transition-colors text-sm">
+              <span>Game History</span>
+              <Clock className="w-4 h-4 text-ccb-muted" />
+            </Link>
           </div>
         </div>
       )}
@@ -1068,9 +1072,14 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       <div className="flex flex-col gap-3 h-full overflow-hidden">
         {/* Header bar */}
         <div className="card flex items-center justify-between shrink-0 !p-3">
-          <Link href="/play" className="text-sm text-ccb-muted hover:text-ccb-primary flex items-center gap-1">
-            <ArrowLeft className="w-4 h-4" /> Back
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/play" className="text-sm text-ccb-muted hover:text-ccb-primary flex items-center gap-1">
+              <ArrowLeft className="w-4 h-4" /> Back
+            </Link>
+            <Link href="/history" className="text-sm text-ccb-muted hover:text-ccb-primary flex items-center gap-1">
+              <Clock className="w-4 h-4" /> History
+            </Link>
+          </div>
           <div className="flex items-center gap-1.5">
             {isSpectator && <span className="flex items-center gap-1 text-xs text-ccb-muted"><Eye className="w-3.5 h-3.5" />Spectating</span>}
             {spectatorCount > 0 && !gameEnded && (

@@ -84,6 +84,18 @@ export default async function DashboardPage() {
   const recentGames = recentGamesRes.data;
   const activeTournaments = activeTournamentsRes.data;
 
+  // Fetch opponent profiles for recent games display
+  const recentOpponentIds = new Set<string>();
+  for (const g of recentGames || []) {
+    if (g.white_player_id !== user!.id) recentOpponentIds.add(g.white_player_id);
+    if (g.black_player_id !== user!.id) recentOpponentIds.add(g.black_player_id);
+  }
+  const { data: recentOpponents } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, avatar_url")
+    .in("id", Array.from(recentOpponentIds));
+  const recentOpponentMap = new Map((recentOpponents || []).map((o) => [o.id, o]));
+
   const winRate = profile?.games_played
     ? Math.round(((profile.wins ?? 0) / profile.games_played) * 100)
     : 0;
@@ -182,7 +194,7 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Recent games */}
+        {/* Recent games — enriched with opponent info */}
         <div className="card p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-base sm:text-lg">Recent Games</h3>
@@ -192,23 +204,44 @@ export default async function DashboardPage() {
             <div className="space-y-2">
               {recentGames.map((game) => {
                 const isWhite = game.white_player_id === user!.id;
+                const oppId = isWhite ? game.black_player_id : game.white_player_id;
+                const opp = recentOpponentMap.get(oppId);
                 const won = game.winner === (isWhite ? "white" : "black");
                 const drew = game.status === "draw";
                 const aborted = game.status === "abort";
                 const result = won ? "W" : drew ? "D" : aborted ? "—" : "L";
                 const resultColor = won ? "text-ccb-success" : drew ? "text-ccb-silver" : aborted ? "text-ccb-muted" : "text-ccb-danger";
+                const resultBg = won ? "bg-ccb-success/10" : drew ? "bg-ccb-silver/10" : aborted ? "bg-ccb-muted/10" : "bg-ccb-danger/10";
+                const oppName = opp?.display_name || opp?.username || "Unknown";
 
                 return (
                   <Link
                     key={game.id}
                     href={`/game/${game.id}`}
-                    className="flex items-center justify-between rounded-lg bg-ccb-surface px-3 py-2.5 sm:px-4 sm:py-3 hover:bg-ccb-card transition-colors"
+                    className="flex items-center gap-2.5 rounded-lg bg-ccb-surface px-3 py-2.5 hover:bg-ccb-card transition-colors"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className={`text-sm font-bold w-5 ${resultColor}`}>{result}</span>
-                      <span className="text-sm capitalize">{game.time_control}</span>
+                    {/* Result badge */}
+                    <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${resultBg} ${resultColor} shrink-0`}>
+                      {result}
+                    </span>
+                    {/* Opponent avatar */}
+                    <div className="shrink-0">
+                      {opp?.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={opp.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-7 h-7 rounded-full bg-ccb-primary/20 flex items-center justify-center">
+                          <span className="text-[10px] font-bold text-ccb-primary">{oppName.charAt(0).toUpperCase()}</span>
+                        </div>
+                      )}
                     </div>
-                    <span className="text-xs text-ccb-muted">
+                    {/* Name + meta */}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">{oppName}</div>
+                      <div className="text-[11px] text-ccb-muted capitalize">{game.time_control} · {isWhite ? "White" : "Black"}</div>
+                    </div>
+                    {/* Date */}
+                    <span className="text-xs text-ccb-muted shrink-0">
                       {new Date(game.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                     </span>
                   </Link>
