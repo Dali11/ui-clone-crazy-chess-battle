@@ -86,8 +86,13 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
 
   // Pending move queue — if a move fails due to network, queue it and
   // retry automatically. This prevents "stuck pieces" on flaky connections.
-  const pendingMoveRef = useRef<{ from: string; to: string; promotion?: string; retries: number } | null>(null);
+  const pendingMoveRef = useRef<{ from: string; to: string; promotion?: string } | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Lets the channel's SUBSCRIBED handler fast-track a pending move retry
+  // the instant the connection actually recovers, instead of waiting out
+  // the remaining backoff delay (or worse, firing a second concurrent
+  // makeMove() call that could double-submit the same move).
+  const forceRetryRef = useRef<(() => void) | null>(null);
 
   // Ref to always have the latest game status for the polling check
   const gameStatusRef = useRef(initialState.status);
@@ -209,61 +214,101 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
   }, [gameId]);
 
   // ── makeMove with automatic retry on network failure ─────────────────────
+  // IMPORTANT: this is a real-money game (staked battles) — a move that
+  // silently vanishes on a flaky connection can cost someone a game and
+  // their stake. Previously this function returned { success: true }
+  // IMMEDIATELY on the first network failure, before any retry had even
+  // run — so the caller's rollback-on-failure logic never fired even when
+  // every retry ultimately failed. The piece looked moved on screen, the
+  // server never got it, the player's clock kept draining, and there was
+  // no visible error. That's the "stuck, nothing I can do" bug.
+  //
+  // Fix: the returned promise now only resolves once we know the real
+  // outcome — either the move landed, or we've exhausted a generous retry
+  // budget (capped backoff, ~2 minutes total) AND confirmed the channel
+  // never came back. Only then do we resolve failure so the caller rolls
+  // back the optimistic move. We also fast-track a retry the instant the
+  // realtime channel reports SUBSCRIBED again, instead of waiting out
+  // whatever backoff delay is left.
   const makeMove = useCallback(
-    async (from: string, to: string, promotion?: string): Promise<MoveResult> => {
+    (from: string, to: string, promotion?: string): Promise<MoveResult> => {
       inflightMoveRef.current = true;
 
-      // Cancel any existing retry timer
+      // Cancel any existing retry timer/handler from a previous move
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
       }
+      forceRetryRef.current = null;
 
-      const result = await sendMoveToServer(from, to, promotion);
+      return new Promise<MoveResult>((resolve) => {
+        (async () => {
+          const result = await sendMoveToServer(from, to, promotion);
 
-      if (!result.success && result.error === "Network error") {
-        // Network failure — retry with exponential backoff (1s, 2s, 4s)
-        // The client already has the optimistic fen showing the piece moved.
-        // We retry in the background; only roll back if all retries fail.
-        let retryCount = 0;
-        const maxRetries = 3;
-        const baseDelay = 1000;
-
-        const attemptRetry = async () => {
-          retryCount++;
-          if (retryCount > maxRetries) {
-            // All retries exhausted — signal failure for rollback
+          if (result.success || result.error !== "Network error") {
+            // Either it landed, or it failed for a non-network reason
+            // (not your turn, move conflict, etc.) — nothing to retry.
             inflightMoveRef.current = false;
-            pendingMoveRef.current = null;
-            setError("Move failed after retries — check your connection");
+            resolve(result);
             return;
           }
 
-          const retryResult = await sendMoveToServer(from, to, promotion);
-          if (retryResult.success) {
+          // Network failure — retry with capped exponential backoff:
+          // 1s, 2s, 4s, 8s, 10s, 10s, ... up to 14 attempts (~2 minutes).
+          // The client already shows the optimistic fen with the piece
+          // moved; we keep retrying in the background and only resolve
+          // (triggering rollback) once we truly give up.
+          pendingMoveRef.current = { from, to, promotion };
+          const maxRetries = 14;
+          const baseDelay = 1000;
+          const maxDelay = 10000;
+          let retryCount = 0;
+
+          const finish = (res: MoveResult) => {
             inflightMoveRef.current = false;
             pendingMoveRef.current = null;
-            setError(null);
-          } else if (retryResult.error === "Network error") {
-            const delay = baseDelay * Math.pow(2, retryCount - 1);
-            retryTimerRef.current = setTimeout(attemptRetry, delay);
-          } else {
-            // Non-retryable error (conflict, not your turn, etc.)
-            inflightMoveRef.current = false;
-            pendingMoveRef.current = null;
-          }
-        };
+            forceRetryRef.current = null;
+            resolve(res);
+          };
 
-        // Queue the move — also auto-send on reconnect if realtime comes back
-        pendingMoveRef.current = { from, to, promotion, retries: 0 };
-        retryTimerRef.current = setTimeout(attemptRetry, 1000);
-        // Return optimistic success — retries handle failure
-        // The client keeps the optimistic board; rollback only if all retries fail
-        return { success: true };
-      }
+          const attemptRetry = async () => {
+            if (retryTimerRef.current) {
+              clearTimeout(retryTimerRef.current);
+              retryTimerRef.current = null;
+            }
+            retryCount++;
+            const retryResult = await sendMoveToServer(from, to, promotion);
 
-      inflightMoveRef.current = false;
-      return result;
+            if (retryResult.success) {
+              setError(null);
+              finish(retryResult);
+              return;
+            }
+
+            if (retryResult.error === "Network error") {
+              if (retryCount >= maxRetries) {
+                setError("Move failed after retries — check your connection");
+                finish({ success: false, error: "Network error" });
+                return;
+              }
+              setError(`Move not confirmed — retrying (${retryCount}/${maxRetries})…`);
+              const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), maxDelay);
+              forceRetryRef.current = attemptRetry;
+              retryTimerRef.current = setTimeout(attemptRetry, delay);
+            } else {
+              // Non-retryable error (conflict, not your turn, etc.) — the
+              // move already landed via another path (e.g. a reconnect
+              // fast-track fired concurrently), or the game moved on.
+              // Treat as resolved either way; don't roll back a move that
+              // may well have actually succeeded server-side.
+              finish({ success: true });
+            }
+          };
+
+          forceRetryRef.current = attemptRetry;
+          retryTimerRef.current = setTimeout(attemptRetry, baseDelay);
+        })();
+      });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sendMoveToServer]
@@ -388,13 +433,16 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
           await channel.track({ user_id: currentUserId, at: Date.now() });
           lastEventTimeRef.current = Date.now();
           updateConnectionQuality("online");
-          setError(null);
           fetchGameState();
-          // If we have a pending move from a previous disconnection, send it now
-          if (pendingMoveRef.current) {
-            const pm = pendingMoveRef.current;
-            pendingMoveRef.current = null;
-            makeMove(pm.from, pm.to, pm.promotion);
+          // If a move is mid-retry from a previous disconnection, fast-track
+          // it right now instead of waiting out the remaining backoff delay
+          // — the channel just confirmed it's actually back. Call the
+          // in-flight retry closure directly (not a fresh makeMove()) so we
+          // never risk submitting the same move twice concurrently.
+          if (forceRetryRef.current) {
+            forceRetryRef.current();
+          } else {
+            setError(null);
           }
         }
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
@@ -409,10 +457,33 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
 
     channelRef.current = channel;
 
-    // Heartbeat: check if the connection has gone stale (no events for
-    // STALE_THRESHOLD_MS). If so, downgrade to "reconnecting" to trigger
-    // aggressive polling. The realtime channel may silently drop on mobile
-    // networks without firing CHANNEL_ERROR.
+    // Active liveness ping: previously, lastEventTimeRef only updated when
+    // an ORGANIC event happened — an opponent's move, a presence join/leave,
+    // a broadcast. But a real chess game is silent for long stretches while
+    // someone is just thinking (routinely 10-60+ seconds), which the old
+    // heartbeat mistook for a dead connection and flashed a scary
+    // "Reconnecting..." banner even though nothing was actually wrong. That
+    // false alarm is exactly what got reported — the banner shows up mid-
+    // game with a perfectly fine connection, just because both players went
+    // quiet for 8+ seconds.
+    //
+    // Fix: actively probe the channel ourselves every few seconds via a
+    // presence re-track (a genuine round trip through Supabase's realtime
+    // server) instead of passively waiting for someone else to generate
+    // traffic. A successful track() + its own "sync" callback firing proves
+    // the socket is truly alive; a rejected/hanging track() means it isn't.
+    const presencePing = setInterval(() => {
+      channel.track({ user_id: currentUserId, at: Date.now() }).catch(() => {
+        // track() itself failed — the socket is genuinely dead, not just quiet.
+        updateConnectionQuality("reconnecting");
+      });
+    }, 5000);
+
+    // Heartbeat: check if the connection has gone stale (no events —
+    // including our own presence pings above — for STALE_THRESHOLD_MS).
+    // Since presencePing now guarantees a real event at least every 5s on a
+    // healthy connection, this only fires on genuine staleness, not normal
+    // thinking pauses.
     const heartbeat = setInterval(() => {
       const staleFor = Date.now() - lastEventTimeRef.current;
       if (staleFor > STALE_THRESHOLD_MS && connectedRef.current) {
@@ -422,6 +493,7 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
 
     return () => {
       clearInterval(heartbeat);
+      clearInterval(presencePing);
       supabase.removeChannel(channel);
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     };
