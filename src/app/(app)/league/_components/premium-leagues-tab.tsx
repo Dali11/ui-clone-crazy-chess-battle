@@ -257,7 +257,7 @@ export default function PremiumLeaguesTab() {
   const hasMembershipGatedLeague = allLeagues.some(l => l.entry_type === 'membership');
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 space-y-4">
+    <div className="space-y-3">
       {/* MEMBERSHIP GATE */}
       {!hasMembership && hasMembershipGatedLeague && !loading && (
         <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
@@ -300,9 +300,6 @@ export default function PremiumLeaguesTab() {
         </div>
       ) : (
         <div className="space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-ccb-muted px-1">
-            {leagues.length} League{leagues.length === 1 ? '' : 's'} Available
-          </h2>
           {leagues.map((league) => {
             const meta = getLeagueMeta(league.tier);
             const Icon = meta.icon;
