@@ -17,6 +17,7 @@ import { useRematch } from "@/hooks/use-rematch";
 import MoveScroller from "./move-scroller";
 import CapturedPieces from "./captured-pieces";
 import VictoryOverlay, { type GameOutcome, type RematchState } from "./victory-overlay";
+import SpectatorLanding from "./spectator-landing";
 import PromotionDialog from "./promotion-dialog";
 import BoardThemePicker from "./board-theme-picker";
 import OpeningBadge from "./opening-badge";
@@ -38,6 +39,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [viewPly, setViewPly] = useState(0);
   const [victoryDismissed, setVictoryDismissed] = useState(false);
+  const [spectatorLandingDismissed, setSpectatorLandingDismissed] = useState(false);
 
   const [reviewFen, setReviewFen] = useState<string | null>(null);
   const [showResignConfirm, setShowResignConfirm] = useState(false);
@@ -847,8 +849,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
               blackName={blackName}
               whiteAvatar={whiteAvatar}
               blackAvatar={blackAvatar}
-              whiteRating={game.white_rating}
-              blackRating={game.black_rating}
+              whiteRating={game.white_rating ?? undefined}
+              blackRating={game.black_rating ?? undefined}
               overlay
             />
           )}
@@ -1149,6 +1151,18 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         </div>
 
         <PromotionDialog visible={!!pendingPromotion} color={isWhite ? "white" : "black"} onSelect={handlePromotionSelect} onCancel={() => setPendingPromotion(null)} />
+        <SpectatorLanding
+          visible={isSpectator && !gameEnded && !spectatorLandingDismissed}
+          whiteName={whiteName}
+          blackName={blackName}
+          whiteAvatar={whiteAvatar}
+          blackAvatar={blackAvatar}
+          whiteRating={game.white_rating ?? undefined}
+          blackRating={game.black_rating ?? undefined}
+          timeControl={game.time_control}
+          moveCount={game.move_count}
+          onWatch={() => setSpectatorLandingDismissed(true)}
+        />
         <VictoryOverlay
           visible={gameEnded && !victoryDismissed}
           outcome={(game.status === "abort" ? "abort" : game.winner === null ? "draw" : game.winner === (isWhite ? "white" : "black") ? "win" : "loss") as GameOutcome}
