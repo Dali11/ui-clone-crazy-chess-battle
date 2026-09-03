@@ -49,7 +49,7 @@ async function handleTournamentCron(req: NextRequest) {
 
     const admin = createAdminClient();
     const now = new Date().toISOString();
-    const results = { started: 0, advanced: 0, finished: 0, errors: [] as string[] };
+    const results = { started: 0, advanced: 0, finished: 0, recovered: 0, errors: [] as string[] };
 
     // ── 0. AUTO-RESUME: Resume paused tournaments whose resume_at has passed ──
     const { data: toResume } = await admin
@@ -957,6 +957,35 @@ async function handleTournamentCron(req: NextRequest) {
       (results as any).gamesStarted = gameIds.length;
     }
 
+    // ── 3A. WAITING-GAME SWEEP: The waiting → playing transition only
+    // happens when a player opens the board (game/state route). If neither
+    // player ever loads the game, it sits in "waiting" forever — no sweep
+    // covers it and its tournament pairing never gets a result, which stalls
+    // the round indefinitely. Transition any scheduled game whose start
+    // time has passed; the no-show sweep below then resolves it (the player
+    // on move who never showed loses on time/no-show) and the result gets
+    // recorded like any other game.
+    {
+      const { data: waitingGames } = await admin
+        .from("games")
+        .select("id")
+        .eq("status", "waiting")
+        .not("scheduled_start", "is", null)
+        .lte("scheduled_start", now)
+        .limit(200);
+      for (const g of waitingGames || []) {
+        try {
+          await admin
+            .from("games")
+            .update({ status: "playing", last_move_at: now })
+            .eq("id", g.id)
+            .eq("status", "waiting");
+        } catch (e: any) {
+          results.errors.push(`Waiting-game ${g.id}: ${e.message}`);
+        }
+      }
+    }
+
     // ── 3B. NO-SHOW AUTO-RESIGN SWEEP (ALL GAMES): If a game has been
     // "playing" for 2+ minutes and the player whose turn it is hasn't made
     // their FIRST move (move_count 0 = white no-show, move_count 1 = black
@@ -1096,6 +1125,94 @@ async function handleTournamentCron(req: NextRequest) {
       }
     }
     (results as any).timedOut = timedOut;
+
+    // ── 4B. RESULT RECONCILIATION SWEEP: Recover tournament pairings that
+    // never got a result recorded even though their game reached a terminal
+    // status (e.g. a transient error while processing the result — the
+    // processor logs and swallows, and nothing ever retried). One stranded
+    // pairing stalls the whole round forever. This scans only the current
+    // round of each active non-arena tournament, finds pairings with no
+    // result whose linked game has ended, and reprocesses them (idempotent
+    // by construction: it only touches pairings whose result is still null).
+    {
+      const { data: activeNonArena } = await admin
+        .from("tournaments")
+        .select("id, name, type, current_round")
+        .eq("status", "active")
+        .neq("type", "arena")
+        .limit(100);
+
+      for (const t of activeNonArena || []) {
+        try {
+          const { data: round } = await admin
+            .from("tournament_rounds")
+            .select("id, pairings")
+            .eq("tournament_id", t.id)
+            .eq("round_number", t.current_round || 1)
+            .maybeSingle();
+          if (!round?.pairings) continue;
+
+          const stranded = (round.pairings as Array<Record<string, any>>).filter(
+            (p) => (p.result === null || p.result === undefined) && p.game_id
+          );
+          if (stranded.length === 0) continue;
+
+          const gameIds = stranded.map((p) => p.game_id);
+          const { data: endedGames } = await admin
+            .from("games")
+            .select("id, white_player_id, black_player_id, winner, status")
+            .in("id", gameIds)
+            .in("status", ["checkmate", "stalemate", "draw", "resign", "timeout"]);
+
+          for (const g of endedGames || []) {
+            try {
+              await processTournamentGameResult({
+                gameId: g.id,
+                whitePlayerId: g.white_player_id,
+                blackPlayerId: g.black_player_id,
+                winner: (g.winner || "draw") as "white" | "black" | "draw",
+                status: g.status,
+              });
+              results.recovered++;
+              console.log(`[reconcile] Recovered result for game ${g.id} in "${t.name}" round ${t.current_round}`);
+            } catch (e: any) {
+              results.errors.push(`Reconcile game ${g.id} (${t.name}): ${e.message}`);
+            }
+          }
+
+          // Stranded Armageddon tiebreaks: pairing sits at result "draw" with
+          // a tiebreak_game_id whose game already ended. Safe to reprocess —
+          // it just rewrites the same pairing result.
+          const pendingTiebreaks = (round.pairings as Array<Record<string, any>>).filter(
+            (p) => p.result === "draw" && p.tiebreak_game_id
+          );
+          if (pendingTiebreaks.length > 0) {
+            const { data: endedTiebreaks } = await admin
+              .from("games")
+              .select("id, white_player_id, black_player_id, winner, status")
+              .in("id", pendingTiebreaks.map((p) => p.tiebreak_game_id))
+              .in("status", ["checkmate", "stalemate", "draw", "resign", "timeout"]);
+            for (const g of endedTiebreaks || []) {
+              try {
+                await processTournamentGameResult({
+                  gameId: g.id,
+                  whitePlayerId: g.white_player_id,
+                  blackPlayerId: g.black_player_id,
+                  winner: (g.winner || "draw") as "white" | "black" | "draw",
+                  status: g.status,
+                });
+                results.recovered++;
+                console.log(`[reconcile] Recovered tiebreak result for game ${g.id} in "${t.name}" round ${t.current_round}`);
+              } catch (e: any) {
+                results.errors.push(`Reconcile tiebreak ${g.id} (${t.name}): ${e.message}`);
+              }
+            }
+          }
+        } catch (e: any) {
+          results.errors.push(`Reconcile round ${t.current_round} of "${t.name}": ${e.message}`);
+        }
+      }
+    }
 
     // ── 5. RE-CHECK AUTO-ADVANCE: If timeouts just completed a round, advance now ──
     if (timedOut > 0) {

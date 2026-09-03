@@ -189,15 +189,22 @@ async function _processTournamentGameResult(result: GameResult) {
 
   // ─── Normal decisive result (or non-knockout draw) ───
   const pairings = existingRound.pairings as Array<Record<string, unknown>>;
-  const updatedPairings = pairings.map((p) => {
-    if (
-      (p.white === result.whitePlayerId && p.black === result.blackPlayerId) ||
-      (p.white === result.blackPlayerId && p.black === result.whitePlayerId)
-    ) {
-      return { ...p, result: result.winner };
-    }
-    return p;
-  });
+  const matchesPairing = (p: Record<string, unknown>) =>
+    (p.white === result.whitePlayerId && p.black === result.blackPlayerId) ||
+    (p.white === result.blackPlayerId && p.black === result.whitePlayerId);
+  if (!pairings.some(matchesPairing)) {
+    // The game ended but no pairing in this round matches its players — the
+    // result would be silently lost and the round would stall. Log loudly
+    // so the reconciliation sweep / a human can pick it up.
+    console.error(
+      "[processTournamentGameResult] NO MATCHING PAIRING for game", result.gameId,
+      "in round", roundNumber, "of tournament", tournamentId,
+      "— players", result.whitePlayerId, "vs", result.blackPlayerId,
+      "— round pairings:", JSON.stringify(pairings)
+    );
+    return;
+  }
+  const updatedPairings = pairings.map((p) => matchesPairing(p) ? { ...p, result: result.winner } : p);
 
   // Round is complete when all non-3rd-place pairings have results (or byes).
   const allDone = updatedPairings.every((p) => (p.result !== null && p.result !== undefined) || p.bye || (p as any).is_third_place);
