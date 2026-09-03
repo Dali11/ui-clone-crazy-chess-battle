@@ -36,9 +36,9 @@ interface ApiResponse {
 function getStatusLabel(status: string): { label: string; color: string; dot: string } {
   switch (status) {
     case 'active': return { label: 'LIVE', color: 'text-ccb-success bg-ccb-success/10 border-ccb-success/30', dot: 'bg-ccb-success' };
-    case 'upcoming': return { label: 'UPCOMING', color: 'text-blue-400 bg-blue-400/10 border-blue-400/30', dot: 'bg-blue-400' };
+    case 'upcoming': return { label: 'UPCOMING', color: 'text-ccb-primary bg-ccb-primary/10 border-ccb-primary/30', dot: 'bg-ccb-primary' };
     case 'completed': return { label: 'COMPLETED', color: 'text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30', dot: 'bg-ccb-muted' };
-    case 'pending': return { label: 'PENDING', color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30', dot: 'bg-yellow-400' };
+    case 'pending': return { label: 'PENDING', color: 'text-ccb-accent bg-ccb-accent/10 border-ccb-accent/30', dot: 'bg-ccb-accent' };
     default: return { label: status.toUpperCase(), color: 'text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30', dot: 'bg-ccb-muted' };
   }
 }

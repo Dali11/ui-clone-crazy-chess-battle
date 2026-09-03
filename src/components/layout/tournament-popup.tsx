@@ -109,7 +109,7 @@ export default function TournamentPopup() {
   if (tournament.popup_reason === "paused") {
     return (
       <div className="fixed left-0 right-0 z-[110] bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-md animate-slide-up">
-        <div className="bg-ccb-card border border-amber-500/40 sm:rounded-xl shadow-2xl px-4 py-3.5">
+        <div className="bg-ccb-card border border-ccb-accent/40 sm:rounded-xl shadow-2xl px-4 py-3.5">
           <button
             onClick={handleDismiss}
             className="absolute top-2 right-2 text-ccb-muted hover:text-ccb-text p-1 transition-colors"
@@ -119,13 +119,13 @@ export default function TournamentPopup() {
           </button>
 
           <div className="flex items-start gap-3 pr-6">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-amber-500 to-orange-500">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-ccb-accent to-ccb-gold">
               <AlertCircle className="w-5 h-5 text-white" />
             </div>
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-ccb-accent/20 text-ccb-gold">
                   Tournament Paused
                 </span>
               </div>
@@ -138,7 +138,7 @@ export default function TournamentPopup() {
               </p>
 
               {tournament.resume_at && (
-                <p className="text-sm text-amber-400 font-semibold mt-1.5">
+                <p className="text-sm text-ccb-gold font-semibold mt-1.5">
                   Resuming {formatResumeDate(tournament.resume_at)}
                 </p>
               )}
@@ -149,7 +149,7 @@ export default function TournamentPopup() {
             <Link
               href={`/tournament/${tournament.id}`}
               onClick={handleDismiss}
-              className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 text-white text-sm font-semibold px-4 py-2.5 transition-all shadow-lg shadow-amber-500/20"
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-ccb-accent to-ccb-gold hover:opacity-90 text-white text-sm font-semibold px-4 py-2.5 transition-all shadow-lg shadow-ccb-accent/20"
             >
               <Trophy className="w-4 h-4" />
               View Tournament
@@ -182,7 +182,7 @@ export default function TournamentPopup() {
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
             isNew
               ? "bg-gradient-to-br from-ccb-primary to-ccb-accent"
-              : "bg-gradient-to-br from-amber-500 to-orange-500"
+              : "bg-gradient-to-br from-ccb-accent to-ccb-gold"
           }`}>
             {isNew ? (
               <Zap className="w-5 h-5 text-white" />
@@ -196,7 +196,7 @@ export default function TournamentPopup() {
               <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
                 isNew
                   ? "bg-ccb-primary/20 text-ccb-primary"
-                  : "bg-amber-500/20 text-amber-400"
+                  : "bg-ccb-accent/20 text-ccb-gold"
               }`}>
                 {isNew ? "New Tournament" : "Starting Soon"}
               </span>
@@ -228,7 +228,7 @@ export default function TournamentPopup() {
             </div>
 
             {!isNew && tournament.minutes_until_start !== null && (
-              <p className="text-xs text-amber-400 font-semibold mt-1.5">
+              <p className="text-xs text-ccb-gold font-semibold mt-1.5">
                 {tournament.minutes_until_start <= 0
                   ? "Starting now!"
                   : `Starts in ${tournament.minutes_until_start} min`}

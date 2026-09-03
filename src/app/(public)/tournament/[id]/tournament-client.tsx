@@ -436,9 +436,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const isFinished = t.status === 'finished' || t.status === 'completed';
 
   const statusInfo = {
-    upcoming: { label: 'UPCOMING', color: 'text-blue-400 bg-blue-400/10 border-blue-400/30', dot: 'bg-blue-400' },
+    upcoming: { label: 'UPCOMING', color: 'text-ccb-primary bg-ccb-primary/10 border-ccb-primary/30', dot: 'bg-ccb-primary' },
     active: { label: 'LIVE', color: 'text-ccb-success bg-ccb-success/10 border-ccb-success/30', dot: 'bg-ccb-success animate-pulse' },
-    pending_approval: { label: 'PENDING', color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30', dot: 'bg-yellow-400' },
+    pending_approval: { label: 'PENDING', color: 'text-ccb-accent bg-ccb-accent/10 border-ccb-accent/30', dot: 'bg-ccb-accent' },
     finished: { label: 'COMPLETED', color: 'text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30', dot: 'bg-ccb-muted' },
     completed: { label: 'COMPLETED', color: 'text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30', dot: 'bg-ccb-muted' },
   }[t.status] || { label: t.status?.toUpperCase(), color: 'text-ccb-muted bg-ccb-muted/10 border-ccb-muted/30', dot: 'bg-ccb-muted' };
@@ -787,7 +787,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     </div>
                     {/* 3rd */}
                     <div className="bg-ccb-card border border-ccb-border rounded-2xl p-3 text-center flex flex-col justify-end" style={{ minHeight: '100px' }}>
-                      <Award className="w-6 h-6 text-amber-600 dark:text-amber-400 mx-auto mb-1" />
+                      <Award className="w-6 h-6 text-ccb-bronze mx-auto mb-1" />
                       <div className="text-xs font-bold truncate">{top3[2].profile?.display_name || top3[2].profile?.username || '—'}</div>
                       <div className="text-[10px] text-ccb-muted">{(top3[2].score ?? 0).toFixed(1)} pts</div>
                       {top3.length > 2 && top3[1].score === top3[2].score && (() => {
@@ -842,7 +842,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   {sortedParticipants.map((p, i) => {
                     const rank = allHaveFinalRank ? (p.final_rank as number) : (i + 1);
                     const isTop3 = rank <= 3;
-                    const medalColor = rank === 1 ? 'text-ccb-accent' : rank === 2 ? 'text-ccb-muted' : rank === 3 ? 'text-amber-600 dark:text-amber-400' : '';
+                    const medalColor = rank === 1 ? 'text-ccb-gold' : rank === 2 ? 'text-ccb-silver' : rank === 3 ? 'text-ccb-bronze' : '';
                     const tb = tiebreaks.get(p.player_id) || { buchholz_cut1: 0, sonneborn_berger: 0 };
                     const tiedWithNext = i < sortedParticipants.length - 1 && p.score === sortedParticipants[i + 1].score;
                     return (
@@ -1179,14 +1179,14 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                                   {(pairing.whiteName || '?').charAt(0)}
                                 </div>
                                 <div className="min-w-0">
-                                  <div className={`text-sm truncate ${pairing.result === 'white' ? 'font-bold text-amber-600 dark:text-amber-400' : ''}`}>
+                                  <div className={`text-sm truncate ${pairing.result === 'white' ? 'font-bold text-ccb-gold' : ''}`}>
                                     {pairing.whiteName}
                                   </div>
                                   <div className="text-[10px] text-ccb-muted">{pairing.whiteRating}</div>
                                 </div>
                               </div>
                               <div className="shrink-0 flex flex-col items-center gap-0.5">
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-amber-600/10 text-amber-600 dark:text-amber-400 border border-amber-600/30">3RD</span>
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-ccb-bronze/10 text-ccb-bronze border border-ccb-bronze/30">3RD</span>
                                 {pairing.result !== null && pairing.result !== undefined ? (
                                   <span className="text-xs font-bold px-2 py-1 rounded-lg bg-ccb-muted/10 text-ccb-muted">
                                     {pairing.result === 'draw' ? '½-½' : pairing.result === 'white' ? '1-0' : '0-1'}
@@ -1205,7 +1205,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                               </div>
                               <div className={`flex-1 flex items-center justify-end gap-2 min-w-0 ${pairing.result === 'black' ? '' : pairing.result === 'white' || pairing.result === 'draw' ? 'opacity-50' : ''}`}>
                                 <div className="min-w-0 text-right">
-                                  <div className={`text-sm truncate ${pairing.result === 'black' ? 'font-bold text-amber-600 dark:text-amber-400' : ''}`}>
+                                  <div className={`text-sm truncate ${pairing.result === 'black' ? 'font-bold text-ccb-gold' : ''}`}>
                                     {pairing.blackName}
                                   </div>
                                   <div className="text-[10px] text-ccb-muted">{pairing.blackRating || '—'}</div>
@@ -1378,7 +1378,7 @@ function PrizeDistribution({ t, formatMoney }: { t: any; formatMoney: (c: number
           const rankLabel = payout.rank === 1 ? '1st' : payout.rank === 2 ? '2nd' : payout.rank === 3 ? '3rd' : `${payout.rank}th`;
           const medalIcon = payout.rank === 1 ? <Crown className="w-4 h-4 text-ccb-accent" /> :
                             payout.rank === 2 ? <Medal className="w-4 h-4 text-ccb-muted" /> :
-                            payout.rank === 3 ? <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" /> : null;
+                            payout.rank === 3 ? <Award className="w-4 h-4 text-ccb-bronze" /> : null;
           return (
             <div key={payout.rank} className={`flex items-center justify-between px-3 py-2.5 rounded-xl ${payout.rank <= 3 ? 'bg-ccb-surface/60' : 'bg-ccb-surface/30'}`}>
               <div className="flex items-center gap-2">

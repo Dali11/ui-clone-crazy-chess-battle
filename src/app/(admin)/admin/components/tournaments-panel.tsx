@@ -119,7 +119,7 @@ export default function TournamentsPanel({
             <div className="text-[10px] uppercase tracking-wider text-ccb-muted">Total</div>
           </div>
           <div className="card p-3 text-center">
-            <div className="text-xl font-bold text-blue-400">{tournamentStats.upcoming}</div>
+            <div className="text-xl font-bold text-ccb-primary">{tournamentStats.upcoming}</div>
             <div className="text-[10px] uppercase tracking-wider text-ccb-muted">Upcoming</div>
           </div>
           <div className="card p-3 text-center">
@@ -131,7 +131,7 @@ export default function TournamentsPanel({
             <div className="text-[10px] uppercase tracking-wider text-ccb-muted">Done</div>
           </div>
           <div className="card p-3 text-center">
-            <div className="text-xl font-bold text-amber-500">{tournamentStats.pending}</div>
+            <div className="text-xl font-bold text-ccb-accent">{tournamentStats.pending}</div>
             <div className="text-[10px] uppercase tracking-wider text-ccb-muted">Pending</div>
           </div>
           <div className="card p-3 text-center">
@@ -200,8 +200,8 @@ export default function TournamentsPanel({
           const totalPaid = tournaments.reduce((sum, t) => sum + (t.paid_count || 0), 0);
           if (totalRevenue === 0) return null;
           return (
-            <div className="flex items-center gap-4 px-3 py-2 mb-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs">
-              <span className="flex items-center gap-1.5 font-medium text-emerald-500">
+            <div className="flex items-center gap-4 px-3 py-2 mb-2 rounded-lg bg-ccb-success/5 border border-ccb-success/20 text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-ccb-success">
                 <TrendingUp className="w-3.5 h-3.5" />
                 Total Revenue: {formatMWK(totalRevenue)}
               </span>
@@ -229,10 +229,10 @@ export default function TournamentsPanel({
                       {t.name}
                       <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                         t.status === "active" ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30" :
-                        t.status === "upcoming" ? "bg-blue-400/10 text-blue-400 border border-blue-400/30" :
+                        t.status === "upcoming" ? "bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30" :
                         t.status === "finished" || t.status === "completed" ? "bg-ccb-muted/10 text-ccb-muted border border-ccb-muted/30" :
                         t.status === "cancelled" ? "bg-ccb-danger/10 text-ccb-danger border border-ccb-danger/30" :
-                        t.status === "pending_approval" ? "bg-amber-500/10 text-amber-500 border border-amber-500/30" :
+                        t.status === "pending_approval" ? "bg-ccb-accent/10 text-ccb-accent border border-ccb-accent/30" :
                         t.status === "rejected" ? "bg-red-500/10 text-red-500 border border-red-500/30" :
                         "bg-ccb-surface text-ccb-muted border border-ccb-border"
                       }`}>{t.status.replace(/_/g, " ")}</span>
@@ -245,7 +245,7 @@ export default function TournamentsPanel({
                       <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{formatMWK(t.entry_fee)}</span>
                       <span className="flex items-center gap-1"><Gift className="w-3 h-3" />{formatMWK(t.prize_pool)}</span>
                       {(t.revenue || 0) > 0 && (
-                        <span className="flex items-center gap-1 text-emerald-500 font-medium"><TrendingUp className="w-3 h-3" />{formatMWK(t.revenue || 0)} ({t.paid_count || 0} paid)</span>
+                        <span className="flex items-center gap-1 text-ccb-success font-medium"><TrendingUp className="w-3 h-3" />{formatMWK(t.revenue || 0)} ({t.paid_count || 0} paid)</span>
                       )}
                       {t.pool_source === 'fixed' && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-ccb-accent/10 text-ccb-accent border border-ccb-accent/30">FIXED</span>
@@ -586,7 +586,7 @@ export default function TournamentsPanel({
                   <h3 className="text-lg font-bold">{managingTournament.name}</h3>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                     managingTournament.status === "active" ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30" :
-                    managingTournament.status === "upcoming" ? "bg-blue-400/10 text-blue-400 border border-blue-400/30" :
+                    managingTournament.status === "upcoming" ? "bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30" :
                     managingTournament.status === "finished" || managingTournament.status === "completed" ? "bg-ccb-muted/10 text-ccb-muted border border-ccb-muted/30" :
                     "bg-ccb-surface text-ccb-muted border border-ccb-border"
                   }`}>{managingTournament.status.replace(/_/g, " ")}</span>
@@ -623,7 +623,7 @@ export default function TournamentsPanel({
                 return (
                   <div className="bg-ccb-surface rounded-lg p-3 space-y-2 border border-ccb-border">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-ccb-fg">
-                      <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                      <TrendingUp className="w-3.5 h-3.5 text-ccb-success" />
                       Revenue Breakdown
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
@@ -637,7 +637,7 @@ export default function TournamentsPanel({
                       </div>
                       <div className="flex justify-between">
                         <span className="text-ccb-muted">Total collected</span>
-                        <span className="font-medium text-emerald-500">{formatMWK(rev.totalCollected)}</span>
+                        <span className="font-medium text-ccb-success">{formatMWK(rev.totalCollected)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-ccb-muted">Prize pool</span>
@@ -646,14 +646,14 @@ export default function TournamentsPanel({
                       {rev.poolSource === 'fixed' && rev.platformRevenue > 0 && (
                         <div className="flex justify-between col-span-2 pt-1 border-t border-ccb-border">
                           <span className="text-ccb-muted">Platform revenue (fixed pool surplus)</span>
-                          <span className="font-bold text-emerald-500">{formatMWK(rev.platformRevenue)}</span>
+                          <span className="font-bold text-ccb-success">{formatMWK(rev.platformRevenue)}</span>
                         </div>
                       )}
                       {rev.creatorProfit > 0 && (
                         <>
                           <div className="flex justify-between">
                             <span className="text-ccb-muted">Creator profit ({rev.creatorProfitPercent}%)</span>
-                            <span className="font-medium text-blue-400">{formatMWK(rev.creatorProfit)}</span>
+                            <span className="font-medium text-ccb-primary">{formatMWK(rev.creatorProfit)}</span>
                           </div>
                           <div className="flex justify-between col-span-2 pt-1 border-t border-ccb-border">
                             <span className="text-ccb-muted">Actual prizes distributed</span>
