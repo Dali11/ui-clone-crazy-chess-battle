@@ -10,7 +10,7 @@ import { generateKnockoutBracket, knockoutRoundCount, advanceKnockoutRound, gene
 import { roundAlreadyExists, atomicAdvanceRound } from "@/lib/tournament/guards";
 
 // Combined tournament cron — does auto-start + auto-advance + start-scheduled in one call.
-// Triggered by Base44 workflow (every 5 min) or cron-job.org. No auth required.
+// Triggered by Vercel Cron (see vercel.json, every 5 min). Auth: CRON_SECRET header.
 export async function GET(req: NextRequest) {
   return handleTournamentCron(req);
 }
@@ -27,7 +27,21 @@ export async function POST(req: NextRequest) {
 let lastCronRunMs = 0;
 const CRON_THROTTLE_MS = 30_000;
 
+// Same auth pattern as the other cron routes (heal-stuck, daily-create, etc.).
+// Enforced once CRON_SECRET is set in the Vercel environment; Vercel Cron
+// requests carry `Authorization: Bearer $CRON_SECRET`.
+function verifyCronAuth(req: NextRequest): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) return true;
+  const authHeader = req.headers.get("authorization");
+  if (authHeader === `Bearer ${cronSecret}`) return true;
+  if (req.headers.get("x-vercel-cron") === "1") return true;
+  return false;
+}
+
 async function handleTournamentCron(req: NextRequest) {
+  if (!verifyCronAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     // No auth required — endpoint only performs safe tournament operations
     // (auto-start, auto-advance). No data exposure or destructive actions.

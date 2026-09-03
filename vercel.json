@@ -7,6 +7,10 @@
   },
   "crons": [
     {
+      "path": "/api/tournaments/cron",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/battles/heal-stuck",
       "schedule": "*/2 * * * *"
     },
