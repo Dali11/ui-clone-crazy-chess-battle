@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { processTournamentGameResult, findPairingForPlayers } from "@/lib/tournament/results";
+import { processLeagueGameResult } from "@/lib/league/process-game-result";
 
 // GET — list recent games with player info
 export async function GET(req: NextRequest) {
@@ -80,7 +82,21 @@ export async function PATCH(req: NextRequest) {
     const { gameId, action, winner, note } = await req.json();
     if (!gameId || !action) return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
 
+    let tournamentRecorded = false;
+    let leagueRecorded = false;
+
     if (action === "abort") {
+      const { data: abortGame } = await admin
+        .from("games")
+        .select("tournament_id")
+        .eq("id", gameId)
+        .single();
+      if (abortGame?.tournament_id) {
+        return NextResponse.json(
+          { error: "This is a tournament game — aborting it would leave the pairing unrecorded and stall the round. Use the result override instead." },
+          { status: 409 }
+        );
+      }
       const { error } = await admin
         .from("games")
         .update({ status: "abort", winner: null, ended_at: new Date().toISOString() })
@@ -93,13 +109,70 @@ export async function PATCH(req: NextRequest) {
 
       const { data: game, error: gameErr } = await admin
         .from("games")
-        .select("id, status, white_player_id, black_player_id, winner, rated")
+        .select("id, status, white_player_id, black_player_id, winner, rated, tournament_id, tournament_round, league_fixture_id")
         .eq("id", gameId)
         .single();
 
       if (gameErr || !game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
 
       const isCorrecting = game.status === "completed" && game.winner !== null;
+
+      // ── Guards: refuse overrides that would desync tournament/league state ──
+      let tournamentType: string | null = null;
+      if (game.tournament_id) {
+        const { data: t } = await admin
+          .from("tournaments")
+          .select("type")
+          .eq("id", game.tournament_id)
+          .single();
+        tournamentType = t?.type ?? null;
+      }
+      const isTerminal = ["checkmate", "stalemate", "draw", "resign", "timeout", "completed"].includes(game.status);
+
+      if (game.tournament_id) {
+        if (tournamentType === "arena") {
+          // Arena has no idempotency marker: re-processing an already-processed
+          // arena game would double-count score/wins and corrupt prize standings.
+          if (isTerminal) {
+            return NextResponse.json(
+              { error: "This arena game already has a result. Overriding would double-count arena points — adjust via SQL if needed." },
+              { status: 409 }
+            );
+          }
+        } else {
+          // Round-based: block only if the pairing result is already recorded
+          // (corrections would desync stats/standings). Unrecorded results are
+          // exactly what the override is for.
+          const { data: round } = await admin
+            .from("tournament_rounds")
+            .select("id, pairings")
+            .eq("tournament_id", game.tournament_id)
+            .eq("round_number", game.tournament_round || 1)
+            .maybeSingle();
+          const pairings = (round?.pairings as Array<Record<string, any>>) || [];
+          const rec = findPairingForPlayers(pairings, game.white_player_id, game.black_player_id);
+          if (rec && rec.result !== null && rec.result !== undefined) {
+            return NextResponse.json(
+              { error: "This tournament match is already recorded in the round. Overriding would desync standings — void the round or contact support." },
+              { status: 409 }
+            );
+          }
+        }
+      }
+
+      if (game.league_fixture_id) {
+        const { data: fixture } = await admin
+          .from("league_fixtures")
+          .select("played")
+          .eq("id", game.league_fixture_id)
+          .single();
+        if (fixture?.played) {
+          return NextResponse.json(
+            { error: "This league fixture already has a recorded result. Overriding would desync standings — reset the fixture first." },
+            { status: 409 }
+          );
+        }
+      }
 
       const gameStatus = winner === "draw" ? "draw" : "completed";
       const winnerValue = winner === "draw" ? null : winner;
@@ -138,6 +211,37 @@ export async function PATCH(req: NextRequest) {
       if (game.rated && isCorrecting) {
         console.log(`Admin override on rated game ${gameId}: ratings may need manual correction`);
       }
+
+      // ── Record into tournament / league immediately (cron reconcile is only
+      // a backstop for round tournaments; arena and leagues have no sweep) ──
+      if (game.tournament_id) {
+        try {
+          await processTournamentGameResult({
+            gameId,
+            whitePlayerId: game.white_player_id,
+            blackPlayerId: game.black_player_id,
+            winner,
+            status: "admin_override",
+          });
+          tournamentRecorded = true;
+        } catch (err) {
+          console.error("Admin override tournament processing failed:", err);
+        }
+      }
+      if (game.league_fixture_id) {
+        try {
+          await processLeagueGameResult({
+            gameId,
+            whitePlayerId: game.white_player_id,
+            blackPlayerId: game.black_player_id,
+            winner,
+            status: "admin_override",
+          });
+          leagueRecorded = true;
+        } catch (err) {
+          console.error("Admin override league processing failed:", err);
+        }
+      }
     } else {
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
@@ -152,7 +256,7 @@ export async function PATCH(req: NextRequest) {
       });
     } catch {}
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, tournamentRecorded, leagueRecorded });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Failed" }, { status: 500 });
   }

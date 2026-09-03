@@ -818,7 +818,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       await fetchGames();
-      showToast(`Result set: ${winnerLabel}`);
+      const suffix = data.tournamentRecorded ? " — tournament updated" : data.leagueRecorded ? " — league standings updated" : "";
+      showToast(`Result set: ${winnerLabel}${suffix}`);
     } finally {
       setActionLoading(null);
     }

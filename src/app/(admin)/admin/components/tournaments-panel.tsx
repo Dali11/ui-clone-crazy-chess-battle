@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   Trophy, Loader2, Check, X, Search, Save, Copy, Trash2, Edit3, Share2,
   Gift, Calendar, ChevronDown, Plus, AlertCircle, ChevronRight, Clock,
-  DollarSign, FileText, Link, Play, Shield, Smartphone, Swords, TrendingUp, Users,
+  DollarSign, FileText, Link, Play, Shield, Smartphone, Swords, TrendingUp, Users, Gavel,
 } from "lucide-react";
 import PlatformSettingsPanel from "../platform-settings-panel";
 import { type Tournament, localToUTC, utcToLocalInput } from "../types";
@@ -90,6 +90,40 @@ export default function TournamentsPanel({
   formatMWK,
   formatDate,
 }: TournamentsPanelProps) {
+  const [overridePair, setOverridePair] = useState<any>(null);
+  const [overrideRound, setOverrideRound] = useState<number | null>(null);
+  const [overrideWinner, setOverrideWinner] = useState<"white" | "black" | "draw" | null>(null);
+  const [overrideLoading, setOverrideLoading] = useState(false);
+  const [overrideError, setOverrideError] = useState<string | null>(null);
+
+  const submitOverride = async () => {
+    if (!managingTournament || !overridePair || !overrideRound || !overrideWinner) return;
+    setOverrideLoading(true);
+    setOverrideError(null);
+    try {
+      const res = await fetch(`/api/admin/tournaments/${managingTournament.id}/override-match`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roundNumber: overrideRound,
+          whiteId: overridePair.white,
+          blackId: overridePair.black,
+          winner: overrideWinner,
+          note: `Admin override from tournament panel (round ${overrideRound})`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to set result");
+      setOverridePair(null);
+      setOverrideWinner(null);
+      await fetchTournamentDetail(managingTournament);
+    } catch (err: any) {
+      setOverrideError(err.message || "Failed");
+    } finally {
+      setOverrideLoading(false);
+    }
+  };
+
   const filteredTournaments = tournaments.filter((t) => {
     const matchFilter = tournamentFilter === "all" || t.status === tournamentFilter;
     const q = tournamentSearch.toLowerCase();
@@ -839,6 +873,20 @@ export default function TournamentsPanel({
                                       <span className={`flex-1 truncate text-right ${pair.result === "black" ? "font-bold text-ccb-success" : ""}`}>
                                         ({pair.blackRating || "\u2014"}) {pair.blackName || "TBD"}
                                       </span>
+                                      {pair.result == null && pair.white && pair.black && (
+                                        <button
+                                          onClick={() => {
+                                            setOverridePair(pair);
+                                            setOverrideRound(round.round_number);
+                                            setOverrideWinner(null);
+                                            setOverrideError(null);
+                                          }}
+                                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-ccb-surface border border-ccb-border text-[10px] font-bold text-ccb-accent hover:bg-ccb-accent/10 shrink-0"
+                                          title="Manually record this match's result"
+                                        >
+                                          <Gavel className="w-3 h-3" /> Override
+                                        </button>
+                                      )}
                                     </>
                                   )}
                                 </div>
@@ -1034,6 +1082,75 @@ export default function TournamentsPanel({
                   Save Prizes
                 </button>
                 <button onClick={() => setPrizeEditTournament(null)} className="px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted text-sm font-medium hover:bg-ccb-muted/10">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MATCH RESULT OVERRIDE MODAL */}
+        {overridePair && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => !overrideLoading && setOverridePair(null)}>
+            <div className="bg-ccb-card rounded-xl border border-ccb-border max-w-sm w-full p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold flex items-center gap-1.5">
+                  <Gavel className="w-4 h-4 text-ccb-accent" /> Override Match Result
+                </h3>
+                <button onClick={() => setOverridePair(null)} className="text-ccb-muted hover:text-ccb-fg">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-ccb-muted">
+                Round {overrideRound}:{" "}
+                <span className="font-bold text-ccb-text">{overridePair.whiteName || "White"}</span> vs{" "}
+                <span className="font-bold text-ccb-text">{overridePair.blackName || "Black"}</span>
+              </p>
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span className="text-[11px] text-amber-400">
+                  Records the result into the tournament, updates player scores, and may complete the round. Cannot be undone.
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { key: "white" as const, label: `${overridePair.whiteName || "White"} wins` },
+                  { key: "draw" as const, label: "Draw" },
+                  { key: "black" as const, label: `${overridePair.blackName || "Black"} wins` },
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setOverrideWinner(opt.key)}
+                    className={`px-2 py-2 rounded-lg border text-[11px] font-medium transition-colors ${
+                      overrideWinner === opt.key
+                        ? "bg-ccb-primary text-white border-ccb-primary"
+                        : "bg-ccb-surface border-ccb-border text-ccb-text hover:bg-ccb-muted/10"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {overrideError && (
+                <div className="text-xs text-ccb-danger flex items-start gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  {overrideError}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={submitOverride}
+                  disabled={!overrideWinner || overrideLoading}
+                  className="flex items-center gap-1 px-4 py-2 rounded-lg bg-ccb-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {overrideLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Record Result
+                </button>
+                <button
+                  onClick={() => setOverridePair(null)}
+                  disabled={overrideLoading}
+                  className="px-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted text-sm font-medium hover:bg-ccb-muted/10 disabled:opacity-50"
+                >
                   Cancel
                 </button>
               </div>

@@ -368,3 +368,168 @@ async function _checkAndFinishRound(
     }
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// MANUAL RESULT RECORDING (admin override)
+// ═══════════════════════════════════════════════════════════════════════
+
+export type ManualOverrideReason =
+  | "tournament_not_found"
+  | "no_round"
+  | "no_matching_pairing"
+  | "already_recorded";
+
+export interface ManualOverrideOutcome {
+  ok: boolean;
+  reason?: ManualOverrideReason;
+  viaGame?: boolean;
+  armageddonCreated?: boolean;
+}
+
+/**
+ * Pure: find the pairing that matches the two players (orientation-agnostic,
+ * byes excluded). Exported for unit tests.
+ */
+export function findPairingForPlayers(
+  pairings: Array<Record<string, any>>,
+  whiteId: string,
+  blackId: string
+): Record<string, any> | undefined {
+  return pairings.find(
+    (p) =>
+      !p.bye &&
+      ((p.white === whiteId && p.black === blackId) ||
+        (p.white === blackId && p.black === whiteId))
+  );
+}
+
+/**
+ * Admin manual result override for a round-based tournament pairing.
+ *
+ * Works whether or not the pairing has a linked game:
+ *  - With a game: the game row is mirrored to the chosen result and the
+ *    normal processing pipeline runs (idempotent) — stats, pairing, round
+ *    completion, armageddon for knockout draws.
+ *  - Without a game (e.g. game creation failed at round start): stats and
+ *    the pairing are recorded directly, mirroring _processTournamentGameResult,
+ *    including Armageddon creation for knockout draws.
+ *
+ * Returns already_recorded when the pairing already has a result, so the
+ * API layer can refuse corrections (they would desync stats/standings).
+ */
+export async function recordManualTournamentResult(opts: {
+  tournamentId: string;
+  roundNumber: number;
+  whiteId: string;
+  blackId: string;
+  winner: "white" | "black" | "draw";
+}): Promise<ManualOverrideOutcome> {
+  const admin = createAdminClient();
+
+  const { data: tournament } = await admin
+    .from("tournaments")
+    .select("id, type")
+    .eq("id", opts.tournamentId)
+    .single();
+  if (!tournament) return { ok: false, reason: "tournament_not_found" };
+  if (tournament.type === "arena") return { ok: false, reason: "no_round" }; // arena has no pairings
+
+  const { data: round } = await admin
+    .from("tournament_rounds")
+    .select("id, pairings")
+    .eq("tournament_id", opts.tournamentId)
+    .eq("round_number", opts.roundNumber)
+    .maybeSingle();
+  if (!round) return { ok: false, reason: "no_round" };
+
+  const pairings = (round.pairings as Array<Record<string, any>>) || [];
+  const matchesPairing = (p: Record<string, any>) =>
+    (p.white === opts.whiteId && p.black === opts.blackId) ||
+    (p.white === opts.blackId && p.black === opts.whiteId);
+  const pairing = findPairingForPlayers(pairings, opts.whiteId, opts.blackId);
+  if (!pairing) return { ok: false, reason: "no_matching_pairing" };
+  if (pairing.result !== null && pairing.result !== undefined) {
+    return { ok: false, reason: "already_recorded" };
+  }
+
+  // ── With a linked game: mirror the game row, then run normal processing ──
+  if (pairing.game_id) {
+    const { data: game } = await admin
+      .from("games")
+      .select("id")
+      .eq("id", pairing.game_id)
+      .maybeSingle();
+
+    if (game) {
+      await admin
+        .from("games")
+        .update({
+          status: opts.winner === "draw" ? "draw" : "completed",
+          winner: opts.winner === "draw" ? null : opts.winner,
+          ended_at: new Date().toISOString(),
+        })
+        .eq("id", pairing.game_id);
+
+      await processTournamentGameResult({
+        gameId: pairing.game_id,
+        whitePlayerId: opts.whiteId,
+        blackPlayerId: opts.blackId,
+        winner: opts.winner,
+        status: "admin_override",
+      });
+      return { ok: true, viaGame: true };
+    }
+    // game row missing → fall through to direct recording
+  }
+
+  // ── No usable game row: record directly ──
+  const whiteWon = opts.winner === "white";
+  const blackWon = opts.winner === "black";
+  const isDraw = opts.winner === "draw";
+
+  // Knockout draw: create the Armageddon tiebreak exactly like the normal flow.
+  if (isDraw && tournament.type === "knockout") {
+    try {
+      const { data: profiles } = await admin
+        .from("profiles")
+        .select("id, rating")
+        .in("id", [opts.whiteId, opts.blackId]);
+      const wRating = profiles?.find((p: any) => p.id === opts.whiteId)?.rating || 1200;
+      const bRating = profiles?.find((p: any) => p.id === opts.blackId)?.rating || 1200;
+
+      const tiebreak = await createTournamentArmageddon(
+        opts.tournamentId, opts.roundNumber, opts.whiteId, opts.blackId, wRating, bRating
+      );
+      const updatedPairings = pairings.map((p) =>
+        matchesPairing(p) ? { ...p, result: "draw", tiebreak_game_id: tiebreak.gameId } : p
+      );
+      await admin
+        .from("tournament_rounds")
+        .update({ pairings: updatedPairings, is_complete: false })
+        .eq("id", round.id);
+      return { ok: true, armageddonCreated: true };
+    } catch (e) {
+      console.error("[recordManualTournamentResult] Armageddon creation failed, recording plain draw:", e);
+      // fall through to plain draw recording
+    }
+  }
+
+  await _updateParticipantStats(admin, opts.tournamentId, opts.whiteId, whiteWon, blackWon, isDraw);
+  await _updateParticipantStats(admin, opts.tournamentId, opts.blackId, blackWon, whiteWon, isDraw);
+
+  const updatedPairings = pairings.map((p) =>
+    matchesPairing(p) ? { ...p, result: opts.winner } : p
+  );
+  const allDone = updatedPairings.every(
+    (p) => (p.result !== null && p.result !== undefined) || p.bye || p.is_third_place
+  );
+  await admin
+    .from("tournament_rounds")
+    .update({ pairings: updatedPairings, is_complete: allDone })
+    .eq("id", round.id);
+
+  if (allDone) {
+    await _checkAndFinishRound(admin, opts.tournamentId, updatedPairings, tournament.type || "swiss");
+  }
+  return { ok: true };
+}
