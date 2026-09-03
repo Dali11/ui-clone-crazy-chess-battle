@@ -260,7 +260,7 @@ export default function PremiumLeaguesTab() {
     <div className="space-y-3">
       {/* MEMBERSHIP GATE */}
       {!hasMembership && hasMembershipGatedLeague && !loading && (
-        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5">
+        <div className="card p-5">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-ccb-primary/20 border border-ccb-primary/30 flex items-center justify-center shrink-0">
               <Lock className="w-6 h-6 text-ccb-primary" />
@@ -283,10 +283,10 @@ export default function PremiumLeaguesTab() {
       {/* LEAGUE CARDS */}
       {loading ? (
         <div className="space-y-4 animate-pulse">
-          {[1, 2, 3, 4, 5].map(i => <div key={i} className="bg-ccb-card border border-ccb-border rounded-2xl h-48" />)}
+          {[1, 2, 3, 4, 5].map(i => <div key={i} className="card h-48" />)}
         </div>
       ) : error ? (
-        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-8 text-center">
+        <div className="card p-8 text-center">
           <AlertCircle className="w-8 h-8 text-ccb-danger mx-auto mb-3" />
           <p className="text-sm text-ccb-muted">{error}</p>
           <button onClick={fetchData} className="mt-3 btn-primary text-xs">
@@ -294,7 +294,7 @@ export default function PremiumLeaguesTab() {
           </button>
         </div>
       ) : leagues.length === 0 ? (
-        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-8 text-center">
+        <div className="card p-8 text-center">
           <AlertCircle className="w-8 h-8 text-ccb-muted mx-auto mb-3" />
           <p className="text-sm text-ccb-muted">No leagues available right now.</p>
         </div>
@@ -317,7 +317,7 @@ export default function PremiumLeaguesTab() {
             return (
               <div
                 key={league.id}
-                className={`bg-ccb-card border rounded-2xl overflow-hidden transition-all ${
+                className={`card p-0 overflow-hidden transition-all ${
                   isExpanded ? `${meta.borderColor}` : 'border-ccb-border'
                 }`}
               >
@@ -672,10 +672,10 @@ export default function PremiumLeaguesTab() {
         </h3>
         {competitionsLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-pulse">
-            {[1, 2].map(i => <div key={i} className="bg-ccb-card border border-ccb-border rounded-2xl h-28" />)}
+            {[1, 2].map(i => <div key={i} className="card h-28" />)}
           </div>
         ) : competitions.length === 0 ? (
-          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-6 text-center">
+          <div className="card p-6 text-center">
             <Swords className="w-8 h-8 text-ccb-muted mx-auto mb-2" />
             <p className="text-sm font-bold text-ccb-text mb-1">Nothing on the board yet</p>
             <p className="text-xs text-ccb-muted">
@@ -693,7 +693,7 @@ export default function PremiumLeaguesTab() {
                     ...(comp.format?.knockoutRounds ? ['Knockouts', 'Semis', 'Final'] : []),
                   ];
               return (
-                <div key={comp.id} className="bg-ccb-card border border-ccb-border rounded-2xl p-4">
+                <div key={comp.id} className="card p-4">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-10 h-10 rounded-xl bg-ccb-surface flex items-center justify-center shrink-0">
                       <Icon className="w-5 h-5 text-ccb-primary" />

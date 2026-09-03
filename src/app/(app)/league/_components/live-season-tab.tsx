@@ -153,7 +153,7 @@ function StandingsSeparator({ label }: { label: string }) {
 
 function AdSlot({ variant = 'banner' }: { variant?: 'banner' | 'card' }) {
   return (
-    <div className={`rounded-2xl border border-dashed border-ccb-border flex items-center justify-center text-center ${
+    <div className={`rounded-xl border border-dashed border-ccb-border flex items-center justify-center text-center ${
       variant === 'banner' ? 'h-16 sm:h-20' : 'h-28'
     }`}>
       <div>
@@ -207,7 +207,7 @@ export default function LiveSeasonTab({ premiumData }: { premiumData: PremiumLea
 
   if (!myLeague) {
     return (
-      <div className="bg-ccb-card border border-ccb-border rounded-2xl p-8 text-center">
+      <div className="card p-8 text-center">
         <Trophy className="w-8 h-8 text-ccb-muted mx-auto mb-3" />
         <p className="text-sm text-ccb-muted">No active league season right now.</p>
       </div>
@@ -234,7 +234,7 @@ export default function LiveSeasonTab({ premiumData }: { premiumData: PremiumLea
   return (
     <div className="space-y-4">
       {/* SPONSORED LEAGUE HEADER */}
-      <div className="bg-ccb-card border border-ccb-border rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+      <div className="card px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           {(() => {
             const Icon = LEAGUE_ICONS[myLeague.tier] || Trophy;
@@ -261,7 +261,7 @@ export default function LiveSeasonTab({ premiumData }: { premiumData: PremiumLea
 
       {/* PLAYER RANK CARD */}
       {userStanding ? (
-        <div className="bg-ccb-card border border-ccb-primary/30 rounded-2xl p-4">
+        <div className="card border-ccb-primary/30 p-4">
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Your Position</span>
             {userStanding.form && userStanding.form.length > 0 && (
@@ -298,7 +298,7 @@ export default function LiveSeasonTab({ premiumData }: { premiumData: PremiumLea
           )}
         </div>
       ) : (
-        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 text-center">
+        <div className="card p-4 text-center">
           <p className="text-xs text-ccb-muted">
             You&apos;re not in this league yet.
             {myLeague.qualification?.canJoin && <span> Join mid-season to start playing!</span>}
@@ -331,7 +331,7 @@ export default function LiveSeasonTab({ premiumData }: { premiumData: PremiumLea
           <Loader2 className="w-6 h-6 text-ccb-primary animate-spin" />
         </div>
       ) : tab === 'standings' ? (
-        <div className="bg-ccb-card border border-ccb-border rounded-2xl overflow-hidden">
+        <div className="card overflow-hidden p-0">
           {(promotesCount > 0 || relegatesCount > 0) && (
             <div className="flex items-center gap-3 px-3 py-2 border-b border-ccb-border text-[10px]">
               {promotesCount > 0 && <span className="flex items-center gap-1 text-ccb-success"><span className="w-2 h-2 rounded-full bg-ccb-success" /> Top {promotesCount} promote</span>}
@@ -360,7 +360,7 @@ export default function LiveSeasonTab({ premiumData }: { premiumData: PremiumLea
           {upcoming.length > 0 ? (
             <>
               {userId && upcoming.find(f => f.home_player_id === userId || f.away_player_id === userId) && (
-                <div className="bg-ccb-card border border-ccb-primary/30 rounded-2xl p-4">
+                <div className="card border-ccb-primary/30 p-4">
                   <div className="flex items-center gap-1.5 mb-3">
                     <Swords className="w-3.5 h-3.5 text-ccb-primary" />
                     <span className="text-[10px] font-bold uppercase tracking-wider text-ccb-primary">Your Match</span>
@@ -368,13 +368,13 @@ export default function LiveSeasonTab({ premiumData }: { premiumData: PremiumLea
                   <FixtureCard fixture={upcoming.find(f => f.home_player_id === userId || f.away_player_id === userId)!} userId={userId} />
                 </div>
               )}
-              <div className="bg-ccb-card border border-ccb-border rounded-2xl p-3 space-y-2">
+              <div className="card p-3 space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted px-1 mb-1">Matchday {league?.currentMatchday} · Other Fixtures</p>
                 {upcoming.filter(f => !userId || (f.home_player_id !== userId && f.away_player_id !== userId)).map(f => <FixtureCard key={f.id} fixture={f} userId={userId} compact />)}
               </div>
             </>
           ) : (
-            <div className="bg-ccb-card border border-ccb-border rounded-2xl p-8 text-center">
+            <div className="card p-8 text-center">
               <Calendar className="w-7 h-7 text-ccb-muted mx-auto mb-2" />
               <p className="text-sm text-ccb-muted">No fixtures scheduled for this matchday.</p>
             </div>
@@ -383,12 +383,12 @@ export default function LiveSeasonTab({ premiumData }: { premiumData: PremiumLea
       ) : (
         <div className="space-y-2">
           {results.length > 0 ? (
-            <div className="bg-ccb-card border border-ccb-border rounded-2xl p-3 space-y-2">
+            <div className="card p-3 space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted px-1 mb-1">Matchday {homeData?.latestResults?.matchday} · Results</p>
               {results.map(f => <ResultCard key={f.id} fixture={f} userId={userId} />)}
             </div>
           ) : (
-            <div className="bg-ccb-card border border-ccb-border rounded-2xl p-8 text-center">
+            <div className="card p-8 text-center">
               <Gamepad2 className="w-7 h-7 text-ccb-muted mx-auto mb-2" />
               <p className="text-sm text-ccb-muted">No results yet — first matchday hasn&apos;t been played.</p>
             </div>

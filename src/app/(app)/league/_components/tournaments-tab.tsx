@@ -155,10 +155,10 @@ export default function TournamentsTab() {
       {/* TOURNAMENTS */}
       {loading ? (
         <div className="space-y-3 animate-pulse">
-          {[1, 2, 3].map(i => <div key={i} className="bg-ccb-card border border-ccb-border rounded-2xl h-36" />)}
+          {[1, 2, 3].map(i => <div key={i} className="card h-36" />)}
         </div>
       ) : error ? (
-        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-8 text-center">
+        <div className="card p-8 text-center">
           <ShieldAlert className="w-8 h-8 text-ccb-danger mx-auto mb-3" />
           <p className="text-sm text-ccb-muted">{error}</p>
           <button onClick={fetchData} className="mt-3 btn-primary text-xs">
@@ -166,7 +166,7 @@ export default function TournamentsTab() {
           </button>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-8 text-center">
+        <div className="card p-8 text-center">
           <Swords className="w-10 h-10 text-ccb-muted mx-auto mb-3" />
           <h3 className="font-bold mb-1 text-sm">No tournaments yet</h3>
           <p className="text-xs text-ccb-muted">Tournaments will appear here when they are scheduled.</p>
