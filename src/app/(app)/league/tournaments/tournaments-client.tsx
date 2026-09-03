@@ -141,12 +141,9 @@ export default function TournamentsPage() {
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Tournaments</h1>
           <p className="text-sm text-ccb-muted mt-1">Swiss · Arena · Knockout — play, climb, win.</p>
-          <div className="flex items-center gap-4 mt-4">
-            <Link href="/league" className="text-xs font-bold text-ccb-accent hover:underline flex items-center gap-1">
-              <Crown className="w-3.5 h-3.5" /> Premium Leagues
-            </Link>
-            <Link href="/league" className="text-xs font-bold text-ccb-muted hover:text-ccb-text flex items-center gap-1">
-              <Crown className="w-3.5 h-3.5" /> Leagues
+          <div className="flex items-center gap-2 mt-4">
+            <Link href="/league" className="btn-secondary text-xs px-3.5 py-2">
+              <Crown className="w-3.5 h-3.5" /> View Leagues
             </Link>
           </div>
         </div>

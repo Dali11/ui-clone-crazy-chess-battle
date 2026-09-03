@@ -224,14 +224,14 @@ export default async function DashboardPage() {
         <div className="card p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-base sm:text-lg">Competitions</h3>
-            <Link href="/league" className="text-xs text-ccb-primary hover:underline">View all</Link>
+            <Link href="/tournaments" className="text-xs text-ccb-primary hover:underline">View all</Link>
           </div>
           {activeTournaments && activeTournaments.length > 0 ? (
             <div className="space-y-2">
               {activeTournaments.map((t) => (
                 <Link
                   key={t.id}
-                  href={`/league`}
+                  href={`/tournament/${t.id}`}
                   className="flex items-center justify-between rounded-lg bg-ccb-surface px-3 py-2.5 sm:px-4 sm:py-3 hover:bg-ccb-card transition-colors"
                 >
                   <div className="min-w-0 flex items-center gap-2">

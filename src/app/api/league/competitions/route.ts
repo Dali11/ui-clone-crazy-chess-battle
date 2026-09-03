@@ -25,42 +25,82 @@ export async function GET(request: NextRequest) {
 
     const market = await getMarketConfig(profile?.country);
 
-    // Get membership status
-    let membership: any = null;
-    if (user) {
-      const { data: membershipData } = await admin
-        .from('memberships')
-        .select('*')
-        .eq('player_id', user.id)
-        .eq('status', 'active')
-        .gt('end_date', new Date().toISOString())
-        .limit(1)
-        .single();
-      membership = membershipData;
-    }
+    // ============================================================
+    // First wave — run all independent fetches in parallel
+    // (previously these were sequential, and everything below them was
+    // 2 queries PER league / PER tournament in a loop)
+    // ============================================================
+
+    const membershipPromise: any = user
+      ? admin
+          .from('memberships')
+          .select('*')
+          .eq('player_id', user.id)
+          .eq('status', 'active')
+          .gt('end_date', new Date().toISOString())
+          .limit(1)
+          .single()
+      : Promise.resolve({ data: null });
 
     // ============================================================
     // PREMIUM LEAGUES (tiered, gender-separated)
     // ============================================================
 
-    const { data: leagues, error: leagueError } = await admin
+    const leaguesPromise = admin
       .from('premier_leagues')
       .select('*')
       .order('tier', { ascending: true })
       .order('created_at', { ascending: false });
 
+    // ============================================================
+    // TOURNAMENTS (Swiss — open to all players; each tournament sets its own optional player cap and free/paid entry fee)
+    // ============================================================
+
+    const tournamentsPromise = admin
+      .from('tournaments')
+      .select('*')
+      .in('status', ['upcoming', 'active', 'pending_approval', 'completed', 'finished'])
+      .order('starts_at', { ascending: true })
+      .limit(50);
+
+    const [membershipRes, leaguesRes, tournamentsRes] = await Promise.all([membershipPromise, leaguesPromise, tournamentsPromise]);
+    const membership = membershipRes?.data || null;
+    const { data: leagues, error: leagueError } = leaguesRes;
+    const { data: tournaments, error: tournamentError } = tournamentsRes;
+
     const tiered: Record<number, { men: any[]; women: any[]; open: any[] }> = {};
 
+    // ── Batched league queries (2 round trips instead of 2 per league) ──
+    const leagueIds = (leagues || []).map((l: any) => l.id);
+    const [leagueRegsRes, myLeagueRegsRes] = await Promise.all([
+      leagueIds.length
+        ? admin
+            .from('league_registrations')
+            .select('league_id, status')
+            .in('league_id', leagueIds)
+            .in('status', ['pending', 'approved'])
+        : Promise.resolve({ data: [] as any[] }),
+      user && leagueIds.length
+        ? admin
+            .from('league_registrations')
+            .select('league_id, id, status')
+            .eq('player_id', user.id)
+            .in('league_id', leagueIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    // pending/approved registration counts per league (matches the old per-league head-count)
+    const leagueRegCounts: Record<string, number> = {};
+    for (const r of (leagueRegsRes.data || [])) {
+      leagueRegCounts[r.league_id] = (leagueRegCounts[r.league_id] || 0) + 1;
+    }
+    // the current user's registration per league (any status — matches the old per-league single())
+    const myLeagueRegs = new Map<string, any>();
+    for (const r of (myLeagueRegsRes.data || [])) {
+      if (!myLeagueRegs.has(r.league_id)) myLeagueRegs.set(r.league_id, r);
+    }
+
     for (const league of (leagues || [])) {
-      let registrationCount = 0;
-      if (league.status === 'registration') {
-        const { count } = await admin
-          .from('league_registrations')
-          .select('id', { count: 'exact', head: true })
-          .eq('league_id', league.id)
-          .in('status', ['pending', 'approved']);
-        registrationCount = count || 0;
-      }
+      let registrationCount = league.status === 'registration' ? (leagueRegCounts[league.id] || 0) : 0;
       // Use registration count as source of truth
       const playerCount = registrationCount || league.player_ids?.length || 0;
 
@@ -69,12 +109,7 @@ export async function GET(request: NextRequest) {
 
       if (user) {
         const isPlayer = league.player_ids?.includes(user.id);
-        const { data: existingReg } = await admin
-          .from('league_registrations')
-          .select('*')
-          .eq('league_id', league.id)
-          .eq('player_id', user.id)
-          .single();
+        const existingReg = myLeagueRegs.get(league.id) || null;
 
         if (isPlayer) {
           qualification = { canJoin: false, reason: 'already_joined', status: 'participating' };
@@ -162,37 +197,40 @@ export async function GET(request: NextRequest) {
       else tiered[tier].open.push(comp);
     }
 
-    // ============================================================
-    // TOURNAMENTS (Swiss — open to all players; each tournament sets its own optional player cap and free/paid entry fee)
-    // ============================================================
-
-    const { data: tournaments, error: tournamentError } = await admin
-      .from('tournaments')
-      .select('*')
-      .in('status', ['upcoming', 'active', 'pending_approval', 'completed', 'finished'])
-      .order('starts_at', { ascending: true })
-      .limit(50);
-
     const tournamentList: any[] = [];
 
+    // ── Batched tournament queries (2 round trips instead of 2 per tournament) ──
+    const tournamentIds = (tournaments || []).map((t: any) => t.id);
+    const [tParticipantsRes, myTParticipantsRes] = await Promise.all([
+      tournamentIds.length
+        ? admin
+            .from('tournament_participants')
+            .select('tournament_id')
+            .in('tournament_id', tournamentIds)
+        : Promise.resolve({ data: [] as any[] }),
+      user && tournamentIds.length
+        ? admin
+            .from('tournament_participants')
+            .select('tournament_id')
+            .eq('player_id', user.id)
+            .in('tournament_id', tournamentIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const tParticipantCounts: Record<string, number> = {};
+    for (const r of (tParticipantsRes.data || [])) {
+      tParticipantCounts[r.tournament_id] = (tParticipantCounts[r.tournament_id] || 0) + 1;
+    }
+    const myTournamentIds = new Set((myTParticipantsRes.data || []).map((r: any) => r.tournament_id));
+
     for (const tournament of (tournaments || [])) {
-      const { count: participantCount } = await admin
-        .from('tournament_participants')
-        .select('id', { count: 'exact', head: true })
-        .eq('tournament_id', tournament.id);
+      const participantCount = tParticipantCounts[tournament.id] || 0;
 
       let isRegistered = false;
       let canJoin = true;
       let reason = null;
 
       if (user) {
-        const { data: existing } = await admin
-          .from('tournament_participants')
-          .select('id')
-          .eq('tournament_id', tournament.id)
-          .eq('player_id', user.id)
-          .single();
-        isRegistered = !!existing;
+        isRegistered = myTournamentIds.has(tournament.id);
       }
 
       if (isRegistered) { canJoin = false; reason = 'already_registered'; }
