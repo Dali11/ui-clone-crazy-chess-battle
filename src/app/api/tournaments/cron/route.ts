@@ -27,26 +27,19 @@ export async function POST(req: NextRequest) {
 let lastCronRunMs = 0;
 const CRON_THROTTLE_MS = 30_000;
 
-// Auth: Bearer CRON_SECRET (Vercel Cron on Pro sends it automatically).
-// GET is also accepted without a secret: the CronHeartbeat component has
-// every open browser ping this endpoint every 5 minutes, which is the
-// sub-daily cadence source on the Hobby plan (Vercel Cron runs at most
-// once a day there). All sweeps are time-gated and idempotent, so an
-// unauthenticated GET can only make scheduled work run on time, never
-// early or twice. POST always requires the secret.
+// Auth: Bearer CRON_SECRET. Vercel Cron (Pro) sends this automatically on
+// its native */5 schedule — the browser heartbeat that previously carried
+// the sub-daily cadence (a Hobby-plan workaround) has been retired.
+// Deliberately NO x-vercel-cron bypass: that header is client-settable and
+// would let anyone skip the secret.
 function verifyCronAuth(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return true;
-  const authHeader = req.headers.get("authorization");
-  if (authHeader === `Bearer ${cronSecret}`) return true;
-  if (req.headers.get("x-vercel-cron") === "1") return true;
-  return false;
+  return req.headers.get("authorization") === `Bearer ${cronSecret}`;
 }
 
 async function handleTournamentCron(req: NextRequest) {
-  const authorized = verifyCronAuth(req);
-  const isGet = req.method === "GET";
-  if (!authorized && !isGet) {
+  if (!verifyCronAuth(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

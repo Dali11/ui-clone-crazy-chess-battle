@@ -17,10 +17,9 @@ import { settleBattle } from "@/lib/battles/settle";
 function verifyCronAuth(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return true;
-  const authHeader = req.headers.get("authorization");
-  if (authHeader === `Bearer ${cronSecret}`) return true;
-  if (req.headers.get("x-vercel-cron") === "1") return true;
-  return false;
+  // No x-vercel-cron bypass: that header is client-settable and would
+  // let anyone skip the secret.
+  return req.headers.get("authorization") === `Bearer ${cronSecret}`;
 }
 
 const TIME_CONTROLS: Record<string, { minutes: number; increment: number }> = {
