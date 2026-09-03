@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Security migration: hardens wallet SQL functions and adds DB-level constraints.
- * Uses the same direct DATABASE_URL connection pattern as migrate-spectator-count.
+ * Direct DATABASE_URL connection pattern (pg Client).
  * Protected by CRON_SECRET. Idempotent.
  */
 
