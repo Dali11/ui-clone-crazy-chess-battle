@@ -80,7 +80,12 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
   // stakes need a winner, and tournament rules already treat misses as
   // forfeits.
   const prospectiveWinner = loser === "white" ? "black" : "white";
-  if (!game.tournament_id && !battle && !canSideMate(game.fen, prospectiveWinner)) {
+  // Battles ARE included: a timeout win with no mating material is just as
+  // hollow when stakes are on the line — settleBattle(null) routes it into
+  // the battle-draw flow (armageddon decider, or stake refunds after max
+  // rounds). Tournaments stay decisive: brackets must advance and their
+  // forfeit rule fires long before material becomes a factor.
+  if (!game.tournament_id && !canSideMate(game.fen, prospectiveWinner)) {
     const { data: claimedDraw } = await admin
       .from("games")
       .update({
@@ -134,6 +139,16 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
       });
     } catch (e) {
       console.error("[timeout] League processing failed for draw game", game.id, e);
+    }
+
+    // Battle: the game itself is a draw, so the battle follows the standard
+    // battle-draw flow — armageddon decider round (or refund after max
+    // rounds). If THIS game is already the armageddon decider, the draw
+    // bumps the round just like an agreed-draw decider would.
+    if (battle) {
+      await settleBattle(battle.id, null, "draw_timeout_insufficient_material").catch((e) =>
+        console.error("[timeout] Battle draw settlement failed for game", game.id, e)
+      );
     }
 
     return { status: "draw" as const, winner: null };
