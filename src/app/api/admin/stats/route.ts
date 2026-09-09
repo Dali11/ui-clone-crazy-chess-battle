@@ -221,14 +221,17 @@ export async function GET(req: NextRequest) {
       .map(([code, count]) => ({ code, count }))
       .sort((a, b) => b.count - a.count);
 
-    const countryIds: string[] | null = country !== "all"
-      ? allProfiles.filter((p: any) => p.country === country).map((p: any) => p.id)
+    const countryIdSet: Set<string> | null = country !== "all"
+      ? new Set(allProfiles.filter((p: any) => p.country === country).map((p: any) => p.id))
       : null;
-    const noCountryMatch = countryIds !== null && countryIds.length === 0;
+    const noCountryMatch = countryIdSet !== null && countryIdSet.size === 0;
 
+    // NOTE: country filtering happens IN MEMORY via countryIdSet, never via
+    // .in(user_id, [...]) URL filters — 200+ UUIDs in a query string blows
+    // past the ~8KB gateway URL limit and the request starts failing.
     const newUsersInRange = allProfiles.filter((p: any) => {
       if (new Date(p.created_at).getTime() < new Date(sinceISO).getTime()) return false;
-      if (countryIds && !countryIds.includes(p.id)) return false;
+      if (countryIdSet && !countryIdSet.has(p.id)) return false;
       return true;
     }).length;
 
@@ -236,14 +239,12 @@ export async function GET(req: NextRequest) {
     let depositsInRange = 0;
     const depositSeries = new Array(buckets.length).fill(0);
     if (!noCountryMatch) {
-      const rows = await fetchAll(() => {
-        let q = admin.from("deposits").select("created_at, amount, user_id")
+      const rows = await fetchAll(() =>
+        admin.from("deposits").select("created_at, amount, user_id")
           .eq("status", "success").in("method", ["mobile_money", "card"])
-          .gte("created_at", sinceISO);
-        if (countryIds) q = q.in("user_id", countryIds);
-        return q;
-      });
+          .gte("created_at", sinceISO));
       for (const r of rows) {
+        if (countryIdSet && !countryIdSet.has(r.user_id)) continue;
         depositsInRange += r.amount || 0;
         const idx = bucketIndexFor(buckets, r.created_at);
         if (idx >= 0) depositSeries[idx] += r.amount || 0;
@@ -254,13 +255,11 @@ export async function GET(req: NextRequest) {
     let withdrawalsInRange = 0;
     const withdrawalSeries = new Array(buckets.length).fill(0);
     if (!noCountryMatch) {
-      const rows = await fetchAll(() => {
-        let q = admin.from("withdrawals").select("created_at, amount, user_id")
-          .eq("status", "completed").gte("created_at", sinceISO);
-        if (countryIds) q = q.in("user_id", countryIds);
-        return q;
-      });
+      const rows = await fetchAll(() =>
+        admin.from("withdrawals").select("created_at, amount, user_id")
+          .eq("status", "completed").gte("created_at", sinceISO));
       for (const r of rows) {
+        if (countryIdSet && !countryIdSet.has(r.user_id)) continue;
         withdrawalsInRange += r.amount || 0;
         const idx = bucketIndexFor(buckets, r.created_at);
         if (idx >= 0) withdrawalSeries[idx] += r.amount || 0;
@@ -272,16 +271,11 @@ export async function GET(req: NextRequest) {
     let battleRevenueInRange = 0;
     const revenueSeries = new Array(buckets.length).fill(0);
     if (!noCountryMatch) {
-      const rows = await fetchAll(() => {
-        let q = admin.from("battles").select("created_at, pot, platform_fee, white_player_id, black_player_id")
-          .eq("status", "completed").eq("settled", true).gte("created_at", sinceISO);
-        if (countryIds) {
-          const idList = countryIds.join(",");
-          q = q.or(`white_player_id.in.(${idList}),black_player_id.in.(${idList})`);
-        }
-        return q;
-      });
+      const rows = await fetchAll(() =>
+        admin.from("battles").select("created_at, pot, platform_fee, white_player_id, black_player_id")
+          .eq("status", "completed").eq("settled", true).gte("created_at", sinceISO));
       for (const r of rows) {
+        if (countryIdSet && !countryIdSet.has(r.white_player_id) && !countryIdSet.has(r.black_player_id)) continue;
         battleVolumeInRange += r.pot || 0;
         battleRevenueInRange += r.platform_fee || 0;
         const idx = bucketIndexFor(buckets, r.created_at);
@@ -293,17 +287,12 @@ export async function GET(req: NextRequest) {
     let gamesInRange = 0;
     const gamesSeries = new Array(buckets.length).fill(0);
     if (!noCountryMatch) {
-      const rows = await fetchAll(() => {
-        let q = admin.from("games").select("created_at, white_player_id, black_player_id")
-          .gte("created_at", sinceISO);
-        if (countryIds) {
-          const idList = countryIds.join(",");
-          q = q.or(`white_player_id.in.(${idList}),black_player_id.in.(${idList})`);
-        }
-        return q;
-      });
-      gamesInRange = rows.length;
+      const rows = await fetchAll(() =>
+        admin.from("games").select("created_at, white_player_id, black_player_id")
+          .gte("created_at", sinceISO));
       for (const r of rows) {
+        if (countryIdSet && !countryIdSet.has(r.white_player_id) && !countryIdSet.has(r.black_player_id)) continue;
+        gamesInRange += 1;
         const idx = bucketIndexFor(buckets, r.created_at);
         if (idx >= 0) gamesSeries[idx] += 1;
       }
