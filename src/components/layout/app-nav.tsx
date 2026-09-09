@@ -48,11 +48,12 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     return () => { document.body.style.overflow = ""; };
   }, [menuOpen]);
 
-  // Bottom nav: Play · Battles · History · Tournaments · Leagues
+  // Bottom nav: Play · Battles · Live · Tournaments · Leagues
+  // (Game History stays reachable via the menu and the desktop nav)
   const bottomNav = [
     { href: "/play", label: "Play", icon: Swords },
     { href: "/battles", label: "Battles", icon: Coins },
-    { href: "/history", label: "History", icon: Clock },
+    { href: "/live", label: "Live", icon: Radio },
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/league", label: "Leagues", icon: Crown },
   ];
