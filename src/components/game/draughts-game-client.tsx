@@ -455,6 +455,24 @@ export default function DraughtsGameClient({
     };
   }, [game.move_count, game.last_move_at, game.created_at, currentDbTurn, game.status, gameEnded, clockTick]);
 
+  // Memoized board element — stable identity across the 1s clock tick so
+  // React skips reconciling the 100-cell board subtree. Prevents stutter
+  // on low-end phones (same fix as the chess board).
+  const draughtsBoardElement = useMemo(() => (
+    <DraughtsBoard
+      boardTheme={boardTheme}
+      board={board}
+      perspective={perspective}
+      selected={selected}
+      legalMoves={legalMoves}
+      mustContinueJump={mustContinueJump}
+      onSquareClick={handleSquareClick}
+      lastMove={lastMove}
+      interactive={myTurn && !submitting && isLiveView}
+    />
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [boardTheme, board, perspective, selected, legalMoves, mustContinueJump, handleSquareClick, lastMove, myTurn, submitting, isLiveView]);
+
   // Player bar renderer — chess.com style with avatar, name, rating, clock
   const renderPlayerBar = (data: {
     userId?: string;
@@ -599,17 +617,7 @@ export default function DraughtsGameClient({
                 </span>
               </div>
             )}
-            <DraughtsBoard
-              boardTheme={boardTheme}
-              board={board}
-              perspective={perspective}
-              selected={selected}
-              legalMoves={legalMoves}
-              mustContinueJump={mustContinueJump}
-              onSquareClick={handleSquareClick}
-              lastMove={lastMove}
-              interactive={myTurn && !submitting && isLiveView}
-            />
+            {draughtsBoardElement}
           </div>
 
           {/* My bar (bottom) */}

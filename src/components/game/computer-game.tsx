@@ -620,6 +620,36 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
   // Show past position when reviewing moves
   const displayFen = reviewFen ?? fen;
 
+  // Memoized board element — stable identity across the 1s clock tick so
+  // React skips reconciling the 64-square board subtree mid-drag. Prevents
+  // piece stutter on low-end phones ("pieces stuck in mud").
+  const chessboardElement = useMemo(() => (
+    <Chessboard
+      options={{
+        position: displayFen,
+        pieces: customPieces,
+        boardOrientation: isPlayerWhite ? "white" : "black",
+        onPieceDrop: ({ sourceSquare, targetSquare }) => {
+          if (!targetSquare) return false;
+          return onDrop(sourceSquare, targetSquare);
+        },
+        allowDragging: !gameEnded && isLiveView,
+        squareStyles: squareStyles,
+        showAnimations: false,
+        animationDurationInMs: 0,
+        showNotation: true,
+        darkSquareNotationStyle: { color: boardTheme.light, fontSize: "10px", fontWeight: 600 },
+        lightSquareNotationStyle: { color: boardTheme.dark, fontSize: "10px", fontWeight: 600 },
+        onPieceClick: handlePieceClick,
+        onSquareClick: handleSquareClick,
+        darkSquareStyle: { backgroundColor: boardTheme.dark },
+        lightSquareStyle: { backgroundColor: boardTheme.light },
+        boardStyle: { borderRadius: "8px", overflow: "hidden" },
+      }}
+    />
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [displayFen, isPlayerWhite, gameEnded, isLiveView, squareStyles, boardTheme, onDrop, handlePieceClick, handleSquareClick]);
+
   useEffect(() => {
     if (viewPly === 0 || moveHistory.length === 0) {
       setReviewFen(null);
@@ -703,27 +733,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
           {/* Chessboard — flexible, fills remaining space, never forces scroll */}
           <div ref={boardContainerRef} className="flex-1 min-h-0 flex items-center justify-center px-2 py-1">
             <div style={{ width: boardSize, height: boardSize, colorScheme: "light" }}>
-              <Chessboard options={{
-                position: displayFen,
-                pieces: customPieces,
-                boardOrientation: isPlayerWhite ? "white" : "black",
-                onPieceDrop: ({ sourceSquare, targetSquare }) => {
-                  if (!targetSquare) return false;
-                  return onDrop(sourceSquare, targetSquare);
-                },
-                allowDragging: !gameEnded && isLiveView,
-                squareStyles: squareStyles,
-                showAnimations: false,
-                animationDurationInMs: 0,
-                showNotation: true,
-                darkSquareNotationStyle: { color: boardTheme.light, fontSize: "10px", fontWeight: 600 },
-                lightSquareNotationStyle: { color: boardTheme.dark, fontSize: "10px", fontWeight: 600 },
-                onPieceClick: handlePieceClick,
-                onSquareClick: handleSquareClick,
-                darkSquareStyle: { backgroundColor: boardTheme.dark },
-                lightSquareStyle: { backgroundColor: boardTheme.light },
-                boardStyle: { borderRadius: "8px", overflow: "hidden" },
-              }} />
+              {chessboardElement}
             </div>
           </div>
 

@@ -833,6 +833,40 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   // 'isWaiting' before initialization".
   const isWaiting = game.status === "waiting" && game.scheduled_start;
 
+  // Memoized board element — identity stays stable across the 1s clock
+  // tick, chat unread updates, draw-offer state, spectator counts, etc.
+  // React bails out of reconciling the 64-square board subtree entirely
+  // when the element reference is unchanged. Previously every clock tick
+  // rebuilt the whole board (64 squares + dnd-kit tree) mid-drag, which
+  // caused visible piece stutter on low-end phones — the "pieces stuck
+  // in mud" report. Only genuinely board-relevant deps are listed.
+  const chessboardElement = useMemo(() => (
+    <Chessboard
+      options={{
+        position: displayFen,
+        pieces: customPieces,
+        boardOrientation: isWhite || isSpectator ? "white" : "black",
+        onPieceDrop: ({ sourceSquare, targetSquare }) => {
+          if (!targetSquare) return false;
+          return onDrop(sourceSquare, targetSquare);
+        },
+        allowDragging: !gameEnded && !isSpectator && isLiveView && !isWaiting,
+        squareStyles: squareStyles,
+        showAnimations: false,
+        animationDurationInMs: 0,
+        showNotation: true,
+        darkSquareNotationStyle: { color: boardTheme.light, fontSize: "10px", fontWeight: 600 },
+        lightSquareNotationStyle: { color: boardTheme.dark, fontSize: "10px", fontWeight: 600 },
+        onPieceClick: handlePieceClick,
+        onSquareClick: handleSquareClick,
+        darkSquareStyle: { backgroundColor: boardTheme.dark },
+        lightSquareStyle: { backgroundColor: boardTheme.light },
+        boardStyle: { borderRadius: "6px", overflow: "hidden" },
+      }}
+    />
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [displayFen, isWhite, isSpectator, gameEnded, isLiveView, isWaiting, squareStyles, boardTheme, onDrop, handlePieceClick, handleSquareClick]);
+
   // ============ SHARED BOARD COLUMN ============
   const boardColumn = (topPlayer: any, bottomPlayer: any, showControls: boolean) => (
     <div className="relative flex flex-col h-full w-full lg:w-[600px] lg:max-w-[600px] lg:h-auto lg:shrink-0 lg:my-auto">
@@ -903,27 +937,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       {/* Board */}
       <div ref={boardContainerRef} className="relative flex-1 min-h-0 flex items-center justify-center px-2 py-1">
         <div style={{ width: boardSize, height: boardSize, colorScheme: "light" }} className="relative">
-          <Chessboard options={{
-            position: displayFen,
-            pieces: customPieces,
-            boardOrientation: isWhite || isSpectator ? "white" : "black",
-            onPieceDrop: ({ sourceSquare, targetSquare }) => {
-              if (!targetSquare) return false;
-              return onDrop(sourceSquare, targetSquare);
-            },
-            allowDragging: !gameEnded && !isSpectator && isLiveView && !isWaiting,
-            squareStyles: squareStyles,
-            showAnimations: false,
-            animationDurationInMs: 0,
-            showNotation: true,
-            darkSquareNotationStyle: { color: boardTheme.light, fontSize: "10px", fontWeight: 600 },
-            lightSquareNotationStyle: { color: boardTheme.dark, fontSize: "10px", fontWeight: 600 },
-            onPieceClick: handlePieceClick,
-            onSquareClick: handleSquareClick,
-            darkSquareStyle: { backgroundColor: boardTheme.dark },
-            lightSquareStyle: { backgroundColor: boardTheme.light },
-            boardStyle: { borderRadius: "6px", overflow: "hidden" },
-          }} />
+          {chessboardElement}
           {isWaiting && (
             <PreGameCountdown
               scheduledStart={game.scheduled_start ?? null}
