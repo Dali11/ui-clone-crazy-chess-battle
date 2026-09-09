@@ -307,53 +307,130 @@ function GroupedBarChart({
     return <p className="text-sm text-ccb-muted py-6 text-center">No data for this period.</p>;
   }
 
-  const max = Math.max(1, ...series.flatMap((s) => bars.map((b) => Number(s[b.key]) || 0)));
-  // Show every Nth label if there are many buckets, to avoid crowding the x-axis.
-  const labelStep = series.length > 20 ? Math.ceil(series.length / 10) : series.length > 10 ? 2 : 1;
+  // Resolve Tailwind bg classes to hex fills for SVG rects.
+  const FILL: Record<string, string> = {
+    "bg-ccb-primary": "#7c3aed",
+    "bg-ccb-accent": "#f59e0b",
+    "bg-ccb-success": "#10b981",
+    "bg-ccb-danger": "#ef4444",
+    "bg-ccb-gold": "#fbbf24",
+  };
+
+  const W = 800;
+  const H = 300;
+  const M = { top: 12, right: 12, bottom: 46, left: 76 }; // margins
+  const plotW = W - M.left - M.right;
+  const plotH = H - M.top - M.bottom;
+
+  const rawMax = Math.max(1, ...series.flatMap((s) => bars.map((b) => Number(s[b.key]) || 0)));
+  // "Nice" axis max: round up to 1/2/2.5/5 × 10^k so tick labels are readable.
+  const mag = Math.pow(10, Math.floor(Math.log10(rawMax)));
+  const norm = rawMax / mag;
+  const niceMax = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+  const TICKS = 4; // gridlines at 0/25/50/75/100%
+
+  const n = series.length;
+  const slotW = plotW / n;
+  const barGroupW = slotW * 0.7;
+  const barW = barGroupW / bars.length;
+
+  const y = (v: number) => M.top + plotH - (v / niceMax) * plotH;
+
+  const labelStep = n > 20 ? Math.ceil(n / 10) : n > 10 ? 2 : 1;
+  const [hover, setHover] = useState<number | null>(null);
 
   return (
     <div>
       {bars.length > 1 && (
-        <div className="flex items-center gap-4 mb-3 text-xs">
+        <div className="flex items-center gap-4 mb-2 text-xs">
           {bars.map((b) => (
             <div key={String(b.key)} className="flex items-center gap-1.5">
-              <span className={`w-2.5 h-2.5 rounded-full ${b.color}`} />
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: FILL[b.color] || "#7c3aed" }} />
               <span className="text-ccb-muted">{b.label}</span>
             </div>
           ))}
         </div>
       )}
-      <div className="flex items-end gap-1 h-36">
-        {series.map((point, i) => (
-          <div key={i} className="flex-1 h-full flex items-end justify-center gap-0.5 group relative">
-            {bars.map((b) => {
-              const v = Number(point[b.key]) || 0;
-              const pct = Math.max(v > 0 ? 2 : 0, (v / max) * 100);
-              return (
-                <div
-                  key={String(b.key)}
-                  className={`flex-1 rounded-t-sm ${b.color} transition-all`}
-                  style={{ height: `${pct}%` }}
-                  title={`${point.label}: ${b.label} ${formatValue(v)}`}
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto select-none" role="img">
+          {/* gridlines + Y axis tick labels */}
+          {Array.from({ length: TICKS + 1 }).map((_, t) => {
+            const v = (niceMax / TICKS) * t;
+            const yy = y(v);
+            return (
+              <g key={t}>
+                <line x1={M.left} x2={W - M.right} y1={yy} y2={yy} stroke="#2a2a3e" strokeWidth={t === 0 ? 1.5 : 1} />
+                <text x={M.left - 8} y={yy + 4} textAnchor="end" fontSize={12} fill="#9ca3af">
+                  {t === 0 ? "0" : formatValue(v)}
+                </text>
+              </g>
+            );
+          })}
+          {/* Y axis line */}
+          <line x1={M.left} x2={M.left} y1={M.top} y2={M.top + plotH} stroke="#3a3a4e" strokeWidth={1.5} />
+
+          {/* bars */}
+          {series.map((point, i) => {
+            const cx = M.left + slotW * i + slotW / 2;
+            const isHover = hover === i;
+            return (
+              <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
+                {/* hover slot background */}
+                <rect
+                  x={M.left + slotW * i} y={M.top} width={slotW} height={plotH}
+                  fill={isHover ? "#ffffff08" : "transparent"}
                 />
-              );
-            })}
-            {/* Tooltip on hover */}
-            <div className="absolute bottom-full mb-1 hidden group-hover:flex flex-col items-center bg-ccb-dark border border-ccb-border rounded px-2 py-1 text-[10px] whitespace-nowrap z-10 shadow-lg">
-              <span className="text-ccb-muted">{point.label}</span>
-              {bars.map((b) => (
-                <span key={String(b.key)}>{b.label}: {formatValue(Number(point[b.key]) || 0)}</span>
-              ))}
-            </div>
+                {bars.map((b, bi) => {
+                  const v = Number(point[b.key]) || 0;
+                  const h = Math.max(v > 0 ? 2 : 0, (v / niceMax) * plotH);
+                  const bx = cx - barGroupW / 2 + barW * bi;
+                  return (
+                    <rect
+                      key={String(b.key)}
+                      x={bx} y={y(v)} width={Math.max(1, barW - 2)} height={h}
+                      rx={2}
+                      fill={FILL[b.color] || "#7c3aed"}
+                      opacity={hover === null || isHover ? 1 : 0.45}
+                    />
+                  );
+                })}
+              </g>
+            );
+          })}
+
+          {/* X axis tick labels */}
+          {series.map((point, i) =>
+            i % labelStep === 0 ? (
+              <text
+                key={i}
+                x={M.left + slotW * i + slotW / 2}
+                y={M.top + plotH + 20}
+                textAnchor="middle" fontSize={12} fill="#9ca3af"
+              >
+                {point.label}
+              </text>
+            ) : null
+          )}
+        </svg>
+
+        {/* Hover tooltip (HTML, positioned over the hovered slot) */}
+        {hover !== null && (
+          <div
+            className="absolute -translate-x-1/2 pointer-events-none z-10 bg-ccb-dark border border-ccb-border rounded px-2.5 py-1.5 text-[11px] whitespace-nowrap shadow-lg"
+            style={{
+              left: `${((M.left + slotW * hover + slotW / 2) / W) * 100}%`,
+              top: 8,
+            }}
+          >
+            <div className="text-ccb-muted font-medium">{series[hover].label}</div>
+            {bars.map((b) => (
+              <div key={String(b.key)} className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full inline-block" style={{ background: FILL[b.color] || "#7c3aed" }} />
+                {b.label}: <span className="font-semibold">{formatValue(Number(series[hover][b.key]) || 0)}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <div className="flex gap-1 mt-1.5">
-        {series.map((point, i) => (
-          <div key={i} className="flex-1 text-center text-[10px] text-ccb-muted truncate">
-            {i % labelStep === 0 ? point.label : ""}
-          </div>
-        ))}
+        )}
       </div>
     </div>
   );
