@@ -1,5 +1,7 @@
 "use client";
 
+import CountryFlag from "./country-flag";
+
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -49,6 +51,8 @@ interface DraughtsGameClientProps {
   blackName?: string;
   whiteAvatar?: string | null;
   blackAvatar?: string | null;
+  whiteCountry?: string | null;
+  blackCountry?: string | null;
 }
 
 export default function DraughtsGameClient({
@@ -58,6 +62,8 @@ export default function DraughtsGameClient({
   blackName = "Black",
   whiteAvatar,
   blackAvatar,
+  whiteCountry,
+  blackCountry,
 }: DraughtsGameClientProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -433,6 +439,7 @@ export default function DraughtsGameClient({
     userId?: string;
     name: string;
     avatar?: string | null;
+    country?: string | null;
     rating?: number | string | null;
     ratingChange?: number | null;
     clock: number;
@@ -450,6 +457,8 @@ export default function DraughtsGameClient({
             <div className={`w-3 h-3 rounded-full ${(data.name === whiteName) ? "bg-stone-100" : "bg-stone-900"}`} />
           )}
         </div>
+        {/* Country flag — multinational platform, shown right after the avatar */}
+        <CountryFlag code={data.country} />
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-1.5">
             <button onClick={() => data.userId && setPreviewUserId(data.userId)} className="text-sm font-semibold leading-tight truncate hover:text-ccb-primary transition-colors cursor-pointer bg-transparent border-0 p-0 m-0 text-inherit text-left">{data.name}</button>
@@ -498,20 +507,20 @@ export default function DraughtsGameClient({
 
   // Determine player data for top/bottom bars
   const opponentData = isWhite
-    ? { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black }
-    : { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white };
+    ? { name: blackName, userId: game.black_player_id, avatar: blackAvatar, country: blackCountry, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black }
+    : { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, country: whiteCountry, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white };
 
   const myData = isWhite
-    ? { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, isMe: true, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white }
-    : { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, isMe: true, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black };
+    ? { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, country: whiteCountry, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, isMe: true, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white }
+    : { name: blackName, userId: game.black_player_id, avatar: blackAvatar, country: blackCountry, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, isMe: true, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black };
 
   // For spectators: white at bottom, black at top
   const topPlayer = isSpectator
-    ? { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black }
+    ? { name: blackName, userId: game.black_player_id, avatar: blackAvatar, country: blackCountry, rating: game.black_rating, ratingChange: game.black_rating_change, clock: blackClockMs, isActive: currentDbTurn === "black" && !gameEnded, materialAdvantage: -materialCount.advantage, pieceCount: materialCount.black }
     : opponentData;
 
   const bottomPlayer = isSpectator
-    ? { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white }
+    ? { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, country: whiteCountry, rating: game.white_rating, ratingChange: game.white_rating_change, clock: whiteClockMs, isActive: currentDbTurn === "white" && !gameEnded, materialAdvantage: materialCount.advantage, pieceCount: materialCount.white }
     : myData;
 
   return (

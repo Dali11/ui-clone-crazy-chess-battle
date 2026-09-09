@@ -64,7 +64,7 @@ function ConnectionStatus({ quality }: { quality: "online" | "reconnecting" | "o
 }
 
 
-export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, battleInfo, tournamentId, countryCode }: GameClientProps) {
+export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, whiteCountry, blackCountry, battleInfo, tournamentId, countryCode }: GameClientProps) {
   const { game, connected, connectionQuality, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw, spectatorCount } = useRealtimeGame(gameId, initialGame, currentUserId);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -807,11 +807,12 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
 
 
-  const renderPlayerBar = (data: { name: string; userId?: string; avatar?: string | null; rating?: number | string | null; ratingChange?: number | null; captured: string[]; advantage: number; clock: string; isActive: boolean; symbol: string }) => (
+  const renderPlayerBar = (data: { name: string; userId?: string; avatar?: string | null; country?: string | null; rating?: number | string | null; ratingChange?: number | null; captured: string[]; advantage: number; clock: string; isActive: boolean; symbol: string }) => (
     <PlayerBar
       name={data.name}
       userId={data.userId}
       avatar={data.avatar}
+      country={data.country}
       rating={data.rating}
       ratingChange={data.ratingChange}
       captured={data.captured}
@@ -1217,8 +1218,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   // ============ SPECTATOR VIEW ============
   if (isSpectator) {
-    const topPlayer = { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" };
-    const bottomPlayer = { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };
+    const topPlayer = { name: blackName, userId: game.black_player_id, avatar: blackAvatar, country: blackCountry, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" };
+    const bottomPlayer = { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, country: whiteCountry, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };
 
     return (
       <>
@@ -1282,12 +1283,12 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   // ============ PLAYER VIEW (also used for waiting state — countdown overlays the board) ============
   const playerData = isWhite
-    ? { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" }
-    : { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };
+    ? { name: blackName, userId: game.black_player_id, avatar: blackAvatar, country: blackCountry, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" }
+    : { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, country: whiteCountry, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" };
 
   const myData = isWhite
-    ? { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" }
-    : { name: blackName, userId: game.black_player_id, avatar: blackAvatar, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" };
+    ? { name: whiteName, userId: game.white_player_id, avatar: whiteAvatar, country: whiteCountry, rating: game.white_rating, ratingChange: game.white_rating_change, captured: captured.white, advantage: captured.advantage, clock: getLiveClock("white"), isActive: game.turn === "white" && !gameEnded, symbol: "♔" }
+    : { name: blackName, userId: game.black_player_id, avatar: blackAvatar, country: blackCountry, rating: game.black_rating, ratingChange: game.black_rating_change, captured: captured.black, advantage: -captured.advantage, clock: getLiveClock("black"), isActive: game.turn === "black" && !gameEnded, symbol: "♚" };
 
   return (
     <>

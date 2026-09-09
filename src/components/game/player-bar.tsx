@@ -3,11 +3,13 @@
 import { memo } from "react";
 import { Clock } from "lucide-react";
 import CapturedPieces from "./captured-pieces";
+import CountryFlag from "./country-flag";
 
 export interface PlayerBarData {
   name: string;
   userId?: string;
   avatar?: string | null;
+  country?: string | null;
   rating?: number | string | null;
   ratingChange?: number | null;
   captured: string[];
@@ -22,7 +24,7 @@ interface PlayerBarProps extends PlayerBarData {
   onPreview: (userId: string) => void;
 }
 
-function PlayerBarBase({ name, userId, avatar, rating, ratingChange, captured, advantage, clock, isActive, symbol, gameEnded, onPreview }: PlayerBarProps) {
+function PlayerBarBase({ name, userId, avatar, country, rating, ratingChange, captured, advantage, clock, isActive, symbol, gameEnded, onPreview }: PlayerBarProps) {
   return (
     <div className={`flex items-center justify-between max-w-[600px] mx-auto w-full px-2 py-2 rounded-lg transition-colors ${isActive ? "bg-ccb-primary/8" : ""}`}>
       <div className="flex items-center gap-2.5 min-w-0">
@@ -34,6 +36,8 @@ function PlayerBarBase({ name, userId, avatar, rating, ratingChange, captured, a
             <span className="text-lg">{symbol}</span>
           )}
         </div>
+        {/* Country flag — multinational platform, shown right after the avatar */}
+        <CountryFlag code={country} />
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-1.5">
             <button onClick={() => userId && onPreview(userId)} className="text-sm font-semibold leading-tight truncate hover:text-ccb-primary transition-colors cursor-pointer bg-transparent border-0 p-0 m-0 text-inherit text-left">{name}</button>
