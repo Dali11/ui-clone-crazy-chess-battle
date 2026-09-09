@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { canSideMate } from "@/lib/game/mating-material";
 import { settleBattle } from "@/lib/battles/settle";
 import { processTournamentGameResult } from "@/lib/tournament/results";
 import { processLeagueGameResult } from "@/lib/league/process-game-result";
@@ -15,6 +16,7 @@ export interface TimeoutableGame {
   black_rating: number | null;
   rated: boolean;
   tournament_id?: string | null;
+  fen?: string | null;
 }
 
 /**
@@ -68,6 +70,73 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
     if (!claimed) return { status: "already_resolved" as const, winner: null };
 
     return { status: "abort" as const, winner: null };
+  }
+
+  // ── Draw by timeout vs insufficient material (FIDE 6.9) ──────────
+  // If the opponent cannot checkmate by any possible series of legal
+  // moves (bare king, king + lone bishop, king + lone knight), a flag
+  // fall is a DRAW, not a win — same rule chess.com applies. Tournament
+  // and battle games still resolve decisively: brackets and escrowed
+  // stakes need a winner, and tournament rules already treat misses as
+  // forfeits.
+  const prospectiveWinner = loser === "white" ? "black" : "white";
+  if (!game.tournament_id && !battle && !canSideMate(game.fen, prospectiveWinner)) {
+    const { data: claimedDraw } = await admin
+      .from("games")
+      .update({
+        status: "draw",
+        winner: null,
+        ended_at: new Date().toISOString(),
+        [`${loser}_clock_ms`]: 0,
+      })
+      .eq("id", game.id)
+      .eq("status", "playing")
+      .select("id")
+      .single();
+
+    if (!claimedDraw) return { status: "already_resolved" as const, winner: null };
+
+    if (game.rated && game.white_rating != null && game.black_rating != null) {
+      const expectedWhite = 1 / (1 + Math.pow(10, (game.black_rating - game.white_rating) / 400));
+      const K = 32;
+      const whiteChange = Math.round(K * (0.5 - expectedWhite));
+      const blackChange = Math.round(K * (0.5 - (1 - expectedWhite)));
+
+      await admin.from("games").update({
+        white_rating_change: whiteChange,
+        black_rating_change: blackChange,
+      }).eq("id", game.id);
+
+      const { data: whiteProfile } = await admin.from("profiles").select("rating, games_played, draws").eq("id", game.white_player_id).single();
+      const { data: blackProfile } = await admin.from("profiles").select("rating, games_played, draws").eq("id", game.black_player_id).single();
+
+      await admin.from("profiles").update({
+        rating: game.white_rating + whiteChange,
+        games_played: (whiteProfile?.games_played ?? 0) + 1,
+        draws: (whiteProfile?.draws ?? 0) + 1,
+      }).eq("id", game.white_player_id);
+
+      await admin.from("profiles").update({
+        rating: game.black_rating + blackChange,
+        games_played: (blackProfile?.games_played ?? 0) + 1,
+        draws: (blackProfile?.draws ?? 0) + 1,
+      }).eq("id", game.black_player_id);
+    }
+
+    // League fixtures support draws
+    try {
+      await processLeagueGameResult({
+        gameId: game.id,
+        whitePlayerId: game.white_player_id,
+        blackPlayerId: game.black_player_id,
+        winner: "draw",
+        status: "draw",
+      });
+    } catch (e) {
+      console.error("[timeout] League processing failed for draw game", game.id, e);
+    }
+
+    return { status: "draw" as const, winner: null };
   }
 
   // Decisive timeout loss

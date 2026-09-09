@@ -26,7 +26,7 @@ async function handleSweep(req: NextRequest) {
 
     const { data: activeGames } = await admin
       .from("games")
-      .select("id, turn, move_count, white_clock_ms, black_clock_ms, last_move_at, created_at, white_player_id, black_player_id, white_rating, black_rating, rated, tournament_id, time_control")
+      .select("id, turn, move_count, white_clock_ms, black_clock_ms, last_move_at, created_at, white_player_id, black_player_id, white_rating, black_rating, rated, tournament_id, time_control, fen")
       .eq("status", "playing");
 
     if (!activeGames || activeGames.length === 0) {

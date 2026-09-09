@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     const { data: game } = await admin
       .from("games")
-      .select("id, status, turn, move_count, white_clock_ms, black_clock_ms, last_move_at, created_at, white_player_id, black_player_id, white_rating, black_rating, rated, tournament_id, time_control")
+      .select("id, status, turn, move_count, white_clock_ms, black_clock_ms, last_move_at, created_at, white_player_id, black_player_id, white_rating, black_rating, rated, tournament_id, time_control, fen")
       .eq("id", gameId)
       .single();
 

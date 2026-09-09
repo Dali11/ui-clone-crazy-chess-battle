@@ -1,5 +1,20 @@
 "use client";
 
+import CountryFlag from "./country-flag";
+
+// Country name from the ISO alpha-2 code via the browser's built-in
+// region display names.
+function countryName(code: string): string {
+  const clean = (code || "").trim().toLowerCase();
+  if (!/^[a-z]{2}$/.test(clean)) return "";
+  try {
+    const dn = new Intl.DisplayNames(["en"], { type: "region" });
+    return dn.of(clean.toUpperCase()) || clean.toUpperCase();
+  } catch {
+    return clean.toUpperCase();
+  }
+}
+
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
@@ -21,7 +36,7 @@ export default function PlayerProfilePreview({ userId, onClose }: PlayerProfileP
       const supabase = createClient();
       const { data } = await supabase
         .from("profiles")
-        .select("id, username, display_name, rating, games_played, wins, losses, draws, bio, avatar_url, created_at, tournaments_won")
+        .select("id, username, display_name, rating, games_played, wins, losses, draws, bio, avatar_url, created_at, tournaments_won, country")
         .eq("id", userId)
         .single();
 
@@ -179,8 +194,16 @@ function renderContent(profile: any, tier: any, winRate: number, recentGames: an
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-bold truncate">{profile.display_name || profile.username}</h2>
-          <p className="text-xs text-ccb-muted">@{profile.username}</p>
+          <h2 className="text-base font-bold truncate flex items-center gap-1.5">
+            <span className="truncate">{profile.display_name || profile.username}</span>
+            <CountryFlag code={profile.country} className="w-4.5 h-3 shrink-0" />
+          </h2>
+          <p className="text-xs text-ccb-muted truncate">
+            @{profile.username}
+            {profile.country && (
+              <span> · {countryName(profile.country)}</span>
+            )}
+          </p>
           <div className="flex items-center gap-2 mt-1">
             <span className={`text-base font-bold ${tier.color}`}>{profile.rating || 1200}</span>
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded bg-ccb-surface ${tier.color}`}>
