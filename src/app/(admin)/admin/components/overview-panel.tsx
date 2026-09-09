@@ -42,6 +42,7 @@ interface StatsResponse {
   walletLiquidity: number;
   totalBattleVolume?: number;
   platformRevenue?: number;
+  creatorEarningsAllTime?: number;
   range: string;
   country: string;
   availableCountries: CountryInfo[];
@@ -54,6 +55,7 @@ interface StatsResponse {
     battleRevenue: number;
     tournamentRevenue: number;
     platformRevenue: number;
+    creatorEarnings: number;
     netFlow: number;
   };
   revenueBreakdown: { battleRevenue: number; tournamentRevenue: number; total: number };
@@ -252,6 +254,14 @@ export default function OverviewPanel({
           <div className="flex justify-between">
             <span className="text-ccb-muted">Net Flow (All Time)</span>
             <span className="font-medium text-ccb-success">{formatMWK(data.totalDeposits - data.totalWithdrawals)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ccb-muted">Tournament Creator Earnings (All Time)</span>
+            <span className="font-medium">{formatMWK(data.creatorEarningsAllTime || 0)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ccb-muted">Creator Earnings (This Period)</span>
+            <span className="font-medium">{formatMWK(rs.creatorEarnings || 0)}</span>
           </div>
         </div>
       </div>

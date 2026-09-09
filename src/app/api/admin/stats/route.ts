@@ -72,6 +72,24 @@ function buildBuckets(range: string): Bucket[] {
   return buckets;
 }
 
+
+/**
+ * PostgREST caps every response at 1000 rows (Supabase default max-rows), which
+ * silently truncates row-scan aggregations — sums stop growing and counts freeze
+ * at exactly 1000. Paginate through the cap instead.
+ */
+const PAGE_SIZE = 1000;
+async function fetchAll(buildQuery: () => any): Promise<any[]> {
+  const out: any[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data } = await buildQuery().range(offset, offset + PAGE_SIZE - 1);
+    if (!data || data.length === 0) break;
+    out.push(...data);
+    if (data.length < PAGE_SIZE) break;
+  }
+  return out;
+}
+
 function bucketIndexFor(buckets: Bucket[], dateStr: string): number {
   const t = new Date(dateStr).getTime();
   for (let i = 0; i < buckets.length; i++) {
@@ -132,25 +150,25 @@ export async function GET(req: NextRequest) {
       .from("deposits").select("*", { count: "exact", head: true })
       .in("status", ["pending", "processing"]);
 
-    const { data: depositsData } = await admin
-      .from("deposits").select("amount")
-      .eq("status", "success")
-      .in("method", ["mobile_money", "card"]);
-    const totalDeposits = depositsData?.reduce((sum, d) => sum + (d.amount || 0), 0) || 0;
+    const depositsData = await fetchAll(() =>
+      admin.from("deposits").select("amount")
+        .eq("status", "success")
+        .in("method", ["mobile_money", "card"]));
+    const totalDeposits = depositsData.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
 
-    const { data: withdrawalsData } = await admin
-      .from("withdrawals").select("amount")
-      .eq("status", "completed");
-    const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0;
+    const withdrawalsData = await fetchAll(() =>
+      admin.from("withdrawals").select("amount")
+        .eq("status", "completed"));
+    const totalWithdrawals = withdrawalsData.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
 
-    const { data: completedBattles } = await admin
-      .from("battles")
-      .select("pot, platform_fee")
-      .eq("status", "completed")
-      .eq("settled", true);
+    const completedBattles = await fetchAll(() =>
+      admin.from("battles")
+        .select("pot, platform_fee")
+        .eq("status", "completed")
+        .eq("settled", true));
 
-    const totalBattleVolume = completedBattles?.reduce((sum, b) => sum + (b.pot || 0), 0) || 0;
-    const battleRevenueAllTime = completedBattles?.reduce((sum, b) => sum + (b.platform_fee || 0), 0) || 0;
+    const totalBattleVolume = completedBattles.reduce((sum: number, b: any) => sum + (b.pot || 0), 0);
+    const battleRevenueAllTime = completedBattles.reduce((sum: number, b: any) => sum + (b.platform_fee || 0), 0);
 
     // NOTE: the platform takes NO cut from tournaments — see lib/tournament/economics.ts
     // (platformCut is always 0; only a tournament's creator can take a profit %, and that
@@ -159,12 +177,27 @@ export async function GET(req: NextRequest) {
     const tournamentRevenueAllTime = 0;
     const platformRevenue = battleRevenueAllTime + tournamentRevenueAllTime;
 
-    const { data: tournamentsData } = await admin
-      .from("tournaments").select("prize_pool")
-      .neq("status", "cancelled");
+    const tournamentsData = await fetchAll(() =>
+      admin.from("tournaments").select("prize_pool")
+        .neq("status", "cancelled"));
     let totalPrizePools = 0;
-    for (const t of tournamentsData || []) {
+    for (const t of tournamentsData) {
       totalPrizePools += t.prize_pool || 0;
+    }
+
+    // Creator earnings from entry-fee tournaments with a creator profit %.
+    // This money goes to the tournament creator, NOT the platform — tracked
+    // separately from platform revenue. Mirrors computeTournamentEconomics()
+    // in lib/tournament/economics.ts.
+    const creatorTournaments = await fetchAll(() =>
+      admin.from("tournaments").select("prize_pool, creator_profit_percent")
+        .eq("status", "finished")
+        .neq("pool_source", "fixed")
+        .gt("creator_profit_percent", 0));
+    let creatorEarningsAllTime = 0;
+    for (const t of creatorTournaments) {
+      const gross = t.prize_pool || 0;
+      if (gross > 0) creatorEarningsAllTime += Math.floor(gross * ((t.creator_profit_percent || 0) / 100));
     }
 
     const walletLiquidity = totalDeposits - totalWithdrawals;
@@ -174,13 +207,14 @@ export async function GET(req: NextRequest) {
     const buckets = buildBuckets(range);
     const sinceISO = buckets[0].start.toISOString();
 
-    // All profiles (id, created_at, country) — cheap at current scale, used for
-    // country filtering, new-user counts, and the country filter dropdown.
-    const { data: allProfiles } = await admin
-      .from("profiles").select("id, created_at, country").limit(20000);
+    // All profiles (id, created_at, country) — used for country filtering,
+    // new-user counts, and the country filter dropdown. Paginated past the
+    // 1000-row max-rows cap.
+    const allProfiles = await fetchAll(() =>
+      admin.from("profiles").select("id, created_at, country"));
 
     const countryCounts = new Map<string, number>();
-    for (const p of allProfiles || []) {
+    for (const p of allProfiles) {
       if (p.country) countryCounts.set(p.country, (countryCounts.get(p.country) || 0) + 1);
     }
     const availableCountries = Array.from(countryCounts.entries())
@@ -188,11 +222,11 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.count - a.count);
 
     const countryIds: string[] | null = country !== "all"
-      ? (allProfiles || []).filter((p) => p.country === country).map((p) => p.id)
+      ? allProfiles.filter((p: any) => p.country === country).map((p: any) => p.id)
       : null;
     const noCountryMatch = countryIds !== null && countryIds.length === 0;
 
-    const newUsersInRange = (allProfiles || []).filter((p) => {
+    const newUsersInRange = allProfiles.filter((p: any) => {
       if (new Date(p.created_at).getTime() < new Date(sinceISO).getTime()) return false;
       if (countryIds && !countryIds.includes(p.id)) return false;
       return true;
@@ -202,12 +236,14 @@ export async function GET(req: NextRequest) {
     let depositsInRange = 0;
     const depositSeries = new Array(buckets.length).fill(0);
     if (!noCountryMatch) {
-      let q = admin.from("deposits").select("created_at, amount, user_id")
-        .eq("status", "success").in("method", ["mobile_money", "card"])
-        .gte("created_at", sinceISO);
-      if (countryIds) q = q.in("user_id", countryIds);
-      const { data: rows } = await q;
-      for (const r of rows || []) {
+      const rows = await fetchAll(() => {
+        let q = admin.from("deposits").select("created_at, amount, user_id")
+          .eq("status", "success").in("method", ["mobile_money", "card"])
+          .gte("created_at", sinceISO);
+        if (countryIds) q = q.in("user_id", countryIds);
+        return q;
+      });
+      for (const r of rows) {
         depositsInRange += r.amount || 0;
         const idx = bucketIndexFor(buckets, r.created_at);
         if (idx >= 0) depositSeries[idx] += r.amount || 0;
@@ -218,11 +254,13 @@ export async function GET(req: NextRequest) {
     let withdrawalsInRange = 0;
     const withdrawalSeries = new Array(buckets.length).fill(0);
     if (!noCountryMatch) {
-      let q = admin.from("withdrawals").select("created_at, amount, user_id")
-        .eq("status", "completed").gte("created_at", sinceISO);
-      if (countryIds) q = q.in("user_id", countryIds);
-      const { data: rows } = await q;
-      for (const r of rows || []) {
+      const rows = await fetchAll(() => {
+        let q = admin.from("withdrawals").select("created_at, amount, user_id")
+          .eq("status", "completed").gte("created_at", sinceISO);
+        if (countryIds) q = q.in("user_id", countryIds);
+        return q;
+      });
+      for (const r of rows) {
         withdrawalsInRange += r.amount || 0;
         const idx = bucketIndexFor(buckets, r.created_at);
         if (idx >= 0) withdrawalSeries[idx] += r.amount || 0;
@@ -234,14 +272,16 @@ export async function GET(req: NextRequest) {
     let battleRevenueInRange = 0;
     const revenueSeries = new Array(buckets.length).fill(0);
     if (!noCountryMatch) {
-      let q = admin.from("battles").select("created_at, pot, platform_fee, white_player_id, black_player_id")
-        .eq("status", "completed").eq("settled", true).gte("created_at", sinceISO);
-      if (countryIds) {
-        const idList = countryIds.join(",");
-        q = q.or(`white_player_id.in.(${idList}),black_player_id.in.(${idList})`);
-      }
-      const { data: rows } = await q;
-      for (const r of rows || []) {
+      const rows = await fetchAll(() => {
+        let q = admin.from("battles").select("created_at, pot, platform_fee, white_player_id, black_player_id")
+          .eq("status", "completed").eq("settled", true).gte("created_at", sinceISO);
+        if (countryIds) {
+          const idList = countryIds.join(",");
+          q = q.or(`white_player_id.in.(${idList}),black_player_id.in.(${idList})`);
+        }
+        return q;
+      });
+      for (const r of rows) {
         battleVolumeInRange += r.pot || 0;
         battleRevenueInRange += r.platform_fee || 0;
         const idx = bucketIndexFor(buckets, r.created_at);
@@ -253,15 +293,17 @@ export async function GET(req: NextRequest) {
     let gamesInRange = 0;
     const gamesSeries = new Array(buckets.length).fill(0);
     if (!noCountryMatch) {
-      let q = admin.from("games").select("created_at, white_player_id, black_player_id")
-        .gte("created_at", sinceISO);
-      if (countryIds) {
-        const idList = countryIds.join(",");
-        q = q.or(`white_player_id.in.(${idList}),black_player_id.in.(${idList})`);
-      }
-      const { data: rows } = await q;
-      gamesInRange = rows?.length || 0;
-      for (const r of rows || []) {
+      const rows = await fetchAll(() => {
+        let q = admin.from("games").select("created_at, white_player_id, black_player_id")
+          .gte("created_at", sinceISO);
+        if (countryIds) {
+          const idList = countryIds.join(",");
+          q = q.or(`white_player_id.in.(${idList}),black_player_id.in.(${idList})`);
+        }
+        return q;
+      });
+      gamesInRange = rows.length;
+      for (const r of rows) {
         const idx = bucketIndexFor(buckets, r.created_at);
         if (idx >= 0) gamesSeries[idx] += 1;
       }
@@ -273,6 +315,22 @@ export async function GET(req: NextRequest) {
     // Was previously fabricated as 10% of entry fees via a query filtering on a
     // "updated_at" column that doesn't exist on `tournaments` (silently returned 0 anyway).
     const tournamentRevenueInRange = 0;
+
+    // Creator earnings in range — tournaments that ENDED within the window.
+    // Creator profit goes to the tournament creator, not the platform.
+    let creatorEarningsInRange = 0;
+    if (!noCountryMatch) {
+      const endedInRange = await fetchAll(() =>
+        admin.from("tournaments").select("prize_pool, creator_profit_percent")
+          .eq("status", "finished")
+          .neq("pool_source", "fixed")
+          .gt("creator_profit_percent", 0)
+          .gte("ended_at", sinceISO));
+      for (const t of endedInRange) {
+        const gross = t.prize_pool || 0;
+        if (gross > 0) creatorEarningsInRange += Math.floor(gross * ((t.creator_profit_percent || 0) / 100));
+      }
+    }
 
     const platformRevenueInRange = battleRevenueInRange + tournamentRevenueInRange;
     const netFlowInRange = depositsInRange - withdrawalsInRange;
@@ -298,6 +356,7 @@ export async function GET(req: NextRequest) {
       totalWithdrawals,
       totalBattleVolume,
       platformRevenue,
+      creatorEarningsAllTime,
       totalPrizePools,
       walletLiquidity,
 
@@ -314,6 +373,7 @@ export async function GET(req: NextRequest) {
         battleRevenue: battleRevenueInRange,
         tournamentRevenue: tournamentRevenueInRange,
         platformRevenue: platformRevenueInRange,
+        creatorEarnings: creatorEarningsInRange,
         netFlow: netFlowInRange,
       },
       revenueBreakdown: {
