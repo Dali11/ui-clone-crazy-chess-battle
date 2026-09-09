@@ -680,7 +680,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
 
   return (
     <>
-      <div className="game-viewport -my-4 sm:-my-6 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-6">
+      <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-6">
         {/* ===== Board column ===== */}
         <div className="relative flex flex-col h-full w-full lg:w-[600px] lg:max-w-[600px] lg:h-auto lg:shrink-0 lg:my-auto">
           {/* Mobile-only slim top bar */}

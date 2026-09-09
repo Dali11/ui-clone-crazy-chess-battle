@@ -24,7 +24,7 @@ const BLACK_STROKE = "#888888";  /* Lighter stroke on black pieces so even
                                      different from white pieces */
 
 /* Thicker stroke width for better visibility on small mobile screens */
-const STROKE_WIDTH = 1.8;
+const STROKE_WIDTH = 2.6;
 
 const svgBase: CSSProperties = {
   width: "100%",

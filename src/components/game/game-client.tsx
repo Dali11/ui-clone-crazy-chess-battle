@@ -1237,7 +1237,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
     return (
       <>
-        <div className="game-viewport -my-4 sm:-my-6 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
+        <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
           {boardColumn(topPlayer, bottomPlayer, false)}
           {renderDesktopSidebar()}
         </div>
@@ -1306,7 +1306,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   return (
     <>
-      <div className="game-viewport -my-4 sm:-my-6 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
+      <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
         {boardColumn(playerData, myData, true)}
         {renderDesktopSidebar()}
       </div>
