@@ -7,7 +7,7 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -21,7 +21,7 @@ export default function ForgotPasswordPage() {
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ identifier }),
       });
 
       if (!res.ok) {
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
               </svg>
             </div>
             <p className="font-medium">Check your email</p>
-            <p className="text-sm text-ccb-muted mt-1">If an account exists for {email}, we&apos;ve sent a reset link.</p>
+            <p className="text-sm text-ccb-muted mt-1">If an account exists for {identifier}, we&apos;ve sent a reset link to its email address.</p>
             <Link href="/login" className="text-ccb-primary text-sm hover:underline mt-4 inline-block">Back to login</Link>
           </div>
         ) : (
@@ -73,13 +73,15 @@ export default function ForgotPasswordPage() {
             )}
             <form onSubmit={handleReset} className="card space-y-4">
               <div>
-                <label htmlFor="email" className="text-sm font-medium block mb-1.5">Email</label>
+                <label htmlFor="identifier" className="text-sm font-medium block mb-1.5">Username or Email</label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   className="input-field"
-                  placeholder="you@example.com"
+                  placeholder="your username or email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   required
                 />
               </div>

@@ -8,27 +8,45 @@ import { sendEmail } from "@/lib/email";
  */
 export async function POST(req: NextRequest) {
   try {
-    const { email } = await req.json();
-    if (!email) return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    const body = await req.json().catch(() => null);
+    // Accept identifier (username or email); keep `email` for any older callers
+    const identifier = String(body?.identifier ?? body?.email ?? "").trim();
+    if (!identifier) return NextResponse.json({ error: "Username or email is required" }, { status: 400 });
 
     const admin = createAdminClient();
 
-    // Check if a user with this email exists
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("email, display_name, username")
-      .eq("email", email.toLowerCase().trim())
-      .single();
+    // Check if a user with this email exists. If the identifier is a
+    // username (no "@"), resolve it to the email on file — the email is
+    // never returned to the client, so usernames can't enumerate emails.
+    let profile = null;
+    if (identifier.includes("@")) {
+      const { data } = await admin
+        .from("profiles")
+        .select("email, display_name, username")
+        .eq("email", identifier.toLowerCase())
+        .single();
+      profile = data;
+    } else {
+      const { data: candidates } = await admin
+        .from("profiles")
+        .select("email, display_name, username")
+        .ilike("username", identifier)
+        .limit(5);
+      // Prefer an exact-case match when two usernames differ only by case
+      profile = candidates?.find((c: any) => c.username === identifier) ?? candidates?.[0] ?? null;
+    }
 
-    // Always return success (don't leak whether email exists)
-    if (!profile) {
+    // Always return success (don't leak whether the account exists)
+    if (!profile?.email) {
       return NextResponse.json({ success: true });
     }
+
+    const email = profile.email;
 
     // Generate a Supabase password recovery link
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: "recovery",
-      email: email.toLowerCase().trim(),
+      email: email.toLowerCase(),
     });
 
     if (linkError || !linkData) {
