@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { sendEmail } from "@/lib/email";
 
 // GET — list users (server-side search, filters, sort, pagination) + KPIs
@@ -27,11 +28,11 @@ export async function GET(req: NextRequest) {
     const pageSize = Math.min(200, Math.max(10, parseInt(searchParams.get("page_size") || "50", 10) || 50));
 
     // ── KPIs — aggregate over the whole userbase (light fields only) ──
-    const { data: light } = await admin
-      .from("profiles")
-      .select("created_at, is_banned, is_admin, games_played, wallet_balance, rating");
-
-    const rows = light || [];
+    // fetchAll(): PostgREST silently caps responses at 1000 rows — an
+    // unbounded scan would freeze every KPI at exactly 1000 users.
+    const rows = await fetchAll(() =>
+      admin.from("profiles")
+        .select("created_at, is_banned, is_admin, games_played, wallet_balance, rating"));
     const d7 = Date.now() - 7 * 864e5;
     const d30 = Date.now() - 30 * 864e5;
     const rated = rows.filter((r: any) => r.rating != null);

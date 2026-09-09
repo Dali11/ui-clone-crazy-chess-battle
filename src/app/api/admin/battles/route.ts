@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAll, fetchByIdChunks } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -148,24 +149,34 @@ async function computeStats(admin: ReturnType<typeof createAdminClient>, applyCo
     countFor("completed"), countFor("disputed"), countFor("cancelled"),
   ]);
 
-  let revenueQuery = admin.from("battles").select("pot, platform_fee").eq("status", "completed").eq("settled", true);
-  revenueQuery = applyCommonFilters(revenueQuery);
-  const { data: revenueRows } = await revenueQuery;
-  const totalVolume = (revenueRows ?? []).reduce((sum: number, b: any) => sum + (b.pot || 0), 0);
-  const totalRevenue = (revenueRows ?? []).reduce((sum: number, b: any) => sum + (b.platform_fee || 0), 0);
+  // fetchAll(): PostgREST silently caps responses at 1000 rows — unbounded
+  // sums would freeze volume/revenue at exactly 1000 battles.
+  const revenueRows = await fetchAll(() => {
+    let q = admin.from("battles").select("pot, platform_fee").eq("status", "completed").eq("settled", true);
+    return applyCommonFilters(q);
+  });
+  const totalVolume = revenueRows.reduce((sum: number, b: any) => sum + (b.pot || 0), 0);
+  const totalRevenue = revenueRows.reduce((sum: number, b: any) => sum + (b.platform_fee || 0), 0);
 
   return { total, pending, stuck, playing, completed, disputed, cancelled, totalVolume, totalRevenue };
 }
 
 async function getAvailableCountries(admin: ReturnType<typeof createAdminClient>, sinceISO: string | null) {
-  let battleQuery = admin.from("battles").select("white_player_id, black_player_id").limit(5000);
-  if (sinceISO) battleQuery = battleQuery.gte("created_at", sinceISO);
-  const { data: rows } = await battleQuery;
+  // fetchAll(): the old .limit(5000) was silently capped at 1000 rows by
+  // PostgREST max-rows anyway; paginate past the cap properly.
+  const rows = await fetchAll(() => {
+    let q = admin.from("battles").select("white_player_id, black_player_id");
+    if (sinceISO) q = q.gte("created_at", sinceISO);
+    return q;
+  });
   const ids = new Set<string>();
-  for (const r of rows ?? []) { ids.add(r.white_player_id); ids.add(r.black_player_id); }
+  for (const r of rows) { ids.add(r.white_player_id); ids.add(r.black_player_id); }
   if (ids.size === 0) return [];
-  const { data: countryRows } = await admin.from("profiles").select("country").in("id", Array.from(ids)).not("country", "is", null);
+  // fetchByIdChunks(): .in("id", [hundreds of uuids]) blows the ~8KB URL limit
+  const countryRows = await fetchByIdChunks(
+    () => admin.from("profiles").select("country").not("country", "is", null),
+    Array.from(ids), "id");
   const counts = new Map<string, number>();
-  for (const r of countryRows ?? []) { if (r.country) counts.set(r.country, (counts.get(r.country) || 0) + 1); }
+  for (const r of countryRows) { if (r.country) counts.set(r.country, (counts.get(r.country) || 0) + 1); }
   return Array.from(counts.entries()).map(([code, count]) => ({ code, count })).sort((a, b) => b.count - a.count);
 }

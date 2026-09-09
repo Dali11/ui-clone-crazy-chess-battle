@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 /**
  * GET /api/admin/stats
@@ -72,23 +73,6 @@ function buildBuckets(range: string): Bucket[] {
   return buckets;
 }
 
-
-/**
- * PostgREST caps every response at 1000 rows (Supabase default max-rows), which
- * silently truncates row-scan aggregations — sums stop growing and counts freeze
- * at exactly 1000. Paginate through the cap instead.
- */
-const PAGE_SIZE = 1000;
-async function fetchAll(buildQuery: () => any): Promise<any[]> {
-  const out: any[] = [];
-  for (let offset = 0; ; offset += PAGE_SIZE) {
-    const { data } = await buildQuery().range(offset, offset + PAGE_SIZE - 1);
-    if (!data || data.length === 0) break;
-    out.push(...data);
-    if (data.length < PAGE_SIZE) break;
-  }
-  return out;
-}
 
 function bucketIndexFor(buckets: Bucket[], dateStr: string): number {
   const t = new Date(dateStr).getTime();

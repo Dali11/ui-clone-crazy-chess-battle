@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAll, fetchByIdChunks } from "@/lib/supabase/fetch-all";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { redirect } from "next/navigation";
 import AffiliateClient from "./affiliate-client";
@@ -32,36 +33,39 @@ export default async function AffiliatePage() {
     .single();
 
   // Get referral stats — use correct column names (activation_condition, commission_amount, commission_paid)
-  const { data: referrals } = await admin
-    .from("referrals")
-    .select(`
-      id, referred_id, status, created_at, activated_at,
-      activation_condition, commission_amount, commission_paid
-    `)
-    .eq("referrer_id", user.id)
-    .order("created_at", { ascending: false });
+  // fetchAll(): PostgREST silently caps responses at 1000 rows
+  const referrals = await fetchAll(() =>
+    admin
+      .from("referrals")
+      .select(`
+        id, referred_id, status, created_at, activated_at,
+        activation_condition, commission_amount, commission_paid
+      `)
+      .eq("referrer_id", user.id)
+      .order("created_at", { ascending: false }));
 
   // Enrich referrals with referred user info
-  const referredIds = (referrals || []).map((r: any) => r.referred_id).filter(Boolean);
+  const referredIds = referrals.map((r: any) => r.referred_id).filter(Boolean);
   let referredProfiles: Record<string, any> = {};
   if (referredIds.length > 0) {
-    const { data: profiles } = await admin
-      .from("profiles")
-      .select("id, username, display_name, avatar_url, rating, created_at")
-      .in("id", referredIds);
-    for (const p of profiles || []) {
+    // fetchByIdChunks(): .in("id", [200+ uuids]) blows the ~8KB URL limit
+    const profiles = await fetchByIdChunks(
+      () => admin.from("profiles").select("id, username, display_name, avatar_url, rating, created_at"),
+      referredIds, "id");
+    for (const p of profiles) {
       referredProfiles[p.id] = p;
     }
   }
 
   // Get total commission earned from deposits ledger (more accurate than summing referrals)
-  const { data: commissionDeposits } = await admin
-    .from("deposits")
-    .select("amount")
-    .eq("user_id", user.id)
-    .eq("method", "affiliate_commission")
-    .eq("status", "success");
-  const totalCommissionEarned = (commissionDeposits || []).reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+  const commissionDeposits = await fetchAll(() =>
+    admin
+      .from("deposits")
+      .select("amount")
+      .eq("user_id", user.id)
+      .eq("method", "affiliate_commission")
+      .eq("status", "success"));
+  const totalCommissionEarned = commissionDeposits.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
 
   // Get membership pricing from platform settings (admin-configurable)
   const mConfig = await getPlatformConfig(admin, "membership");
@@ -83,7 +87,7 @@ export default async function AffiliatePage() {
       yearlyPrice={yearlyPrice}
       membershipCurrency={membershipCurrency}
       commissionRate={commissionRate}
-      referrals={(referrals || []).map((r: any) => ({
+      referrals={referrals.map((r: any) => ({
         id: r.id,
         status: r.status,
         created_at: r.created_at,
