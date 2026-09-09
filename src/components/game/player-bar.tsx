@@ -36,8 +36,6 @@ function PlayerBarBase({ name, userId, avatar, country, rating, ratingChange, ca
             <span className="text-lg">{symbol}</span>
           )}
         </div>
-        {/* Country flag — multinational platform, shown right after the avatar */}
-        <CountryFlag code={country} />
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-1.5">
             <button onClick={() => userId && onPreview(userId)} className="text-sm font-semibold leading-tight truncate hover:text-ccb-primary transition-colors cursor-pointer bg-transparent border-0 p-0 m-0 text-inherit text-left">{name}</button>
@@ -52,6 +50,8 @@ function PlayerBarBase({ name, userId, avatar, country, rating, ratingChange, ca
                 )
               </span>
             )}
+            {/* Country flag — after the rating, sized to the name/rating line so it never wraps to its own row */}
+            <CountryFlag code={country} className="w-4 h-[11px] shrink-0" />
           </div>
           <CapturedPieces pieces={captured} advantage={advantage} perspective="top" />
         </div>

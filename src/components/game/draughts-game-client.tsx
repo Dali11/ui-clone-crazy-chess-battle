@@ -478,8 +478,6 @@ export default function DraughtsGameClient({
             <div className={`w-3 h-3 rounded-full ${(data.name === whiteName) ? "bg-stone-100" : "bg-stone-900"}`} />
           )}
         </div>
-        {/* Country flag — multinational platform, shown right after the avatar */}
-        <CountryFlag code={data.country} />
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-1.5">
             <button onClick={() => data.userId && setPreviewUserId(data.userId)} className="text-sm font-semibold leading-tight truncate hover:text-ccb-primary transition-colors cursor-pointer bg-transparent border-0 p-0 m-0 text-inherit text-left">{data.name}</button>
@@ -497,6 +495,8 @@ export default function DraughtsGameClient({
                 )
               </span>
             )}
+            {/* Country flag — after the rating, sized to this small text row so it stays inline */}
+            <CountryFlag code={data.country} className="w-3.5 h-[9px] shrink-0" />
           </div>
         </div>
       </div>
