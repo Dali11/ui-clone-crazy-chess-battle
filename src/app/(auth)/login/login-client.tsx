@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,13 +26,29 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    let errorMessage: string | null = null;
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errorMessage = data.error || "Invalid username or password";
+      } else {
+        const { error: sessionErr } = await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+        if (sessionErr) errorMessage = "Login failed — please try again";
+      }
+    } catch {
+      errorMessage = "Login failed — please try again";
+    }
 
-    if (error) {
-      setError(error.message);
+    if (errorMessage) {
+      setError(errorMessage);
       setLoading(false);
     } else {
       const fullRedirect = actionParam
@@ -69,13 +85,15 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="card space-y-4">
           <div>
-            <label htmlFor="email" className="text-sm font-medium block mb-1.5">Email</label>
+            <label htmlFor="identifier" className="text-sm font-medium block mb-1.5">Username or Email</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="input"
-              placeholder="you@example.com"
+              placeholder="your username or email"
+              autoCapitalize="none"
+              autoCorrect="off"
               required
             />
           </div>
