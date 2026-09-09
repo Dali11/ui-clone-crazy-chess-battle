@@ -568,7 +568,7 @@ export default function DraughtsGameClient({
         {/* Board column */}
         <div className="relative flex flex-col h-full w-full lg:w-[600px] lg:max-w-[600px] lg:h-auto lg:shrink-0 lg:my-auto">
           {/* Mobile top bar */}
-          <div className="lg:hidden shrink-0 flex items-center justify-between px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 h-auto min-h-11 border-b border-ccb-border">
+          <div className="lg:hidden shrink-0 flex items-center justify-between px-3 pt-[max(0.875rem,env(safe-area-inset-top))] pb-2 h-auto min-h-12 border-b border-ccb-border">
             <Link href="/draughts" className="p-1.5 -ml-1.5 text-ccb-muted hover:text-ccb-primary">
               <ArrowLeft className="w-5 h-5" />
             </Link>
@@ -699,7 +699,7 @@ export default function DraughtsGameClient({
           )}
 
           {/* Mobile bottom toolbar — chess.com style */}
-          <div className="lg:hidden shrink-0 border-t border-ccb-border" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+          <div className="lg:hidden shrink-0 border-t border-ccb-border" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}>
             {showResignConfirm ? (
               <div className="flex items-center justify-center gap-3 h-14">
                 <span className="text-sm text-ccb-muted">Resign?</span>

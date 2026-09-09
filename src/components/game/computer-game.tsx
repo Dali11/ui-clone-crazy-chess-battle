@@ -792,7 +792,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
           )}
 
           {/* Mobile bottom toolbar — chess.com style layout used during both play and after game */}
-          <div className="lg:hidden shrink-0 border-t border-ccb-border" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+          <div className="lg:hidden shrink-0 border-t border-ccb-border" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}>
             {showResignConfirm ? (
               <div className="flex items-center justify-center gap-3 h-14">
                 <span className="text-sm text-ccb-muted">Resign?</span>

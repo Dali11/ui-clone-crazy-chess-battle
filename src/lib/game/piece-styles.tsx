@@ -3,28 +3,23 @@ import { type CSSProperties } from "react";
 /**
  * Custom chess piece renderers with explicit, high-contrast fills.
  *
- * The default react-chessboard pieces use fill="#ffffff" for white and
- * fill="#000000" for black. On some mobile browsers (Samsung Internet,
- * UC Browser, etc.) with "smart dark mode" enabled, the #ffffff gets
- * inverted to a dark color, making white pieces look identical to black
- * pieces.
- *
- * - White pieces: fill #f8f8f8 (slightly off-white) + #1a1a1a outline
- * - Black pieces: fill #2a2a2a (dark gray, not pure black) + #555 outline
- *
- * Even if a browser inverts colors, the two fills are far enough apart in
- * brightness that the pieces remain distinguishable.
+ * Pure white / pure black fills with black outlines on both, matching
+ * chess.com's classic piece look. (Previously used off-white/dark-gray
+ * fills with a light-gray outline on black pieces, as a defense against
+ * a handful of mobile browsers' "smart dark mode" inverting pure
+ * #ffffff/#000000 SVG fills. That tradeoff was traded back for exact
+ * visual parity per explicit request — SVG inline fills are rarely
+ * touched by that heuristic in practice, and the size/shape difference
+ * between fills still keeps pieces distinguishable even in that edge case.)
  */
 
-const WHITE_FILL = "#f5f5f5";
-const WHITE_STROKE = "#1a1a1a";
-const BLACK_FILL = "#2b2b2b";
-const BLACK_STROKE = "#888888";  /* Lighter stroke on black pieces so even
-                                     after browser inversion they look
-                                     different from white pieces */
+const WHITE_FILL = "#ffffff";
+const WHITE_STROKE = "#000000";
+const BLACK_FILL = "#000000";
+const BLACK_STROKE = "#000000";
 
-/* Thicker stroke width for better visibility on small mobile screens */
-const STROKE_WIDTH = 2.6;
+/* Thick stroke width for a bold, chess.com-style piece weight */
+const STROKE_WIDTH = 3;
 
 const svgBase: CSSProperties = {
   width: "100%",
