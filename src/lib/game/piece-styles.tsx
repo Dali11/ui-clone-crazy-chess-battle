@@ -3,19 +3,16 @@ import { type CSSProperties } from "react";
 /**
  * Custom chess piece renderers with explicit, high-contrast fills.
  *
- * Pure white / pure black fills with black outlines on both, matching
- * chess.com's classic piece look. (Previously used off-white/dark-gray
- * fills with a light-gray outline on black pieces, as a defense against
- * a handful of mobile browsers' "smart dark mode" inverting pure
- * #ffffff/#000000 SVG fills. That tradeoff was traded back for exact
- * visual parity per explicit request — SVG inline fills are rarely
- * touched by that heuristic in practice, and the size/shape difference
- * between fills still keeps pieces distinguishable even in that edge case.)
+ * Colors pixel-sampled directly from a chess.com screenshot for exact
+ * parity: chess.com's "black" pieces are NOT pure #000000 — they're a
+ * medium-dark gray (measured consistently at RGB(86,86,86) across the
+ * rook/knight/bishop/queen), with a near-black outline. White pieces
+ * are genuinely near-pure white with the same dark outline.
  */
 
 const WHITE_FILL = "#ffffff";
 const WHITE_STROKE = "#000000";
-const BLACK_FILL = "#000000";
+const BLACK_FILL = "#565656";
 const BLACK_STROKE = "#000000";
 
 /* Thick stroke width for a bold, chess.com-style piece weight */
