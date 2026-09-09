@@ -8,6 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import DraughtsBoard from "./draughts-board";
 import { getStoredBoardTheme, type BoardTheme } from "@/lib/game/board-themes";
+import { DRAUGHTS_NO_SHOW_SECONDS } from "@/lib/game/draughts-timeout";
 import VictoryOverlay, { type GameOutcome } from "./victory-overlay";
 import GameChat from "./game-chat";
 import PlayerProfilePreview from "./player-profile-preview";
@@ -434,6 +435,26 @@ export default function DraughtsGameClient({
   // Rating change
   const myRatingChange = isWhite ? game.white_rating_change : isBlack ? game.black_rating_change : null;
 
+  // No-show countdown: mirrors the server's timeout sweep — draughts games
+  // abort if moves 0-1 aren't made within DRAUGHTS_NO_SHOW_SECONDS. Surface
+  // a visible countdown (like the chess board) so both players see the
+  // timer instead of the game silently aborting. Turns red and pulses in
+  // the final 30 seconds.
+  const noShowInfo = useMemo(() => {
+    if (gameEnded || game.status !== "playing") return null;
+    if (game.move_count !== 0 && game.move_count !== 1) return null;
+    const timerStartRaw = game.last_move_at || game.created_at;
+    if (!timerStartRaw) return null;
+    void clockTick; // re-run every second
+    const thresholdMs = DRAUGHTS_NO_SHOW_SECONDS * 1000;
+    const elapsed = Date.now() - new Date(timerStartRaw).getTime();
+    const remainingMs = thresholdMs - elapsed;
+    return {
+      remainingSec: Math.max(0, Math.ceil(remainingMs / 1000)),
+      noShowPlayer: currentDbTurn as "white" | "black",
+    };
+  }, [game.move_count, game.last_move_at, game.created_at, currentDbTurn, game.status, gameEnded, clockTick]);
+
   // Player bar renderer — chess.com style with avatar, name, rating, clock
   const renderPlayerBar = (data: {
     userId?: string;
@@ -560,7 +581,24 @@ export default function DraughtsGameClient({
           {renderPlayerBar(topPlayer)}
 
           {/* Board */}
-          <div className="flex-1 min-h-0 flex items-center justify-center px-2 py-1">
+          <div className="relative flex-1 min-h-0 flex items-center justify-center px-2 py-1">
+            {/* No-show countdown — visible while the game waits on the
+                opening moves, matching the server's abort rule */}
+            {noShowInfo && (
+              <div
+                className={`absolute top-0.5 left-3 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] shadow-md ${
+                  noShowInfo.remainingSec <= 30
+                    ? "bg-red-500/95 border-red-500 text-white animate-pulse"
+                    : "bg-amber-500/95 border-amber-500 text-black"
+                }`}
+              >
+                <span className="font-medium">
+                  {noShowInfo.noShowPlayer === "white" ? "White" : "Black"} must move
+                  {" · "}
+                  {Math.floor(noShowInfo.remainingSec / 60)}:{String(noShowInfo.remainingSec % 60).padStart(2, "0")}
+                </span>
+              </div>
+            )}
             <DraughtsBoard
               boardTheme={boardTheme}
               board={board}
