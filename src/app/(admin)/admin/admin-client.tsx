@@ -53,6 +53,11 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [withdrawalConfig, setWithdrawalConfig] = useState<any>(null);
   const [withdrawalConfigSaving, setWithdrawalConfigSaving] = useState(false);
   const [userSearch, setUserSearch] = useState("");
+  const [userStatus, setUserStatus] = useState("all");
+  const [userSort, setUserSort] = useState("newest");
+  const [userPage, setUserPage] = useState(0);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [userKpis, setUserKpis] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<UserInfo | null>(null);
   const [userDetailId, setUserDetailId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -97,11 +102,28 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     setWithdrawals(data.withdrawals || []);
   }, [withdrawalFilter]);
 
+  const USER_PAGE_SIZE = 50;
   const fetchUsers = useCallback(async () => {
-    const res = await fetch("/api/admin/users");
+    const p = new URLSearchParams({
+      page: String(userPage),
+      page_size: String(USER_PAGE_SIZE),
+      status: userStatus,
+      sort: userSort,
+    });
+    if (userSearch.trim()) p.set("search", userSearch.trim());
+    const res = await fetch(`/api/admin/users?${p.toString()}`);
     const data = await res.json();
     setUsers(data.users || []);
-  }, []);
+    setUsersTotal(data.total ?? 0);
+    if (data.kpis) setUserKpis(data.kpis);
+  }, [userPage, userStatus, userSort, userSearch]);
+
+  // Refetch (debounced) whenever the users tab is active and any filter changes
+  useEffect(() => {
+    if (tab !== "users") return;
+    const t = setTimeout(() => { fetchUsers(); }, 300);
+    return () => clearTimeout(t);
+  }, [tab, fetchUsers]);
 
   const fetchDeposits = useCallback(async () => {
     const res = await fetch(`/api/admin/deposits?status=${depositFilter}`);
@@ -267,7 +289,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       setLoading(true);
       await fetchStats();
       if (tab === "withdrawals") { await fetchWithdrawals(); await fetchWithdrawalConfig(); }
-      if (tab === "users") await fetchUsers();
       if (tab === "deposits") await fetchDeposits();
       if (tab === "tournaments") await fetchTournaments();
       if (tab === "games") await fetchGames();
@@ -1041,16 +1062,75 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {tab === "users" && (
             <div className="space-y-3">
               <PlatformSettingsPanel section="users" />
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ccb-muted" />
-                <input
-                  type="text"
-                  placeholder="Search users by name, email..."
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm"
-                />
+
+              {/* KPIs */}
+              {userKpis && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                  {[
+                    { label: "Total Users", value: userKpis.total, sub: `${userKpis.new_7d} new this week`, icon: Users },
+                    { label: "New (30d)", value: userKpis.new_30d, sub: `${userKpis.new_7d} in last 7 days`, icon: TrendingUp },
+                    { label: "Active Players", value: userKpis.active_players, sub: "played ≥ 1 game", icon: Swords },
+                    { label: "Avg Rating", value: userKpis.avg_rating, sub: `${userKpis.admins} admin${userKpis.admins === 1 ? "" : "s"}`, icon: Star },
+                    { label: "Wallet Liability", value: formatMWK(userKpis.wallet_liability), sub: `${userKpis.negative_wallets} negative balance${userKpis.negative_wallets === 1 ? "" : "s"}`, icon: Wallet },
+                    { label: "Banned", value: userKpis.banned, sub: "suspended accounts", icon: Ban },
+                  ].map((k) => (
+                    <div key={k.label} className="card p-3">
+                      <div className="flex items-center gap-1.5 text-xs text-ccb-muted">
+                        <k.icon className="w-3.5 h-3.5" /> {k.label}
+                      </div>
+                      <div className="text-lg font-bold mt-1">{k.value}</div>
+                      <div className="text-[11px] text-ccb-muted">{k.sub}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Search + filters + sort */}
+              <div className="flex flex-col lg:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ccb-muted" />
+                  <input
+                    type="text"
+                    placeholder="Search users by name, email... (searches all pages)"
+                    value={userSearch}
+                    onChange={(e) => { setUserSearch(e.target.value); setUserPage(0); }}
+                    className="w-full pl-10 pr-4 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm"
+                  />
+                </div>
+                <select
+                  value={userSort}
+                  onChange={(e) => { setUserSort(e.target.value); setUserPage(0); }}
+                  className="px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="rating">Highest rating</option>
+                  <option value="games">Most games</option>
+                  <option value="wallet">Wallet balance</option>
+                  <option value="username">Username A–Z</option>
+                </select>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: "all", label: `All (${userKpis?.total ?? "…"})` },
+                  { id: "new", label: `New 30d (${userKpis?.new_30d ?? "…"})` },
+                  { id: "active", label: `Active (${userKpis?.active_players ?? "…"})` },
+                  { id: "admins", label: `Admins (${userKpis?.admins ?? "…"})` },
+                  { id: "banned", label: `Banned (${userKpis?.banned ?? "…"})` },
+                  { id: "negative", label: `Negative wallets (${userKpis?.negative_wallets ?? "…"})` },
+                ].map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => { setUserStatus(c.id); setUserPage(0); }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      userStatus === c.id
+                        ? "bg-ccb-primary text-ccb-dark font-bold"
+                        : "bg-ccb-surface border border-ccb-border text-ccb-muted hover:border-ccb-primary/40"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
               </div>
 
               {filteredUsers.length === 0 ? (
@@ -1144,6 +1224,31 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Pagination */}
+              {usersTotal > USER_PAGE_SIZE && (
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-xs text-ccb-muted">
+                    Showing {userPage * USER_PAGE_SIZE + 1}–{Math.min((userPage + 1) * USER_PAGE_SIZE, usersTotal)} of {usersTotal}
+                  </div>
+                  <div className="flex gap-2">
+                    <ActionButton
+                      onClick={() => setUserPage((p) => Math.max(0, p - 1))}
+                      loading={false}
+                      variant="default"
+                    >
+                      Previous
+                    </ActionButton>
+                    <ActionButton
+                      onClick={() => setUserPage((p) => p + 1)}
+                      loading={false}
+                      variant="default"
+                    >
+                      Next
+                    </ActionButton>
+                  </div>
                 </div>
               )}
             </div>

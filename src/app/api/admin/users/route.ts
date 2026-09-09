@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
 
-// GET — list all users (supports country filter + search)
+// GET — list users (server-side search, filters, sort, pagination) + KPIs
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -20,27 +20,64 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const country = searchParams.get("country");
-    const search = searchParams.get("search");
+    const search = searchParams.get("search")?.trim();
+    const status = searchParams.get("status") || "all"; // all|new|active|admins|banned|negative
+    const sort = searchParams.get("sort") || "newest"; // newest|oldest|rating|games|wallet|username
+    const page = Math.max(0, parseInt(searchParams.get("page") || "0", 10) || 0);
+    const pageSize = Math.min(200, Math.max(10, parseInt(searchParams.get("page_size") || "50", 10) || 50));
 
+    // ── KPIs — aggregate over the whole userbase (light fields only) ──
+    const { data: light } = await admin
+      .from("profiles")
+      .select("created_at, is_banned, is_admin, games_played, wallet_balance, rating");
+
+    const rows = light || [];
+    const d7 = Date.now() - 7 * 864e5;
+    const d30 = Date.now() - 30 * 864e5;
+    const rated = rows.filter((r: any) => r.rating != null);
+    const kpis = {
+      total: rows.length,
+      new_7d: rows.filter((r: any) => new Date(r.created_at).getTime() >= d7).length,
+      new_30d: rows.filter((r: any) => new Date(r.created_at).getTime() >= d30).length,
+      active_players: rows.filter((r: any) => (r.games_played || 0) > 0).length,
+      banned: rows.filter((r: any) => r.is_banned).length,
+      admins: rows.filter((r: any) => r.is_admin).length,
+      negative_wallets: rows.filter((r: any) => (r.wallet_balance || 0) < 0).length,
+      wallet_liability: rows.reduce((s: number, r: any) => s + (r.wallet_balance || 0), 0),
+      avg_rating: rated.length ? Math.round(rated.reduce((s: number, r: any) => s + r.rating, 0) / rated.length) : 0,
+    };
+
+    // ── Paginated list ──
     let query = admin
       .from("profiles")
-      .select("id, username, display_name, email, rating, games_played, wins, losses, draws, wallet_balance, is_admin, is_banned, phone, country, created_at")
-      .order("created_at", { ascending: false })
-      .limit(100);
+      .select("id, username, display_name, email, rating, games_played, wins, losses, draws, wallet_balance, is_admin, is_banned, phone, country, created_at", { count: "exact" });
 
-    if (country) {
-      query = query.eq("country", country);
+    if (country) query = query.eq("country", country);
+    if (search) query = query.or(`username.ilike.%${search}%,email.ilike.%${search}%,display_name.ilike.%${search}%`);
+
+    switch (status) {
+      case "new": query = query.gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()); break;
+      case "active": query = query.gt("games_played", 0); break;
+      case "admins": query = query.eq("is_admin", true); break;
+      case "banned": query = query.eq("is_banned", true); break;
+      case "negative": query = query.lt("wallet_balance", 0); break;
     }
 
-    if (search) {
-      query = query.or(`username.ilike.%${search}%,email.ilike.%${search}%,display_name.ilike.%${search}%`);
+    switch (sort) {
+      case "oldest": query = query.order("created_at", { ascending: true }); break;
+      case "rating": query = query.order("rating", { ascending: false, nullsFirst: false }); break;
+      case "games": query = query.order("games_played", { ascending: false, nullsFirst: false }); break;
+      case "wallet": query = query.order("wallet_balance", { ascending: false, nullsFirst: false }); break;
+      case "username": query = query.order("username", { ascending: true }); break;
+      default: query = query.order("created_at", { ascending: false });
     }
 
-    const { data: users, error } = await query;
+    query = query.range(page * pageSize, (page + 1) * pageSize - 1);
 
+    const { data: users, count, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    return NextResponse.json({ users });
+    return NextResponse.json({ users, total: count ?? 0, page, page_size: pageSize, kpis });
   } catch (err: any) {
     return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
   }
