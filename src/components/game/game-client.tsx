@@ -23,6 +23,7 @@ import BoardThemePicker from "./board-theme-picker";
 import OpeningBadge from "./opening-badge";
 import GameChat from "./game-chat";
 import PreGameCountdown from "./pre-game-countdown";
+import { getAbortSeconds } from "@/lib/game/abort-config";
 import PlayerProfilePreview from "./player-profile-preview";
 import PlayerBar from "./player-bar";
 import { formatClock } from "./utils";
@@ -381,24 +382,32 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   };
 
   // No-show countdown: while move_count is 0 (white hasn't moved) or 1
-  // (black hasn't responded), the tournament cron auto-resigns the player
-  // on the clock if they don't move within 2 minutes. Surface a visible
-  // countdown so both players know the timer is ticking instead of it
-  // silently happening server-side.
-  const NO_SHOW_MS = 2 * 60 * 1000;
+  // (black hasn't responded), surface a visible countdown so both players
+  // know the timer is ticking. The thresholds MUST mirror the server's
+  // early-move enforcement exactly (/api/game/timeout-check and the
+  // /api/game/timeout cron sweep) so the countdown actually resolves when
+  // it hits zero — previously the UI promised 2:00 but the server only
+  // enforced the full clock, so the countdown ran out and nothing happened.
+  //   move 0 casual: getAbortSeconds(time_control) — bullet aborts at 30s
+  //   move 0 battle/tournament: 2 minutes (decisive settlement / cron auto-resign)
+  //   move 1 (Black's reply): 2 minutes
   const noShowInfo = useMemo(() => {
     if (gameEnded || game.status !== "playing") return null;
     if (game.move_count !== 0 && game.move_count !== 1) return null;
     const timerStartRaw = game.last_move_at || game.created_at;
     if (!timerStartRaw) return null;
     void clockTick; // re-run every second
+    const thresholdMs =
+      game.move_count === 0 && !isTournamentGame && !isBattleGame
+        ? getAbortSeconds(game.time_control) * 1000
+        : 2 * 60 * 1000;
     const elapsed = Date.now() - new Date(timerStartRaw).getTime();
-    const remainingMs = NO_SHOW_MS - elapsed;
+    const remainingMs = thresholdMs - elapsed;
     return {
       remainingSec: Math.max(0, Math.ceil(remainingMs / 1000)),
       noShowPlayer: game.turn as "white" | "black",
     };
-  }, [game.move_count, game.last_move_at, game.created_at, game.turn, game.status, gameEnded, clockTick]);
+  }, [game.move_count, game.last_move_at, game.created_at, game.turn, game.status, gameEnded, clockTick, isTournamentGame, isBattleGame]);
 
   const isPromotionMove = useCallback((from: string, to: string): boolean => {
     const game2 = new Chess(fen);

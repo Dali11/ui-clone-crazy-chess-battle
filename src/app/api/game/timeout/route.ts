@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveTimeoutForGame } from "@/lib/game/resolve-timeout";
-import { getAbortSeconds } from "@/lib/game/abort-config";
+import { getAbortSeconds, REPLY_ABORT_SECONDS } from "@/lib/game/abort-config";
 
-// Cron sweep — checks ALL active games for expired clocks AND first-move
-// abort. This is a backup safety net in case neither player's client is
-// connected to poll timeout-check (e.g. both tabs closed). Requires CRON_SECRET.
-export async function POST(req: NextRequest) {
+// Cron sweep — checks ALL active games for:
+//   1. Early-move no-show (moves 0 and 1): mirrors the "must move" countdown
+//      in the UI. Casual games abort, battles resolve decisively.
+//   2. Expired clocks.
+// Runs every minute via Vercel cron (see vercel.json) so games resolve
+// chess.com-style even when neither player has a tab open — previously
+// enforcement depended entirely on a connected browser polling
+// /api/game/timeout-check, so a dead game just sat there forever.
+// Tournament games are excluded from the no-show rule here: the tournament
+// cron enforces its own 2-minute auto-resign (plus bracket advancement).
+// Requires CRON_SECRET.
+async function handleSweep(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -29,33 +37,45 @@ export async function POST(req: NextRequest) {
     let aborted = 0;
 
     for (const game of activeGames) {
-      // ── First-move abort check ──────────────────────────────────────
-      if (game.move_count === 0 && !game.tournament_id) {
-        const abortThresholdMs = getAbortSeconds(game.time_control) * 1000;
-        const elapsedSinceCreation = now - new Date(game.created_at).getTime();
+      // ── Early-move no-show check (moves 0 and 1) ────────────────────
+      if ((game.move_count === 0 || game.move_count === 1) && !game.tournament_id) {
+        const thresholdSec =
+          game.move_count === 0 ? getAbortSeconds(game.time_control) : REPLY_ABORT_SECONDS;
+        const timerStart = new Date(game.last_move_at || game.created_at).getTime();
+        const elapsedMs = now - timerStart;
 
-        if (elapsedSinceCreation >= abortThresholdMs) {
-          // Check if this is a battle game — battles always resolve decisively
+        if (elapsedMs >= thresholdSec * 1000) {
+          // Battles always resolve decisively — never abort with money in escrow
           const { data: battle } = await admin
             .from("battles")
             .select("id")
             .or(`game_id.eq.${game.id},armageddon_game_id.eq.${game.id}`)
             .in("status", ["playing", "draw_armageddon"])
             .limit(1)
-            .single();
+            .maybeSingle();
 
-          if (!battle) {
-            await admin
-              .from("games")
-              .update({
-                status: "abort",
-                winner: null,
-                ended_at: new Date().toISOString(),
-              })
-              .eq("id", game.id);
-            aborted++;
+          if (battle) {
+            await resolveTimeoutForGame(admin, game);
+            timedOut++;
             continue;
           }
+
+          // Casual game: abort with no winner and no rating change.
+          // Atomic claim so this sweep can't race a player's timeout-check.
+          const { data: claimed } = await admin
+            .from("games")
+            .update({
+              status: "abort",
+              winner: null,
+              ended_at: new Date().toISOString(),
+            })
+            .eq("id", game.id)
+            .eq("status", "playing")
+            .select("id")
+            .maybeSingle();
+
+          if (claimed) aborted++;
+          continue;
         }
       }
 
@@ -78,4 +98,12 @@ export async function POST(req: NextRequest) {
     console.error("Timeout check error:", e);
     return NextResponse.json({ error: "Timeout check failed" }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+  return handleSweep(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handleSweep(req);
 }

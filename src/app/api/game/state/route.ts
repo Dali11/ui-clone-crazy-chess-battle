@@ -28,7 +28,12 @@ export async function GET(req: NextRequest) {
 
     // Try user-scoped client first (respects RLS, uses user's session)
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // getSession() validates the JWT locally — no network round trip. This
+    // endpoint is polled every ~1.5s by every active player; getUser()'s
+    // auth call was flooding Supabase during peak play. Spectators and
+    // expired sessions still fall through to the public admin read below.
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
 
     if (user) {
       const { data: game, error } = await supabase

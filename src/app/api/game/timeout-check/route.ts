@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveTimeoutForGame } from "@/lib/game/resolve-timeout";
-import { getAbortSeconds } from "@/lib/game/abort-config";
+import { getAbortSeconds, REPLY_ABORT_SECONDS } from "@/lib/game/abort-config";
 
 // Client-callable timeout check — verifies the current user is in the game.
 // Polled every few seconds by both players' clients while a game is in
@@ -15,7 +15,12 @@ import { getAbortSeconds } from "@/lib/game/abort-config";
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Read the session locally (no network round trip). This endpoint is
+    // polled every few seconds by every active player; getUser()'s auth
+    // call was flooding Supabase during peak play. The user id comes from
+    // the signed JWT, so membership checks below remain trustworthy.
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -47,35 +52,52 @@ export async function POST(req: NextRequest) {
 
     const now = Date.now();
 
-    // ── First-move abort check ──────────────────────────────────────────
-    // If no moves have been made and we've exceeded the abort threshold,
-    // abort the game immediately. Tournaments and battles are excluded —
-    // they always resolve decisively (handled by resolveTimeoutForGame).
-    if (game.move_count === 0 && !game.tournament_id) {
-      const abortThresholdMs = getAbortSeconds(game.time_control) * 1000;
-      const elapsedSinceCreation = now - new Date(game.created_at).getTime();
+    // ── Early-move no-show check (moves 0 AND 1) ───────────────────────
+    // Mirrors the "must move" countdown shown in the game UI so the
+    // countdown actually resolves when it hits zero (chess.com-style):
+    //   move 0 (White hasn't opened): abort threshold for the time control
+    //   move 1 (Black hasn't replied): REPLY_ABORT_SECONDS (2 minutes)
+    // Casual games abort (no result, no rating change). Battles resolve
+    // decisively via resolveTimeoutForGame (stakes in escrow). Tournament
+    // games are excluded — the tournament cron has its own 2-minute
+    // auto-resign rule that also advances brackets.
+    if ((game.move_count === 0 || game.move_count === 1) && !game.tournament_id) {
+      const thresholdSec =
+        game.move_count === 0 ? getAbortSeconds(game.time_control) : REPLY_ABORT_SECONDS;
+      const timerStart = new Date(game.last_move_at || game.created_at).getTime();
+      const elapsedMs = now - timerStart;
 
-      if (elapsedSinceCreation >= abortThresholdMs) {
-        // Check if this is a battle game — battles always resolve decisively
+      if (elapsedMs >= thresholdSec * 1000) {
+        // Battles always resolve decisively — never abort with money in escrow
         const { data: battle } = await admin
           .from("battles")
           .select("id")
           .or(`game_id.eq.${game.id},armageddon_game_id.eq.${game.id}`)
           .in("status", ["playing", "draw_armageddon"])
           .limit(1)
-          .single();
+          .maybeSingle();
 
-        if (!battle) {
-          // Abort: no winner, no rating change
-          await admin
-            .from("games")
-            .update({
-              status: "abort",
-              winner: null,
-              ended_at: new Date().toISOString(),
-            })
-            .eq("id", game.id);
+        if (battle) {
+          const result = await resolveTimeoutForGame(admin, game);
+          return NextResponse.json({ timedOut: true, status: result.status, winner: result.winner });
+        }
 
+        // Casual game: abort with no winner and no rating change.
+        // Atomic claim (.eq status "playing") so concurrent polls from
+        // both players can't double-resolve.
+        const { data: claimed } = await admin
+          .from("games")
+          .update({
+            status: "abort",
+            winner: null,
+            ended_at: new Date().toISOString(),
+          })
+          .eq("id", game.id)
+          .eq("status", "playing")
+          .select("id")
+          .maybeSingle();
+
+        if (claimed) {
           return NextResponse.json({ timedOut: true, status: "abort", winner: null });
         }
       }

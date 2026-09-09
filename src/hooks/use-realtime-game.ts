@@ -75,7 +75,7 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
   // Reconnection counter — bumping this re-triggers the subscription effect
   const [reconnectTick, setReconnectTick] = useState(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Connection quality: "online" | "reconnecting" | "offline"
   const [connectionQuality, setConnectionQuality] = useState<"online" | "reconnecting" | "offline">("reconnecting");
@@ -534,22 +534,37 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
   useEffect(() => {
     fetchGameState();
 
-    const pollInterval = connectedRef.current ? 1500 : 500;
-
-    pollRef.current = setInterval(() => {
-      // Poll during "waiting" too — this is the only fallback that can
-      // catch a dropped realtime event flipping waiting -> playing (e.g.
-      // pre-game countdown hitting 0:00 and never transitioning on flaky
-      // mobile connections). Without this, a missed single UPDATE event
-      // leaves the client frozen on the countdown screen forever, since
-      // nothing else re-checks game state while status stays "waiting".
-      if (gameStatusRef.current === "playing" || gameStatusRef.current === "waiting") {
-        fetchGameState();
-      }
-    }, pollInterval);
+    // Self-scheduling chain (not setInterval) so every poll gets a fresh
+    // jittered delay. Jitter desynchronizes players so 20 active players
+    // don't fire in lockstep bursts at the API, and a long disconnect
+    // ESCALATES instead of hammering at 500ms forever — which tripled
+    // request volume during an auth slowdown and fed the very congestion
+    // it was trying to overcome.
+    let fastPolls = 0;
+    const scheduleNext = () => {
+      const delay = connectedRef.current
+        ? 1500 + Math.random() * 1500 // online: 1.5–3s safety net
+        : fastPolls < 8
+          ? 600 // just dropped: aggressive catch-up (~first 5 seconds)
+          : 2000 + Math.random() * 2000; // still down: back off to 2–4s
+      pollRef.current = setTimeout(() => {
+        if (!connectedRef.current) fastPolls++;
+        // Poll during "waiting" too — this is the only fallback that can
+        // catch a dropped realtime event flipping waiting -> playing (e.g.
+        // pre-game countdown hitting 0:00 and never transitioning on flaky
+        // mobile connections). Without this, a missed single UPDATE event
+        // leaves the client frozen on the countdown screen forever, since
+        // nothing else re-checks game state while status stays "waiting".
+        if (gameStatusRef.current === "playing" || gameStatusRef.current === "waiting") {
+          fetchGameState();
+        }
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollRef.current) clearTimeout(pollRef.current);
     };
   }, [fetchGameState, connectionQuality]);
 

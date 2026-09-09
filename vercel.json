@@ -15,6 +15,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/api/game/timeout",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/battles/challenge/cleanup-expired",
       "schedule": "0 0 * * *"
     },

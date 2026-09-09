@@ -6,7 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Local JWT validation — this endpoint is polled frequently by active
+    // players; getUser()'s network call was flooding Supabase auth.
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
