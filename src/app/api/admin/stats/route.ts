@@ -152,25 +152,11 @@ export async function GET(req: NextRequest) {
     const totalBattleVolume = completedBattles?.reduce((sum, b) => sum + (b.pot || 0), 0) || 0;
     const battleRevenueAllTime = completedBattles?.reduce((sum, b) => sum + (b.platform_fee || 0), 0) || 0;
 
-    const { data: finishedTournaments } = await admin
-      .from("tournaments")
-      .select("id, entry_fee")
-      .eq("status", "finished");
-
-    let tournamentEntryFees = 0;
-    if (finishedTournaments && finishedTournaments.length > 0) {
-      const finishedIds = finishedTournaments.map((t) => t.id);
-      const { data: participants } = await admin
-        .from("tournament_participants")
-        .select("tournament_id")
-        .in("tournament_id", finishedIds);
-
-      const feeMap = new Map(finishedTournaments.map((t) => [t.id, t.entry_fee || 0]));
-      for (const p of participants || []) {
-        tournamentEntryFees += feeMap.get(p.tournament_id) || 0;
-      }
-    }
-    const tournamentRevenueAllTime = Math.floor(tournamentEntryFees * 0.1);
+    // NOTE: the platform takes NO cut from tournaments — see lib/tournament/economics.ts
+    // (platformCut is always 0; only a tournament's creator can take a profit %, and that
+    // money goes to the creator, never the platform). Tournament revenue is therefore
+    // always 0 and must not be fabricated from entry fees here.
+    const tournamentRevenueAllTime = 0;
     const platformRevenue = battleRevenueAllTime + tournamentRevenueAllTime;
 
     const { data: tournamentsData } = await admin
@@ -281,26 +267,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Tournament revenue in range (finished tournaments updated within window)
-    let tournamentRevenueInRange = 0;
-    if (!noCountryMatch) {
-      const { data: finishedInRange } = await admin
-        .from("tournaments").select("id, entry_fee")
-        .eq("status", "finished").gte("updated_at", sinceISO);
-      if (finishedInRange && finishedInRange.length > 0) {
-        const finishedIds = finishedInRange.map((t) => t.id);
-        let pq = admin.from("tournament_participants").select("tournament_id, player_id")
-          .in("tournament_id", finishedIds);
-        const { data: parts } = await pq;
-        const feeMap = new Map(finishedInRange.map((t) => [t.id, t.entry_fee || 0]));
-        let fees = 0;
-        for (const p of parts || []) {
-          if (countryIds && !countryIds.includes((p as any).player_id)) continue;
-          fees += feeMap.get(p.tournament_id) || 0;
-        }
-        tournamentRevenueInRange = Math.floor(fees * 0.1);
-      }
-    }
+    // Tournament revenue in range: the platform takes NO cut from tournaments — see
+    // lib/tournament/economics.ts (platformCut is always 0; only a tournament's creator
+    // can take a profit %, and that money goes to the creator, never the platform).
+    // Was previously fabricated as 10% of entry fees via a query filtering on a
+    // "updated_at" column that doesn't exist on `tournaments` (silently returned 0 anyway).
+    const tournamentRevenueInRange = 0;
 
     const platformRevenueInRange = battleRevenueInRange + tournamentRevenueInRange;
     const netFlowInRange = depositsInRange - withdrawalsInRange;
