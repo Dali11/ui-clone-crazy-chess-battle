@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveTimeoutForGame } from "@/lib/game/resolve-timeout";
 import { getAbortSeconds, REPLY_ABORT_SECONDS } from "@/lib/game/abort-config";
+import { resolveDraughtsTimeout, abortDraughtsNoShow, DRAUGHTS_NO_SHOW_SECONDS } from "@/lib/game/draughts-timeout";
 
 // Cron sweep — checks ALL active games for:
 //   1. Early-move no-show (moves 0 and 1): mirrors the "must move" countdown
@@ -93,7 +94,51 @@ async function handleSweep(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ checked: activeGames.length, timedOut, aborted });
+    // ── DRAUGHTS SWEEP ────────────────────────────────────────────────
+    // draughts_games previously had NO timeout enforcement at all — only a
+    // self-check when the mover submitted a move, so a player who never
+    // moved left the game "playing" forever. All draughts games are casual
+    // (no battles), so early no-shows abort and expired clocks resolve as
+    // a decisive timeout loss with ELO update — same rules as chess.
+    const { data: draughtsGames } = await admin
+      .from("draughts_games")
+      .select("id, turn, move_count, white_clock_ms, black_clock_ms, last_move_at, created_at, white_player_id, black_player_id, rated")
+      .eq("status", "playing");
+
+    let draughtsTimedOut = 0;
+    let draughtsAborted = 0;
+
+    for (const dg of draughtsGames || []) {
+      const lastMoveTime = new Date(dg.last_move_at || dg.created_at).getTime();
+      const elapsedMs = now - lastMoveTime;
+
+      // Early-move no-show (moves 0-1)
+      if ((dg.move_count === 0 || dg.move_count === 1) && elapsedMs >= DRAUGHTS_NO_SHOW_SECONDS * 1000) {
+        const r = await abortDraughtsNoShow(admin, dg);
+        if (r.status === "abort") draughtsAborted++;
+        continue;
+      }
+
+      // Clock expiry — only meaningful once a move has been made (the
+      // first draughts move starts the clock without consuming time).
+      if (dg.move_count === 0) continue;
+      const currentClockMs = dg.turn === "white" ? dg.white_clock_ms : dg.black_clock_ms;
+      const remainingMs = (currentClockMs ?? 0) - elapsedMs;
+
+      if (remainingMs <= 0) {
+        const r = await resolveDraughtsTimeout(admin, dg);
+        if (r.status === "timeout") draughtsTimedOut++;
+      }
+    }
+
+    return NextResponse.json({
+      checked: activeGames.length,
+      timedOut,
+      aborted,
+      draughtsChecked: draughtsGames?.length ?? 0,
+      draughtsTimedOut,
+      draughtsAborted,
+    });
   } catch (e: any) {
     console.error("Timeout check error:", e);
     return NextResponse.json({ error: "Timeout check failed" }, { status: 500 });
