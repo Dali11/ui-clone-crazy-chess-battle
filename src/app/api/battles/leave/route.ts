@@ -27,6 +27,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not in any battle queue" }, { status: 400 });
     }
 
+    // Atomic claim FIRST — mark this entry "left" before refunding, and only
+    // proceed if THIS request is the one that actually flipped it. Without
+    // this, two near-simultaneous /leave calls (double-tap on Cancel, or a
+    // client retry after a slow response) both see status="waiting" and
+    // both credit the wallet — a real duplicate refund a player hit today.
+    const { data: claimed } = await admin
+      .from("battle_queue")
+      .update({ status: "left" })
+      .eq("id", queueEntry.id)
+      .eq("status", "waiting")
+      .select("id")
+      .maybeSingle();
+
+    if (!claimed) {
+      // Already left/matched by a concurrent request — refund already
+      // handled by whichever call won the race. Not an error to the client.
+      return NextResponse.json({ success: true, refunded: 0, alreadyLeft: true });
+    }
+
     // Refund the locked stake
     const { error: creditErr } = await admin.rpc("credit_wallet", {
       p_user_id: user.id,
@@ -35,6 +54,8 @@ export async function POST(req: NextRequest) {
 
     if (creditErr) {
       console.error("Refund failed:", creditErr);
+      // Roll back the claim so a retry (or heal-stuck) can still refund this
+      await admin.from("battle_queue").update({ status: "waiting" }).eq("id", queueEntry.id);
       return NextResponse.json({ error: "Failed to refund stake" }, { status: 500 });
     }
 
@@ -47,12 +68,6 @@ export async function POST(req: NextRequest) {
       reference: `battle_queue_refund:${queueEntry.id}`,
     });
     if (_depErr) console.error("Deposit audit log failed:", _depErr);
-
-    // Mark queue entry as left
-    await admin
-      .from("battle_queue")
-      .update({ status: "left" })
-      .eq("id", queueEntry.id);
 
     return NextResponse.json({ success: true, refunded: queueEntry.stake });
   } catch (e: any) {
