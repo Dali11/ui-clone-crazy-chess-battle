@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveTimeoutForGame } from "@/lib/game/resolve-timeout";
-import { getAbortSeconds, REPLY_ABORT_SECONDS } from "@/lib/game/abort-config";
+import { getAbortSeconds, REPLY_ABORT_SECONDS, BATTLE_FIRST_MOVE_GRACE_SECONDS, BATTLE_REPLY_GRACE_SECONDS } from "@/lib/game/abort-config";
 import { finalizeResign } from "@/lib/game/finalize-resign";
 import { getAbandonedColor, shouldRefreshHeartbeat } from "@/lib/game/abandonment";
 
@@ -98,21 +98,25 @@ export async function POST(req: NextRequest) {
     // games are excluded — the tournament cron has its own 2-minute
     // auto-resign rule that also advances brackets.
     if ((game.move_count === 0 || game.move_count === 1) && !game.tournament_id) {
-      const thresholdSec =
-        game.move_count === 0 ? getAbortSeconds(game.time_control) : REPLY_ABORT_SECONDS;
+      // Battles always resolve decisively — never abort with money in escrow —
+      // but they also get a wider no-show grace than casual games (see
+      // BATTLE_FIRST_MOVE_GRACE_SECONDS): check battle-ness FIRST so the
+      // right threshold is used, not the casual one.
+      const { data: battle } = await admin
+        .from("battles")
+        .select("id")
+        .or(`game_id.eq.${game.id},armageddon_game_id.eq.${game.id}`)
+        .in("status", ["playing", "draw_armageddon"])
+        .limit(1)
+        .maybeSingle();
+
+      const thresholdSec = battle
+        ? (game.move_count === 0 ? BATTLE_FIRST_MOVE_GRACE_SECONDS : BATTLE_REPLY_GRACE_SECONDS)
+        : (game.move_count === 0 ? getAbortSeconds(game.time_control) : REPLY_ABORT_SECONDS);
       const timerStart = new Date(game.last_move_at || game.created_at).getTime();
       const elapsedMs = now - timerStart;
 
       if (elapsedMs >= thresholdSec * 1000) {
-        // Battles always resolve decisively — never abort with money in escrow
-        const { data: battle } = await admin
-          .from("battles")
-          .select("id")
-          .or(`game_id.eq.${game.id},armageddon_game_id.eq.${game.id}`)
-          .in("status", ["playing", "draw_armageddon"])
-          .limit(1)
-          .maybeSingle();
-
         if (battle) {
           const result = await resolveTimeoutForGame(admin, game);
           return NextResponse.json({ timedOut: true, status: result.status, winner: result.winner });

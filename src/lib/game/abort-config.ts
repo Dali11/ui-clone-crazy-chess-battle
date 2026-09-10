@@ -22,6 +22,18 @@ export const DEFAULT_ABORT_SECONDS = 120;
 // countdown shown in the game UI.
 export const REPLY_ABORT_SECONDS = 120;
 
+// Battles hold real money in escrow, so how long a no-show grace lasts
+// matters more than for a casual game. Challenges are often shared
+// asynchronously (e.g. posted in a WhatsApp group) — the challenger may
+// not be watching the app at all when someone accepts and the game
+// starts, so the standard 30s-2min casual thresholds are too tight and
+// were burning people's stakes before they ever saw the game existed.
+// Wider grace at move 0/1 gives real time for the in-app notification
+// (and the ActiveBattleWatcher redirect, if a tab is open anywhere) to
+// actually reach the player before the clock forfeits their stake.
+export const BATTLE_FIRST_MOVE_GRACE_SECONDS = 300; // 5 minutes
+export const BATTLE_REPLY_GRACE_SECONDS = 180; // 3 minutes
+
 /**
  * Returns the abort threshold in seconds for a given time control.
  * Falls back to DEFAULT_ABORT_SECONDS if the time control is unrecognized.

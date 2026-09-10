@@ -23,7 +23,7 @@ import BoardThemePicker from "./board-theme-picker";
 import OpeningBadge from "./opening-badge";
 import GameChat from "./game-chat";
 import PreGameCountdown from "./pre-game-countdown";
-import { getAbortSeconds } from "@/lib/game/abort-config";
+import { getAbortSeconds, BATTLE_FIRST_MOVE_GRACE_SECONDS, BATTLE_REPLY_GRACE_SECONDS } from "@/lib/game/abort-config";
 import PlayerProfilePreview from "./player-profile-preview";
 import PlayerBar from "./player-bar";
 import { formatClock } from "./utils";
@@ -414,8 +414,11 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   // it hits zero — previously the UI promised 2:00 but the server only
   // enforced the full clock, so the countdown ran out and nothing happened.
   //   move 0 casual: getAbortSeconds(time_control) — bullet aborts at 30s
-  //   move 0 battle/tournament: 2 minutes (decisive settlement / cron auto-resign)
-  //   move 1 (Black's reply): 2 minutes
+  //   move 0 tournament: 2 minutes (cron auto-resign)
+  //   move 0 battle: BATTLE_FIRST_MOVE_GRACE_SECONDS (5 min — wider grace
+  //     since challenges are often accepted async, e.g. shared in a
+  //     WhatsApp group, and the challenger may not be watching at all)
+  //   move 1 (reply): 2 minutes casual/tournament, BATTLE_REPLY_GRACE_SECONDS battle
   const noShowInfo = useMemo(() => {
     if (gameEnded || game.status !== "playing") return null;
     if (game.move_count !== 0 && game.move_count !== 1) return null;
@@ -423,9 +426,15 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     if (!timerStartRaw) return null;
     void clockTick; // re-run every second
     const thresholdMs =
-      game.move_count === 0 && !isTournamentGame && !isBattleGame
-        ? getAbortSeconds(game.time_control) * 1000
-        : 2 * 60 * 1000;
+      game.move_count === 0
+        ? isBattleGame
+          ? BATTLE_FIRST_MOVE_GRACE_SECONDS * 1000
+          : isTournamentGame
+            ? 2 * 60 * 1000
+            : getAbortSeconds(game.time_control) * 1000
+        : isBattleGame
+          ? BATTLE_REPLY_GRACE_SECONDS * 1000
+          : 2 * 60 * 1000;
     const elapsed = Date.now() - new Date(timerStartRaw).getTime();
     const remainingMs = thresholdMs - elapsed;
     return {
