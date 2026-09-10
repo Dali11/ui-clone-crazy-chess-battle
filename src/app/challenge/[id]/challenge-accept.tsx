@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Swords, Clock, Star, Loader2 } from "lucide-react";
+import AdSlot from "@/components/ads/ad-slot";
 
 interface ChallengeAcceptProps {
   challengeId: string;
@@ -79,6 +80,11 @@ export default function ChallengeAccept({
             {error}
           </div>
         )}
+
+        {/* Admin-managed ad — pre-game decision screen, not a money/stake
+            screen (casual/ranked only, no wagers here). Uses the lobby
+            placement since it's the equivalent of a pre-game waiting page. */}
+        <AdSlot placement="lobby" />
 
         <div className="flex gap-3">
           <button

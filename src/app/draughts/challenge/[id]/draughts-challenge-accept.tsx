@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Disc3, Clock, Star, Loader2 } from "lucide-react";
+import AdSlot from "@/components/ads/ad-slot";
 
 export default function DraughtsChallengeAccept({
   challengeId,
@@ -64,6 +65,7 @@ export default function DraughtsChallengeAccept({
           </div>
         </div>
         {error && <div className="text-sm text-ccb-danger bg-ccb-danger/10 border border-ccb-danger/20 rounded-lg p-3">{error}</div>}
+        <AdSlot placement="lobby" />
         <div className="flex gap-3">
           <button onClick={() => router.push("/draughts")} className="btn-secondary flex-1">Decline</button>
           <button onClick={handleAccept} disabled={loading} className="btn-primary flex-1 flex items-center justify-center gap-2">
