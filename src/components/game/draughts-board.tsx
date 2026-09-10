@@ -47,7 +47,7 @@ export default function DraughtsBoard({
   }, [legalMoves]);
 
   return (
-    <div className="relative aspect-square w-full max-w-[min(92vw,552px)] max-h-full mx-auto select-none">
+    <div className="relative aspect-square w-full max-w-[min(94vw,564px)] max-h-full mx-auto select-none">
       <div className="grid grid-cols-8 grid-rows-8 w-full h-full rounded-lg overflow-hidden border-2 border-ccb-border shadow-lg">
         {displayRows.map((row, displayRowIdx) =>
           row.map((cell, displayColIdx) => {

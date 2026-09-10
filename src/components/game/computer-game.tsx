@@ -99,10 +99,10 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundPlayedForEnd = useRef(false);
   const savedRef = useRef(false);
-  // 0.92: board gets ~4% breathing room per side on phones/tablets so
+  // 0.94: board gets ~3% breathing room per side on phones/tablets so
   // squares stay slightly smaller than full-width (was edge-to-edge ~55-56px
   // on mobile). Snapped to a multiple of 8 by the hook, so still seam-free.
-  const { containerRef: boardContainerRef, size: boardSize } = useBoardSize(600, 220, 8, 0.92);
+  const { containerRef: boardContainerRef, size: boardSize } = useBoardSize(600, 220, 8, 0.94);
 
   useLockBodyScroll();
 
