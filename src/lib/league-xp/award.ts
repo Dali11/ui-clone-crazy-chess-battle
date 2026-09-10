@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { currentWeekStart, getLeagueXpConfig, ENTRY_TIER } from "./index";
+import { currentWeekStart, getLeagueXpConfig, ENTRY_TIER, BATTLE_XP } from "./index";
 
 /**
  * Idempotent XP award for a finished PvP game. Safe to call from every
@@ -61,7 +61,17 @@ export async function awardGameXp(opts: {
     const whiteRating = g.white_rating ?? white.rating ?? 400;
     const blackRating = g.black_rating ?? black.rating ?? 400;
 
+    // Staked battle games (incl. armageddon deciders) earn the flat
+    // BATTLE_XP rate instead of the normal PvP ladder rates.
+    const { data: battleRow } = await admin
+      .from("battles")
+      .select("id")
+      .or(`game_id.eq.${opts.gameId},armageddon_game_id.eq.${opts.gameId}`)
+      .limit(1);
+    const isBattle = !!battleRow?.length;
+
     const amountFor = (won: boolean, lostTo: boolean, oppRating: number, myRating: number) => {
+      if (isBattle) return draw ? BATTLE_XP.draw : won ? BATTLE_XP.win : BATTLE_XP.loss;
       let xp = draw ? cfg.xp_draw : won ? cfg.xp_win : cfg.xp_loss;
       if (won && lostTo && oppRating > myRating) xp += cfg.xp_upset_bonus;
       return xp;

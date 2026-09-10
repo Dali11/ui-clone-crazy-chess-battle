@@ -26,6 +26,14 @@ export const LEAGUE_TIERS = [
 /** Everyone who joins after launch starts in the Open League (tier 1). */
 export const ENTRY_TIER = 1;
 
+/**
+ * Flat XP for staked battle games (incl. armageddon deciders).
+ * Owner policy 2026-09-10: Win 3 / Draw 1 / Loss 0 — battles already pay
+ * cash, so league XP is a small participation bonus and the ladder can't
+ * be bought with stakes. Normal PvP games keep cfg rates (10/4/2 + upset).
+ */
+export const BATTLE_XP = { win: 3, draw: 1, loss: 0 } as const;
+
 export interface LeagueXpConfig {
   enabled: boolean;
   xp_win: number;
