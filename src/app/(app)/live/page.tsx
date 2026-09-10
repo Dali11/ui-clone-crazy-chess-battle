@@ -171,13 +171,6 @@ export default function LiveMatchesPage() {
         </div>
       )}
 
-      {/* Spectate ad — admin-managed (Ads > Spectate / Live List) */}
-      {!loading && (myGames.length > 0 || otherGames.length > 0) && (
-        <div className="px-4 sm:px-6 lg:px-8 pt-4">
-          <AdSlot placement="spectate" />
-        </div>
-      )}
-
       {/* Other Live Games */}
       {!loading && otherGames.length > 0 && (
         <div className="px-4 sm:px-6 lg:px-8 space-y-2">
@@ -189,6 +182,14 @@ export default function LiveMatchesPage() {
           {otherGames.map((game) => (
             <GameCard key={game.id} game={game} />
           ))}
+        </div>
+      )}
+
+      {/* Spectate ad — admin-managed (Ads > Spectate / Live List).
+          Bottom row: under all game cards so it never disrupts browsing. */}
+      {!loading && (myGames.length > 0 || otherGames.length > 0) && (
+        <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-2">
+          <AdSlot placement="spectate" />
         </div>
       )}
     </div>

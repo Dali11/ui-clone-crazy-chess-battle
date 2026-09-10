@@ -321,9 +321,6 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Lobby ad — admin-managed (Ads > Lobby). Renders nothing when off. */}
-      <AdSlot placement="lobby" className="pt-2" />
-
       {/* Wallet row */}
       <div className="grid grid-cols-1 gap-2 sm:gap-3">
 
@@ -338,6 +335,10 @@ export default async function DashboardPage() {
           <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:translate-x-1 transition-transform" />
         </Link>
       </div>
+
+      {/* Lobby ad — admin-managed (Ads > Lobby). Renders nothing when off.
+          Bottom row: sits under all content so it never pushes the UI. */}
+      <AdSlot placement="lobby" className="pt-2" />
     </div>
   );
 }

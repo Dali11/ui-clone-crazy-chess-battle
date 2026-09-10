@@ -65,12 +65,17 @@ export default function DraughtsChallengeAccept({
           </div>
         </div>
         {error && <div className="text-sm text-ccb-danger bg-ccb-danger/10 border border-ccb-danger/20 rounded-lg p-3">{error}</div>}
-        <AdSlot placement="lobby" />
         <div className="flex gap-3">
           <button onClick={() => router.push("/draughts")} className="btn-secondary flex-1">Decline</button>
           <button onClick={handleAccept} disabled={loading} className="btn-primary flex-1 flex items-center justify-center gap-2">
             {loading ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Starting...</span></> : <><Disc3 className="w-4 h-4" /><span>Accept</span></>}
           </button>
+        </div>
+
+        {/* Admin-managed ad — pre-game decision screen. Lobby placement.
+            Bottom row: below the decision buttons so it never pushes them. */}
+        <div className="mt-5">
+          <AdSlot placement="lobby" />
         </div>
       </div>
     </div>

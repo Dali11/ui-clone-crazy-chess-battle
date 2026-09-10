@@ -81,12 +81,6 @@ export default function DraughtsChallengeTaken({
           </span>
         </div>
 
-        {/* Admin-managed ad — same non-gameplay spectate placement as the
-            live matches list. Renders nothing until enabled + configured. */}
-        <div className="mb-4">
-          <AdSlot placement="spectate" />
-        </div>
-
         <button
           onClick={() => router.push(`/draughts/game/${gameId}`)}
           className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold bg-ccb-primary text-white hover:opacity-90 active:scale-[0.98] transition-all"
@@ -100,6 +94,13 @@ export default function DraughtsChallengeTaken({
         >
           <Home className="w-3.5 h-3.5" /> Back to Draughts
         </button>
+
+        {/* Admin-managed ad — same non-gameplay spectate placement as the
+            live matches list. Renders nothing until enabled + configured.
+            Bottom row: under all actions so it never pushes the CTAs. */}
+        <div className="mt-5">
+          <AdSlot placement="spectate" />
+        </div>
       </div>
     </div>
   );

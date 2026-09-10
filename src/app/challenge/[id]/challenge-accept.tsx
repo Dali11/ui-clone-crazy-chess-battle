@@ -81,11 +81,6 @@ export default function ChallengeAccept({
           </div>
         )}
 
-        {/* Admin-managed ad — pre-game decision screen, not a money/stake
-            screen (casual/ranked only, no wagers here). Uses the lobby
-            placement since it's the equivalent of a pre-game waiting page. */}
-        <AdSlot placement="lobby" />
-
         <div className="flex gap-3">
           <button
             onClick={() => router.push("/play")}
@@ -110,6 +105,14 @@ export default function ChallengeAccept({
               </>
             )}
           </button>
+        </div>
+
+        {/* Admin-managed ad — pre-game decision screen, not a money/stake
+            screen (casual/ranked only, no wagers here). Uses the lobby
+            placement since it's the equivalent of a pre-game waiting page.
+            Bottom row: below the decision buttons so it never pushes them. */}
+        <div className="mt-5">
+          <AdSlot placement="lobby" />
         </div>
       </div>
     </div>

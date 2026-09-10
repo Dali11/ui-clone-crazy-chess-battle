@@ -224,14 +224,6 @@ export default function VictoryOverlay({
 
         <p className="text-xs text-white/35 mb-5">{subtitle}</p>
 
-        {/* Admin-managed post-game ad (results / battle settlement).
-            Renders nothing until enabled + configured in the admin Ads section. */}
-        {adPlacement && (
-          <div className="mb-5 max-w-sm mx-auto">
-            <AdSlot placement={adPlacement} />
-          </div>
-        )}
-
         {/* Battle draw → mandatory Armageddon decider */}
         {isArmageddonDraw && (
           <div className="mb-4 px-4 py-3 rounded-xl text-left" style={{ backgroundColor: accentBg, border: `1px solid ${accentBorder}` }}>
@@ -392,6 +384,16 @@ export default function VictoryOverlay({
           >
             <Home className="w-4 h-4" /> Back to Lobby
           </Link>
+
+          {/* Admin-managed post-game ad (results / battle settlement).
+              Renders nothing until enabled + configured in the admin Ads
+              section. Bottom row: below every action so it never pushes
+              the result CTAs. */}
+          {adPlacement && (
+            <div className="mt-5 max-w-sm mx-auto w-full">
+              <AdSlot placement={adPlacement} />
+            </div>
+          )}
         </div>
       </div>
     </div>

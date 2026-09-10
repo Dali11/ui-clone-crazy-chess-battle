@@ -89,12 +89,6 @@ export default function ChallengeTaken({
           </span>
         </div>
 
-        {/* Admin-managed ad — same non-gameplay spectate placement as the
-            live matches list. Renders nothing until enabled + configured. */}
-        <div className="mb-4">
-          <AdSlot placement="spectate" />
-        </div>
-
         {/* Primary action */}
         <button
           onClick={() => router.push(`/game/${gameId}?spectate=1`)}
@@ -125,6 +119,13 @@ export default function ChallengeTaken({
         >
           <Home className="w-3.5 h-3.5" /> Back to Home
         </button>
+
+        {/* Admin-managed ad — same non-gameplay spectate placement as the
+            live matches list. Renders nothing until enabled + configured.
+            Bottom row: under all actions so it never pushes the CTAs. */}
+        <div className="mt-5">
+          <AdSlot placement="spectate" />
+        </div>
       </div>
     </div>
   );
