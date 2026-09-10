@@ -61,7 +61,10 @@ export default function ActiveTournamentWatcher() {
     };
   }, [pathname, skip, router]);
 
-  if (!redirecting) return null;
+  // Render-time guard: hide the instant we're on the game page, not just
+  // when the effect gets around to clearing state (was leaving this stuck
+  // visible on the board until a manual refresh).
+  if (!redirecting || skip) return null;
 
   return (
     <div className="fixed bottom-24 sm:bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 rounded-full bg-ccb-accent text-white text-sm font-medium shadow-lg shadow-ccb-accent/30">

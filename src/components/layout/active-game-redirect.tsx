@@ -68,7 +68,11 @@ export default function ActiveGameRedirect() {
     }
   }, [skip]);
 
-  if (!redirecting) return null;
+  // Render-time guard (not just the effect): as soon as the pathname is
+  // actually on the game page, hide immediately — don't wait for a state
+  // update to catch up. This is what was leaving the toast stuck visible
+  // until a manual refresh if the effect's re-run lagged the navigation.
+  if (!redirecting || skip) return null;
 
   const config = {
     free: { icon: Zap, label: "Your game is live", color: "bg-ccb-primary" },
