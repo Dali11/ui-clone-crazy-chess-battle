@@ -57,7 +57,7 @@ const SECTIONS = [
   {
     icon: TrendingUp,
     title: "Every Battle Counts",
-    body: "Battles are Elo-rated AND earn League XP — Win 3 / Draw 1 / Loss 0 — toward your weekly League rewards, alongside normal games.",
+    body: "Battles are Elo-rated AND earn League XP — Win 3 / Draw 1 / Loss 0 — toward your weekly League rewards — the same rates every PvP game earns.",
   },
 ];
 
