@@ -85,10 +85,12 @@ function warmUpAdNetworks(cfg: AdsConfig | null) {
       try { origin = new URL(url).origin; } catch { continue; }
       if (!seenOrigins.has(origin)) {
         seenOrigins.add(origin);
+        // Plain preconnect (no crossorigin attr): classic ad scripts are
+        // fetched no-cors, so a crossorigin="anonymous" preconnect would
+        // open a *separate* connection and never be reused.
         const pc = document.createElement("link");
         pc.rel = "preconnect";
         pc.href = origin;
-        pc.crossOrigin = "anonymous";
         pc.dataset.ccbAdWarmup = "1";
         head.appendChild(pc);
       }
@@ -147,10 +149,22 @@ export default function AdSlot({
 
     // Same-origin about:blank iframe: document.write stays contained and
     // we can read the rendered height after load for seamless sizing.
+    // The head pre-warms the ad domains so the iframe does not pay a
+    // DNS+TLS cold start before fetching invoke.js (cache/connections are
+    // partitioned per frame — the host page's preconnects don't cover it).
+    const origins = [...new Set(
+      extractScriptUrls(script)
+        .map((u) => { try { return new URL(u).origin; } catch { return null; } })
+        .filter(Boolean)
+    )];
+    const warmLinks = origins
+      .map((o) => `<link rel="preconnect" href="${o}"><link rel="dns-prefetch" href="${o}">`)
+      .join("");
     const doc = iframe.contentDocument!;
     doc.open();
     doc.write(
       `<!DOCTYPE html><html><head><meta name="color-scheme" content="dark">` +
+      warmLinks +
       `<style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}</style>` +
       `</head><body>${script}</body></html>`
     );
