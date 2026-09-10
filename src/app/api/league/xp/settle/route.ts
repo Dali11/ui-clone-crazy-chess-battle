@@ -98,8 +98,31 @@ async function runSettlement() {
       if (isTop) {
         reward = rewards[rank - 1] ?? 0;
         if (reward > 0) {
-          const { error: creditErr } = await admin.rpc("credit_wallet", { p_user_id: m.user_id, p_amount: reward });
-          if (!creditErr) paid++;
+          // Idempotency: ledger row FIRST with a unique reference. The
+          // deposits_reference_unique partial index turns any crash/retry
+          // into a no-op instead of a double payout.
+          const rewardRef = `league:${closingWeek}:${m.user_id}`;
+          const { error: depErr } = await admin.from("deposits").insert({
+            user_id: m.user_id,
+            amount: reward,
+            status: "success",
+            method: "league_reward",
+            reference: rewardRef,
+          });
+          if (depErr && String(depErr.message || "").includes("duplicate key")) {
+            // Already paid in a previous run — skip.
+          } else if (!depErr) {
+            const { error: creditErr } = await admin.rpc("credit_wallet", { p_user_id: m.user_id, p_amount: reward });
+            if (!creditErr) {
+              paid++;
+            } else {
+              // Roll back the ledger claim so a retry can pay properly.
+              await admin.from("deposits").delete().eq("reference", rewardRef);
+              console.error(`League reward credit failed for ${m.user_id}, ledger row rolled back`);
+            }
+          } else {
+            console.error("League reward ledger insert failed:", depErr);
+          }
         }
         if (tier < 5 && room > 0) { newTier = tier + 1; didPromote = true; room--; }
         else if (tier < 5 && room <= 0) capped++;

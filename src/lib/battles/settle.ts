@@ -54,6 +54,13 @@ export async function settleBattle(
       await admin.rpc("credit_wallet", { p_user_id: battle.white_player_id, p_amount: battle.stake });
       await admin.rpc("credit_wallet", { p_user_id: battle.black_player_id, p_amount: battle.stake });
 
+      // Ledger both stake refunds (unique references; idempotent on retry).
+      const { error: _drawDepErr } = await admin.from("deposits").insert([
+        { user_id: battle.white_player_id, amount: battle.stake, status: "success", method: "battle_refund", reference: `battle:${battleId}:draw:white` },
+        { user_id: battle.black_player_id, amount: battle.stake, status: "success", method: "battle_refund", reference: `battle:${battleId}:draw:black` },
+      ]);
+      if (_drawDepErr) console.error("Draw refund ledger log failed:", _drawDepErr);
+
       await admin
         .from("battle_escrow")
         .update({ status: "refunded", released_at: new Date().toISOString() })

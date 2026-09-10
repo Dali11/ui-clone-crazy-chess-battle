@@ -60,6 +60,11 @@ export async function POST(req: NextRequest) {
     const profitPercent = Math.max(0, Math.min(100, Number(creatorProfitPercent) || 0));
     const isPaid = Number(entryFee) > 0;
 
+    // Guard: a fixed prize pool backed by the house is only allowed on a
+    // paid-entry tournament (or by an admin). Free tournaments must use
+    // entry-fee pools (which collect nothing = no cash prize) or berry
+    // prizes. This closes the unbacked-payout hole.
+
     const dbType = ["arena", "swiss", "knockout"].includes(type) ? type : "swiss";
     const GAME_TIME_CONTROL_MAP: Record<string, string> = {
       bullet: "bullet", blitz3: "blitz", blitz: "blitz",
@@ -72,6 +77,13 @@ export async function POST(req: NextRequest) {
     const { data: creatorProfile } = await admin
       .from("profiles").select("is_admin").eq("id", user.id).single();
     const isCreatorAdmin = creatorProfile?.is_admin ?? false;
+
+    if (poolSource === "fixed" && !isPaid && !isCreatorAdmin) {
+      return NextResponse.json(
+        { error: "Fixed prize pools require a paid entry. Free tournaments can use berry prizes instead." },
+        { status: 400 }
+      );
+    }
 
     // Determine approval status based on platform settings
     const requireApproval = tConfig.require_approval !== false;
