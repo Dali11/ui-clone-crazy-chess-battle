@@ -28,6 +28,8 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "battle_settlement_script", label: "Battle Settlement Ad Script", type: "textarea", group: "control" },
     { key: "draughts_results_enabled", label: "Draughts Results Ad", type: "toggle", group: "control", help: "End-of-game screen for draughts — recommended 300x250" },
     { key: "draughts_results_script", label: "Draughts Results Ad Script", type: "textarea", group: "control" },
+    { key: "challenge_finished_enabled", label: "Challenge Finished Ad", type: "toggle", group: "control", help: "Shown when someone opens a challenge link after the game ended — falls back to the Chess Results ad if no script is set" },
+    { key: "challenge_finished_script", label: "Challenge Finished Ad Script", type: "textarea", group: "control" },
   ],
   overview: [
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display", help: "Display stat cards at the top" },

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Trophy, Handshake, Eye, Home } from "lucide-react";
+import AdSlot from "@/components/ads/ad-slot";
 
 interface PlayerInfo {
   name: string;
@@ -139,6 +140,9 @@ export default function ChallengeFinished({
         >
           <Home className="w-3.5 h-3.5" /> Back to Home
         </button>
+
+        {/* Ad — bottom row, below every action button (admin-managed) */}
+        <AdSlot placement="challenge_finished" />
       </div>
     </div>
   );

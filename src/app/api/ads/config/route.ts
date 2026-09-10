@@ -26,6 +26,14 @@ export async function GET() {
           game_results: { enabled: !!cfg.game_results_enabled, script: String(cfg.game_results_script || "") },
           battle_settlement: { enabled: !!cfg.battle_settlement_enabled, script: String(cfg.battle_settlement_script || "") },
           draughts_results: { enabled: !!cfg.draughts_results_enabled, script: String(cfg.draughts_results_script || "") },
+          challenge_finished: {
+            // "Challenge already finished" results screen. Falls back to
+            // the chess results ad so it's usable with zero extra config.
+            enabled: cfg.challenge_finished_script
+              ? !!cfg.challenge_finished_enabled
+              : !!cfg.game_results_enabled,
+            script: String(cfg.challenge_finished_script || cfg.game_results_script || ""),
+          },
         },
       },
       { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } }

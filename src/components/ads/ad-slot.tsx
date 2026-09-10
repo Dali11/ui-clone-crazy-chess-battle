@@ -30,7 +30,8 @@ export type AdPlacement =
   | "spectate"
   | "game_results"
   | "battle_settlement"
-  | "draughts_results";
+  | "draughts_results"
+  | "challenge_finished";
 
 interface PlacementConfig {
   enabled: boolean;
