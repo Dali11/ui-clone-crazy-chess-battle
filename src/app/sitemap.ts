@@ -10,6 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE_URL}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${BASE_URL}/how-it-works`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${BASE_URL}/faq`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${BASE_URL}/how-battles-work`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${BASE_URL}/league`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${BASE_URL}/league`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${BASE_URL}/tournaments`, lastModified: now, changeFrequency: "daily", priority: 0.8 },

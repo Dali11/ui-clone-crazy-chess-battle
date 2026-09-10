@@ -6,8 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import { useCurrency } from "@/hooks/use-currency";
 import {
   Swords, Clock, Coins, Zap, AlertCircle, Loader2, Link2, Copy, Check,
-  RefreshCw, XCircle, ChevronRight, Users, Target, Sparkles,
+  RefreshCw, XCircle, ChevronRight, Users, Target, Sparkles, ArrowRight,
 } from "lucide-react";
+import Link from "next/link";
 
 // Single fixed stake for matchmaking battles: MK 1,000
 const BATTLE_STAKE = 1000;
@@ -775,6 +776,12 @@ export default function BattlesPage() {
             <span>Players worldwide can match up — stake shown in your currency</span>
           </li>
         </ol>
+        <Link
+          href="/how-battles-work"
+          className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-ccb-accent hover:underline"
+        >
+          Learn how battles work <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
       </div>
     </div>
   );
