@@ -173,17 +173,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .order("joined_at", { ascending: false })
       .limit(20);
 
-    // ─── League registrations ────────────────────────────────────────────
-    const { data: leagues } = await admin
-      .from("league_registrations")
-      .select(`
-        id, status, qualified, qualification_reason, registered_at, reviewed_at,
-        league:premier_leagues(id, name, tier)
-      `)
-      .eq("player_id", id)
-      .order("registered_at", { ascending: false })
-      .limit(10);
-
     // ─── Referrals ────────────────────────────────────────────────────────
     // referrals.referrer_id / referred_id reference auth.users, not profiles —
     // same FK-embed limitation as battles, so resolve usernames manually.
@@ -255,7 +244,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       transactions,
       battles,
       tournaments: tournaments || [],
-      leagues: leagues || [],
       referralsMade,
       referralReceived,
       adminActions: adminActions || [],

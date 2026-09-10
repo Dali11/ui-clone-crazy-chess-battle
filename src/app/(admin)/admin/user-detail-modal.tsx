@@ -176,18 +176,6 @@ export default function UserDetailModal({ userId, onClose, onAction, onDelete, a
                 </div>
               )}
 
-              {data.leagues?.length > 0 && (
-                <div className="card p-4">
-                  <div className="text-xs font-bold text-ccb-muted mb-3">LEAGUE REGISTRATIONS</div>
-                  {data.leagues.map((l: any) => (
-                    <div key={l.id} className="flex items-center justify-between text-xs py-1.5">
-                      <span>{l.league?.name || "Unknown"} (Tier {l.league?.tier || "?"})</span>
-                      <StatusBadge status={l.status} />
-                    </div>
-                  ))}
-                </div>
-              )}
-
               <div className="flex flex-wrap gap-2 pt-2">
                 <button onClick={() => onAction(userId, p.is_banned ? "unban" : "ban")} disabled={actionLoading === `${userId}_${p.is_banned ? "unban" : "ban"}`} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all disabled:opacity-50 ${p.is_banned ? "bg-ccb-success/10 text-ccb-success hover:bg-ccb-success/20" : "bg-ccb-danger/10 text-ccb-danger hover:bg-ccb-danger/20"}`}>
                   {actionLoading === `${userId}_${p.is_banned ? "unban" : "ban"}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Ban className="w-3.5 h-3.5" /> {p.is_banned ? "Unban" : "Ban"}</>}
