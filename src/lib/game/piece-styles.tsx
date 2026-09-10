@@ -15,8 +15,10 @@ const WHITE_STROKE = "#000000";
 const BLACK_FILL = "#565656";
 const BLACK_STROKE = "#000000";
 
-/* Thick stroke width for a bold, chess.com-style piece weight */
-const STROKE_WIDTH = 3;
+/* Thin outline matching chess.com's measured ~3.6%-of-square line weight
+   (2px on a 56px square). A 3-unit stroke rendered ~6.7% — nearly twice
+   as bold — and read as a visibly heavier, different-looking piece set. */
+const STROKE_WIDTH = 1.5;
 
 const svgBase: CSSProperties = {
   width: "100%",
