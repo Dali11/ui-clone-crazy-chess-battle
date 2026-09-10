@@ -13,6 +13,11 @@ import { settleBattle } from "@/lib/battles/settle";
  * Case 2: pending + game_id NOT NULL (legacy bug: status never advanced)
  *   - if game finished: settle now
  *   - if still playing: correct status to "playing"
+ * Case 3: battle_queue rows stuck in "waiting" past the queue timeout
+ *   - The active/join routes refund these when the PLAYER returns, but if
+ *     they closed the app mid-search the stake sat in escrow forever.
+ *   - Refund them here, with a 60s grace so the player's own visit path
+ *     (nicer toast message) wins the race. Same atomic claim either way.
  */
 
 function verifyCronAuth(req: NextRequest): boolean {
@@ -37,7 +42,7 @@ async function handleHeal(req: NextRequest) {
 
   const admin = createAdminClient();
   const now = Date.now();
-  const results = { scanned: 0, gameCreated: 0, statusCorrected: 0, settled: 0, cancelledAndRefunded: 0, stillRetrying: 0, failed: 0 };
+  const results = { scanned: 0, gameCreated: 0, statusCorrected: 0, settled: 0, cancelledAndRefunded: 0, stillRetrying: 0, queuesExpired: 0, failed: 0 };
 
   try {
     const cutoff = new Date(now - 60_000).toISOString();
@@ -110,6 +115,38 @@ async function handleHeal(req: NextRequest) {
       ]);
       await admin.from("battle_escrow").update({ status: "refunded", released_at: new Date().toISOString() }).eq("battle_id", battle.id);
       results.cancelledAndRefunded++;
+    }
+
+    // ── Case 3: stale queue rows — refund escrow even if the player
+    // never reopens /battles. 60s grace past queue_timeout_s so the
+    // player-visible timeout path (same atomic claim) fires first.
+    const { data: queueConfig } = await admin.from("battle_config").select("queue_timeout_s").limit(1).maybeSingle();
+    const queueCutoff = new Date(now - ((queueConfig?.queue_timeout_s ?? 120) * 1000 + 60_000)).toISOString();
+    const { data: staleQueues } = await admin.from("battle_queue")
+      .select("id, player_id, stake, created_at")
+      .eq("status", "waiting").lt("created_at", queueCutoff)
+      .order("created_at", { ascending: true }).limit(200);
+
+    for (const q of staleQueues ?? []) {
+      // Atomic claim — matches /api/battles/active and /api/battles/join,
+      // so concurrent paths can never double-refund.
+      const { data: claimed } = await admin.from("battle_queue")
+        .update({ status: "expired" }).eq("id", q.id).eq("status", "waiting")
+        .select("id, stake").maybeSingle();
+      if (!claimed) continue; // another path handled it
+
+      const { error: creditErr } = await admin.rpc("credit_wallet", { p_user_id: q.player_id, p_amount: claimed.stake });
+      if (creditErr) {
+        // Refund failed — revert so the player's own visit (or next run) retries
+        await admin.from("battle_queue").update({ status: "waiting" }).eq("id", q.id);
+        results.failed++;
+        continue;
+      }
+      await admin.from("deposits").insert({
+        user_id: q.player_id, amount: claimed.stake, status: "success",
+        method: "battle_refund", reference: `battle_queue_timeout:${claimed.id}`,
+      }).then(() => {}, () => {});
+      results.queuesExpired++;
     }
 
     console.log("[heal-stuck]", JSON.stringify(results));
