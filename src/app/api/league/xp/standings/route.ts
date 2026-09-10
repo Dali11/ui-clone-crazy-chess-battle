@@ -70,6 +70,7 @@ export async function GET(_req: NextRequest) {
       myRank,
       promoteCount: cfg.promote_count,
       demoteCount: cfg.demote_count,
+      tierCap: cfg.tier_cap ?? 1000,
       cycleStart: week,
       cycleEnd: nextWeekStart(),
       standings,

@@ -22,6 +22,7 @@ interface StandingsResponse {
   myRank?: number | null;
   promoteCount?: number;
   demoteCount?: number;
+  tierCap?: number;
   cycleEnd?: string;
   standings?: Standing[];
   xpRules?: { win: number; draw: number; loss: number; upsetBonus: number; dailyCap: number };
@@ -98,9 +99,9 @@ export default function XpLeagueTab() {
             </div>
           </div>
           <p className="text-sm text-ccb-muted mt-4 leading-relaxed">
-            Play any game — chess or draughts — and you&apos;ll be placed into a league based on your rating.
-            Every game you finish earns XP. The top {data.tiers ? 5 : 5} players in each league are rewarded
-            and promoted every week.
+            Play any game — chess or draughts — and you start in the Open League.
+            Every game you finish earns XP. The top {data.promoteCount ?? 5} players in each league are rewarded
+            and promoted every week — climb all the way to the Premier League.
           </p>
           <Link href="/play" className="btn-primary w-full flex items-center justify-center gap-2 mt-5 py-3 rounded-xl text-sm font-bold">
             <Swords className="w-4 h-4" /> Play your first game
@@ -133,9 +134,10 @@ export default function XpLeagueTab() {
   // ── Seeded: standings ─────────────────────────────────────────────────
   const standings = data.standings ?? [];
   const promote = data.promoteCount ?? 5;
-  const demote = data.demoteCount ?? 5;
+  const demote = data.demoteCount ?? 0;
+  const tierCap = data.tierCap ?? 1000;
   const n = standings.length;
-  const demoteStart = n > promote + demote ? n - demote + 1 : Infinity;
+  const demoteStart = demote > 0 && n > promote + demote ? n - demote + 1 : Infinity;
 
   return (
     <div className="space-y-4">
@@ -235,8 +237,8 @@ export default function XpLeagueTab() {
           <div className="px-4 pb-4 space-y-2 text-xs text-ccb-muted leading-relaxed">
             <p>Every finished game earns XP — wins <b className="text-ccb-text">{rules.win} XP</b>, draws <b className="text-ccb-text">{rules.draw} XP</b>, losses <b className="text-ccb-text">{rules.loss} XP</b>. Beat a higher-rated player for <b className="text-ccb-text">+{rules.upsetBonus} XP</b> extra.</p>
             <p>To keep it fair, you can earn at most <b className="text-ccb-text">{rules.dailyCap} XP per day</b>, and games against the computer never count.</p>
-            <p>Standings reset <b className="text-ccb-text">every Monday at 00:00 CAT</b>. The top {promote} players in each league are rewarded and promoted to the next league up; the bottom {demote} are demoted. Premier League champions stay on top.</p>
-            <p>Everyone who joins starts in the Open League and climbs the ladder — Open → Amateur → Bronze → Knights Championship → Premier League.</p>
+            <p>Standings reset <b className="text-ccb-text">every Monday at 00:00 CAT</b>. The top {promote} players in each league are rewarded and promoted to the next league up. Premier League champions stay on top — and nobody gets demoted.</p>
+            <p>Everyone who joins starts in the Open League and climbs the ladder — Open → Amateur → Bronze → Knights Championship → Premier League. The Open League is unlimited; every league above it holds up to {tierCap.toLocaleString()} players, so promotion happens when there&apos;s a free spot.</p>
           </div>
         )}
       </div>

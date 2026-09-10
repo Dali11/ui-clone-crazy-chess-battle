@@ -35,6 +35,7 @@ export interface LeagueXpConfig {
   daily_xp_cap: number;
   promote_count: number;
   demote_count: number;
+  tier_cap: number;
   rewards_enabled: boolean;
   reward_1_mwk: number;
   reward_2_mwk: number;

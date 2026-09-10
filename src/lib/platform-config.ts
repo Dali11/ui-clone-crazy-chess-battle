@@ -30,7 +30,8 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     xp_upset_bonus: 2,
     daily_xp_cap: 100,
     promote_count: 5,
-    demote_count: 5,
+    demote_count: 0, // promotion-only mode — no demotion
+    tier_cap: 1000, // max players per league above Open (Open is uncapped)
     rewards_enabled: true,
     reward_1_mwk: 2000,
     reward_2_mwk: 1000,

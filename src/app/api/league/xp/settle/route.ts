@@ -12,8 +12,10 @@ export const maxDuration = 60;
  * For each tier, ranked by XP desc:
  *   - top `promote_count` (default 5): credited their rank reward to the
  *     wallet (credit_wallet RPC, same path as battle payouts) and
- *     promoted one tier (except Queen — top tier stays).
- *   - bottom `demote_count` (default 5): demoted one tier (except Open League).
+ *     promoted one tier — but only while the league above has a free
+ *     slot (tier_cap, default 1000; the Open League is uncapped).
+ *   - demotion is config-driven (`demote_count`, currently 0 —
+ *     promotion-only mode: nobody gets pushed down).
  *   - every member's XP resets for the new week and a history snapshot is
  *     written (league_xp_history).
  * Idempotent guard: members already on the new week are skipped, so a
@@ -63,7 +65,8 @@ async function runSettlement() {
 
   const promoted = cfg.promote_count;
   const demoted = cfg.demote_count;
-  let paid = 0, moves = 0, snapshots = 0;
+  const cap = cfg.tier_cap > 0 ? cfg.tier_cap : Infinity; // 0/absent = uncapped
+  let paid = 0, moves = 0, snapshots = 0, capped = 0;
 
   // Rank within each tier: active members first (by xp desc — the select is
   // already ordered), then anyone whose row predates the closing cycle
@@ -77,12 +80,16 @@ async function runSettlement() {
       ...tierMembers.filter((m) => m.week_start !== closingWeek),
     ];
     const n = ranked.length;
+    // Current roster size of the league above — promotion only proceeds
+    // while it has free slots under tier_cap. (Tier 5 never promotes.)
+    const destRoster = (members ?? []).filter((m) => m.tier === tier + 1).length;
+    let room = Math.max(0, cap - destRoster);
 
     for (let i = 0; i < n; i++) {
       const m = ranked[i];
       const rank = i + 1;
       const isTop = rank <= promoted && m.week_start === closingWeek && m.xp > 0;
-      const isBottom = m.week_start === closingWeek && n > promoted + demoted && rank > n - demoted;
+      const isBottom = m.week_start === closingWeek && demoted > 0 && n > promoted + demoted && rank > n - demoted;
 
       let reward = 0;
       let newTier = m.tier;
@@ -94,7 +101,8 @@ async function runSettlement() {
           const { error: creditErr } = await admin.rpc("credit_wallet", { p_user_id: m.user_id, p_amount: reward });
           if (!creditErr) paid++;
         }
-        if (tier < 5) { newTier = tier + 1; didPromote = true; }
+        if (tier < 5 && room > 0) { newTier = tier + 1; didPromote = true; room--; }
+        else if (tier < 5 && room <= 0) capped++;
       } else if (isBottom && tier > 1) {
         newTier = tier - 1; didDemote = true;
       }
@@ -123,5 +131,5 @@ async function runSettlement() {
     }
   }
 
-  return NextResponse.json({ ok: true, closingWeek, newWeek, paid, moves, snapshots });
+  return NextResponse.json({ ok: true, closingWeek, newWeek, paid, moves, snapshots, cappedAtCapacity: capped });
 }
