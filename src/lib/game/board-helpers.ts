@@ -151,3 +151,47 @@ export function buildSquareStyles({
 
   return styles;
 }
+
+/**
+ * Chessboard square styling that is immune to sub-pixel rounding seams.
+ *
+ * react-chessboard lays out 64 independent square <div>s in a CSS grid
+ * (8 equal '1fr' columns, each square sized via aspect-ratio). Even when
+ * the board's CSS-pixel size is an exact multiple of 8, a device's
+ * devicePixelRatio (2.625x, 3x, 3.5x — common on Android/Samsung phones)
+ * can still map that CSS pixel to a non-integer number of physical
+ * pixels. Each of the 64 boxes then gets its edges anti-aliased/rounded
+ * independently, and the page's dark background bleeds through as thin
+ * lines at rank boundaries — the "distracting black lines between rows"
+ * reported on real devices even after the board size was snapped to a
+ * multiple of 8.
+ *
+ * The fix: stop coloring squares individually. Paint the entire
+ * checkerboard as ONE continuous conic-gradient on the board container,
+ * and make every square transparent. A CSS gradient is computed
+ * per-output-pixel by the compositor as a single paint operation — there
+ * is no per-square box to round independently, so there is no seam,
+ * regardless of devicePixelRatio. (An 8x8 checkerboard is symmetric
+ * under 180° rotation, so this works unchanged for both board
+ * orientations.)
+ */
+export function getSeamlessBoardStyles(
+  darkColor: string,
+  lightColor: string,
+  boardSizePx: number
+): {
+  boardStyle: CSSProperties;
+  darkSquareStyle: CSSProperties;
+  lightSquareStyle: CSSProperties;
+} {
+  const squareSize = boardSizePx / 8;
+  const tile = squareSize * 2;
+  return {
+    boardStyle: {
+      backgroundImage: `conic-gradient(from 0deg, ${darkColor} 0turn 0.25turn, ${lightColor} 0.25turn 0.5turn, ${darkColor} 0.5turn 0.75turn, ${lightColor} 0.75turn 1turn)`,
+      backgroundSize: `${tile}px ${tile}px`,
+    },
+    darkSquareStyle: { backgroundColor: "transparent" },
+    lightSquareStyle: { backgroundColor: "transparent" },
+  };
+}

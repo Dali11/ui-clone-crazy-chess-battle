@@ -8,7 +8,7 @@ import { Clock, Flag, ArrowLeft, Bot, Volume2, VolumeX, List, Palette, X, Chevro
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getBestMove, type AIDifficulty } from "@/lib/game/chess-ai";
-import { getCapturedPieces, getCheckSquare } from "@/lib/game/board-helpers";
+import { getCapturedPieces, getCheckSquare, getSeamlessBoardStyles } from "@/lib/game/board-helpers";
 import { playSound, detectMoveSound, setSoundEnabled } from "@/lib/game/sound";
 import { getStoredBoardTheme, type BoardTheme } from "@/lib/game/board-themes";
 import { useBoardSize } from "@/hooks/use-board-size";
@@ -623,6 +623,10 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
   // Memoized board element — stable identity across the 1s clock tick so
   // React skips reconciling the 64-square board subtree mid-drag. Prevents
   // piece stutter on low-end phones ("pieces stuck in mud").
+  // Computed fresh each render (cheap: one function call) so it always
+  // reflects the latest boardSize/theme — memoized below via chessboardElement's deps.
+  const seamlessBoardStyles = getSeamlessBoardStyles(boardTheme.dark, boardTheme.light, boardSize);
+
   const chessboardElement = useMemo(() => (
     <Chessboard
       options={{
@@ -642,13 +646,12 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
         lightSquareNotationStyle: { color: boardTheme.dark, fontSize: "10px", fontWeight: 600 },
         onPieceClick: handlePieceClick,
         onSquareClick: handleSquareClick,
-        darkSquareStyle: { backgroundColor: boardTheme.dark },
-        lightSquareStyle: { backgroundColor: boardTheme.light },
-        boardStyle: { borderRadius: "8px", overflow: "hidden" },
+        ...seamlessBoardStyles,
+        boardStyle: { ...seamlessBoardStyles.boardStyle, borderRadius: "8px", overflow: "hidden" },
       }}
     />
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [displayFen, isPlayerWhite, gameEnded, isLiveView, squareStyles, boardTheme, onDrop, handlePieceClick, handleSquareClick]);
+  ), [displayFen, isPlayerWhite, gameEnded, isLiveView, squareStyles, boardTheme, boardSize, onDrop, handlePieceClick, handleSquareClick]);
 
   useEffect(() => {
     if (viewPly === 0 || moveHistory.length === 0) {

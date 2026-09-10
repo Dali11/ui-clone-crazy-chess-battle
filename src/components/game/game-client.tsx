@@ -8,7 +8,7 @@ import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
 import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Swords, RefreshCw, Radio, Wifi, WifiOff } from "lucide-react";
 import Link from "next/link";
-import { getCapturedPieces, getCheckSquare } from "@/lib/game/board-helpers";
+import { getCapturedPieces, getCheckSquare, getSeamlessBoardStyles } from "@/lib/game/board-helpers";
 import { playSound, detectMoveSound, setSoundEnabled } from "@/lib/game/sound";
 import { getStoredBoardTheme, type BoardTheme } from "@/lib/game/board-themes";
 import { useBoardSize } from "@/hooks/use-board-size";
@@ -840,6 +840,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   // rebuilt the whole board (64 squares + dnd-kit tree) mid-drag, which
   // caused visible piece stutter on low-end phones — the "pieces stuck
   // in mud" report. Only genuinely board-relevant deps are listed.
+  // Computed fresh each render (cheap: one function call) so it always
+  // reflects the latest boardSize/theme — memoized below via chessboardElement's deps.
+  const seamlessBoardStyles = getSeamlessBoardStyles(boardTheme.dark, boardTheme.light, boardSize);
+
   const chessboardElement = useMemo(() => (
     <Chessboard
       options={{
@@ -859,13 +863,12 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         lightSquareNotationStyle: { color: boardTheme.dark, fontSize: "10px", fontWeight: 600 },
         onPieceClick: handlePieceClick,
         onSquareClick: handleSquareClick,
-        darkSquareStyle: { backgroundColor: boardTheme.dark },
-        lightSquareStyle: { backgroundColor: boardTheme.light },
-        boardStyle: { borderRadius: "6px", overflow: "hidden" },
+        ...seamlessBoardStyles,
+        boardStyle: { ...seamlessBoardStyles.boardStyle, borderRadius: "6px", overflow: "hidden" },
       }}
     />
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [displayFen, isWhite, isSpectator, gameEnded, isLiveView, isWaiting, squareStyles, boardTheme, onDrop, handlePieceClick, handleSquareClick]);
+  ), [displayFen, isWhite, isSpectator, gameEnded, isLiveView, isWaiting, squareStyles, boardTheme, boardSize, onDrop, handlePieceClick, handleSquareClick]);
 
   // ============ SHARED BOARD COLUMN ============
   const boardColumn = (topPlayer: any, bottomPlayer: any, showControls: boolean) => (
