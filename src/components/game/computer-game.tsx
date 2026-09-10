@@ -99,7 +99,10 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundPlayedForEnd = useRef(false);
   const savedRef = useRef(false);
-  const { containerRef: boardContainerRef, size: boardSize } = useBoardSize(600, 220);
+  // 0.92: board gets ~4% breathing room per side on phones/tablets so
+  // squares stay slightly smaller than full-width (was edge-to-edge ~55-56px
+  // on mobile). Snapped to a multiple of 8 by the hook, so still seam-free.
+  const { containerRef: boardContainerRef, size: boardSize } = useBoardSize(600, 220, 8, 0.92);
 
   useLockBodyScroll();
 
@@ -653,13 +656,30 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [displayFen, isPlayerWhite, gameEnded, isLiveView, squareStyles, boardTheme, boardSize, onDrop, handlePieceClick, handleSquareClick]);
 
+  // BUGFIX: this effect used to only update `reviewFen` and never touch
+  // `lastMove`, so the purple "last move" highlight always showed the
+  // most-recently-PLAYED squares regardless of which historical ply was
+  // being reviewed — a highlight stuck on the wrong squares while
+  // browsing move history (reads as a rendering glitch on the board).
+  // Every branch now recomputes `lastMove` from whatever position is
+  // actually being displayed, mirroring the live-game reviewer.
   useEffect(() => {
     if (viewPly === 0 || moveHistory.length === 0) {
       setReviewFen(null);
+      setLastMove(null); // start of the game — nothing to highlight yet
       return;
     }
     if (viewPly >= moveHistory.length) {
       setReviewFen(null);
+      try {
+        const liveGame = new Chess();
+        for (const mv of moveHistory) liveGame.move(mv);
+        const liveVerbose = liveGame.history({ verbose: true });
+        const liveLast = liveVerbose[liveVerbose.length - 1];
+        setLastMove(liveLast ? { from: liveLast.from, to: liveLast.to } : null);
+      } catch {
+        setLastMove(null);
+      }
       return;
     }
     try {
@@ -668,6 +688,9 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
         tempGame.move(moveHistory[i]);
       }
       setReviewFen(tempGame.fen());
+      const verbose = tempGame.history({ verbose: true });
+      const last = verbose[verbose.length - 1];
+      setLastMove(last ? { from: last.from, to: last.to } : null);
     } catch {
       setReviewFen(null);
     }

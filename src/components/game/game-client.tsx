@@ -110,7 +110,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const lastFenRef = useRef(game.fen);
   const soundPlayedForEnd = useRef(false);
   const prevFenRef = useRef(game.fen);
-  const { containerRef: boardContainerRef, size: boardSize } = useBoardSize(600, 220);
+  // 0.92: board gets ~4% breathing room per side on phones/tablets so
+  // squares stay slightly smaller than full-width (was edge-to-edge ~55-56px
+  // on mobile). Snapped to a multiple of 8 by the hook, so still seam-free.
+  const { containerRef: boardContainerRef, size: boardSize } = useBoardSize(600, 220, 8, 0.92);
 
   const TERMINAL_STATUSES = ["checkmate", "stalemate", "draw", "resign", "timeout", "abort"];
   const gameEnded = TERMINAL_STATUSES.includes(game.status);
@@ -304,14 +307,36 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     }
   }, [game.fen, game.pgn]);
 
-  // Show past position when reviewing moves (same pattern as computer game)
+  // Show past position when reviewing moves (same pattern as computer game).
+  //
+  // BUGFIX: the two early-return branches below used to leave `lastMove`
+  // untouched, so the purple "last move" highlight kept showing whatever
+  // squares were highlighted for the PREVIOUSLY reviewed ply — stuck on
+  // stale squares that don't correspond to any move visible in the
+  // position now on screen (reported as "board looks off / not evenly
+  // divided": a highlighted square with no piece movement to justify it
+  // reads as a rendering glitch). Every branch now recomputes `lastMove`
+  // from whatever position is actually being displayed, so the highlight
+  // always matches what's on the board.
   useEffect(() => {
     if (viewPly === 0 || moveHistory.length === 0) {
       setReviewFen(null);
+      setLastMove(null); // start of the game — nothing to highlight yet
       return;
     }
     if (viewPly >= moveHistory.length) {
       setReviewFen(null);
+      // Back at the live position — recompute from the full move list
+      // instead of leaving the highlight stuck on a reviewed ply.
+      try {
+        const liveGame = new Chess();
+        for (const mv of moveHistory) liveGame.move(mv);
+        const liveVerbose = liveGame.history({ verbose: true });
+        const liveLast = liveVerbose[liveVerbose.length - 1];
+        setLastMove(liveLast ? { from: liveLast.from, to: liveLast.to } : null);
+      } catch {
+        setLastMove(null);
+      }
       return;
     }
     try {
