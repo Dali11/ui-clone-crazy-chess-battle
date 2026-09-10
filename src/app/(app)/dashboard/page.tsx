@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight, Target, Gamepad2, Crown } from "lucide-react";
 import WhatsAppBanner from "@/components/layout/whatsapp-banner";
+import AdSlot from "@/components/ads/ad-slot";
 import { moneySymbol } from "@/lib/geo/format";
 
 const LEVEL_RATINGS: Record<string, number> = {
@@ -319,6 +320,9 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Lobby ad — admin-managed (Ads > Lobby). Renders nothing when off. */}
+      <AdSlot placement="lobby" className="pt-2" />
 
       {/* Wallet row */}
       <div className="grid grid-cols-1 gap-2 sm:gap-3">

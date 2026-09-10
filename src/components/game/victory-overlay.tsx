@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Trophy, Handshake, Frown, RefreshCw, Home, Swords, ScanSearch, Clock, Wallet, Check, X, Loader2 } from "lucide-react";
 import FireworksCanvas from "./fireworks-canvas";
+import AdSlot, { type AdPlacement } from "@/components/ads/ad-slot";
 import { moneySymbol } from "@/lib/geo/format";
 
 export type GameOutcome = "win" | "loss" | "draw" | "abort";
@@ -34,6 +35,7 @@ interface VictoryOverlayProps {
   onDeclineRematch?: () => void;
   onDismiss?: () => void;
   rematchState?: RematchState;
+  adPlacement?: AdPlacement; // admin-managed ad shown on the end-of-game screen
   rematchStake?: number;
   incomingRematchStake?: number;
   incomingRematchError?: string;
@@ -71,6 +73,7 @@ export default function VictoryOverlay({
   onDeclineRematch,
   onDismiss,
   rematchState = { status: "idle" },
+  adPlacement,
   rematchStake = 0,
   incomingRematchStake = 0,
   countryCode,
@@ -220,6 +223,14 @@ export default function VictoryOverlay({
         </div>
 
         <p className="text-xs text-white/35 mb-5">{subtitle}</p>
+
+        {/* Admin-managed post-game ad (results / battle settlement).
+            Renders nothing until enabled + configured in the admin Ads section. */}
+        {adPlacement && (
+          <div className="mb-5 max-w-sm mx-auto">
+            <AdSlot placement={adPlacement} />
+          </div>
+        )}
 
         {/* Battle draw → mandatory Armageddon decider */}
         {isArmageddonDraw && (

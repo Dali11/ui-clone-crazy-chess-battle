@@ -1,5 +1,6 @@
 "use client";
 
+import AdSlot from "@/components/ads/ad-slot";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Radio, Eye, Crown, Swords, Clock, User, Loader2 } from "lucide-react";
@@ -167,6 +168,13 @@ export default function LiveMatchesPage() {
           {myGames.map((game) => (
             <GameCard key={game.id} game={game} priority />
           ))}
+        </div>
+      )}
+
+      {/* Spectate ad — admin-managed (Ads > Spectate / Live List) */}
+      {!loading && (myGames.length > 0 || otherGames.length > 0) && (
+        <div className="px-4 sm:px-6 lg:px-8 pt-4">
+          <AdSlot placement="spectate" />
         </div>
       )}
 

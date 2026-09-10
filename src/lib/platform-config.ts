@@ -19,6 +19,22 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     show_kpi_cards: true,
     refresh_interval_seconds: 30,
   },
+  // Adsterra ad placements. Scripts are the raw snippet from the Adsterra
+  // dashboard (the whole <script>...</script> block). Everything is OFF by
+  // default — placements only render when individually toggled here.
+  ads: {
+    enabled: false, // global kill switch
+    lobby_enabled: false,
+    lobby_script: "",
+    spectate_enabled: false,
+    spectate_script: "",
+    game_results_enabled: false,
+    game_results_script: "",
+    battle_settlement_enabled: false,
+    battle_settlement_script: "",
+    draughts_results_enabled: false,
+    draughts_results_script: "",
+  },
   deposits: {
     enabled: true,
     auto_credit: false,

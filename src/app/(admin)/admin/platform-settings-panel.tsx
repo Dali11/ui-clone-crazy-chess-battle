@@ -8,7 +8,7 @@ import { Settings, Save, Loader2, SlidersHorizontal } from "lucide-react";
 interface SettingField {
   key: string;
   label: string;
-  type: "toggle" | "number" | "text" | "select";
+  type: "toggle" | "number" | "text" | "select" | "textarea";
   options?: { value: string; label: string }[];
   help?: string;
   group?: "control" | "pricing" | "display";
@@ -16,6 +16,19 @@ interface SettingField {
 }
 
 const SECTION_FIELDS: Record<string, SettingField[]> = {
+  ads: [
+    { key: "enabled", label: "Ads Enabled (Global)", type: "toggle", group: "control", help: "Master switch — nothing renders anywhere when off" },
+    { key: "lobby_enabled", label: "Lobby Ad", type: "toggle", group: "control", help: "Dashboard lobby — recommended 320x50 mobile / 728x90 desktop banner" },
+    { key: "lobby_script", label: "Lobby Ad Script", type: "textarea", group: "control", help: "Paste the full Adsterra snippet" },
+    { key: "spectate_enabled", label: "Spectate / Live List Ad", type: "toggle", group: "control", help: "Live games browsing page — recommended native banner 300x250" },
+    { key: "spectate_script", label: "Spectate Ad Script", type: "textarea", group: "control" },
+    { key: "game_results_enabled", label: "Chess Results Ad", type: "toggle", group: "control", help: "Shown on the end-of-game screen after casual/free games — recommended 300x250" },
+    { key: "game_results_script", label: "Chess Results Ad Script", type: "textarea", group: "control" },
+    { key: "battle_settlement_enabled", label: "Battle Settlement Ad", type: "toggle", group: "control", help: "End-of-game screen for staked battles — recommended 300x250" },
+    { key: "battle_settlement_script", label: "Battle Settlement Ad Script", type: "textarea", group: "control" },
+    { key: "draughts_results_enabled", label: "Draughts Results Ad", type: "toggle", group: "control", help: "End-of-game screen for draughts — recommended 300x250" },
+    { key: "draughts_results_script", label: "Draughts Results Ad Script", type: "textarea", group: "control" },
+  ],
   overview: [
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display", help: "Display stat cards at the top" },
     { key: "refresh_interval_seconds", label: "Refresh Interval", type: "number", group: "display", unit: "sec", help: "Auto-refresh stats every N seconds" },
@@ -145,6 +158,7 @@ function formatValue(value: any, unit?: string): string {
 }
 
 const SECTION_LABELS: Record<string, string> = {
+  ads: "Ads",
   overview: "Overview",
   deposits: "Deposits",
   withdrawals: "Withdrawals",
@@ -333,7 +347,7 @@ function FieldRow({
   onChange: (v: any) => void;
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className={`flex flex-col gap-1 ${field.type === "textarea" ? "sm:col-span-2" : ""}`}>
       <div className="flex items-center gap-1.5">
         <label className="text-xs font-medium text-ccb-text">{field.label}</label>
         {field.help && (
@@ -382,6 +396,18 @@ function FieldRow({
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value)}
           className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-ccb-dark border border-ccb-border text-ccb-text focus:outline-none focus:border-ccb-primary transition-colors"
+        />
+      )}
+
+      {/* Textarea — full ad snippets */}
+      {field.type === "textarea" && (
+        <textarea
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          rows={4}
+          spellCheck={false}
+          placeholder="Paste the ad network snippet here (full <script> block)"
+          className="w-full px-2.5 py-1.5 text-xs font-mono rounded-lg bg-ccb-dark border border-ccb-border text-ccb-text focus:outline-none focus:border-ccb-primary transition-colors resize-y"
         />
       )}
 

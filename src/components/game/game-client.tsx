@@ -1262,6 +1262,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           ratingChange={myRatingChange}
           moneyEarned={moneyEarned}
           moneyLabel={isBattleGame ? "Battle winnings" : undefined}
+          adPlacement={isBattleGame ? "battle_settlement" : "game_results"}
           moveCount={game.move_count}
           subtitle={`${game.time_control} · ${isTournamentGame ? "Tournament" : game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
           playerNames={{ white: whiteName, black: blackName }}

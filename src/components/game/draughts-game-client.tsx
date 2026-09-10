@@ -865,6 +865,7 @@ export default function DraughtsGameClient({
         reasonLabel={STATUS_LABELS[game.status] || game.status}
         ratingChange={myRatingChange}
         moveCount={game.move_count || 0}
+        adPlacement="draughts_results"
         subtitle={`${game.time_control || "10+0"} · ${game.rated ? "Ranked" : "Casual"} · ${variant}`}
         playerNames={{ white: whiteName, black: blackName }}
         winnerSide={game.winner as "white" | "black" | null}

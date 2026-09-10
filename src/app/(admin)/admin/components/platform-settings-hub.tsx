@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Gamepad2,
   Swords, Shield, Calendar, Crown,
   Search, SlidersHorizontal, Database, ChevronDown, ScrollText,
-  ShieldCheck, DollarSign,
+  ShieldCheck, DollarSign, Megaphone,
 } from "lucide-react";
 import PlatformSettingsPanel from "../platform-settings-panel";
 
@@ -15,6 +15,7 @@ function PlatformSettingsHubBase() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["battles", "withdrawals"]));
 
   const settingSections = [
+    { id: "ads", label: "Ads", icon: Megaphone, desc: "Placements, ad scripts, kill switch" },
     { id: "battles", label: "Battles", icon: Swords, desc: "Stakes, fees, auto-cancel" },
     { id: "withdrawals", label: "Withdrawals", icon: ArrowDownUp, desc: "Limits, fees, approval" },
     { id: "deposits", label: "Deposits", icon: DollarSign, desc: "Limits, auto-credit, approval" },
