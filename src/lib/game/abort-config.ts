@@ -22,17 +22,24 @@ export const DEFAULT_ABORT_SECONDS = 120;
 // countdown shown in the game UI.
 export const REPLY_ABORT_SECONDS = 120;
 
-// Battles hold real money in escrow, so how long a no-show grace lasts
-// matters more than for a casual game. Challenges are often shared
-// asynchronously (e.g. posted in a WhatsApp group) — the challenger may
-// not be watching the app at all when someone accepts and the game
-// starts, so the standard 30s-2min casual thresholds are too tight and
-// were burning people's stakes before they ever saw the game existed.
-// Wider grace at move 0/1 gives real time for the in-app notification
-// (and the ActiveBattleWatcher redirect, if a tab is open anywhere) to
-// actually reach the player before the clock forfeits their stake.
-export const BATTLE_FIRST_MOVE_GRACE_SECONDS = 300; // 5 minutes
-export const BATTLE_REPLY_GRACE_SECONDS = 180; // 3 minutes
+// Battle games begin in "waiting" status: clocks frozen, no forfeit
+// possible, for up to BATTLE_JOIN_WINDOW_SECONDS from game creation.
+// The game flips to "playing" the moment BOTH players are on the board
+// (heartbeat early-start in timeout-check), or naturally when the window
+// expires (/api/game/state auto-transition + the cron sweep). Challenges
+// are often shared asynchronously (posted in a WhatsApp group) and
+// accepted while the challenger isn't watching the app — without this
+// window their clock, with real money in escrow, burns from the second
+// of creation before they even know a game exists.
+export const BATTLE_JOIN_WINDOW_SECONDS = 120;
+
+// After the join window (or once both players are present) the game
+// progresses naturally: the standard "must move" no-show countdowns.
+// Battles keep the 2-minute thresholds (bullet battles get the full 2
+// minutes rather than the casual 30s) — they resolve decisively, never
+// abort, because stakes are in escrow.
+export const BATTLE_FIRST_MOVE_GRACE_SECONDS = 120;
+export const BATTLE_REPLY_GRACE_SECONDS = REPLY_ABORT_SECONDS;
 
 /**
  * Returns the abort threshold in seconds for a given time control.

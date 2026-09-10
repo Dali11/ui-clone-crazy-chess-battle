@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { applyBattleJoinWindow } from "@/lib/battles/join-window";
 import { settleBattle } from "@/lib/battles/settle";
 import { moneySymbol } from "@/lib/geo/format";
 
@@ -291,6 +292,9 @@ export async function GET() {
       .from("battles")
       .update({ game_id: gameId, status: "playing", started_at: new Date().toISOString() })
       .eq("id", battle.id);
+
+    // Same join window as the normal start path — self-heal must not skip it
+    await applyBattleJoinWindow(admin, gameId);
 
     return NextResponse.json({ active: true, battleId: battle.id, gameId, status: "playing" });
   } catch (e: any) {

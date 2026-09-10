@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { applyBattleJoinWindow } from "@/lib/battles/join-window";
 import { createClient } from "@/lib/supabase/server";
 import { settleBattle } from "@/lib/battles/settle";
 
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (gameErr || !gameId) return NextResponse.json({ error: "Game creation failed — try Cancel & Refund instead." }, { status: 500 });
 
       await admin.from("battles").update({ game_id: gameId, status: "playing", started_at: new Date().toISOString() }).eq("id", battleId);
+      await applyBattleJoinWindow(admin, gameId);
       return NextResponse.json({ success: true, action: "retry_game", gameId });
     }
 

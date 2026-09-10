@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     const { data: game } = await admin
       .from("games")
-      .select("id, status, turn, move_count, white_clock_ms, black_clock_ms, last_move_at, created_at, white_player_id, black_player_id, white_rating, black_rating, rated, tournament_id, time_control, fen, white_last_seen, black_last_seen")
+      .select("id, status, turn, move_count, white_clock_ms, black_clock_ms, last_move_at, created_at, scheduled_start, white_player_id, black_player_id, white_rating, black_rating, rated, tournament_id, time_control, fen, white_last_seen, black_last_seen")
       .eq("id", gameId)
       .single();
 
@@ -46,6 +46,45 @@ export async function POST(req: NextRequest) {
 
     if (game.white_player_id !== user.id && game.black_player_id !== user.id) {
       return NextResponse.json({ error: "Not a player in this game" }, { status: 403 });
+    }
+
+    // ── Battle join window: early-start once BOTH players are on the board ──
+    // Waiting battle games have frozen clocks and no forfeit rules. As soon
+    // as both players' heartbeats are fresh, the game starts immediately —
+    // no need to wait out the full 2-minute window. (Battle games only:
+    // tournament games keep their synchronized scheduled start.)
+    if (game.status === "waiting" && game.scheduled_start) {
+      const isWhiteHere = game.white_player_id === user.id;
+      // Stamp presence even while waiting — the both-present check reads it.
+      await admin
+        .from("games")
+        .update(isWhiteHere ? { white_last_seen: new Date().toISOString() } : { black_last_seen: new Date().toISOString() })
+        .eq("id", game.id)
+        .eq("status", "waiting");
+
+      const nowMs = Date.now();
+      const FRESH_MS = 45_000; // heartbeat refreshes every ~15s; 45s = comfortably present
+      const whiteAge = game.white_last_seen ? nowMs - new Date(game.white_last_seen).getTime() : null;
+      const blackAge = game.black_last_seen ? nowMs - new Date(game.black_last_seen).getTime() : null;
+      if (whiteAge !== null && blackAge !== null && whiteAge < FRESH_MS && blackAge < FRESH_MS) {
+        const { data: battle } = await admin
+          .from("battles")
+          .select("id")
+          .eq("game_id", game.id)
+          .in("status", ["playing", "draw_armageddon"])
+          .limit(1)
+          .maybeSingle();
+        if (battle) {
+          const nowIso = new Date().toISOString();
+          await admin
+            .from("games")
+            .update({ status: "playing", last_move_at: nowIso })
+            .eq("id", game.id)
+            .eq("status", "waiting");
+          return NextResponse.json({ status: "playing", startedEarly: true, timedOut: false });
+        }
+      }
+      return NextResponse.json({ status: "waiting", timedOut: false });
     }
 
     if (game.status !== "playing") {

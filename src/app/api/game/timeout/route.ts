@@ -32,8 +32,27 @@ async function handleSweep(req: NextRequest) {
       .eq("status", "playing");
 
     if (!activeGames || activeGames.length === 0) {
+      // Still flip expired waiting games even when nothing is playing —
+      // e.g. a battle join window lapsing with neither player on the page.
+      const nowIso = new Date().toISOString();
+      await admin
+        .from("games")
+        .update({ status: "playing", last_move_at: nowIso })
+        .eq("status", "waiting")
+        .lt("scheduled_start", nowIso);
       return NextResponse.json({ checked: 0, timedOut: 0, aborted: 0, abandoned: 0 });
     }
+
+    // Waiting games whose join window / scheduled start has passed but
+    // nobody is polling /api/game/state (no client on the page): flip them
+    // to playing here so the game progresses naturally — clocks start and
+    // the no-show rules above pick them up on the next sweep.
+    const expiredWaitingIso = new Date().toISOString();
+    await admin
+      .from("games")
+      .update({ status: "playing", last_move_at: expiredWaitingIso })
+      .eq("status", "waiting")
+      .lt("scheduled_start", expiredWaitingIso);
 
     const now = Date.now();
     let timedOut = 0;

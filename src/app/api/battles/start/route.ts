@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { applyBattleJoinWindow } from "@/lib/battles/join-window";
 import { createClient } from "@/lib/supabase/server";
 
 const TIME_CONTROLS: Record<string, { minutes: number; increment: number }> = {
@@ -115,6 +116,11 @@ export async function POST(req: NextRequest) {
       .from("battles")
       .update({ game_id: gameId })
       .eq("id", battleId);
+
+    // Join window: clocks frozen until both players are on the board
+    // (or 2 minutes pass) — stakes must not burn for a player who doesn't
+    // yet know the game exists (e.g. async challenge acceptance).
+    await applyBattleJoinWindow(admin, gameId);
 
     return NextResponse.json({ gameId, battleId });
   } catch (e: any) {

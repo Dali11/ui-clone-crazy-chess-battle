@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
         user_id: challenge.challenger_id,
         type: "challenge_accepted",
         title: "Challenge accepted!",
-        body: `Your battle challenge (${await formatMoneyConverted(challenge.stake, _profile?.country)}) was accepted. Game starting now!`,
+        body: `Your battle challenge (${await formatMoneyConverted(challenge.stake, _profile?.country)}) was accepted. Clocks wait up to 2 minutes for you to join the board!`,
         data: { battle_id: battle.id, stake: challenge.stake },
         read: false,
       });

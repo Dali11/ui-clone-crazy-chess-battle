@@ -415,9 +415,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   // enforced the full clock, so the countdown ran out and nothing happened.
   //   move 0 casual: getAbortSeconds(time_control) — bullet aborts at 30s
   //   move 0 tournament: 2 minutes (cron auto-resign)
-  //   move 0 battle: BATTLE_FIRST_MOVE_GRACE_SECONDS (5 min — wider grace
-  //     since challenges are often accepted async, e.g. shared in a
-  //     WhatsApp group, and the challenger may not be watching at all)
+  //   move 0 battle: BATTLE_FIRST_MOVE_GRACE_SECONDS (2 min) — but battles
+  //     begin in a 2-minute "waiting" join window with frozen clocks first,
+  //     so an absent player's total grace is window + 2 min
   //   move 1 (reply): 2 minutes casual/tournament, BATTLE_REPLY_GRACE_SECONDS battle
   const noShowInfo = useMemo(() => {
     if (gameEnded || game.status !== "playing") return null;
@@ -984,6 +984,11 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
               blackAvatar={blackAvatar}
               whiteRating={game.white_rating ?? undefined}
               blackRating={game.black_rating ?? undefined}
+              waitingLabel={
+                isBattleGame
+                  ? "Waiting for both players to join — starts the moment you're both on the board"
+                  : undefined
+              }
               overlay
             />
           )}

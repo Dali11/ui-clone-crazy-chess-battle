@@ -12,6 +12,8 @@ interface PreGameCountdownProps {
   blackRating?: number | null;
   /** When true, renders as a translucent overlay on top of the board. When false, renders as a standalone full-screen card. */
   overlay?: boolean;
+  /** Custom status line under the countdown — e.g. battle games explain the countdown is a join window that ends early once both players arrive. */
+  waitingLabel?: string;
 }
 
 function initials(name: string) {
@@ -61,6 +63,7 @@ export default function PreGameCountdown({
   whiteRating,
   blackRating,
   overlay = false,
+  waitingLabel,
 }: PreGameCountdownProps) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
@@ -119,7 +122,7 @@ export default function PreGameCountdown({
           {/* Status */}
           <div className="flex items-center justify-center gap-2 text-xs text-ccb-muted px-3 py-1 rounded-full bg-ccb-surface/70 border border-ccb-border/50">
             <span className="w-2 h-2 rounded-full bg-ccb-primary animate-pulse" />
-            <span>{secondsLeft > 0 ? "Waiting for countdown" : "Starting now…"}</span>
+            <span>{secondsLeft > 0 ? (waitingLabel ?? "Waiting for countdown") : "Starting now…"}</span>
           </div>
         </div>
       </div>

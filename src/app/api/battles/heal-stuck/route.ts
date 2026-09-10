@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { applyBattleJoinWindow } from "@/lib/battles/join-window";
 import { settleBattle } from "@/lib/battles/settle";
 
 /**
@@ -87,7 +88,7 @@ async function handleHeal(req: NextRequest) {
         if (gameErr || !gameId) { results.stillRetrying++; continue; }
         const { error: linkErr } = await admin.from("battles")
           .update({ game_id: gameId, status: "playing", started_at: new Date().toISOString() }).eq("id", battle.id).eq("status", "pending");
-        if (linkErr) results.failed++; else results.gameCreated++;
+        if (linkErr) results.failed++; else { results.gameCreated++; await applyBattleJoinWindow(admin, gameId); }
         continue;
       }
 
