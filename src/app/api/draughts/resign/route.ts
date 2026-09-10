@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { awardGameXp } from "@/lib/league-xp/award";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -51,6 +52,14 @@ export async function POST(req: NextRequest) {
     if (claimErr || !claimed) {
       return NextResponse.json({ error: "Game already resolved" }, { status: 409 });
     }
+
+    // XP Leagues: award XP for the finished game (idempotent, never throws).
+    awardGameXp({
+      gameId,
+      gameKind: "draughts",
+      game: { white_player_id: game.white_player_id, black_player_id: game.black_player_id, winner, white_rating: game.white_rating, black_rating: game.black_rating },
+      admin,
+    }).catch(() => {});
 
     // Update ratings
     const { data: whiteProfile } = await admin

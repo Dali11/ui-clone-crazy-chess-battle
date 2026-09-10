@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { awardGameXp } from "@/lib/league-xp/award";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -99,6 +100,12 @@ export async function resolveDraughtsTimeout(
   if (!claimed) return { status: "already_resolved" as const, winner: null };
 
   await updateDraughtsRatingsForTimeout(admin, game, winner, "timeout");
+  awardGameXp({
+    gameId: game.id,
+    gameKind: "draughts",
+    game: { white_player_id: game.white_player_id, black_player_id: game.black_player_id, winner },
+    admin,
+  }).catch(() => {});
   return { status: "timeout" as const, winner };
 }
 

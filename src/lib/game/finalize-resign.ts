@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { processTournamentGameResult } from "@/lib/tournament/results";
 import { processLeagueGameResult } from "@/lib/league/process-game-result";
 import { settleBattle } from "@/lib/battles/settle";
+import { awardGameXp } from "@/lib/league-xp/award";
 
 /**
  * Shared "a player resigns, opponent wins" resolution flow, extracted from
@@ -101,6 +102,17 @@ export async function finalizeResign(opts: {
       black_rating_change: blackNewRating - blackProfile.rating,
     }).eq("id", gameId);
   }
+
+  // ── XP Leagues: award XP for the finished game (idempotent) ──────────
+  awardGameXp({
+    gameId,
+    game: {
+      white_player_id: whitePlayerId,
+      black_player_id: blackPlayerId,
+      winner,
+    },
+    admin,
+  }).catch(() => {});
 
   // ── Tournament / league result processing ─────────────────────────────
   const { data: fullGame } = await admin

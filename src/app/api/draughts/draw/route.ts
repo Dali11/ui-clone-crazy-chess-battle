@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { awardGameXp } from "@/lib/league-xp/award";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -57,6 +58,14 @@ export async function POST(req: NextRequest) {
           ended_at: new Date().toISOString(),
         })
         .eq("id", gameId);
+
+      // XP Leagues: award draw XP for the finished game (idempotent).
+      awardGameXp({
+        gameId,
+        gameKind: "draughts",
+        game: { white_player_id: game.white_player_id, black_player_id: game.black_player_id, winner: null, white_rating: game.white_rating, black_rating: game.black_rating },
+        admin,
+      }).catch(() => {});
 
       // Update ratings for draw
       if (game.rated && game.white_rating && game.black_rating) {

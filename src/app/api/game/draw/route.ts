@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { awardGameXp } from "@/lib/league-xp/award";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Chess } from "chess.js";
@@ -109,6 +110,9 @@ export async function POST(req: NextRequest) {
           games_played: (blackProfile?.games_played ?? 0) + 1,
         }).eq("id", game.black_player_id);
       }
+
+      // XP Leagues: award draw XP for the finished game (idempotent).
+      awardGameXp({ gameId, game: { white_player_id: game.white_player_id, black_player_id: game.black_player_id, winner: null, white_rating: game.white_rating, black_rating: game.black_rating }, admin }).catch(() => {});
 
       // Broadcast draw_accepted so the opponent's UI clears the "waiting" state
       const channel = admin.channel(`game:${gameId}`);

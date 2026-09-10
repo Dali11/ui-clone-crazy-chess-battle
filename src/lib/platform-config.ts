@@ -22,6 +22,22 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
   // Adsterra ad placements. Scripts are the raw snippet from the Adsterra
   // dashboard (the whole <script>...</script> block). Everything is OFF by
   // default — placements only render when individually toggled here.
+  leagues_xp: {
+    enabled: true,
+    xp_win: 10,
+    xp_draw: 4,
+    xp_loss: 2,
+    xp_upset_bonus: 2,
+    daily_xp_cap: 100,
+    promote_count: 5,
+    demote_count: 5,
+    rewards_enabled: true,
+    reward_1_mwk: 2000,
+    reward_2_mwk: 1000,
+    reward_3_mwk: 500,
+    reward_4_mwk: 250,
+    reward_5_mwk: 100,
+  },
   ads: {
     enabled: false, // global kill switch
     lobby_enabled: false,

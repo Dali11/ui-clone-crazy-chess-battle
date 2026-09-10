@@ -5,8 +5,7 @@ import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Gamepad2,
   Swords, Shield, Calendar, Crown,
   Search, SlidersHorizontal, Database, ChevronDown, ScrollText,
-  ShieldCheck, DollarSign, Megaphone,
-} from "lucide-react";
+  ShieldCheck, DollarSign, Megaphone, Zap} from "lucide-react";
 import PlatformSettingsPanel from "../platform-settings-panel";
 
 function PlatformSettingsHubBase() {
@@ -23,6 +22,7 @@ function PlatformSettingsHubBase() {
     { id: "games", label: "Games", icon: Gamepad2, desc: "Spectators, concurrency" },
     { id: "users", label: "Users", icon: Users, desc: "Signups, verification, admin" },
     { id: "leagues", label: "Leagues", icon: Crown, desc: "Membership, promotion/relegation" },
+    { id: "leagues_xp", label: "XP Leagues", icon: Zap, desc: "XP rules, weekly rewards, promotion/demotion" },
     { id: "seasons", label: "Seasons", icon: Calendar, desc: "Auto-create, duration, overlap" },
     { id: "membership", label: "Membership", icon: Shield, desc: "Auto-renew, grace period" },
     { id: "verification", label: "Verification", icon: ShieldCheck, desc: "ID, selfie, auto-approve" },

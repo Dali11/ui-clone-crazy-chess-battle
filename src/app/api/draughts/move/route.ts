@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { awardGameXp } from "@/lib/league-xp/award";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -86,6 +87,12 @@ export async function POST(req: NextRequest) {
 
       // Update ratings
       await updateDraughtsRatings(admin, game, winner, "timeout");
+      awardGameXp({
+        gameId,
+        gameKind: "draughts",
+        game: { white_player_id: game.white_player_id, black_player_id: game.black_player_id, winner, white_rating: game.white_rating, black_rating: game.black_rating },
+        admin,
+      }).catch(() => {});
 
       return NextResponse.json({
         error: "Your clock has expired",
@@ -220,6 +227,13 @@ export async function POST(req: NextRequest) {
     // Update ratings if game ended
     if (gameEnded) {
       await updateDraughtsRatings(admin, game, winner, endStatus);
+      // XP Leagues: award XP for the finished game (idempotent, never throws).
+      awardGameXp({
+        gameId,
+        gameKind: "draughts",
+        game: { white_player_id: game.white_player_id, black_player_id: game.black_player_id, winner, white_rating: game.white_rating, black_rating: game.black_rating },
+        admin,
+      }).catch(() => {});
     }
 
     return NextResponse.json({

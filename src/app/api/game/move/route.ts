@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { validateAndApplyMove } from "@/lib/game/chess-engine";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { settleBattle } from "@/lib/battles/settle";
+import { awardGameXp } from "@/lib/league-xp/award";
 import { resolveTimeoutForGame } from "@/lib/game/resolve-timeout";
 
 export async function POST(req: NextRequest) {
@@ -241,6 +242,11 @@ export async function POST(req: NextRequest) {
 
         await settleBattle(battle.id, battleWinnerId, result.status || "draw").catch((e) => console.error("Battle settlement failed:", e));
       }
+    }
+
+    // XP Leagues: award XP for the finished game (idempotent, never throws).
+    if (result.winner !== undefined) {
+      awardGameXp({ gameId, game: { white_player_id: game.white_player_id, black_player_id: game.black_player_id, winner: result.winner ?? null, white_rating: game.white_rating, black_rating: game.black_rating }, admin }).catch(() => {});
     }
 
     return NextResponse.json({
