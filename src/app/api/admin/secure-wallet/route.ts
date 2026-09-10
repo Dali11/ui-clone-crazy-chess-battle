@@ -51,9 +51,23 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION public.credit_wallet(UUID, INT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.debit_wallet(UUID, INT) TO authenticated;
 
--- 3. Partial unique index on deposits.reference — DB-level backstop against double-refunds
+-- 3. Partial unique index on deposits.reference — DB-level backstop against
+--    double-pays, scoped to exactly-once money flows. A global unique index is
+--    WRONG here: repeatable flows legitimately reuse references (queue joins
+--    per user+stake, tournament entries per tournament, draw refunds per game
+--    shared by both players before the draw:white/draw:black split).
+--    Scoped patterns: league payouts, queue refunds/timeouts, stuck-battle
+--    cancels/heals, draw refunds (post-split), expired/cleaned challenges.
 CREATE UNIQUE INDEX IF NOT EXISTS deposits_reference_unique
-  ON deposits (reference) WHERE reference IS NOT NULL;
+  ON deposits (reference)
+  WHERE reference LIKE 'league:%'
+     OR reference LIKE 'battle_queue_refund:%'
+     OR reference LIKE 'battle_queue_timeout:%'
+     OR reference LIKE 'battle_cancel:%'
+     OR reference LIKE 'heal_stuck:%'
+     OR reference LIKE 'battle:%:draw:%'
+     OR reference LIKE 'expired_challenge:%'
+     OR reference LIKE 'cleanup_expired:%';
 
 `;
 
