@@ -129,15 +129,31 @@ export default function VictoryOverlay({
       {(isWin || isDraw) && <FireworksCanvas active={mounted} colorTheme={isWin ? "win" : "draw"} />}
 
       <div
-        className={`relative w-[88%] max-w-[340px] max-h-[92vh] overflow-y-auto rounded-2xl border p-6 text-center shadow-2xl transition-all duration-600 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`relative w-[88%] max-w-[340px] transition-all duration-600 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           mounted ? "translate-y-0 scale-100 opacity-100" : "-translate-y-8 scale-95 opacity-0"
         }`}
-        style={{
-          backgroundColor: "rgba(15,15,22,0.95)",
-          borderColor: accentBorder,
-          boxShadow: `0 20px 60px -10px ${accentBg}, 0 0 0 1px ${accentBorder}`,
-        }}
       >
+        {/* Accent ring — lives on the OUTER (non-clipping) wrapper so it can
+            poke out above the card without being cut off by the inner
+            scroll container's overflow boundary. */}
+        <div
+          className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full flex items-center justify-center z-10"
+          style={{ backgroundColor: "rgba(15,15,22,0.95)", border: `2px solid ${accent}`, boxShadow: `0 0 24px ${accentBg}` }}
+        >
+          {isWin && <Trophy className="h-7 w-7" style={{ color: accent }} />}
+          {isDraw && <Handshake className="h-7 w-7" style={{ color: accent }} />}
+          {isAbort && <Clock className="h-7 w-7" style={{ color: accent }} />}
+          {isLoss && <Frown className="h-7 w-7" style={{ color: accent }} />}
+        </div>
+
+        <div
+          className="relative max-h-[92vh] overflow-y-auto rounded-2xl border p-6 text-center shadow-2xl"
+          style={{
+            backgroundColor: "rgba(15,15,22,0.95)",
+            borderColor: accentBorder,
+            boxShadow: `0 20px 60px -10px ${accentBg}, 0 0 0 1px ${accentBorder}`,
+          }}
+        >
         {/* Dismiss button — lets players close the overlay to review the board/moves underneath */}
         {onDismiss && (
           <button
@@ -148,17 +164,6 @@ export default function VictoryOverlay({
             <X className="w-4 h-4" />
           </button>
         )}
-
-        {/* Accent ring */}
-        <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full flex items-center justify-center transition-transform duration-500"
-          style={{ backgroundColor: "rgba(15,15,22,0.95)", border: `2px solid ${accent}`, boxShadow: `0 0 24px ${accentBg}` }}
-        >
-          {isWin && <Trophy className="h-7 w-7" style={{ color: accent }} />}
-          {isDraw && <Handshake className="h-7 w-7" style={{ color: accent }} />}
-          {isAbort && <Clock className="h-7 w-7" style={{ color: accent }} />}
-          {isLoss && <Frown className="h-7 w-7" style={{ color: accent }} />}
-        </div>
 
         {/* Headline */}
         <div className="mt-6">
@@ -400,6 +405,7 @@ export default function VictoryOverlay({
               <AdSlot placement={adPlacement} />
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
