@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Eye, Swords, Home, Clock } from "lucide-react";
+import AdSlot from "@/components/ads/ad-slot";
 
 interface PlayerInfo {
   name: string;
@@ -86,6 +87,12 @@ export default function ChallengeTaken({
           <span className="flex items-center gap-1 text-red-400">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Live
           </span>
+        </div>
+
+        {/* Admin-managed ad — same non-gameplay spectate placement as the
+            live matches list. Renders nothing until enabled + configured. */}
+        <div className="mb-4">
+          <AdSlot placement="spectate" />
         </div>
 
         {/* Primary action */}
