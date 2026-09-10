@@ -1062,6 +1062,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
         onPlayAgain={handlePlayAgain}
         onNewGame={handleNewGame}
         newGameLabel="Rematch Bot"
+        adPlacement="game_results"
         onReview={() => setOverlayDismissed(true)}
       />
     </>
