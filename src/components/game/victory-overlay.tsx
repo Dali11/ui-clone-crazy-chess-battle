@@ -119,6 +119,7 @@ export default function VictoryOverlay({
   const headline2 = isWin ? "You Won" : isDraw ? "Game Drawn" : isAbort ? "Game Aborted" : "You Lost";
 
   const hasEarnings = (isWin && (moneyEarned !== undefined && moneyEarned > 0));
+  const isRematchIdle = !!onRematch && (rematchState.status === "idle" || rematchState.status === "declined" || rematchState.status === "cancelled" || rematchState.status === "expired");
 
   return (
     <div
@@ -128,7 +129,7 @@ export default function VictoryOverlay({
       {(isWin || isDraw) && <FireworksCanvas active={mounted} colorTheme={isWin ? "win" : "draw"} />}
 
       <div
-        className={`relative w-[88%] max-w-[340px] rounded-2xl border p-6 text-center shadow-2xl transition-all duration-600 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`relative w-[88%] max-w-[340px] max-h-[92vh] overflow-y-auto rounded-2xl border p-6 text-center shadow-2xl transition-all duration-600 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           mounted ? "translate-y-0 scale-100 opacity-100" : "-translate-y-8 scale-95 opacity-0"
         }`}
         style={{
@@ -264,17 +265,6 @@ export default function VictoryOverlay({
 
         {/* Buttons */}
         <div className={`flex flex-col gap-2 transition-all duration-400 ${showButtons ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"}`}>
-          {/* Rematch button — only show when idle, not waiting/accepted/declined */}
-          {onRematch && (rematchState.status === "idle" || rematchState.status === "declined" || rematchState.status === "cancelled" || rematchState.status === "expired") && (
-            <button
-              onClick={onRematch}
-              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
-              style={{ backgroundColor: accentBg, color: accent, border: `1px solid ${accentBorder}` }}
-            >
-              <Swords className="w-4 h-4" /> Rematch
-            </button>
-          )}
-
           {/* Rematch sending state */}
           {rematchState.status === "sending" && (
             <button disabled className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold opacity-60" style={{ backgroundColor: accentBg, color: accent, border: `1px solid ${accentBorder}` }}>
@@ -357,32 +347,48 @@ export default function VictoryOverlay({
             </button>
           )}
 
-          {onNewGame && (
-            <button
-              onClick={onNewGame}
-              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
-              style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}
-            >
-              <RefreshCw className="w-4 h-4" /> {newGameLabel}
-            </button>
-          )}
+          {/* Secondary row — Rematch/New Game + Review Moves side by side
+              instead of stacked, so the whole screen stays compact and
+              always leaves room for the ad below. */}
+          {(isRematchIdle || onNewGame || onReview) && (
+            <div className="flex gap-2">
+              {isRematchIdle && (
+                <button
+                  onClick={onRematch}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  style={{ backgroundColor: accentBg, color: accent, border: `1px solid ${accentBorder}` }}
+                >
+                  <Swords className="w-3.5 h-3.5" /> Rematch
+                </button>
+              )}
 
-          {onReview && (
-            <button
-              onClick={onReview}
-              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98]"
-              style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}
-            >
-              <ScanSearch className="w-4 h-4" /> Review Moves
-            </button>
+              {!isRematchIdle && onNewGame && (
+                <button
+                  onClick={onNewGame}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> {newGameLabel}
+                </button>
+              )}
+
+              {onReview && (
+                <button
+                  onClick={onReview}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  <ScanSearch className="w-3.5 h-3.5" /> Review Moves
+                </button>
+              )}
+            </div>
           )}
 
           <Link
             href={lobbyHref}
-            className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98]"
-            style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}
+            className="w-full flex items-center justify-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors py-1.5"
           >
-            <Home className="w-4 h-4" /> Back to Lobby
+            <Home className="w-3.5 h-3.5" /> Back to Lobby
           </Link>
 
           {/* Admin-managed post-game ad (results / battle settlement).
