@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getLeagueXpConfig, currentWeekStart, nextWeekStart, rewardsArray } from "@/lib/league-xp";
+import { getLeagueXpConfig, currentWeekStart, rewardsArray } from "@/lib/league-xp";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -39,8 +39,19 @@ async function runSettlement() {
   const admin = createAdminClient();
   const cfg = await getLeagueXpConfig(admin);
 
-  const closingWeek = currentWeekStart(new Date(Date.now() - 60 * 60 * 1000)); // week that just ended
-  const newWeek = nextWeekStart(new Date(Date.now() - 60 * 60 * 1000)); // week that starts now
+  // ── Boundary guard ───────────────────────────────────────────────────
+  // Settlement is only valid in the hours right after Monday 00:00 CAT.
+  // Anywhere else in the week we would be settling the LIVE week —
+  // paying mid-week and wiping everyone's XP. So: only run when "6 hours
+  // ago" falls in the previous cycle. (The idempotency guard on
+  // week_start additionally prevents double-paying re-runs.)
+  const now = new Date();
+  const curWeek = currentWeekStart(now);
+  const closingWeek = currentWeekStart(new Date(now.getTime() - 6 * 60 * 60 * 1000));
+  if (closingWeek === curWeek) {
+    return NextResponse.json({ ok: true, skipped: "not at cycle boundary", week: curWeek });
+  }
+  const newWeek = curWeek;
   const rewards = cfg.rewards_enabled ? rewardsArray(cfg) : [0, 0, 0, 0, 0];
 
   const { data: members, error } = await admin
