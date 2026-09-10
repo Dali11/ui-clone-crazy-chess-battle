@@ -34,6 +34,13 @@ export async function GET() {
               : !!cfg.game_results_enabled,
             script: String(cfg.challenge_finished_script || cfg.game_results_script || ""),
           },
+          leagues: {
+            // League page (weekly + monthly leaderboards) and tournaments
+            // page — bottom-of-content banner. Recommended 320x50 mobile /
+            // 728x90 desktop, same shape as the lobby ad.
+            enabled: !!cfg.leagues_enabled,
+            script: String(cfg.leagues_script || ""),
+          },
         },
       },
       { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } }

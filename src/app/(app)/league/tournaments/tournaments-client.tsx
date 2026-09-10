@@ -7,6 +7,7 @@ import {
   CheckCircle2, Lock, Zap, Clock, DollarSign, Sparkles, Target, TrendingUp,
 } from 'lucide-react';
 import { useCurrency } from '@/hooks/use-currency';
+import AdSlot from '@/components/ads/ad-slot';
 
 interface Competition {
   type: 'league' | 'tournament';
@@ -222,6 +223,9 @@ export default function TournamentsPage() {
           )}
         </>
       )}
+
+      {/* Bottom-of-content banner — same unit as the League page ad. */}
+      <AdSlot placement="leagues" />
     </div>
   );
 }

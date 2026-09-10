@@ -56,6 +56,14 @@ export interface LeagueXpConfig {
   rewards_t3_mwk?: number[];
   rewards_t4_mwk?: number[];
   rewards_t5_mwk?: number[];
+  /** Monthly championship: separate payouts paid on the 1st of each month. */
+  monthly_rewards_enabled?: boolean;
+  monthly_top_count?: number;
+  monthly_rewards_t1_mwk?: number[];
+  monthly_rewards_t2_mwk?: number[];
+  monthly_rewards_t3_mwk?: number[];
+  monthly_rewards_t4_mwk?: number[];
+  monthly_rewards_t5_mwk?: number[];
 }
 
 export function rewardsArray(c: LeagueXpConfig): number[] {
@@ -79,6 +87,25 @@ export function rewardsForTier(c: LeagueXpConfig, tier: number): number[] {
 export function allTierRewards(c: LeagueXpConfig): Record<number, number[]> {
   const out: Record<number, number[]> = {};
   for (let t = 1; t <= LEAGUE_TIERS.length; t++) out[t] = rewardsForTier(c, t);
+  return out;
+}
+
+/**
+ * Monthly championship payouts for a league tier (MWK). Falls back to the
+ * tier's weekly array when no monthly array is configured.
+ */
+export function monthlyRewardsForTier(c: LeagueXpConfig, tier: number): number[] {
+  const arr = (c as any)[`monthly_rewards_t${tier}_mwk`];
+  if (Array.isArray(arr) && arr.length > 0 && arr.every((v: unknown) => typeof v === "number" && v >= 0)) {
+    return arr as number[];
+  }
+  return rewardsForTier(c, tier);
+}
+
+/** All tiers' monthly payout arrays — for UI display. */
+export function allMonthlyTierRewards(c: LeagueXpConfig): Record<number, number[]> {
+  const out: Record<number, number[]> = {};
+  for (let t = 1; t <= LEAGUE_TIERS.length; t++) out[t] = monthlyRewardsForTier(c, t);
   return out;
 }
 
@@ -114,4 +141,20 @@ export function nextWeekStart(now = new Date()): string {
   const cur = currentWeekStart(now);
   const next = new Date(cur + "T00:00:00Z").getTime() + 7 * 86400_000;
   return new Date(next).toISOString().slice(0, 10);
+}
+
+/** ISO date (yyyy-mm-01) of the calendar month currently running in CAT. */
+export function currentMonthStart(now = new Date()): string {
+  const cat = new Date(now.getTime() + CAT_OFFSET_MS);
+  return cat.toISOString().slice(0, 7) + "-01";
+}
+
+/** ISO date of the 1st of the NEXT month (CAT) — month cycle end boundary. */
+export function nextMonthStart(now = new Date()): string {
+  const cat = new Date(now.getTime() + CAT_OFFSET_MS);
+  const y = cat.getUTCFullYear();
+  const m = cat.getUTCMonth(); // 0-based
+  const nextY = m === 11 ? y + 1 : y;
+  const nextM = m === 11 ? 1 : m + 2; // 1-based month number
+  return `${nextY}-${String(nextM).padStart(2, "0")}-01`;
 }

@@ -17,6 +17,7 @@ interface Standing {
 interface StandingsResponse {
   seeded: boolean;
   enabled: boolean;
+  scope?: "week" | "month";
   tier?: { tier: number; name: string; emoji: string };
   myXp?: number;
   myRank?: number | null;
@@ -66,25 +67,50 @@ function useCountdown(targetIso?: string) {
   return label;
 }
 
+function ScopeToggle({ scope, setScope }: { scope: "week" | "month"; setScope: (s: "week" | "month") => void }) {
+  return (
+    <div className="flex items-center gap-1 p-1 rounded-xl bg-ccb-muted/5 w-fit">
+      {(["week", "month"] as const).map((s) => (
+        <button
+          key={s}
+          onClick={() => setScope(s)}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+            scope === s ? "bg-ccb-primary text-white" : "text-ccb-muted hover:text-ccb-text"
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5" />
+          {s === "week" ? "Weekly" : "Monthly"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function XpLeagueTab() {
+  const [scope, setScope] = useState<"week" | "month">("week");
   const [data, setData] = useState<StandingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [showHow, setShowHow] = useState(false);
   const currency = useCurrency();
 
   useEffect(() => {
-    fetch("/api/league/xp/standings")
+    setLoading(true);
+    fetch(`/api/league/xp/standings${scope === "month" ? "?scope=month" : ""}`)
       .then((r) => (r.status === 401 ? null : r.json()))
       .then((d) => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
-  }, []);
+  }, [scope]);
 
   const countdown = useCountdown(data?.cycleEnd);
+  const isMonth = scope === "month";
 
   if (loading) {
     return (
-      <div className="card p-8 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-ccb-muted" />
+      <div className="space-y-4">
+        <ScopeToggle scope={scope} setScope={setScope} />
+        <div className="card p-8 flex items-center justify-center">
+          <Loader2 className="w-6 h-6 animate-spin text-ccb-muted" />
+        </div>
       </div>
     );
   }
@@ -166,6 +192,9 @@ export default function XpLeagueTab() {
 
   return (
     <div className="space-y-4">
+      {/* Weekly | Monthly leaderboard switch */}
+      <ScopeToggle scope={scope} setScope={setScope} />
+
       {/* Header: tier + my rank + countdown */}
       <div className="card p-5">
         <div className="flex items-center justify-between gap-3">
@@ -177,7 +206,7 @@ export default function XpLeagueTab() {
             </div>
           </div>
           <div className="text-right shrink-0">
-            <div className="text-xs text-ccb-muted">Resets Monday 00:00 CAT</div>
+            <div className="text-xs text-ccb-muted">{isMonth ? "Ends on the 1st · 00:00 CAT" : "Resets Monday 00:00 CAT"}</div>
             <div className="text-sm font-bold text-ccb-primary tabular-nums">{countdown || "…"}</div>
           </div>
         </div>
@@ -189,7 +218,7 @@ export default function XpLeagueTab() {
           <div className="flex items-center gap-2 mb-2.5">
             <Gift className="w-4 h-4 text-ccb-primary" />
             <h3 className="text-sm font-semibold">
-              Weekly rewards — top {promote} in the {data.tier?.name ?? "league"}
+              {isMonth ? "Monthly championship" : "Weekly rewards"} — top {promote} in the {data.tier?.name ?? "league"}
             </h3>
           </div>
           {currency.currencyCode !== "MWK" && (
@@ -211,15 +240,15 @@ export default function XpLeagueTab() {
       {/* Leaderboard */}
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-ccb-muted/10">
-          <h3 className="text-sm font-semibold">Weekly standings</h3>
+          <h3 className="text-sm font-semibold">{isMonth ? "Monthly standings" : "Weekly standings"}</h3>
           <div className="flex items-center gap-3 text-[10px] text-ccb-muted">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Reward + promotion</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> {isMonth ? "Monthly reward" : "Reward + promotion"}</span>
             {demoteStart !== Infinity && <span className="flex items-center gap-1"><ArrowDownCircle className="w-2.5 h-2.5 text-red-400" /> Demotion</span>}
           </div>
         </div>
         {standings.length === 0 ? (
           <div className="p-6 text-center">
-            <p className="text-sm text-ccb-muted">New week, fresh start — play a game to get on the board.</p>
+            <p className="text-sm text-ccb-muted">{isMonth ? "No games on the monthly board yet — play to get on it." : "New week, fresh start — play a game to get on the board."}</p>
             <Link href="/play" className="btn-primary inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl text-sm font-bold">
               <Swords className="w-4 h-4" /> Find a game
             </Link>
@@ -271,6 +300,7 @@ export default function XpLeagueTab() {
             <p>To keep it fair, you can earn at most <b className="text-ccb-text">{rules.dailyCap} XP per day</b>, and games against the computer never count.</p>
             <p>Standings reset <b className="text-ccb-text">every Monday at 00:00 CAT</b>. The top {promote} players in each league are rewarded and promoted to the next league up. Every league has its own payout — the higher you climb, the bigger the rewards. Premier League champions stay on top — and nobody gets demoted.</p>
             <p>Everyone who joins starts in the Open League and climbs the ladder — Open → Amateur → Bronze → Knights Championship → Premier League. The Open League is unlimited; every league above it holds up to {tierCap.toLocaleString()} players, so promotion happens when there&apos;s a free spot.</p>
+            <p><b className="text-ccb-text">Monthly championship:</b> alongside the weekly ladder, every league also runs a <b className="text-ccb-text">monthly leaderboard</b> from the 1st to the end of the month. The top players in each league earn <b className="text-ccb-text">bigger monthly rewards</b> — same tier, separate prizes, paid on the 1st. Your tier only moves on the weekly cycle.</p>
           </div>
         )}
       </div>

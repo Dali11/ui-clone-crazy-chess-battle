@@ -30,6 +30,8 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "draughts_results_script", label: "Draughts Results Ad Script", type: "textarea", group: "control" },
     { key: "challenge_finished_enabled", label: "Challenge Finished Ad", type: "toggle", group: "control", help: "Shown when someone opens a challenge link after the game ended — falls back to the Chess Results ad if no script is set" },
     { key: "challenge_finished_script", label: "Challenge Finished Ad Script", type: "textarea", group: "control" },
+    { key: "leagues_enabled", label: "Leagues Page Ad", type: "toggle", group: "control", help: "Bottom of the League page (weekly + monthly leaderboards) and tournaments page — recommended 320x50 mobile / 728x90 desktop" },
+    { key: "leagues_script", label: "Leagues Ad Script", type: "textarea", group: "control", help: "Paste the full Adsterra snippet" },
   ],
   overview: [
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display", help: "Display stat cards at the top" },
@@ -123,6 +125,13 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "rewards_t3_mwk", label: "🥉 Bronze League Rewards", type: "numberArray", group: "pricing", unit: "MWK" },
     { key: "rewards_t4_mwk", label: "♞ Knights Championship Rewards", type: "numberArray", group: "pricing", unit: "MWK" },
     { key: "rewards_t5_mwk", label: "🏆 Premier League Rewards", type: "numberArray", group: "pricing", unit: "MWK", help: "Each league pays its own weekly rewards — higher leagues, bigger payouts. Players see these amounts in their own currency." },
+    { key: "monthly_rewards_enabled", label: "Monthly Championship Enabled", type: "toggle", group: "pricing", help: "Parallel calendar-month leaderboard per league — top players earn monthly rewards on the 1st. Tiers only move on the weekly cycle." },
+    { key: "monthly_top_count", label: "Monthly Paid Spots", type: "number", group: "pricing", help: "Top N players per league earn monthly rewards (default 5)" },
+    { key: "monthly_rewards_t1_mwk", label: "🌍 Open League Monthly Rewards", type: "numberArray", group: "pricing", unit: "MWK", help: "Comma-separated monthly payouts for 1st–5th, e.g. 8000,4000,2000,1000,500" },
+    { key: "monthly_rewards_t2_mwk", label: "🎯 Amateur League Monthly Rewards", type: "numberArray", group: "pricing", unit: "MWK" },
+    { key: "monthly_rewards_t3_mwk", label: "🥉 Bronze League Monthly Rewards", type: "numberArray", group: "pricing", unit: "MWK" },
+    { key: "monthly_rewards_t4_mwk", label: "♞ Knights Championship Monthly Rewards", type: "numberArray", group: "pricing", unit: "MWK" },
+    { key: "monthly_rewards_t5_mwk", label: "🏆 Premier League Monthly Rewards", type: "numberArray", group: "pricing", unit: "MWK", help: "Each league has its own monthly payout — settled on the 1st of each month" },
   ],
   verification: [
     { key: "require_id_document", label: "Require ID Document", type: "toggle", group: "control" },

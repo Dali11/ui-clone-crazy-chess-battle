@@ -46,6 +46,14 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     rewards_t3_mwk: [5000, 2500, 1200, 600, 250],
     rewards_t4_mwk: [8000, 4000, 2000, 1000, 400],
     rewards_t5_mwk: [15000, 8000, 4000, 2000, 1000],
+    // Monthly championship (calendar month, settled on the 1st)
+    monthly_rewards_enabled: true,
+    monthly_top_count: 5,
+    monthly_rewards_t1_mwk: [8000, 4000, 2000, 1000, 500],
+    monthly_rewards_t2_mwk: [12000, 6000, 3000, 1600, 600],
+    monthly_rewards_t3_mwk: [20000, 10000, 5000, 2400, 1000],
+    monthly_rewards_t4_mwk: [32000, 16000, 8000, 4000, 1600],
+    monthly_rewards_t5_mwk: [60000, 32000, 16000, 8000, 4000],
   },
   ads: {
     enabled: false, // global kill switch
@@ -59,6 +67,8 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     battle_settlement_script: "",
     draughts_results_enabled: false,
     draughts_results_script: "",
+    leagues_enabled: false,
+    leagues_script: "",
   },
   deposits: {
     enabled: true,

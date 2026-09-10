@@ -3,6 +3,7 @@
 import React from 'react';
 import { Zap } from 'lucide-react';
 import XpLeagueTab from './_components/xp-league-tab';
+import AdSlot from '@/components/ads/ad-slot';
 
 /**
  * Leagues — the Duolingo-style XP League is the one and only league
@@ -26,6 +27,10 @@ export default function CompetePage() {
       </div>
 
       <XpLeagueTab />
+
+      {/* Bottom-of-content banner — visible under both the weekly and
+          monthly leaderboards. Zero-cost until enabled in admin → Ads. */}
+      <AdSlot placement="leagues" />
     </div>
   );
 }

@@ -1,25 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getLeagueXpConfig, currentWeekStart, rewardsForTier } from "@/lib/league-xp";
+import { getLeagueXpConfig, currentWeekStart, currentMonthStart, rewardsForTier, monthlyRewardsForTier } from "@/lib/league-xp";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Weekly XP League settlement — Vercel cron, Mondays 00:05 CAT
- * (Sunday 22:05 UTC, see vercel.json). Requires Bearer CRON_SECRET.
+ * XP League settlement — Vercel cron, daily 00:05 CAT (22:05 UTC, see
+ * vercel.json). Requires Bearer CRON_SECRET. Two independent settles,
+ * each self-guarding, so one daily cron covers both:
  *
- * For each tier, ranked by XP desc:
- *   - top `promote_count` (default 5): credited their rank reward to the
- *     wallet (credit_wallet RPC, same path as battle payouts) and
- *     promoted one tier — but only while the league above has a free
- *     slot (tier_cap, default 1000; the Open League is uncapped).
- *   - demotion is config-driven (`demote_count`, currently 0 —
- *     promotion-only mode: nobody gets pushed down).
- *   - every member's XP resets for the new week and a history snapshot is
- *     written (league_xp_history).
- * Idempotent guard: members already on the new week are skipped, so a
- * re-run or overlap with live traffic can never double-pay.
+ * 1. WEEKLY (only fires right after Monday 00:00 CAT):
+ *    For each tier, ranked by XP desc:
+ *      - top `promote_count` (default 5): credited their rank reward to the
+ *        wallet (credit_wallet RPC, same path as battle payouts) and
+ *        promoted one tier — but only while the league above has a free
+ *        slot (tier_cap, default 1000; the Open League is uncapped).
+ *      - demotion is config-driven (`demote_count`, currently 0 —
+ *        promotion-only mode: nobody gets pushed down).
+ *      - every member's XP resets for the new week and a history snapshot
+ *        is written (league_xp_history).
+ *    Idempotent guard: members already on the new week are skipped, so a
+ *    re-run or overlap with live traffic can never double-pay.
+ *
+ * 2. MONTHLY (only fires on the 1st, for the month that just closed):
+ *    Aggregates league_xp_events over the calendar month, ranks each tier,
+ *    pays the top `monthly_top_count` from the per-tier monthly reward
+ *    arrays, and snapshots into league_xp_monthly_history. Tiers never
+ *    move on the monthly cycle — it's a championship, not a ladder.
+ *    Idempotency: unique (month, tier, user_id) history index + unique
+ *    deposits reference — re-runs are no-ops.
  */
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -41,6 +51,16 @@ async function runSettlement() {
   const admin = createAdminClient();
   const cfg = await getLeagueXpConfig(admin);
 
+  const result = await runWeeklySettle(admin, cfg);
+  const monthly = await runMonthlySettle(admin, cfg);
+  return NextResponse.json({ ok: true, ...result, monthly });
+}
+
+/** Weekly ladder settle — only acts in the hours right after Monday 00:00 CAT. */
+async function runWeeklySettle(
+  admin: ReturnType<typeof createAdminClient>,
+  cfg: Awaited<ReturnType<typeof getLeagueXpConfig>>
+) {
   // ── Boundary guard ───────────────────────────────────────────────────
   // Settlement is only valid in the hours right after Monday 00:00 CAT.
   // Anywhere else in the week we would be settling the LIVE week —
@@ -51,7 +71,7 @@ async function runSettlement() {
   const curWeek = currentWeekStart(now);
   const closingWeek = currentWeekStart(new Date(now.getTime() - 6 * 60 * 60 * 1000));
   if (closingWeek === curWeek) {
-    return NextResponse.json({ ok: true, skipped: "not at cycle boundary", week: curWeek });
+    return { skipped: "not at week boundary", week: curWeek };
   }
   const newWeek = curWeek;
 
@@ -60,7 +80,7 @@ async function runSettlement() {
     .select("user_id, tier, xp, week_start, profiles!inner(display_name, username)")
     .order("xp", { ascending: false })
     .order("updated_at", { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return { error: error.message };
 
   const promoted = cfg.promote_count;
   const demoted = cfg.demote_count;
@@ -155,5 +175,115 @@ async function runSettlement() {
     }
   }
 
-  return NextResponse.json({ ok: true, closingWeek, newWeek, paid, moves, snapshots, cappedAtCapacity: capped });
+  return { closingWeek, newWeek, paid, moves, snapshots, cappedAtCapacity: capped };
+}
+
+/**
+ * Monthly championship settle — only acts on the 1st of the month.
+ * Ranks each tier by XP earned during the month that just closed and
+ * pays the configured monthly rewards. No promotion/demotion.
+ */
+async function runMonthlySettle(
+  admin: ReturnType<typeof createAdminClient>,
+  cfg: Awaited<ReturnType<typeof getLeagueXpConfig>>
+) {
+  const now = new Date();
+  const closingMonth = currentMonthStart(new Date(now.getTime() - 6 * 60 * 60 * 1000));
+  const curMonth = currentMonthStart(now);
+  if (closingMonth === curMonth) {
+    return { skipped: "not at month boundary", month: curMonth };
+  }
+
+  // Already settled this month? Unique history index makes re-runs no-ops,
+  // but skip the work entirely if a snapshot exists.
+  const { count } = await admin
+    .from("league_xp_monthly_history")
+    .select("id", { count: "exact", head: true })
+    .eq("month", closingMonth);
+  if (count && count > 0) {
+    return { skipped: "already settled", month: closingMonth };
+  }
+
+  // Aggregate the month's XP from the events audit log.
+  const monthStartIso = closingMonth + "T00:00:00+02:00";
+  const monthEndIso = curMonth + "T00:00:00+02:00";
+  const { data: events, error: evErr } = await admin
+    .from("league_xp_events")
+    .select("user_id, amount")
+    .gte("created_at", monthStartIso)
+    .lt("created_at", monthEndIso);
+  if (evErr) return { error: evErr.message };
+
+  const xpByUser = new Map<string, number>();
+  for (const ev of events ?? []) {
+    xpByUser.set(ev.user_id, (xpByUser.get(ev.user_id) ?? 0) + ev.amount);
+  }
+  if (xpByUser.size === 0) return { closingMonth, paid: 0, ranked: 0, snapshots: 0 };
+
+  const { data: members } = await admin
+    .from("league_xp_members")
+    .select("user_id, tier, profiles!inner(display_name, username)");
+
+  const topCount = cfg.monthly_top_count ?? 5;
+  let paid = 0, ranked = 0, snapshots = 0;
+
+  for (const tier of [1, 2, 3, 4, 5]) {
+    const rewards = cfg.monthly_rewards_enabled !== false && cfg.rewards_enabled
+      ? monthlyRewardsForTier(cfg, tier)
+      : [];
+    const rows = (members ?? [])
+      .filter((m: any) => m.tier === tier && xpByUser.has(m.user_id))
+      .map((m: any) => ({
+        user_id: m.user_id,
+        xp: xpByUser.get(m.user_id) ?? 0,
+        name: m.profiles?.display_name || m.profiles?.username || "Player",
+      }))
+      .sort((a: any, b: any) => b.xp - a.xp)
+      .slice(0, Math.max(topCount, 20)); // snapshot a bit beyond the paid zone
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const rank = i + 1;
+      const inPaidZone = rank <= topCount && r.xp > 0;
+      const reward = inPaidZone ? rewards[rank - 1] ?? 0 : 0;
+      ranked++;
+
+      if (reward > 0) {
+        const rewardRef = `league_monthly:${closingMonth}:${r.user_id}`;
+        const { error: depErr } = await admin.from("deposits").insert({
+          user_id: r.user_id,
+          amount: reward,
+          status: "success",
+          method: "league_reward",
+          reference: rewardRef,
+        });
+        if (depErr && String(depErr.message || "").includes("duplicate key")) {
+          // Already paid in a previous run — no-op.
+        } else if (!depErr) {
+          const { error: creditErr } = await admin.rpc("credit_wallet", { p_user_id: r.user_id, p_amount: reward });
+          if (!creditErr) {
+            paid++;
+          } else {
+            await admin.from("deposits").delete().eq("reference", rewardRef);
+            console.error(`Monthly league reward credit failed for ${r.user_id}, ledger row rolled back`);
+          }
+        } else {
+          console.error("Monthly league reward ledger insert failed:", depErr);
+        }
+      }
+
+      const { error: histErr } = await admin.from("league_xp_monthly_history").insert({
+        month: closingMonth,
+        tier,
+        user_id: r.user_id,
+        display_name: r.name,
+        final_rank: rank,
+        final_xp: r.xp,
+        reward_mwk: reward,
+      });
+      if (!histErr) snapshots++;
+    }
+  }
+
+  return { closingMonth, paid, ranked, snapshots };
 }
