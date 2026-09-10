@@ -8,7 +8,7 @@ import { Settings, Save, Loader2, SlidersHorizontal } from "lucide-react";
 interface SettingField {
   key: string;
   label: string;
-  type: "toggle" | "number" | "text" | "select" | "textarea";
+  type: "toggle" | "number" | "text" | "select" | "textarea" | "numberArray";
   options?: { value: string; label: string }[];
   help?: string;
   group?: "control" | "pricing" | "display";
@@ -118,36 +118,11 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "demote_count", label: "Demotion Spots", type: "number", group: "control", help: "Bottom N demoted each week — set 0 for promotion-only (current default)" },
     { key: "tier_cap", label: "League Size Cap", type: "number", group: "control", help: "Max players per league above the Open League (default 1000; Open is unlimited). Promotion pauses when the league above is full." },
     { key: "rewards_enabled", label: "Cash Rewards Enabled", type: "toggle", group: "pricing", help: "Off = top players are promoted only, no wallet credit" },
-    { key: "reward_1_mwk", label: "1st Place Reward", type: "number", group: "pricing", unit: "MWK" },
-    { key: "reward_2_mwk", label: "2nd Place Reward", type: "number", group: "pricing", unit: "MWK" },
-    { key: "reward_3_mwk", label: "3rd Place Reward", type: "number", group: "pricing", unit: "MWK" },
-    { key: "reward_4_mwk", label: "4th Place Reward", type: "number", group: "pricing", unit: "MWK" },
-    { key: "reward_5_mwk", label: "5th Place Reward", type: "number", group: "pricing", unit: "MWK" },
-  ],
-  leagues: [
-    { key: "require_membership", label: "Require Membership", type: "toggle", group: "control" },
-    { key: "auto_relegate", label: "Auto-Relegate", type: "toggle", group: "control", help: "Auto-relegate inactive members" },
-    { key: "promotion_spots", label: "Promotion Spots", type: "number", group: "control" },
-    { key: "relegation_spots", label: "Relegation Spots", type: "number", group: "control" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
-    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
-  ],
-  seasons: [
-    { key: "auto_create", label: "Auto-Create Seasons", type: "toggle", group: "control" },
-    { key: "default_duration_weeks", label: "Default Duration", type: "number", group: "control", unit: "weeks" },
-    { key: "allow_overlap", label: "Allow Overlap", type: "toggle", group: "control", help: "Allow overlapping seasons" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
-    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
-  ],
-  membership: [
-    { key: "monthly_price", label: "Monthly Price", type: "number", group: "control", unit: "MWK", help: "Monthly membership fee in MWK" },
-    { key: "yearly_price", label: "Yearly Price", type: "number", group: "control", unit: "MWK", help: "Yearly membership fee (2 months free)" },
-    { key: "membership_active", label: "Membership Active", type: "toggle", group: "control", help: "Allow new membership purchases" },
-    { key: "auto_renew", label: "Auto-Renew", type: "toggle", group: "control" },
-    { key: "grace_period_days", label: "Grace Period", type: "number", group: "control", unit: "days" },
-    { key: "require_verification", label: "Require Verification", type: "toggle", group: "control" },
-    { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
-    { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
+    { key: "rewards_t1_mwk", label: "🌍 Open League Rewards", type: "numberArray", group: "pricing", unit: "MWK", help: "Comma-separated payouts for 1st–5th place, e.g. 2000,1000,500,250,100" },
+    { key: "rewards_t2_mwk", label: "🎯 Amateur League Rewards", type: "numberArray", group: "pricing", unit: "MWK" },
+    { key: "rewards_t3_mwk", label: "🥉 Bronze League Rewards", type: "numberArray", group: "pricing", unit: "MWK" },
+    { key: "rewards_t4_mwk", label: "♞ Knights Championship Rewards", type: "numberArray", group: "pricing", unit: "MWK" },
+    { key: "rewards_t5_mwk", label: "🏆 Premier League Rewards", type: "numberArray", group: "pricing", unit: "MWK", help: "Each league pays its own weekly rewards — higher leagues, bigger payouts. Players see these amounts in their own currency." },
   ],
   verification: [
     { key: "require_id_document", label: "Require ID Document", type: "toggle", group: "control" },
@@ -186,9 +161,6 @@ const SECTION_LABELS: Record<string, string> = {
   users: "Users",
   tournaments: "Tournaments",
   leagues_xp: "XP Leagues",
-  leagues: "Leagues",
-  seasons: "Seasons",
-  membership: "Membership",
   verification: "Verification",
   logs: "Admin Logs",
 };
@@ -257,7 +229,11 @@ export default function PlatformSettingsPanel({ section }: { section: string }) 
   };
 
   const setFieldValue = (field: SettingField, value: any) => {
-    if (field.type === "text" && field.key === "stake_levels") {
+    if (field.type === "numberArray") {
+      // Comma-separated payouts -> number array (allow 0 for empty slots)
+      const arr = String(value).split(",").map((v: string) => Number(v.trim())).filter((v: number) => !isNaN(v) && v >= 0);
+      updateField(field.key, arr);
+    } else if (field.type === "text" && field.key === "stake_levels") {
       // Convert comma-separated string to number array
       const arr = value.split(",").map((v: string) => Number(v.trim())).filter((v: number) => !isNaN(v) && v > 0);
       updateField(field.key, arr);
@@ -401,6 +377,22 @@ function FieldRow({
             type="number"
             value={value}
             onChange={(e) => onChange(Number(e.target.value))}
+            className="flex-1 min-w-0 px-2.5 py-1.5 text-sm rounded-lg bg-ccb-dark border border-ccb-border text-ccb-text focus:outline-none focus:border-ccb-primary transition-colors"
+          />
+          {field.unit && (
+            <span className="text-xs text-ccb-muted shrink-0 w-8">{field.unit}</span>
+          )}
+        </div>
+      )}
+
+      {/* Comma-separated number array (e.g. per-tier reward payouts) */}
+      {field.type === "numberArray" && (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="2000,1000,500,250,100"
             className="flex-1 min-w-0 px-2.5 py-1.5 text-sm rounded-lg bg-ccb-dark border border-ccb-border text-ccb-text focus:outline-none focus:border-ccb-primary transition-colors"
           />
           {field.unit && (

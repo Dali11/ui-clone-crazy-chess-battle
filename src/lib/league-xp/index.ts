@@ -50,10 +50,36 @@ export interface LeagueXpConfig {
   reward_3_mwk: number;
   reward_4_mwk: number;
   reward_5_mwk: number;
+  /** Per-tier weekly payouts (MWK): rewards_tN_mwk = [1st, 2nd, …]. */
+  rewards_t1_mwk?: number[];
+  rewards_t2_mwk?: number[];
+  rewards_t3_mwk?: number[];
+  rewards_t4_mwk?: number[];
+  rewards_t5_mwk?: number[];
 }
 
 export function rewardsArray(c: LeagueXpConfig): number[] {
   return [c.reward_1_mwk, c.reward_2_mwk, c.reward_3_mwk, c.reward_4_mwk, c.reward_5_mwk];
+}
+
+/**
+ * Configurable weekly payout for a specific league tier (MWK).
+ * Falls back to the legacy flat rewards when the tier's array is missing
+ * or malformed, so old configs keep working.
+ */
+export function rewardsForTier(c: LeagueXpConfig, tier: number): number[] {
+  const tierRewards = (c as any)[`rewards_t${tier}_mwk`];
+  if (Array.isArray(tierRewards) && tierRewards.length > 0 && tierRewards.every((v: unknown) => typeof v === "number" && v >= 0)) {
+    return tierRewards as number[];
+  }
+  return rewardsArray(c);
+}
+
+/** All tiers' payout arrays — for UI display (per-league rewards preview). */
+export function allTierRewards(c: LeagueXpConfig): Record<number, number[]> {
+  const out: Record<number, number[]> = {};
+  for (let t = 1; t <= LEAGUE_TIERS.length; t++) out[t] = rewardsForTier(c, t);
+  return out;
 }
 
 let cachedConfig: { at: number; cfg: LeagueXpConfig } | null = null;

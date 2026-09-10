@@ -27,7 +27,23 @@ interface StandingsResponse {
   standings?: Standing[];
   xpRules?: { win: number; draw: number; loss: number; upsetBonus: number; dailyCap: number };
   rewards?: number[];
+  /** Payout (MWK) for every league tier — keys are tier numbers. */
+  tierRewards?: Record<number, number[]>;
   tiers?: { tier: number; name: string; emoji: string }[];
+}
+
+/** Local-currency reward tile: primary = player's currency, secondary = MWK. */
+function RewardAmount({ mwk, currency }: { mwk: number; currency: ReturnType<typeof useCurrency> }) {
+  const mwkLabel = `MK ${Math.floor(mwk).toLocaleString("en-US")}`;
+  if (currency.currencyCode === "MWK") {
+    return <div className="text-xs font-bold mt-0.5">{mwkLabel}</div>;
+  }
+  return (
+    <div className="mt-0.5">
+      <div className="text-xs font-bold">{currency.formatMoney(mwk)}</div>
+      <div className="text-[9px] text-ccb-muted/80 leading-tight">{mwkLabel}</div>
+    </div>
+  );
 }
 
 function useCountdown(targetIso?: string) {
@@ -54,7 +70,7 @@ export default function XpLeagueTab() {
   const [data, setData] = useState<StandingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [showHow, setShowHow] = useState(false);
-  const { convertFormatted } = useCurrency();
+  const currency = useCurrency();
 
   useEffect(() => {
     fetch("/api/league/xp/standings")
@@ -112,7 +128,9 @@ export default function XpLeagueTab() {
           <div className="card p-4">
             <h3 className="text-sm font-semibold mb-3">The five leagues</h3>
             <div className="space-y-2">
-              {data.tiers.map((t, i) => (
+              {data.tiers.map((t, i) => {
+                const payout = data.tierRewards?.[t.tier]?.[0] ?? 0;
+                return (
                 <div key={t.tier} className={`flex items-center gap-3 p-2.5 rounded-lg ${i === data.tiers!.length - 1 ? "bg-ccb-primary/10" : "bg-ccb-muted/5"}`}>
                   <span className="text-xl">{t.emoji}</span>
                   <div className="flex-1">
@@ -121,9 +139,16 @@ export default function XpLeagueTab() {
                       {["Rating 400–649", "Rating 650–899", "Rating 900–1149", "Rating 1150–1399", "Rating 1400+"][i]}
                     </div>
                   </div>
+                  {payout > 0 && (
+                    <div className="text-right shrink-0">
+                      <div className="text-[9px] text-ccb-muted font-semibold uppercase tracking-wide">1st wins</div>
+                      <div className="text-[11px] font-bold text-ccb-primary">{currency.currencyCode === "MWK" ? `MK ${payout.toLocaleString()}` : currency.formatMoney(payout)}</div>
+                    </div>
+                  )}
                   {i < (data.tiers?.length ?? 5) - 1 && <TrendingUp className="w-3.5 h-3.5 text-ccb-muted/50" />}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -163,13 +188,20 @@ export default function XpLeagueTab() {
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-2.5">
             <Gift className="w-4 h-4 text-ccb-primary" />
-            <h3 className="text-sm font-semibold">Weekly rewards — top {promote} of every league</h3>
+            <h3 className="text-sm font-semibold">
+              Weekly rewards — top {promote} in the {data.tier?.name ?? "league"}
+            </h3>
           </div>
+          {currency.currencyCode !== "MWK" && (
+            <p className="text-[10px] text-ccb-muted -mt-1 mb-2">
+              Shown in your currency at today&apos;s exchange rate · paid to your wallet in Malawi Kwacha
+            </p>
+          )}
           <div className="grid grid-cols-5 gap-2">
             {rewards.map((r, i) => (
               <div key={i} className={`rounded-lg py-2 px-1 text-center ${i === 0 ? "bg-ccb-primary/15" : "bg-ccb-muted/5"}`}>
                 <div className="text-[10px] text-ccb-muted font-semibold">#{i + 1}</div>
-                <div className="text-xs font-bold mt-0.5">{convertFormatted(r)}</div>
+                <RewardAmount mwk={r} currency={currency} />
               </div>
             ))}
           </div>
@@ -237,7 +269,7 @@ export default function XpLeagueTab() {
           <div className="px-4 pb-4 space-y-2 text-xs text-ccb-muted leading-relaxed">
             <p>Every finished game earns XP — wins <b className="text-ccb-text">{rules.win} XP</b>, draws <b className="text-ccb-text">{rules.draw} XP</b>, losses <b className="text-ccb-text">{rules.loss} XP</b>. Beat a higher-rated player for <b className="text-ccb-text">+{rules.upsetBonus} XP</b> extra.</p>
             <p>To keep it fair, you can earn at most <b className="text-ccb-text">{rules.dailyCap} XP per day</b>, and games against the computer never count.</p>
-            <p>Standings reset <b className="text-ccb-text">every Monday at 00:00 CAT</b>. The top {promote} players in each league are rewarded and promoted to the next league up. Premier League champions stay on top — and nobody gets demoted.</p>
+            <p>Standings reset <b className="text-ccb-text">every Monday at 00:00 CAT</b>. The top {promote} players in each league are rewarded and promoted to the next league up. Every league has its own payout — the higher you climb, the bigger the rewards. Premier League champions stay on top — and nobody gets demoted.</p>
             <p>Everyone who joins starts in the Open League and climbs the ladder — Open → Amateur → Bronze → Knights Championship → Premier League. The Open League is unlimited; every league above it holds up to {tierCap.toLocaleString()} players, so promotion happens when there&apos;s a free spot.</p>
           </div>
         )}

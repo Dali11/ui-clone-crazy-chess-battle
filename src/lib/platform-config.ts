@@ -33,11 +33,19 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     demote_count: 0, // promotion-only mode — no demotion
     tier_cap: 1000, // max players per league above Open (Open is uncapped)
     rewards_enabled: true,
+    // Legacy flat rewards (pre per-tier config) — kept as fallback.
     reward_1_mwk: 2000,
     reward_2_mwk: 1000,
     reward_3_mwk: 500,
     reward_4_mwk: 250,
     reward_5_mwk: 100,
+    // Per-league weekly payouts, MWK. rewards_tN_mwk = [1st, 2nd, 3rd, ...]
+    // for tier N. Higher leagues pay more — climb for bigger rewards.
+    rewards_t1_mwk: [2000, 1000, 500, 250, 100],
+    rewards_t2_mwk: [3000, 1500, 750, 400, 150],
+    rewards_t3_mwk: [5000, 2500, 1200, 600, 250],
+    rewards_t4_mwk: [8000, 4000, 2000, 1000, 400],
+    rewards_t5_mwk: [15000, 8000, 4000, 2000, 1000],
   },
   ads: {
     enabled: false, // global kill switch
@@ -114,32 +122,6 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     auto_create_max_players: 128,
     auto_create_min_players: 6,
     auto_create_creator_profit_pct: 10,
-    show_kpi_cards: true,
-    page_size: 20,
-  },
-  leagues: {
-    require_membership: true,
-    auto_relegate: true,
-    promotion_spots: 5,
-    relegation_spots: 5,
-    show_kpi_cards: true,
-    page_size: 20,
-  },
-  seasons: {
-    auto_create: false,
-    default_duration_weeks: 12,
-    allow_overlap: false,
-    show_kpi_cards: true,
-    page_size: 20,
-  },
-  membership: {
-    auto_renew: false,
-    grace_period_days: 10,
-    require_verification: false,
-    monthly_price: 10000,   // MWK — admin-configurable
-    yearly_price: 100000,    // MWK — 10 months (2 free)
-    currency: "MWK",
-    membership_active: true,
     show_kpi_cards: true,
     page_size: 20,
   },

@@ -1,19 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Zap, Swords } from 'lucide-react';
+import React from 'react';
+import { Zap } from 'lucide-react';
 import XpLeagueTab from './_components/xp-league-tab';
-import PremiumLeaguesTab from './_components/premium-leagues-tab';
 
 /**
- * Leagues — Duolingo-style XP League is the main experience: players are
- * seeded into a tier by rating, earn XP from every PvP game, and the top
- * 5 in each tier are rewarded + promoted weekly (Monday 00:00 CAT reset).
- * The premium weekend fixture leagues remain available in a secondary tab.
+ * Leagues — the Duolingo-style XP League is the one and only league
+ * system: players earn XP from every PvP game, climb their tier, and
+ * the top performers are rewarded + promoted weekly (Monday 00:00 CAT).
+ * The old weekend fixture leagues have been fully retired.
  */
 export default function CompetePage() {
-  const [tab, setTab] = useState<'xp' | 'weekend'>('xp');
-
   return (
     <div className="space-y-5 pb-20 sm:pb-0">
       {/* Clean header — matches history page style */}
@@ -24,23 +21,11 @@ export default function CompetePage() {
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setTab('xp')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${tab === 'xp' ? 'bg-ccb-primary text-white shadow' : 'bg-ccb-muted/10 text-ccb-muted hover:bg-ccb-muted/15'}`}
-        >
-          <Zap className="w-4 h-4" /> XP League
-        </button>
-        <button
-          onClick={() => setTab('weekend')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${tab === 'weekend' ? 'bg-ccb-primary text-white shadow' : 'bg-ccb-muted/10 text-ccb-muted hover:bg-ccb-muted/15'}`}
-        >
-          <Swords className="w-4 h-4" /> Weekend Leagues
-        </button>
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-ccb-primary/10 text-sm font-bold text-ccb-primary w-fit">
+        <Zap className="w-4 h-4" /> XP League
       </div>
 
-      {tab === 'xp' ? <XpLeagueTab /> : <PremiumLeaguesTab />}
+      <XpLeagueTab />
     </div>
   );
 }

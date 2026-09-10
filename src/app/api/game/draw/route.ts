@@ -5,7 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Chess } from "chess.js";
 import { settleBattle } from "@/lib/battles/settle";
 import { processTournamentGameResult } from "@/lib/tournament/results";
-import { processLeagueGameResult } from "@/lib/league/process-game-result";
 
 export async function POST(req: NextRequest) {
   try {
@@ -147,22 +146,6 @@ export async function POST(req: NextRequest) {
           });
         } catch (e) {
           console.error("[draw] Tournament processing failed for game", gameId, e);
-        }
-      }
-
-      // Process league game result if this is a league fixture game
-      const { data: leagueGame } = await admin.from("games").select("league_fixture_id").eq("id", gameId).maybeSingle();
-      if (leagueGame?.league_fixture_id) {
-        try {
-          await processLeagueGameResult({
-            gameId,
-            whitePlayerId: game.white_player_id,
-            blackPlayerId: game.black_player_id,
-            winner: "draw",
-            status: "draw",
-          });
-        } catch (e) {
-          console.error("[draw] League processing failed for game", gameId, e);
         }
       }
 

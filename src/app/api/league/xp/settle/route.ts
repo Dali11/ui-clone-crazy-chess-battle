@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getLeagueXpConfig, currentWeekStart, rewardsArray } from "@/lib/league-xp";
+import { getLeagueXpConfig, currentWeekStart, rewardsForTier } from "@/lib/league-xp";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -54,7 +54,6 @@ async function runSettlement() {
     return NextResponse.json({ ok: true, skipped: "not at cycle boundary", week: curWeek });
   }
   const newWeek = curWeek;
-  const rewards = cfg.rewards_enabled ? rewardsArray(cfg) : [0, 0, 0, 0, 0];
 
   const { data: members, error } = await admin
     .from("league_xp_members")
@@ -73,6 +72,8 @@ async function runSettlement() {
   // (no games this week → 0 XP by definition, still reset and eligible
   // for demotion).
   for (const tier of [1, 2, 3, 4, 5]) {
+    // Configurable payout per league — each tier has its own reward set.
+    const rewards = cfg.rewards_enabled ? rewardsForTier(cfg, tier) : [0, 0, 0, 0, 0];
     const tierMembers = (members ?? []).filter((m) => m.tier === tier);
     const active = tierMembers.filter((m) => m.week_start === closingWeek);
     const ranked = [

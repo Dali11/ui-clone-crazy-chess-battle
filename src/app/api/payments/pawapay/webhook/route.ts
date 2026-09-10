@@ -57,25 +57,6 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ received: true, message: "Already processing" });
         }
 
-        // Check if this is a membership payment
-        const isMembership = deposit.reference?.startsWith("membership:");
-
-        if (isMembership) {
-          await admin
-            .from("deposits")
-            .update({ status: "success", updated_at: new Date().toISOString() })
-            .eq("id", deposit.id);
-
-          // activateMembership is imported lazily to avoid circular deps
-          const { activateMembership } = await import("@/lib/league/membership");
-          try {
-            await activateMembership(admin, deposit.user_id, (deposit as any).pawapay_ref || (deposit as any).charge_id || body.depositId, deposit.reference);
-          } catch (err) {
-            console.error("PawaPay webhook membership activation failed:", err);
-          }
-          return NextResponse.json({ received: true, message: "Membership activated" });
-        }
-
         // Normal deposit — credit wallet
         await admin.rpc("credit_wallet", {
           p_user_id: deposit.user_id,

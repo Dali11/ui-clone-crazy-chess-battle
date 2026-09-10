@@ -384,7 +384,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
             </div>
             <div>
               <label className="text-sm font-medium block mb-2">Gender Identity</label>
-              <p className="text-xs text-ccb-muted mb-2.5">Determines which league divisions you're eligible for.</p>
+              <p className="text-xs text-ccb-muted mb-2.5">Part of your player profile.</p>
               <div className={`flex items-center gap-2 px-3 py-2 rounded-xl mb-2.5 text-xs font-medium ${identityVerified ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30" : "bg-ccb-surface text-ccb-muted border border-ccb-border"}`}>
                 {identityVerified ? <><CheckCircle className="w-3.5 h-3.5" /> Identity verified</> : <><AlertCircle className="w-3.5 h-3.5" /> Not verified</>}
               </div>
@@ -427,16 +427,6 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
               {profile?.chesscom_verified ? <span className="text-xs px-2.5 py-1 rounded-lg bg-ccb-success/10 text-ccb-success border border-ccb-success/30 font-medium">Verified</span> : <Link href="/signup?step=2" className="text-xs px-3 py-1.5 rounded-lg bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30 font-medium hover:bg-ccb-primary/20">Link</Link>}
             </div>
           </SectionCard>
-          <SectionCard title="Division & Season">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between py-2"><span className="text-sm text-ccb-muted">Current Division</span><span className="text-sm font-medium">{country || "Set country first"}</span></div>
-              <div className="flex items-center justify-between py-2"><span className="text-sm text-ccb-muted">Season</span><span className="text-sm font-medium">Season 1 — 2026</span></div>
-              <div className="flex items-center justify-between py-2"><span className="text-sm text-ccb-muted">Season Points</span><span className="text-sm font-medium">0 pts</span></div>
-            </div>
-          </SectionCard>
-          <SectionCard title="Membership">
-            <div className="flex items-center justify-between"><div><p className="text-sm font-medium">Status</p><p className="text-xs text-ccb-muted mt-0.5">No active membership</p></div><Link href="/league/subscribe" className="text-xs px-3 py-1.5 rounded-lg bg-ccb-primary text-white font-medium hover:bg-ccb-primary/90">Join League</Link></div>
-          </SectionCard>
         </div>
       )}
 
@@ -446,7 +436,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
             <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl mb-4 text-xs font-medium ${identityVerified ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30" : "bg-ccb-surface text-ccb-muted border border-ccb-border"}`}>
               {identityVerified ? <><CheckCircle className="w-4 h-4" /> Verified</> : <><AlertCircle className="w-4 h-4" /> Not verified</>}
             </div>
-            <p className="text-sm text-ccb-muted mb-4">Verify to unlock gender-restricted leagues and competitive tournaments. Documents are reviewed by admins and kept confidential.</p>
+            <p className="text-sm text-ccb-muted mb-4">Verify your identity to unlock competitive tournaments. Documents are reviewed by admins and kept confidential.</p>
             <div className="space-y-2">
               <div className="flex items-center gap-2"><div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${idDocUploaded ? "bg-ccb-success text-white" : "bg-ccb-surface border border-ccb-border text-ccb-muted"}`}>{idDocUploaded ? "✓" : "1"}</div><p className="text-sm font-medium">Government ID</p></div>
               <p className="text-xs text-ccb-muted pl-9">National ID, passport, or driver's license</p>

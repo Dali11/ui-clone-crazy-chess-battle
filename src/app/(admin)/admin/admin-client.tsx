@@ -11,7 +11,6 @@ import {
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
   Settings, FileText, SlidersHorizontal, Database, ChevronDown,
 } from "lucide-react";
-import LeagueManager from "./league-manager";
 import PlatformSettingsPanel from "./platform-settings-panel";
 import UserDetailModal from "./user-detail-modal";
 import { type Withdrawal, type Stats, type UserInfo, type Deposit, type Tournament, type GameInfo, type AdminLog, type Tab, localToUTC, utcToLocalInput } from "./types";
@@ -38,11 +37,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [overrideGame, setOverrideGame] = useState<GameInfo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [adminLeagues, setAdminLeagues] = useState<any[]>([]);
   const [marketConfigs, setMarketConfigs] = useState<any[]>([]);
-  const [marketEdits, setMarketEdits] = useState<Record<string, any>>({});
-  const [adminSeasons, setAdminSeasons] = useState<any[]>([]);
-  const [leagueEdits, setLeagueEdits] = useState<Record<string, any>>({});
   const [newSeason, setNewSeason] = useState({ name: "", country: "MW", start_date: "", end_date: "" });
   const [withdrawalFilter, setWithdrawalFilter] = useState("pending");
   const [depositFilter, setDepositFilter] = useState("all");
@@ -190,96 +185,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     finally { setActionLoading(null); }
   };
 
-  const fetchAdminLeagues = useCallback(async () => {
-    const res = await fetch("/api/admin/leagues");
-    if (res.ok) {
-      const data = await res.json();
-      setAdminLeagues(data);
-      const edits: Record<string, any> = {};
-      data.forEach((l: any) => {
-        edits[l.id] = { prize_pool: l.prize_pool, league_size: l.league_size, promotes_count: l.promotes_count, relegates_count: l.relegates_count, qualifying_positions: l.qualifying_positions, status: l.status };
-      });
-      setLeagueEdits(edits);
-    }
-  }, []);
-
-  const fetchAdminSeasons = useCallback(async () => {
-    const res = await fetch("/api/admin/seasons");
-    if (res.ok) setAdminSeasons(await res.json());
-  }, []);
-
-  const saveLeague = async (leagueId: string) => {
-    setActionLoading(leagueId);
-    try {
-      const res = await fetch(`/api/admin/leagues/${leagueId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(leagueEdits[leagueId]),
-      });
-      if (res.ok) {
-        showToast("League updated");
-        await fetchAdminLeagues();
-      }
-    } catch {} finally { setActionLoading(null); }
-  };
-
-  const createSeason = async () => {
-    setActionLoading("new-season");
-    try {
-      const res = await fetch("/api/admin/seasons", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newSeason),
-      });
-      if (res.ok) {
-        showToast("Season created");
-        setNewSeason({ name: "", country: "MW", start_date: "", end_date: "" });
-        await fetchAdminSeasons();
-      }
-    } catch {} finally { setActionLoading(null); }
-  };
-
-  const updateSeason = async (seasonId: string, status: string) => {
-    setActionLoading(seasonId);
-    try {
-      const res = await fetch(`/api/admin/seasons/${seasonId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (res.ok) {
-        showToast(`Season ${status === "active" ? "activated" : "completed"}`);
-        await fetchAdminSeasons();
-      }
-    } catch {} finally { setActionLoading(null); }
-  };
-  const fetchMarketConfigs = useCallback(async () => {
-    const res = await fetch("/api/admin/market-config");
-    if (res.ok) {
-      const data = await res.json();
-      setMarketConfigs(data);
-      const edits: Record<string, any> = {};
-      data.forEach((c: any) => {
-        edits[c.country_code] = { membership_price: c.membership_price, membership_currency: c.membership_currency, membership_active: c.membership_active };
-      });
-      setMarketEdits(edits);
-    }
-  }, []);
-
-  const saveMarketConfig = async (countryCode: string) => {
-    setActionLoading(countryCode);
-    try {
-      const res = await fetch("/api/admin/market-config", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ country_code: countryCode, ...marketEdits[countryCode] }),
-      });
-      if (res.ok) {
-        showToast("Membership pricing updated");
-        await fetchMarketConfigs();
-      }
-    } catch {} finally { setActionLoading(null); }
-  };
   useEffect(() => {
     if (tab === "verification") fetchVerificationPlayers();
   }, [verificationFilter]);
@@ -295,9 +200,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       if (tab === "logs") await fetchLogs();
       if (tab === "battles") await fetchBattleStats();
       
-      if (tab === "leagues") await fetchAdminLeagues();
-      if (tab === "seasons") await fetchAdminSeasons();
-      if (tab === "membership") await fetchMarketConfigs();
       if (tab === "verification") await fetchVerificationPlayers();
       setLoading(false);
     };
@@ -839,7 +741,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       await fetchGames();
-      const suffix = data.tournamentRecorded ? " — tournament updated" : data.leagueRecorded ? " — league standings updated" : "";
+      const suffix = data.tournamentRecorded ? " — tournament updated" : "";
       showToast(`Result set: ${winnerLabel}${suffix}`);
     } finally {
       setActionLoading(null);
@@ -894,8 +796,6 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     { id: "battles", label: "Battles", icon: Swords },
     { id: "logs", label: "Logs", icon: ScrollText },
     { id: "leagues", label: "Leagues", icon: Crown },
-    { id: "seasons", label: "Seasons", icon: Calendar },
-    { id: "membership", label: "Membership", icon: Crown },
     { id: "verification", label: "Verification", icon: ShieldCheck },
     { id: "settings", label: "Settings", icon: Settings },
   ];
@@ -947,8 +847,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {[
             { label: null, items: ["overview"] },
             { label: "Financial", items: ["deposits", "withdrawals", "battles"] },
-            { label: "Compete", items: ["tournaments", "games", "leagues", "seasons"] },
-            { label: "Community", items: ["users", "membership", "verification"] },
+            { label: "Compete", items: ["tournaments", "games", "leagues"] },
+            { label: "Community", items: ["users", "verification"] },
             { label: "System", items: ["logs", "settings"] },
           ].map((group, gi) => {
             const groupTabs = group.items
@@ -1460,134 +1360,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* LEAGUES MANAGEMENT */}
           {tab === "leagues" && (
             <div className="space-y-4">
-              <PlatformSettingsPanel section="leagues" />
-              <LeagueManager />
+              <PlatformSettingsPanel section="leagues_xp" />
             </div>
           )}
 
-          {/* SEASONS MANAGEMENT */}
-          {tab === "seasons" && (
-            <div className="space-y-4">
-              <PlatformSettingsPanel section="seasons" />
-              {/* Create new season */}
-              <div className="card space-y-3">
-                <h3 className="text-sm font-bold flex items-center gap-2"><Calendar className="w-4 h-4 text-ccb-primary" /> Create New Season</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <input type="text" placeholder="Season name" value={newSeason.name} onChange={(e) => setNewSeason((p) => ({ ...p, name: e.target.value }))} className="px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm col-span-2" />
-                  <select value={newSeason.country} onChange={(e) => setNewSeason((p) => ({ ...p, country: e.target.value }))} className="px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm">
-                    <option value="MW">Malawi</option>
-                    <option value="ZM">Zambia</option>
-                    <option value="KE">Kenya</option>
-                    <option value="NG">Nigeria</option>
-                    <option value="ZA">South Africa</option>
-                    <option value="GLOBAL">Global</option>
-                  </select>
-                  <input type="date" value={newSeason.start_date} onChange={(e) => setNewSeason((p) => ({ ...p, start_date: e.target.value }))} className="px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm" />
-                  <input type="date" value={newSeason.end_date} onChange={(e) => setNewSeason((p) => ({ ...p, end_date: e.target.value }))} className="px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm col-span-2 sm:col-span-1" />
-                </div>
-                <ActionButton onClick={createSeason} loading={actionLoading === "new-season"} variant="primary">Create Season</ActionButton>
-              </div>
-              {/* Existing seasons */}
-              {adminSeasons.length === 0 ? (
-                <div className="text-center py-8 text-ccb-muted text-sm">
-                  <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  No seasons yet
-                </div>
-              ) : (
-                adminSeasons.map((season: any) => (
-                  <div key={season.id} className="card flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-sm">{season.name}</span>
-                      <span className="text-xs text-ccb-muted ml-2">{season.country} · {season.start_date} to {season.end_date}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${season.status === "active" ? "bg-ccb-success/10 text-ccb-success" : season.status === "completed" ? "bg-ccb-surface text-ccb-muted" : "bg-ccb-accent/10 text-ccb-accent"}`}>{season.status}</span>
-                      {season.status !== "active" && season.status !== "completed" && (
-                        <ActionButton onClick={() => updateSeason(season.id, "active")} loading={actionLoading === season.id} variant="success">Activate</ActionButton>
-                      )}
-                      {season.status === "active" && (
-                        <ActionButton onClick={() => updateSeason(season.id, "completed")} loading={actionLoading === season.id} variant="danger">Complete</ActionButton>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* MEMBERSHIP PRICING */}
-          {tab === "membership" && (
-            <div className="space-y-4">
-              <PlatformSettingsPanel section="membership" />
-              <div className="card p-4">
-                <h3 className="text-sm font-bold flex items-center gap-2 mb-2"><Crown className="w-4 h-4 text-ccb-primary" /> Membership Pricing</h3>
-                <p className="text-xs text-ccb-muted">Configure the monthly membership fee for each market. Players pay this to access Premium Leagues and exclusive competitions. Yearly pricing is automatically calculated as 10x monthly (2 months free).</p>
-              </div>
-              {marketConfigs.length === 0 ? (
-                <div className="text-center py-8 text-ccb-muted text-sm">
-                  <Crown className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  No market configs found. Run database migrations first.
-                </div>
-              ) : (
-                marketConfigs.map((config: any) => (
-                  <div key={config.country_code} className="card space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold">{config.country_name}</span>
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-ccb-surface text-ccb-muted">{config.country_code}</span>
-                        {config.is_default && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-ccb-primary/10 text-ccb-primary">DEFAULT</span>}
-                      </div>
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${config.membership_active ? "bg-ccb-success/10 text-ccb-success" : "bg-ccb-muted/10 text-ccb-muted"}`}>
-                        {config.membership_active ? "ACTIVE" : "INACTIVE"}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-xs text-ccb-muted mb-1 block">Monthly Price (MWK)</label>
-                        <input
-                          type="number"
-                          value={marketEdits[config.country_code]?.membership_price ?? config.membership_price}
-                          onChange={(e) => setMarketEdits((p: any) => ({ ...p, [config.country_code]: { ...p[config.country_code], membership_price: e.target.value } }))}
-                          className="w-full px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm"
-                          placeholder="10000"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-ccb-muted mb-1 block">Currency</label>
-                        <input
-                          type="text"
-                          value={marketEdits[config.country_code]?.membership_currency ?? config.membership_currency}
-                          onChange={(e) => setMarketEdits((p: any) => ({ ...p, [config.country_code]: { ...p[config.country_code], membership_currency: e.target.value } }))}
-                          className="w-full px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm"
-                          placeholder="MWK"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-ccb-muted mb-1 block">Membership Active</label>
-                        <select
-                          value={marketEdits[config.country_code]?.membership_active ?? config.membership_active}
-                          onChange={(e) => setMarketEdits((p: any) => ({ ...p, [config.country_code]: { ...p[config.country_code], membership_active: e.target.value === "true" } }))}
-                          className="w-full px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm"
-                        >
-                          <option value="true">Active</option>
-                          <option value="false">Inactive</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-ccb-muted">
-                        Display: <span className="text-ccb-text font-medium">
-                          {Math.floor(marketEdits[config.country_code]?.membership_price ?? config.membership_price).toLocaleString()}
-                          {" "}{marketEdits[config.country_code]?.membership_currency ?? config.membership_currency}/month
-                        </span>
-                      </span>
-                      <ActionButton onClick={() => saveMarketConfig(config.country_code)} loading={actionLoading === config.country_code} variant="primary">Save</ActionButton>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
         </>
       )}
 

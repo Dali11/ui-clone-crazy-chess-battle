@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { activateMembership } from "@/lib/league/membership";
 
 // PayChangu signs webhooks with HMAC-SHA256 of the raw JSON body, using the
 // webhook secret from the dashboard. The digest is sent in the "Signature" header.
@@ -84,24 +83,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true, message: "Already processing" });
       }
 
-      // We won the race — check if this is a membership payment
-      const isMembership = deposit.reference?.startsWith('membership:');
-
-      if (isMembership) {
-        // Membership payments don't credit the wallet. Activate the membership
-        // right here (idempotent — client-side verify polling may also race
-        // this, activateMembership() handles that safely).
-        await admin
-          .from('deposits')
-          .update({ status: 'success', updated_at: new Date().toISOString() })
-          .eq('id', deposit.id);
-        try {
-          await activateMembership(admin, deposit.user_id, chargeId, deposit.reference);
-        } catch (err) {
-          console.error('Webhook membership activation failed:', err);
-        }
-        return NextResponse.json({ received: true, message: 'Membership payment confirmed and activated' });
-      }
+      // We won the race. (Weekend-league membership payments are retired —
+      // nothing creates membership: references anymore; every deposit now
+      // credits the wallet.)
 
       // Normal deposit — credit wallet
       await admin.rpc('credit_wallet', {

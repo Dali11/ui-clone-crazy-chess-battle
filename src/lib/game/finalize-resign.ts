@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processTournamentGameResult } from "@/lib/tournament/results";
-import { processLeagueGameResult } from "@/lib/league/process-game-result";
 import { settleBattle } from "@/lib/battles/settle";
 import { awardGameXp } from "@/lib/league-xp/award";
 
@@ -114,10 +113,10 @@ export async function finalizeResign(opts: {
     admin,
   }).catch(() => {});
 
-  // ── Tournament / league result processing ─────────────────────────────
+  // ── Tournament result processing ─────────────────────────────
   const { data: fullGame } = await admin
     .from("games")
-    .select("tournament_id, league_fixture_id")
+    .select("tournament_id")
     .eq("id", gameId)
     .single();
 
@@ -132,20 +131,6 @@ export async function finalizeResign(opts: {
       });
     } catch (e) {
       console.error("[finalizeResign] Tournament processing failed for game", gameId, e);
-    }
-  }
-
-  if (fullGame?.league_fixture_id) {
-    try {
-      await processLeagueGameResult({
-        gameId,
-        whitePlayerId,
-        blackPlayerId,
-        winner,
-        status: "resign",
-      });
-    } catch (e) {
-      console.error("[finalizeResign] League processing failed for game", gameId, e);
     }
   }
 

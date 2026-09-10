@@ -2,7 +2,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { canSideMate } from "@/lib/game/mating-material";
 import { settleBattle } from "@/lib/battles/settle";
 import { processTournamentGameResult } from "@/lib/tournament/results";
-import { processLeagueGameResult } from "@/lib/league/process-game-result";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -128,19 +127,6 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
       }).eq("id", game.black_player_id);
     }
 
-    // League fixtures support draws
-    try {
-      await processLeagueGameResult({
-        gameId: game.id,
-        whitePlayerId: game.white_player_id,
-        blackPlayerId: game.black_player_id,
-        winner: "draw",
-        status: "draw",
-      });
-    } catch (e) {
-      console.error("[timeout] League processing failed for draw game", game.id, e);
-    }
-
     // Battle: the game itself is a draw, so the battle follows the standard
     // battle-draw flow — armageddon decider round (or refund after max
     // rounds). If THIS game is already the armageddon decider, the draw
@@ -221,18 +207,6 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
     }
   }
 
-  // League fixture processing
-  try {
-    await processLeagueGameResult({
-      gameId: game.id,
-      whitePlayerId: game.white_player_id,
-      blackPlayerId: game.black_player_id,
-      winner: winner as "white" | "black",
-      status: "timeout",
-    });
-  } catch (e) {
-    console.error("[timeout] League processing failed for game", game.id, e);
-  }
 
   // Battle settlement
   if (battle) {

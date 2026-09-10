@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processTournamentGameResult, findPairingForPlayers } from "@/lib/tournament/results";
-import { processLeagueGameResult } from "@/lib/league/process-game-result";
 
 // GET — list recent games with player info
 export async function GET(req: NextRequest) {
@@ -83,7 +82,6 @@ export async function PATCH(req: NextRequest) {
     if (!gameId || !action) return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
 
     let tournamentRecorded = false;
-    let leagueRecorded = false;
 
     if (action === "abort") {
       const { data: abortGame } = await admin
@@ -109,7 +107,7 @@ export async function PATCH(req: NextRequest) {
 
       const { data: game, error: gameErr } = await admin
         .from("games")
-        .select("id, status, white_player_id, black_player_id, winner, rated, tournament_id, tournament_round, league_fixture_id")
+        .select("id, status, white_player_id, black_player_id, winner, rated, tournament_id, tournament_round")
         .eq("id", gameId)
         .single();
 
@@ -157,20 +155,6 @@ export async function PATCH(req: NextRequest) {
               { status: 409 }
             );
           }
-        }
-      }
-
-      if (game.league_fixture_id) {
-        const { data: fixture } = await admin
-          .from("league_fixtures")
-          .select("played")
-          .eq("id", game.league_fixture_id)
-          .single();
-        if (fixture?.played) {
-          return NextResponse.json(
-            { error: "This league fixture already has a recorded result. Overriding would desync standings — reset the fixture first." },
-            { status: 409 }
-          );
         }
       }
 
@@ -228,20 +212,6 @@ export async function PATCH(req: NextRequest) {
           console.error("Admin override tournament processing failed:", err);
         }
       }
-      if (game.league_fixture_id) {
-        try {
-          await processLeagueGameResult({
-            gameId,
-            whitePlayerId: game.white_player_id,
-            blackPlayerId: game.black_player_id,
-            winner,
-            status: "admin_override",
-          });
-          leagueRecorded = true;
-        } catch (err) {
-          console.error("Admin override league processing failed:", err);
-        }
-      }
     } else {
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
@@ -256,7 +226,7 @@ export async function PATCH(req: NextRequest) {
       });
     } catch {}
 
-    return NextResponse.json({ success: true, tournamentRecorded, leagueRecorded });
+    return NextResponse.json({ success: true, tournamentRecorded });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Failed" }, { status: 500 });
   }

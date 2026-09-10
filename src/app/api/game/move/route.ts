@@ -1,5 +1,4 @@
 import { processTournamentGameResult } from "@/lib/tournament/results";
-import { processLeagueGameResult } from "@/lib/league/process-game-result";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { validateAndApplyMove } from "@/lib/game/chess-engine";
@@ -198,24 +197,6 @@ export async function POST(req: NextRequest) {
         });
       } catch (e) {
         console.error("[move] Tournament processing failed for game", gameId, e);
-      }
-    }
-
-    // Process league game result if this is a league fixture game
-    if (gameEnded && result.winner) {
-      const { data: leagueGame } = await admin.from("games").select("league_fixture_id").eq("id", gameId).maybeSingle();
-      if (leagueGame?.league_fixture_id) {
-        try {
-          await processLeagueGameResult({
-            gameId,
-            whitePlayerId: game.white_player_id,
-            blackPlayerId: game.black_player_id,
-            winner: result.winner as "white" | "black" | "draw",
-            status: result.status || "playing",
-          });
-        } catch (e) {
-          console.error("[move] League processing failed for game", gameId, e);
-        }
       }
     }
 

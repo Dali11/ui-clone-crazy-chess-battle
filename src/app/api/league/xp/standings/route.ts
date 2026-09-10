@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getLeagueXpConfig, currentWeekStart, nextWeekStart, LEAGUE_TIERS, rewardsArray } from "@/lib/league-xp";
+import { getLeagueXpConfig, currentWeekStart, nextWeekStart, LEAGUE_TIERS, rewardsForTier, allTierRewards } from "@/lib/league-xp";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,8 @@ export async function GET(_req: NextRequest) {
         seeded: false,
         enabled: cfg.enabled,
         xpRules: { win: cfg.xp_win, draw: cfg.xp_draw, loss: cfg.xp_loss, upsetBonus: cfg.xp_upset_bonus, dailyCap: cfg.daily_xp_cap },
-        rewards: cfg.rewards_enabled ? rewardsArray(cfg) : [],
+        rewards: cfg.rewards_enabled ? rewardsForTier(cfg, 1) : [],
+        tierRewards: cfg.rewards_enabled ? allTierRewards(cfg) : {},
         tiers: LEAGUE_TIERS,
       });
     }
@@ -75,7 +76,9 @@ export async function GET(_req: NextRequest) {
       cycleEnd: nextWeekStart(),
       standings,
       xpRules: { win: cfg.xp_win, draw: cfg.xp_draw, loss: cfg.xp_loss, upsetBonus: cfg.xp_upset_bonus, dailyCap: cfg.daily_xp_cap },
-      rewards: cfg.rewards_enabled ? rewardsArray(cfg) : [],
+      // Payout for the player's own league; tierRewards covers all leagues.
+      rewards: cfg.rewards_enabled ? rewardsForTier(cfg, member.tier) : [],
+      tierRewards: cfg.rewards_enabled ? allTierRewards(cfg) : {},
       tiers: LEAGUE_TIERS,
     });
   } catch (err) {
