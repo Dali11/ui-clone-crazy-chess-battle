@@ -14,9 +14,15 @@ import { useEffect, useRef, useState } from "react";
  *    which would otherwise wipe the host page when executed after load.
  *    Iframe isolation also prevents atOptions collisions when two
  *    different ad units render on the same page.
- *  - The config is fetched once per page load and shared by every slot.
  *  - Lazy by construction: mounting an AdSlot (e.g. on the results screen)
- *    is what triggers the fetch/render — ads never load during gameplay.
+ *    is what renders the ad — ads never display during gameplay.
+ *
+ * Speed (the ad chain is 3 serial round-trips: config → invoke.js → banner):
+ *  - The config fetch and a preload of each snippet's invoke.js are kicked
+ *    off at module-eval time, i.e. when the host page (game page, lobby,
+ *    live) first loads — long before a result screen appears. Warming the
+ *    script file (DNS+TLS+HTTP cache) does NOT render an ad and does not
+ *    count an impression; only the actual slot render does.
  */
 
 export type AdPlacement =
@@ -50,6 +56,60 @@ function loadAdsConfig(): Promise<AdsConfig | null> {
   }
   return configPromise;
 }
+
+/* ---------- Early warm-up: config + invoke.js preload ---------- */
+
+function extractScriptUrls(html: string): string[] {
+  const urls: string[] = [];
+  const re = /src\s*=\s*["\']([^"\']+)["\']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const u = m[1];
+    if (u.startsWith("http")) urls.push(u);
+  }
+  return urls;
+}
+
+function warmUpAdNetworks(cfg: AdsConfig | null) {
+  if (!cfg?.enabled) return;
+  const seenOrigins = new Set<string>();
+  const head = document.head;
+  const id = "ccb-ad-warmup";
+  // Replace any previous warmup links (config may have changed).
+  head.querySelectorAll(`link[data-ccb-ad-warmup]`).forEach((l) => l.remove());
+
+  for (const p of Object.values(cfg.placements ?? {})) {
+    if (!p?.enabled || !p.script) continue;
+    for (const url of extractScriptUrls(p.script)) {
+      let origin: string;
+      try { origin = new URL(url).origin; } catch { continue; }
+      if (!seenOrigins.has(origin)) {
+        seenOrigins.add(origin);
+        const pc = document.createElement("link");
+        pc.rel = "preconnect";
+        pc.href = origin;
+        pc.crossOrigin = "anonymous";
+        pc.dataset.ccbAdWarmup = "1";
+        head.appendChild(pc);
+      }
+      const pl = document.createElement("link");
+      pl.rel = "preload";
+      pl.as = "script";
+      pl.href = url;
+      pl.dataset.ccbAdWarmup = "1";
+      head.appendChild(pl);
+    }
+  }
+}
+
+if (typeof window !== "undefined") {
+  // Module-eval prefetch: this module is imported by the game/lobby/live
+  // pages, so the tiny config JSON + the ad invoke script (file only,
+  // never executed here) are fetched as soon as the page loads.
+  loadAdsConfig().then(warmUpAdNetworks).catch(() => {});
+}
+
+/* ---------- Component ---------- */
 
 export default function AdSlot({
   placement,
@@ -103,8 +163,12 @@ export default function AdSlot({
       } catch { /* cross-origin render — leave default */ }
     };
     iframe.addEventListener("load", fitHeight);
-    const t = window.setTimeout(fitHeight, 1200); // late banners
-    return () => window.clearTimeout(t);
+    // Ad networks render their banner in a nested iframe that can pop in
+    // late — re-check the height a few times after load.
+    const timers = [300, 800, 1600, 3000, 5000].map((ms) =>
+      window.setTimeout(fitHeight, ms)
+    );
+    return () => timers.forEach((t) => window.clearTimeout(t));
   }, [script]);
 
   if (!script) return null;
