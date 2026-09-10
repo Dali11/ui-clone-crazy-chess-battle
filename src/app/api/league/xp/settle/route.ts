@@ -13,7 +13,7 @@ export const maxDuration = 60;
  *   - top `promote_count` (default 5): credited their rank reward to the
  *     wallet (credit_wallet RPC, same path as battle payouts) and
  *     promoted one tier (except Queen — top tier stays).
- *   - bottom `demote_count` (default 5): demoted one tier (except Pawn).
+ *   - bottom `demote_count` (default 5): demoted one tier (except Open League).
  *   - every member's XP resets for the new week and a history snapshot is
  *     written (league_xp_history).
  * Idempotent guard: members already on the new week are skipped, so a

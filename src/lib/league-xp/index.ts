@@ -4,29 +4,27 @@ import { DEFAULT_CONFIGS } from "@/lib/platform-config";
 /**
  * Duolingo-style XP Leagues.
  *
- * Players are seeded into a tier by Elo on their first PvP game, then
- * earn XP from every finished PvP game (chess + draughts — bot/computer
- * games never count, so XP cannot be farmed). Standings reset weekly
- * (Monday 00:00 CAT); the settle cron rewards and promotes the top 5
- * and demotes the bottom 5 of each tier.
+ * Everyone who joins starts in the Open League (tier 1) — the founding
+ * members were Elo-seeded once at launch; tiers move only through
+ * weekly results from then on. Players earn XP from every finished PvP
+ * game (chess + draughts — bot/computer games never count, so XP cannot
+ * be farmed). Standings reset weekly (Monday 00:00 CAT); the settle cron
+ * rewards and promotes the top 5 and demotes the bottom 5 of each tier.
  */
 
 // CAT is UTC+2 year-round (no DST) — a fixed offset is exact.
 export const CAT_OFFSET_MS = 2 * 60 * 60 * 1000;
 
 export const LEAGUE_TIERS = [
-  { tier: 1, name: "Pawn League", emoji: "♟️" },
-  { tier: 2, name: "Knight League", emoji: "♞" },
-  { tier: 3, name: "Bishop League", emoji: "♝" },
-  { tier: 4, name: "Rook League", emoji: "♜" },
-  { tier: 5, name: "Queen League", emoji: "♛" },
+  { tier: 1, name: "Open League", emoji: "🌍" },
+  { tier: 2, name: "Amateur League", emoji: "🎯" },
+  { tier: 3, name: "Bronze League", emoji: "🥉" },
+  { tier: 4, name: "Knights Championship", emoji: "♞" },
+  { tier: 5, name: "Premier League", emoji: "🏆" },
 ] as const;
 
-/** Elo seeding: 400-649 Pawn · 650-899 Knight · 900-1149 Bishop · 1150-1399 Rook · 1400+ Queen */
-export function tierFromElo(elo: number): number {
-  const t = Math.floor((elo - 400) / 250) + 1;
-  return Math.min(5, Math.max(1, t));
-}
+/** Everyone who joins after launch starts in the Open League (tier 1). */
+export const ENTRY_TIER = 1;
 
 export interface LeagueXpConfig {
   enabled: boolean;

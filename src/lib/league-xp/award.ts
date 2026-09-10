@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { currentWeekStart, getLeagueXpConfig, tierFromElo } from "./index";
+import { currentWeekStart, getLeagueXpConfig, ENTRY_TIER } from "./index";
 
 /**
  * Idempotent XP award for a finished PvP game. Safe to call from every
@@ -110,18 +110,17 @@ export async function awardGameXp(opts: {
     if (insertError || !inserted?.length) return; // conflict => already processed
 
     // Upsert memberships + add XP.
-    const playerRows = [
-      { id: g.white_player_id, rating: white.rating },
-      { id: g.black_player_id, rating: black.rating },
-    ];
+    const playerRows = [g.white_player_id, g.black_player_id];
     for (const p of playerRows) {
-      const grant = inserted.find((e) => e.user_id === p.id);
+      const grant = inserted.find((e) => e.user_id === p);
       if (!grant) continue;
-      const { data: member } = await admin.from("league_xp_members").select("*").eq("user_id", p.id).maybeSingle();
+      const { data: member } = await admin.from("league_xp_members").select("*").eq("user_id", p).maybeSingle();
       if (!member) {
+        // Everyone who joins after the league has started enters in the
+        // Open League and climbs through weekly promotion only.
         await admin.from("league_xp_members").insert({
-          user_id: p.id,
-          tier: tierFromElo(p.rating ?? 400),
+          user_id: p,
+          tier: ENTRY_TIER,
           xp: grant.amount,
           week_start: week,
         });
@@ -129,13 +128,13 @@ export async function awardGameXp(opts: {
         await admin
           .from("league_xp_members")
           .update({ xp: (member.xp ?? 0) + grant.amount, updated_at: new Date().toISOString() })
-          .eq("user_id", p.id);
+          .eq("user_id", p);
       } else {
         // Stale week (user played before this week's cron reset ran) — fresh cycle.
         await admin
           .from("league_xp_members")
           .update({ xp: grant.amount, week_start: week, updated_at: new Date().toISOString() })
-          .eq("user_id", p.id);
+          .eq("user_id", p);
       }
     }
   } catch (err) {

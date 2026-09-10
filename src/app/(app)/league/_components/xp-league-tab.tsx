@@ -235,8 +235,8 @@ export default function XpLeagueTab() {
           <div className="px-4 pb-4 space-y-2 text-xs text-ccb-muted leading-relaxed">
             <p>Every finished game earns XP — wins <b className="text-ccb-text">{rules.win} XP</b>, draws <b className="text-ccb-text">{rules.draw} XP</b>, losses <b className="text-ccb-text">{rules.loss} XP</b>. Beat a higher-rated player for <b className="text-ccb-text">+{rules.upsetBonus} XP</b> extra.</p>
             <p>To keep it fair, you can earn at most <b className="text-ccb-text">{rules.dailyCap} XP per day</b>, and games against the computer never count.</p>
-            <p>Standings reset <b className="text-ccb-text">every Monday at 00:00 CAT</b>. The top {promote} players in each league are rewarded and promoted to the next league up; the bottom {demote} are demoted. Queen League champions stay on top.</p>
-            <p>Your league is seeded from your rating: Pawn, Knight, Bishop, Rook, and Queen.</p>
+            <p>Standings reset <b className="text-ccb-text">every Monday at 00:00 CAT</b>. The top {promote} players in each league are rewarded and promoted to the next league up; the bottom {demote} are demoted. Premier League champions stay on top.</p>
+            <p>Everyone who joins starts in the Open League and climbs the ladder — Open → Amateur → Bronze → Knights Championship → Premier League.</p>
           </div>
         )}
       </div>
