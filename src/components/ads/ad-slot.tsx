@@ -156,38 +156,15 @@ export default function AdSlot({
     );
     doc.close();
 
-    // Mobile scale-down: on small screens the banner is visually halved
-    // (user request — less intrusive). This is a pure CSS transform on the
-    // iframe: Adsterra still loads the creative at full size, so
-    // impression counting and click tracking inside their nested iframe
-    // are completely unaffected — only the rendered pixels shrink. The
-    // wrapper height is collapsed to the scaled height so no blank space
-    // is left under the ad.
-    const MOBILE_MAX_W = 640;
-    const MOBILE_SCALE = 0.5;
-    let scaleListener: (() => void) | null = null;
-
-    const applyScale = (h: number) => {
-      if (scaleListener) window.removeEventListener("resize", scaleListener);
-      const apply = () => {
-        const m = window.innerWidth < MOBILE_MAX_W;
-        const s = m ? MOBILE_SCALE : 1;
-        iframe.style.transform = s === 1 ? "" : `scale(${s})`;
-        iframe.style.transformOrigin = "top center";
-        host.style.height = s === 1 ? "" : `${Math.round(h * s)}px`;
-      };
-      apply();
-      scaleListener = apply;
-      window.addEventListener("resize", apply);
-    };
-
+    // Ad sizing is admin-driven: the admin panel stores whichever ad-unit
+    // snippet Adsterra generated (e.g. a 320x50 for mobile-sized screens),
+    // and we render it at its declared size — no CSS scaling here. The
+    // earlier scale-to-half transform was removed once a properly-sized
+    // 320x50 unit was configured; render the unit as-is.
     const fitHeight = () => {
       try {
         const h = iframe.contentDocument?.body?.scrollHeight || 0;
-        if (h > 0) {
-          iframe.style.height = `${h}px`;
-          applyScale(h);
-        }
+        if (h > 0) iframe.style.height = `${h}px`;
       } catch { /* cross-origin render — leave default */ }
     };
     iframe.addEventListener("load", fitHeight);
@@ -196,10 +173,7 @@ export default function AdSlot({
     const timers = [300, 800, 1600, 3000, 5000].map((ms) =>
       window.setTimeout(fitHeight, ms)
     );
-    return () => {
-      timers.forEach((t) => window.clearTimeout(t));
-      if (scaleListener) window.removeEventListener("resize", scaleListener);
-    };
+    return () => timers.forEach((t) => window.clearTimeout(t));
   }, [script]);
 
   if (!script) return null;
