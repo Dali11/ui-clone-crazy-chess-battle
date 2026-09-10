@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveTimeoutForGame } from "@/lib/game/resolve-timeout";
 import { getAbortSeconds, REPLY_ABORT_SECONDS } from "@/lib/game/abort-config";
 import { resolveDraughtsTimeout, abortDraughtsNoShow, DRAUGHTS_NO_SHOW_SECONDS } from "@/lib/game/draughts-timeout";
+import { finalizeResign } from "@/lib/game/finalize-resign";
+import { getAbandonedColor } from "@/lib/game/abandonment";
 
 // Cron sweep — checks ALL active games for:
 //   1. Early-move no-show (moves 0 and 1): mirrors the "must move" countdown
@@ -26,16 +28,17 @@ async function handleSweep(req: NextRequest) {
 
     const { data: activeGames } = await admin
       .from("games")
-      .select("id, turn, move_count, white_clock_ms, black_clock_ms, last_move_at, created_at, white_player_id, black_player_id, white_rating, black_rating, rated, tournament_id, time_control, fen")
+      .select("id, turn, move_count, white_clock_ms, black_clock_ms, last_move_at, created_at, white_player_id, black_player_id, white_rating, black_rating, rated, tournament_id, time_control, fen, white_last_seen, black_last_seen")
       .eq("status", "playing");
 
     if (!activeGames || activeGames.length === 0) {
-      return NextResponse.json({ checked: 0, timedOut: 0, aborted: 0 });
+      return NextResponse.json({ checked: 0, timedOut: 0, aborted: 0, abandoned: 0 });
     }
 
     const now = Date.now();
     let timedOut = 0;
     let aborted = 0;
+    let abandoned = 0;
 
     for (const game of activeGames) {
       // ── Early-move no-show check (moves 0 and 1) ────────────────────
@@ -76,6 +79,30 @@ async function handleSweep(req: NextRequest) {
             .maybeSingle();
 
           if (claimed) aborted++;
+          continue;
+        }
+      }
+
+      // ── Abandonment check (mid-game rage-quit) ──────────────────────
+      // Both players' presence heartbeats (refreshed by their timeout-check
+      // polls) have gone silent for 2+ minutes. The player who went silent
+      // FIRST is auto-resigned — the shared finalizeResign flow, so stakes,
+      // ratings, tournaments and leagues all settle exactly as if they had
+      // tapped Resign. Covers the case where BOTH players closed the app,
+      // where no client poll ever fires to enforce the rule.
+      const abandoner = getAbandonedColor(game, now);
+      if (abandoner) {
+        const winner = abandoner === "white" ? "black" : "white";
+        const result = await finalizeResign({
+          gameId: game.id,
+          whitePlayerId: game.white_player_id,
+          blackPlayerId: game.black_player_id,
+          winner,
+          resignedPlayerId: abandoner === "white" ? game.white_player_id : game.black_player_id,
+          admin,
+        });
+        if (result.ok) {
+          abandoned++;
           continue;
         }
       }
@@ -133,6 +160,7 @@ async function handleSweep(req: NextRequest) {
 
     return NextResponse.json({
       checked: activeGames.length,
+      abandoned,
       timedOut,
       aborted,
       draughtsChecked: draughtsGames?.length ?? 0,

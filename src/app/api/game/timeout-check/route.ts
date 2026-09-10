@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveTimeoutForGame } from "@/lib/game/resolve-timeout";
 import { getAbortSeconds, REPLY_ABORT_SECONDS } from "@/lib/game/abort-config";
+import { finalizeResign } from "@/lib/game/finalize-resign";
+import { getAbandonedColor, shouldRefreshHeartbeat } from "@/lib/game/abandonment";
 
 // Client-callable timeout check — verifies the current user is in the game.
 // Polled every few seconds by both players' clients while a game is in
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     const { data: game } = await admin
       .from("games")
-      .select("id, status, turn, move_count, white_clock_ms, black_clock_ms, last_move_at, created_at, white_player_id, black_player_id, white_rating, black_rating, rated, tournament_id, time_control, fen")
+      .select("id, status, turn, move_count, white_clock_ms, black_clock_ms, last_move_at, created_at, white_player_id, black_player_id, white_rating, black_rating, rated, tournament_id, time_control, fen, white_last_seen, black_last_seen")
       .eq("id", gameId)
       .single();
 
@@ -51,6 +53,40 @@ export async function POST(req: NextRequest) {
     }
 
     const now = Date.now();
+
+    // ── Heartbeat: this poll doubles as the player's presence signal ────
+    // The client polls every 4s while the game page is open. Refresh this
+    // player's last_seen (throttled to one write per 15s) so that, if they
+    // close the app / navigate away, their heartbeat goes silent and the
+    // opponent's next poll auto-resigns them (2-minute abandonment rule).
+    const isWhite = game.white_player_id === user.id;
+    const myLastSeen = isWhite ? game.white_last_seen : game.black_last_seen;
+    if (shouldRefreshHeartbeat(myLastSeen, now)) {
+      await admin
+        .from("games")
+        .update(isWhite ? { white_last_seen: new Date().toISOString() } : { black_last_seen: new Date().toISOString() })
+        .eq("id", game.id)
+        .eq("status", "playing");
+    }
+
+    // ── Abandonment check: resign a player who's been silent 2+ minutes ──
+    // Only the OPPONENT can be resigned here — the caller just refreshed
+    // their own heartbeat above, so they're present by definition.
+    const abandonedColor = getAbandonedColor(game, now);
+    if (abandonedColor && abandonedColor !== (isWhite ? "white" : "black")) {
+      const opponentId = isWhite ? game.black_player_id : game.white_player_id;
+      const result = await finalizeResign({
+        gameId: game.id,
+        whitePlayerId: game.white_player_id,
+        blackPlayerId: game.black_player_id,
+        winner: isWhite ? "white" : "black",
+        resignedPlayerId: opponentId,
+        admin,
+      });
+      if (result.ok) {
+        return NextResponse.json({ timedOut: true, status: "resign", winner: isWhite ? "white" : "black" });
+      }
+    }
 
     // ── Early-move no-show check (moves 0 AND 1) ───────────────────────
     // Mirrors the "must move" countdown shown in the game UI so the
