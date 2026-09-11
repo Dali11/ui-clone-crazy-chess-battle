@@ -43,6 +43,30 @@ function colorFor(name: string): string {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
+// Small round avatar used to the left of group messages — real profile
+// pic if the sender has one set, falling back to an initial-letter
+// circle (and falling BACK to that same circle if the image URL 404s,
+// so a stale/deleted photo never leaves a broken-image icon).
+function MsgAvatar({ username, url }: { username: string; url?: string | null }) {
+  const [broken, setBroken] = useState(false);
+  if (url && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={url}
+        alt={username}
+        onError={() => setBroken(true)}
+        className="w-7 h-7 rounded-full object-cover shrink-0 border border-ccb-border"
+      />
+    );
+  }
+  return (
+    <div className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-white text-[11px] font-bold ${colorFor(username)}`}>
+      {username?.[0]?.toUpperCase() || "?"}
+    </div>
+  );
+}
+
 function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
@@ -109,6 +133,7 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
   const [hasMore, setHasMore] = useState(false);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [headerAvatarBroken, setHeaderAvatarBroken] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
@@ -439,11 +464,12 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        {headerAvatarUrl ? (
+        {headerAvatarUrl && !headerAvatarBroken ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={headerAvatarUrl}
             alt={headerTitle}
+            onError={() => setHeaderAvatarBroken(true)}
             className="w-10 h-10 rounded-full object-cover shrink-0 border border-ccb-border"
           />
         ) : (
@@ -509,7 +535,10 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
                       </span>
                     </div>
                   )}
-                  <div className={`flex ${mine ? "justify-end" : "justify-start"} ${grouped ? "mt-0.5" : "mt-2"}`}>
+                  <div className={`flex items-end gap-1.5 ${mine ? "justify-end" : "justify-start"} ${grouped ? "mt-0.5" : "mt-2"}`}>
+                    {!mine && mode === "group" && (
+                      grouped ? <div className="w-7 shrink-0" /> : <MsgAvatar username={m.username || "?"} url={m.avatar_url} />
+                    )}
                     {deleted ? (
                       <div className={`max-w-[78%] rounded-2xl px-3 py-1.5 text-[13px] italic text-ccb-muted ${mine ? "bg-ccb-surface" : "bg-ccb-card"} border border-ccb-border`}>
                         This message was deleted
@@ -523,8 +552,7 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
                         }`}
                       >
                         {!mine && mode === "group" && !grouped && (
-                          <span className="block text-[11px] font-semibold text-ccb-muted">
-                            <span className={`inline-block w-2 h-2 rounded-full mr-1 ${colorFor(m.username || "")}`} />
+                          <span className={`block text-[11px] font-semibold ${colorFor(m.username || "").replace("bg-", "text-")}`}>
                             {m.username}
                           </span>
                         )}
