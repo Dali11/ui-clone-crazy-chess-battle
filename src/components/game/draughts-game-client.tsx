@@ -152,7 +152,8 @@ export default function DraughtsGameClient({
 
   // League XP: fetch what this game earned once it ends (3 win / 1 draw /
   // 0 loss). The server award is fire-and-forget, so retry briefly until
-  // the event row lands. Losses stay 0 → nothing is shown.
+  // the event row lands. Losses (−1 XP) are shown; bot games stay 0
+  // → nothing is shown.
   useEffect(() => {
     if (!gameEnded) return;
     let cancelled = false;
@@ -162,7 +163,7 @@ export default function DraughtsGameClient({
         if (!res.ok) return false;
         const data = await res.json();
         if (cancelled) return false;
-        if (typeof data.amount === "number" && data.amount > 0) {
+        if (typeof data.amount === "number" && data.amount !== 0) {
           setXpEarned(data.amount);
           return true;
         }

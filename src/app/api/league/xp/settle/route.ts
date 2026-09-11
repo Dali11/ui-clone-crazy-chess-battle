@@ -23,6 +23,11 @@ export const maxDuration = 60;
  *        promotion-only mode: nobody gets pushed down).
  *      - every member's XP resets for the new week and a history snapshot
  *        is written (league_xp_history).
+ *      - FAIR-SHARE REBALANCE (owner policy 2026-09-11): after the
+ *        standard moves, any roster drift from the even share (total / 5
+ *        per league) is corrected in one wave — Open's surplus rides up
+ *        (XP earners only), over-shared leagues shed their bottom. Only
+ *        fires at drift ≥ 5; cash rewards are unaffected.
  *    Idempotent guard: members already on the new week are skipped, so a
  *    re-run or overlap with live traffic can never double-pay.
  *
@@ -92,6 +97,11 @@ async function runWeeklySettle(
 
   const promoted = cfg.promote_count;
   const demoted = cfg.demote_count;
+  // Final tier per member after the standard moves (for the fair-share
+  // rebalance below) + players who already moved this run (never moved
+  // twice in one settle).
+  const finalTier = new Map<string, number>();
+  const movedUsers = new Set<string>();
   const cap = cfg.tier_cap > 0 ? cfg.tier_cap : Infinity; // 0/absent = uncapped
   let paid = 0, moves = 0, snapshots = 0, capped = 0;
 
@@ -165,7 +175,8 @@ async function runWeeklySettle(
         newTier = tier - 1; didDemote = true;
       }
 
-      if (didPromote || didDemote) moves++;
+      finalTier.set(m.user_id, newTier);
+      if (didPromote || didDemote) { moves++; movedUsers.add(m.user_id); }
 
       const { error: histErr } = await admin.from("league_xp_history").insert({
         week_start: closingWeek,
@@ -189,7 +200,86 @@ async function runWeeklySettle(
     }
   }
 
-  return { closingWeek, newWeek, paid, moves, snapshots, cappedAtCapacity: capped };
+  // ── Fair-share rebalance (owner policy 2026-09-11) ────────────────────
+  // Dynamic promotion: after the standard top-5/bottom-5 moves, if the
+  // rosters have drifted from the even share (total / 5 per league, the
+  // top leagues take the remainder), move the difference in one wave —
+  // Open's surplus rides up the chain (only players who earned XP this
+  // week ride the wave), over-shared leagues shed their bottom back
+  // down (inactive players go first). Only fires when drift ≥ 5, so a
+  // normal week is unchanged. Cash rewards never change: only the
+  // standard top 5 per league get paid, no matter how many players
+  // move. Idempotent by construction — after one rebalance the counts
+  // sit at the fair-share fixed point, so a re-run is a no-op.
+  {
+    const all = (members ?? []).map((m: any) => ({
+      user_id: m.user_id as string,
+      tier: (finalTier.get(m.user_id) ?? m.tier) as number,
+      earned: m.week_start === closingWeek && (m.xp ?? 0) > 0,
+      // Sort key: active players rank by this week's XP; inactive rows
+      // sink below every 0-XP player so dead accounts demote first.
+      xp: m.week_start === closingWeek ? (m.xp ?? 0) : -1,
+    }));
+    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const m of all) counts[m.tier]++;
+    const total = all.length;
+    const base = Math.floor(total / 5);
+    const rem = total % 5;
+    const targets: Record<number, number> = {
+      1: base,
+      2: base + (rem > 3 ? 1 : 0),
+      3: base + (rem > 2 ? 1 : 0),
+      4: base + (rem > 1 ? 1 : 0),
+      5: base + (rem > 0 ? 1 : 0),
+    };
+    const nowIso = new Date().toISOString();
+    const pool = (t: number) => all.filter((m) => m.tier === t && !movedUsers.has(m.user_id)).sort((a, b) => b.xp - a.xp);
+
+    // Top-down demotion: leagues over their fair share shed their bottom.
+    let rebalancedDown = 0;
+    for (let t = 5; t >= 2; t--) {
+      const excess = counts[t] - targets[t];
+      if (excess < 5) continue;
+      const bottom = pool(t).slice().reverse().slice(0, excess);
+      if (bottom.length === 0) continue;
+      await admin
+        .from("league_xp_members")
+        .update({ tier: t - 1, updated_at: nowIso })
+        .in("user_id", bottom.map((m) => m.user_id));
+      rebalancedDown += bottom.length;
+      counts[t] -= bottom.length;
+      counts[t - 1] += bottom.length;
+    }
+
+    // Bottom-up promotion: Open's surplus rides up the chain, absorbed
+    // by each league's shortfall. Only XP earners ride the wave.
+    let rebalancedUp = 0;
+    let inflow = Math.max(0, counts[1] - targets[1]);
+    if (inflow >= 5) {
+      for (let t = 2; t <= 5 && inflow > 0; t++) {
+        const room = Math.max(0, cap - counts[t]);
+        if (room <= 0) break; // chain blocked at a full league
+        const eligible = pool(t - 1).filter((m) => m.earned);
+        const move = Math.min(inflow, eligible.length, room);
+        if (move <= 0) break;
+        const wave = eligible.slice(0, move);
+        await admin
+          .from("league_xp_members")
+          .update({ tier: t, updated_at: nowIso })
+          .in("user_id", wave.map((m) => m.user_id));
+        rebalancedUp += move;
+        counts[t - 1] -= move;
+        counts[t] += move;
+        for (const m of wave) { m.tier = t; movedUsers.add(m.user_id); }
+        const shortBy = Math.max(0, targets[t] - (counts[t] - move));
+        inflow = move - Math.min(move, shortBy);
+      }
+    }
+    if (rebalancedUp || rebalancedDown) {
+      console.log(`[league] fair-share rebalance: ${rebalancedUp} up, ${rebalancedDown} down`);
+    }
+    return { closingWeek, newWeek, paid, moves, snapshots, cappedAtCapacity: capped, rebalancedUp, rebalancedDown };
+  }
 }
 
 /**

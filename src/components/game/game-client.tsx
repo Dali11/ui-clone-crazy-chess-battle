@@ -180,9 +180,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   // game as soon as the draw is settled, but we gate the redirect behind an
   // explicit player choice instead of yanking them straight into it. Poll
   // battle status until the new armageddon game shows up.
-  // League XP: fetch what this game earned once it ends (3 win / 1 draw /
-  // 0 loss). The server award is fire-and-forget, so retry briefly until
-  // the event row lands. Losses and bot games stay 0 → nothing is shown.
+  // League XP: fetch what this game earned once it ends (+3 win / +1 draw /
+  // −1 loss). The server award is fire-and-forget, so retry briefly until
+  // the event row lands. Bot games stay 0 → nothing is shown.
   useEffect(() => {
     if (!gameEnded || isSpectator) return;
     let cancelled = false;
@@ -192,7 +192,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         if (!res.ok) return false;
         const data = await res.json();
         if (cancelled) return false;
-        if (typeof data.amount === "number" && data.amount > 0) {
+        if (typeof data.amount === "number" && data.amount !== 0) {
           setXpEarned(data.amount);
           return true;
         }

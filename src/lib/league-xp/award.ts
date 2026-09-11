@@ -133,11 +133,22 @@ export async function awardGameXp(opts: {
       // Weekly standings XP is floored at 0 — a loss can drag you down
       // the ladder but never into negative territory.
       if (!member) {
-        // Everyone who joins after the league has started enters in the
-        // Open League and climbs through weekly promotion only.
+        // Owner policy 2026-09-11: new entrants join the league that's
+        // currently SHORT on players (fair-share drift control) instead
+        // of always Open — ties break toward the lower league. The
+        // weekly fair-share rebalance corrects any remaining drift.
+        const { data: tierRows } = await admin.from("league_xp_members").select("tier");
+        const tierCounts = new Map<number, number>();
+        for (const r of tierRows ?? []) tierCounts.set(r.tier, (tierCounts.get(r.tier) ?? 0) + 1);
+        let joinTier: number = ENTRY_TIER;
+        let bestCount = tierCounts.get(ENTRY_TIER) ?? 0;
+        for (const t of [2, 3, 4, 5]) {
+          const c = tierCounts.get(t) ?? 0;
+          if (c < bestCount) { bestCount = c; joinTier = t; }
+        }
         await admin.from("league_xp_members").insert({
           user_id: p,
-          tier: ENTRY_TIER,
+          tier: joinTier,
           xp: Math.max(0, grant.amount),
           week_start: week,
         });

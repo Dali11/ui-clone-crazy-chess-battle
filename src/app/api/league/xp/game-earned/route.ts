@@ -8,9 +8,9 @@ export const dynamic = "force-dynamic";
  * GET /api/league/xp/game-earned?gameId=...&kind=chess|draughts
  *
  * XP the signed-in player earned from one specific finished game — used
- * by the end-of-game screen to show "+3 XP" / "+1 XP". Returns amount 0
- * for losses (no event is written when loss XP is 0), bot games, and
- * games the caller never played.
+ * by the end-of-game screen to show "+3 XP" / "+1 XP" / "−1 XP". Returns
+ * amount 0 for bot games and games the caller never played; losses
+ * return −1 (owner policy 2026-09-11: losses cost XP).
  *
  * The award itself is fire-and-forget on the server, so the client may
  * poll this before the event row is committed — hence the light-weight
