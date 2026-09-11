@@ -65,14 +65,26 @@ export async function POST(req: NextRequest) {
     }
 
     const week = currentWeekStart();
-    const { data: member, error: upErr } = await admin
+    // AUDIT FIX 2026-09-11: only INSERT when the member row is absent —
+    // the old upsert overwrote tier AND xp for existing members, so any
+    // re-register call would throw a Premier player back into Open with
+    // their weekly XP wiped mid-cycle.
+    const { data: existing } = await admin
       .from("league_xp_members")
-      .upsert(
-        { user_id: user.id, tier: tierNum, xp: 0, week_start: week },
-        { onConflict: "user_id" }
-      )
       .select("user_id, tier, xp, week_start")
-      .single();
+      .eq("user_id", user.id)
+      .maybeSingle();
+    let member = existing;
+    let upErr: unknown = null;
+    if (!member) {
+      const res = await admin
+        .from("league_xp_members")
+        .insert({ user_id: user.id, tier: tierNum, xp: 0, week_start: week })
+        .select("user_id, tier, xp, week_start")
+        .single();
+      member = res.data;
+      upErr = res.error;
+    }
 
     if (upErr) {
       console.error("[league/register] upsert failed:", upErr);

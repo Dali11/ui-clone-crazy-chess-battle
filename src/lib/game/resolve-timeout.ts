@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { canSideMate } from "@/lib/game/mating-material";
+import { awardGameXp } from "@/lib/league-xp/award";
 import { settleBattle } from "@/lib/battles/settle";
 import { processTournamentGameResult } from "@/lib/tournament/results";
 
@@ -137,6 +138,21 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
       );
     }
 
+    // AUDIT FIX 2026-09-11: the flag-fall draw is a finished game — it
+    // earns draw XP like any other draw (this path previously awarded
+    // nothing at all).
+    awardGameXp({
+      gameId: game.id,
+      game: {
+        white_player_id: game.white_player_id,
+        black_player_id: game.black_player_id,
+        winner: null,
+        white_rating: game.white_rating,
+        black_rating: game.black_rating,
+      },
+      admin,
+    }).catch(() => {});
+
     return { status: "draw" as const, winner: null };
   }
 
@@ -216,6 +232,21 @@ export async function resolveTimeoutForGame(admin: AdminClient, game: Timeoutabl
       : (isArmageddon ? battle.white_player_id : battle.black_player_id);
     await settleBattle(battle.id, battleWinnerId, "timeout").catch((e) => console.error("Battle settlement failed:", e));
   }
+
+  // AUDIT FIX 2026-09-11: timeout wins are the most common decisive
+  // result on the platform — they must earn XP like any other finish
+  // (this path previously awarded nothing at all).
+  awardGameXp({
+    gameId: game.id,
+    game: {
+      white_player_id: game.white_player_id,
+      black_player_id: game.black_player_id,
+      winner,
+      white_rating: game.white_rating,
+      black_rating: game.black_rating,
+    },
+    admin,
+  }).catch(() => {});
 
   return { status: "timeout" as const, winner };
 }

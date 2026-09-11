@@ -226,7 +226,11 @@ export async function POST(req: NextRequest) {
     }
 
     // XP Leagues: award XP for the finished game (idempotent, never throws).
-    if (result.winner !== undefined) {
+    // AUDIT FIX 2026-09-11: gate on gameEnded, NOT result.winner !== undefined.
+    // Mid-game moves return winner: null, which awardGameXp read as a DRAW —
+    // every game's first move granted phantom +1 draw XP to both players and
+    // the unique (user, kind, game) index then blocked the real win/loss XP.
+    if (gameEnded) {
       awardGameXp({ gameId, game: { white_player_id: game.white_player_id, black_player_id: game.black_player_id, winner: result.winner ?? null, white_rating: game.white_rating, black_rating: game.black_rating }, admin }).catch(() => {});
     }
 

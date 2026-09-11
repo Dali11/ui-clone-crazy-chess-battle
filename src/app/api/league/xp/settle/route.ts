@@ -121,6 +121,14 @@ async function runWeeklySettle(
   // first real payout: the settle on 2026-09-22.
   const payOn = cfg.rewards_enabled && cfg.weekly_payouts_enabled !== false;
   let paid = 0, moves = 0, snapshots = 0, capped = 0;
+  // AUDIT FIX 2026-09-11: bulk processing. The old per-member awaits
+  // (~2 queries x 472+ members) blow past the 60s serverless limit as the
+  // player base grows, leaving a half-settled week that can't re-run
+  // until the NEXT boundary. History rows are now collected and bulk-
+  // upserted (idempotent via the unique (week_start, user_id) index), and
+  // member resets are grouped by resulting tier into chunked bulk updates.
+  const historyRows: any[] = [];
+  const updateGroups = new Map<number, string[]>();
 
   // Rank within each tier: active members first (by xp desc — the select is
   // already ordered), then anyone whose row predates the closing cycle
@@ -195,7 +203,7 @@ async function runWeeklySettle(
       finalTier.set(m.user_id, newTier);
       if (didPromote || didDemote) { moves++; movedUsers.add(m.user_id); }
 
-      const { error: histErr } = await admin.from("league_xp_history").insert({
+      historyRows.push({
         week_start: closingWeek,
         tier,
         user_id: m.user_id,
@@ -206,13 +214,28 @@ async function runWeeklySettle(
         promoted: didPromote,
         demoted: didDemote,
       });
-      if (!histErr) snapshots++;
+      const group = updateGroups.get(newTier) ?? [];
+      group.push(m.user_id);
+      updateGroups.set(newTier, group);
+    }
+  }
 
-      // Reset for the new cycle (idempotent: week_start guard).
+  // ── Bulk: history snapshots + member resets (idempotent) ────────────
+  for (let i = 0; i < historyRows.length; i += 500) {
+    const { data: inserted, error: histErr } = await admin
+      .from("league_xp_history")
+      .upsert(historyRows.slice(i, i + 500), { onConflict: "week_start,user_id", ignoreDuplicates: true })
+      .select("id");
+    if (histErr) console.error("[league] history bulk insert failed:", histErr.message);
+    else snapshots += inserted?.length ?? 0;
+  }
+  const resetIso = new Date().toISOString();
+  for (const [groupTier, ids] of updateGroups) {
+    for (let i = 0; i < ids.length; i += 100) {
       await admin
         .from("league_xp_members")
-        .update({ xp: 0, week_start: newWeek, tier: newTier, updated_at: new Date().toISOString() })
-        .eq("user_id", m.user_id)
+        .update({ xp: 0, week_start: newWeek, tier: groupTier, updated_at: resetIso })
+        .in("user_id", ids.slice(i, i + 100))
         .neq("week_start", newWeek);
     }
   }
