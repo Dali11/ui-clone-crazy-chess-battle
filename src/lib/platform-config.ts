@@ -75,6 +75,8 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     draughts_results_script: "",
     leagues_enabled: false,
     leagues_script: "",
+    leagues_inline_enabled: false,
+    leagues_inline_script: "",
     // Frequency router caps (per player, localStorage-tracked):
     // min gap between any two ads, max per rolling hour / 24h, and the
     // end-of-game ad shows only on every Nth finished game.

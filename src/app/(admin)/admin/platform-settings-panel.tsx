@@ -32,6 +32,8 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "challenge_finished_script", label: "Challenge Finished Ad Script", type: "textarea", group: "control" },
     { key: "leagues_enabled", label: "Leagues Page Ad", type: "toggle", group: "control", help: "Bottom of the League page (weekly + monthly leaderboards) and tournaments page — recommended 320x50 mobile / 728x90 desktop" },
     { key: "leagues_script", label: "Leagues Ad Script", type: "textarea", group: "control", help: "Paste the full Adsterra snippet" },
+    { key: "leagues_inline_enabled", label: "Leagues Inline Ad", type: "toggle", group: "control", help: "Mid-feed slot: between league cards on Overview, and between rewards + standings on My League — configured separately since it needs a SMALLER unit (recommended 300x100 or native, not 300x250)" },
+    { key: "leagues_inline_script", label: "Leagues Inline Ad Script", type: "textarea", group: "control", help: "Paste a SMALL Adsterra snippet — this renders between compact cards, not at the bottom of the page" },
     { key: "frequency_min_gap_sec", label: "Min Gap Between Ads", type: "number", group: "control", unit: "sec", help: "Cooldown between any two ads for the same player, across all placements" },
     { key: "frequency_hourly_cap", label: "Hourly Cap (per player)", type: "number", group: "control", unit: "ads", help: "Max ad impressions per rolling hour, all placements combined. 0 = unlimited" },
     { key: "frequency_daily_cap", label: "Daily Cap (per player)", type: "number", group: "control", unit: "ads", help: "Max ad impressions per rolling 24h, all placements combined. 0 = unlimited" },

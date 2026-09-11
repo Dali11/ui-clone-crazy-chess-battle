@@ -47,6 +47,15 @@ export async function GET() {
             enabled: !!cfg.leagues_enabled,
             script: String(cfg.leagues_script || ""),
           },
+          leagues_inline: {
+            // Mid-feed native slot: between league cards on the Overview
+            // tab, and between the rewards strip and standings on My
+            // League. Configured SEPARATELY from the bottom "leagues" ad
+            // because it sits inline between compact cards — needs a
+            // smaller unit. Recommended 300x100 or a native ad, NOT 300x250.
+            enabled: !!cfg.leagues_inline_enabled,
+            script: String(cfg.leagues_inline_script || ""),
+          },
         },
       },
       { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } }

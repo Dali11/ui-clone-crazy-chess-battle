@@ -38,7 +38,8 @@ export type AdPlacement =
   | "battle_settlement"
   | "draughts_results"
   | "challenge_finished"
-  | "leagues";
+  | "leagues"
+  | "leagues_inline";
 
 interface PlacementConfig {
   enabled: boolean;

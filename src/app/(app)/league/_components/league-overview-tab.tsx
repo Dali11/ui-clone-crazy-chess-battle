@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Loader2, Zap, Trophy } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
+import AdSlot from "@/components/ads/ad-slot";
 
 interface TopPlayer {
   userId: string;
@@ -117,8 +118,15 @@ export default function LeagueOverviewTab() {
         </div>
       </div>
 
-      {[...data.leagues].sort((a, b) => b.tier - a.tier).map((lg) => (
-        <LeagueCard key={lg.tier} league={lg} currency={currency} />
+      {[...data.leagues].sort((a, b) => b.tier - a.tier).map((lg, i) => (
+        <React.Fragment key={lg.tier}>
+          <LeagueCard league={lg} currency={currency} />
+          {/* Mid-feed inline ad: between the 2nd and 3rd league card
+             (e.g. Premier / Knights done, Bronze / Amateur / Open below).
+             Separate placement from the bottom "leagues" ad — smaller
+             unit, native-feeling between compact cards. */}
+          {i === 1 && <AdSlot placement="leagues_inline" />}
+        </React.Fragment>
       ))}
     </div>
   );

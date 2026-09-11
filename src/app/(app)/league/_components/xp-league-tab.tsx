@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Loader2, Swords, TrendingUp, ChevronDown, Zap, Gift, ArrowDownCircle, Trophy, Info } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
 import { countryFlag } from "@/lib/geo/flags";
+import AdSlot from "@/components/ads/ad-slot";
 
 interface Standing {
   userId: string;
@@ -260,6 +261,11 @@ export default function XpLeagueTab() {
           </div>
         </div>
       )}
+
+      {/* Mid-feed inline ad: between the rewards strip and the standings
+         list — separate "leagues_inline" placement from the bottom
+         "leagues" ad, smaller unit sized for this native slot. */}
+      <AdSlot placement="leagues_inline" />
 
       {/* Leaderboard */}
       <div className="card overflow-hidden">
