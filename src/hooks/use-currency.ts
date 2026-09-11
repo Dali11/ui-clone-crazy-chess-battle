@@ -16,6 +16,11 @@ export interface UseCurrencyReturn extends CurrencyState {
   formatMoney: (amountMWK: number) => string;
   convert: (amountMWK: number) => number;
   convertFormatted: (amountMWK: number) => string;
+  /** Inverse of convert(): local-currency amount -> MWK-equivalent (the
+   *  internal ledger unit every wallet/stake/deposit is stored in). Use
+   *  this whenever a player TYPES a money amount in their own currency
+   *  and it needs to be sent to an API that expects MWK. */
+  toMWK: (amountLocal: number) => number;
 }
 
 export function useCurrency(initialCountryCode?: string | null): UseCurrencyReturn {
@@ -99,5 +104,17 @@ export function useCurrency(initialCountryCode?: string | null): UseCurrencyRetu
     [convert],
   );
 
-  return { ...state, formatMoney, convert, convertFormatted };
+  const toMWK = useCallback(
+    (amountLocal: number) => {
+      const value = Math.max(0, Math.floor(amountLocal ?? 0));
+      if (state.currencyCode === "MWK") return value;
+      // Rate hasn't loaded yet — treat as MWK 1:1 rather than guessing.
+      // (Matches convert()'s same honesty rule for the pre-load window.)
+      if (!state.loaded || !state.rate || state.rate === 1) return value;
+      return Math.round(value / state.rate);
+    },
+    [state.currencyCode, state.rate, state.loaded],
+  );
+
+  return { ...state, formatMoney, convert, convertFormatted, toMWK };
 }

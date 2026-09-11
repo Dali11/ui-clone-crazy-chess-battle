@@ -80,7 +80,7 @@ export default function BattlesPage() {
   const [cancellingStuck, setCancellingStuck] = useState(false);
 
   // Live currency conversion — all money displayed to the user uses this
-  const { formatMoney: fmtCurrency, convert: convertCurrency, currencySymbol: _curSym, rate: fxRate, currencyCode: currencyCode, loaded: currencyLoaded } = useCurrency(userCountry);
+  const { formatMoney: fmtCurrency, convert: convertCurrency, toMWK, currencySymbol: _curSym, rate: fxRate, currencyCode: currencyCode, loaded: currencyLoaded } = useCurrency(userCountry);
 
   // Currency state
   // Currency via shared hook — provides formatMoney(), convert(), rate, etc.
@@ -299,17 +299,25 @@ export default function BattlesPage() {
 
   const handleChallengeFriend = async () => {
     setStakeError(null);
-    const stakeValue = parseInt(customStake, 10);
+    const stakeValue = parseInt(customStake, 10); // entered in the PLAYER'S OWN currency
 
     if (!customStake || isNaN(stakeValue) || stakeValue <= 0) {
       setStakeError("Enter a valid stake amount");
       return;
     }
 
-    const stake = stakeValue; // user enters in MWK
+    // Non-MWK players: don't let a request through before we know the real
+    // FX rate — toMWK() would otherwise silently treat their local amount
+    // as if it were already MWK.
+    if (currencyCode !== "MWK" && !currencyLoaded) {
+      setStakeError("Loading exchange rate — try again in a moment");
+      return;
+    }
+
+    const stake = toMWK(stakeValue); // convert to MWK, the wallet's internal ledger unit
 
     if (balance < stake) {
-      setStakeError(`Insufficient balance. You need ${fmtCurrency(stakeValue)}.`);
+      setStakeError(`Insufficient balance. You need ${_curSym} ${stakeValue.toLocaleString()}.`);
       return;
     }
 
@@ -583,9 +591,9 @@ export default function BattlesPage() {
           </div>
         </div>
 
-        {/* Custom Stake Input */}
+        {/* Custom Stake Input — amount is always in the PLAYER'S OWN currency */}
         <div>
-          <h3 className="text-sm font-medium text-ccb-muted mb-3">Custom Stake Amount (MWK)</h3>
+          <h3 className="text-sm font-medium text-ccb-muted mb-3">Custom Stake Amount ({currencyCode})</h3>
           <div className="relative">
             <input
               type="number"
@@ -595,7 +603,7 @@ export default function BattlesPage() {
               min="1"
               className="w-full px-4 py-4 rounded-xl bg-ccb-surface border-2 border-ccb-border text-lg font-bold focus:outline-none focus:border-ccb-accent transition-colors"
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ccb-muted text-sm font-medium">MWK</span>
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ccb-muted text-sm font-medium">{currencyCode}</span>
           </div>
           {stakeError && (
             <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
@@ -608,12 +616,6 @@ export default function BattlesPage() {
                 <span className="text-ccb-muted">Your stake</span>
                 <span className="font-semibold">{_curSym} {parseInt(customStake).toLocaleString()}</span>
               </div>
-              {currencyCode !== "MWK" && (
-                <div className="flex items-center justify-between text-xs text-ccb-muted mb-2">
-                  <span>≈ in your currency</span>
-                  <span>{fmtCurrency(parseInt(customStake))}</span>
-                </div>
-              )}
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="text-ccb-muted">Time control</span>
                 <span className="font-semibold">{CHALLENGE_TIME_CONTROLS.find(tc => tc.id === selectedChallengeTC)?.desc || "15+10"}</span>
