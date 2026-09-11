@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendPushToUsers } from "@/lib/push/send";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +82,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ userId: st
 
     const { data: partner } = await admin.from("profiles").select("id").eq("id", partnerId).single();
     if (!partner) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    const { data: senderProfile } = await admin.from("profiles").select("username").eq("id", user.id).single();
 
     // Rate limit: one message per RATE_LIMIT_MS per sender
     const since = new Date(Date.now() - RATE_LIMIT_MS).toISOString();
@@ -98,6 +101,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ userId: st
       .select("id, sender_id, recipient_id, body, created_at, read_at, deleted_at, audio_url, audio_duration, image_url")
       .single();
     if (error || !message) return NextResponse.json({ error: "Failed to send" }, { status: 500 });
+
+    // Push notification to the recipient (WhatsApp-style). Never blocks the send.
+    try {
+      const { dmPayload, rulesFromConfig } = await import("@/lib/push/rules");
+      let rules = rulesFromConfig(null);
+      try { rules = rulesFromConfig(await getPlatformConfig(admin, "push")); } catch {}
+      await sendPushToUsers(admin, [partnerId],
+        dmPayload(senderProfile?.username || "A player", clean || (message.audio_url ? "🎤 Voice note" : "📷 Photo"), user.id),
+        { notifKey: `dm:${user.id}:${partnerId}`, gapMin: rules.dm_gap_min, rules });
+    } catch {}
 
     return NextResponse.json({ message });
   } catch {

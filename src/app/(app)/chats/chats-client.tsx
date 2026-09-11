@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Globe, Image as ImageIcon, Loader2, MessageCircle, Mic, Search, Pin } from "lucide-react";
+import { X, Bell, Globe, Image as ImageIcon, Loader2, MessageCircle, Mic, Search, Pin } from "lucide-react";
 
 interface Group {
   id: string;
@@ -68,6 +68,59 @@ function timeShort(iso: string | null): string {
   const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
   if (sameDay) return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+const PUSH_BANNER_KEY = "ccb_push_banner_dismissed";
+
+function PushBanner() {
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (typeof Notification === "undefined" || Notification.permission !== "default") return;
+        const { pushSupported } = await import("@/lib/push/client");
+        if (pushSupported() && localStorage.getItem(PUSH_BANNER_KEY) !== "1") setShow(true);
+      } catch {}
+    })();
+  }, []);
+
+  if (!show || done) return null;
+
+  const enable = async () => {
+    setBusy(true);
+    const { enablePush } = await import("@/lib/push/client");
+    const res = await enablePush();
+    setBusy(false);
+    if (res.ok) setDone(true);
+    else setShow(false); // denied/unsupported → hide silently
+  };
+
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-ccb-primary/30 bg-ccb-primary/5 px-4 py-3">
+      <Bell className="w-5 h-5 text-ccb-primary shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-ccb-text">Never miss a message</p>
+        <p className="text-xs text-ccb-muted">Get notified like WhatsApp, even when you&apos;re out of the app</p>
+      </div>
+      <button
+        onClick={enable}
+        disabled={busy}
+        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-ccb-primary text-white disabled:opacity-50 shrink-0"
+      >
+        {busy ? "…" : "Enable"}
+      </button>
+      <button
+        onClick={() => { localStorage.setItem(PUSH_BANNER_KEY, "1"); setShow(false); }}
+        className="text-ccb-muted hover:text-ccb-text shrink-0"
+        aria-label="Dismiss"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
 }
 
 export default function ChatsClient() {
@@ -140,6 +193,8 @@ export default function ChatsClient() {
           className="flex-1 bg-transparent text-sm text-ccb-text placeholder:text-ccb-muted outline-none"
         />
       </div>
+
+      <PushBanner />
 
       {loading ? (
         <div className="py-16 flex justify-center">

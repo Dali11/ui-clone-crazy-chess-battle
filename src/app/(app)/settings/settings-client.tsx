@@ -190,6 +190,66 @@ const SaveButton = ({ onSave, saving, saved, error }: { onSave: () => void; savi
   </div>
 );
 
+// Push notifications — WhatsApp-style. Shows current state and lets the
+// player toggle subscription for this device.
+function NotificationsSection() {
+  const [state, setState] = useState<"checking" | "unsupported" | "denied" | "off" | "on">("checking");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { pushSupported, getPushState } = await import("@/lib/push/client");
+        if (!pushSupported()) { setState("unsupported"); return; }
+        setState(await getPushState());
+      } catch { setState("unsupported"); }
+    })();
+  }, []);
+
+  const toggle = async () => {
+    setBusy(true);
+    const { enablePush, disablePush, getPushState } = await import("@/lib/push/client");
+    if (state === "on") {
+      await disablePush();
+    } else {
+      await enablePush();
+    }
+    setState(await getPushState());
+    setBusy(false);
+  };
+
+  return (
+    <SectionCard title="Notifications">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <Bell className="w-4 h-4 text-ccb-accent" />
+          <div>
+            <p className="text-sm">Push notifications</p>
+            <p className="text-xs text-ccb-muted mt-0.5">
+              {state === "checking" && "Checking…"}
+              {state === "on" && "On — messages, turns & battles alert you"}
+              {state === "off" && "Off — tap to turn on"}
+              {state === "denied" && "Blocked — allow notifications for this site in your browser settings"}
+              {state === "unsupported" && "Not supported here. iOS: install the app to your home screen first"}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={toggle}
+          disabled={busy || state === "checking" || state === "unsupported"}
+          className={`text-xs font-semibold px-3 py-1.5 rounded-lg border shrink-0 transition-colors disabled:opacity-50 ${
+            state === "on"
+              ? "bg-ccb-surface text-ccb-muted border-ccb-border"
+              : "bg-ccb-primary text-white border-ccb-primary"
+          }`}
+        >
+          {busy ? "…" : state === "on" ? "Turn off" : "Turn on"}
+        </button>
+      </div>
+    </SectionCard>
+  );
+}
+
 export default function SettingsClient({ profile, userId }: { profile: Profile | null; userId: string }) {
   const router = useRouter();
   const supabase = createClient();
@@ -408,6 +468,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
               <Link href="/history" className="flex items-center justify-between hover:bg-ccb-surface -mx-2 px-2 py-2 rounded-lg transition-colors"><div className="flex items-center gap-2.5"><Swords className="w-4 h-4 text-ccb-text" /><span className="text-sm">Game History</span></div><ChevronRight className="w-4 h-4 text-ccb-muted" /></Link>
             </div>
           </SectionCard>
+          <NotificationsSection />
         </div>
       )}
 

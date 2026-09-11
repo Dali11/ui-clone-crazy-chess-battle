@@ -38,6 +38,11 @@ export default function PWAInstaller() {
     const handleInstalled = () => {
       localStorage.setItem(INSTALLED_KEY, "true");
       setShowBanner(false);
+      // iOS/Android PWA installed — if the player already granted
+      // notification permission, register push now (first-run UX).
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        import("@/lib/push/client").then(({ enablePush }) => enablePush()).catch(() => {});
+      }
       setDeferredPrompt(null);
     };
     window.addEventListener("appinstalled", handleInstalled);

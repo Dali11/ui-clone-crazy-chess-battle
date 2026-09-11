@@ -19,6 +19,13 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     show_kpi_cards: true,
     refresh_interval_seconds: 30,
   },
+  // Push notifications (WhatsApp-style). Master switch + per-type throttle gaps.
+  push: {
+    enabled: true,
+    dm_gap_min: 0,       // DMs always notify (per sender:recipient pair)
+    group_gap_min: 10,   // one group notification per room per player per 10 min
+    turn_gap_min: 5,     // "your move" reminders max once per 5 min per game
+  },
   // Adsterra ad placements. Scripts are the raw snippet from the Adsterra
   // dashboard (the whole <script>...</script> block). Everything is OFF by
   // default — placements only render when individually toggled here.

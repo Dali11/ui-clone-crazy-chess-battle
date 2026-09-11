@@ -6,6 +6,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { settleBattle } from "@/lib/battles/settle";
 import { awardGameXp } from "@/lib/league-xp/award";
 import { resolveTimeoutForGame } from "@/lib/game/resolve-timeout";
+import { sendPushToUsers } from "@/lib/push/send";
+import { turnPayload, opponentRecentlyActive, rulesFromConfig } from "@/lib/push/rules";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,7 +28,7 @@ export async function POST(req: NextRequest) {
     // Load current game state
     const { data: game } = await supabase
       .from("games")
-      .select("id, white_player_id, black_player_id, fen, pgn, turn, status, move_count, white_clock_ms, black_clock_ms, last_move_at, increment_seconds, tournament_id, created_at, white_rating, black_rating, rated")
+      .select("id, white_player_id, black_player_id, fen, pgn, turn, status, move_count, white_clock_ms, black_clock_ms, last_move_at, increment_seconds, tournament_id, created_at, white_rating, black_rating, rated, white_last_seen, black_last_seen")
       .eq("id", gameId)
       .single();
 
@@ -232,6 +235,26 @@ export async function POST(req: NextRequest) {
     // the unique (user, kind, game) index then blocked the real win/loss XP.
     if (gameEnded) {
       awardGameXp({ gameId, game: { white_player_id: game.white_player_id, black_player_id: game.black_player_id, winner: result.winner ?? null, white_rating: game.white_rating, black_rating: game.black_rating }, admin }).catch(() => {});
+    }
+
+    // Push: WhatsApp-style "your move" nudge. Only when the game is still
+    // going, it's now the OTHER player's turn, they're not actively on the
+    // board (last_seen heartbeat > 90s old), and the per-game throttle
+    // allows it. Never blocks or fails the move.
+    if (!gameEnded) {
+      try {
+        const nextIsWhite = result.turn === "white";
+        const nextPlayerId = nextIsWhite ? game.white_player_id : game.black_player_id;
+        const nextLastSeen = nextIsWhite ? game.white_last_seen : game.black_last_seen;
+        if (nextPlayerId !== user.id && !opponentRecentlyActive(nextLastSeen)) {
+          const { data: moverProfile } = await admin.from("profiles").select("username").eq("id", user.id).single();
+          let rules = rulesFromConfig(null);
+          try { rules = rulesFromConfig(await getPlatformConfig(admin, "push")); } catch {}
+          await sendPushToUsers(admin, [nextPlayerId],
+            turnPayload(gameId, moverProfile?.username || "your opponent"),
+            { notifKey: `turn:${gameId}`, gapMin: rules.turn_gap_min, rules });
+        }
+      } catch {}
     }
 
     return NextResponse.json({

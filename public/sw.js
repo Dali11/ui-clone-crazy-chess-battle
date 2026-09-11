@@ -1,4 +1,4 @@
-const CACHE_NAME = "ccb-cache-v7";
+const CACHE_NAME = "ccb-cache-v8";
 const PRECACHE_URLS = [
   "/",
   "/manifest.json",
@@ -63,5 +63,38 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
+  );
+});
+
+
+// ─── Web Push (WhatsApp-style notifications) ────────────────────────────
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
+  const title = data.title || "Crazy Chess Battles";
+  const options = {
+    body: data.body || "",
+    icon: "/icon-192.png",
+    badge: "/logo-badge.png",
+    tag: data.tag || "ccb",
+    data: { url: data.url || "/" },
+    vibrate: [100, 50, 100],
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // Focus an already-open window and route it; else open one.
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin)) {
+          return client.focus().then(() => client.navigate(url));
+        }
+      }
+      return self.clients.openWindow(url);
+    })
   );
 });

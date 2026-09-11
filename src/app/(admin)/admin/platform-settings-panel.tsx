@@ -16,6 +16,12 @@ interface SettingField {
 }
 
 const SECTION_FIELDS: Record<string, SettingField[]> = {
+  push: [
+    { key: "enabled", label: "Push notifications", type: "toggle", group: "control", help: "Master switch — off kills all device notifications" },
+    { key: "dm_gap_min", label: "DM gap", type: "number", unit: "min", group: "control", help: "Min minutes between DM notifications per conversation (0 = always)" },
+    { key: "group_gap_min", label: "Group gap", type: "number", unit: "min", group: "control", help: "Max one notification per room per player in this window" },
+    { key: "turn_gap_min", label: "Turn reminder gap", type: "number", unit: "min", group: "control", help: "Max one 'your move' per game in this window" },
+  ],
   ads: [
     { key: "enabled", label: "Ads Enabled (Global)", type: "toggle", group: "control", help: "Master switch — nothing renders anywhere when off" },
     { key: "lobby_enabled", label: "Lobby Ad", type: "toggle", group: "control", help: "Dashboard lobby — recommended 320x50 mobile / 728x90 desktop banner" },
@@ -178,6 +184,7 @@ const SECTION_LABELS: Record<string, string> = {
   users: "Users",
   tournaments: "Tournaments",
   leagues_xp: "XP Leagues",
+  push: "Push Notifications",
   verification: "Verification",
   logs: "Admin Logs",
 };

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendPushToUsers } from "@/lib/push/send";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 export const dynamic = "force-dynamic";
 
 const MAX_BODY = 500;          // WhatsApp-ish message cap
-const RATE_LIMIT_MS = 2500;    // min gap between a user's messages
+const RATE_LIMIT_MS = 2500;
+
+export const maxDuration = 60;    // min gap between a user's messages
 const PAGE_SIZE = 50;
 
 // GET /api/community/messages?room=malawi&before=<id>
@@ -119,6 +123,30 @@ export async function POST(req: NextRequest) {
       .select("id, room, user_id, username, avatar_url, body, created_at, deleted_at, audio_url, audio_duration, image_url")
       .single();
     if (error || !message) return NextResponse.json({ error: "Failed to send" }, { status: 500 });
+
+    // Push notification to subscribed players who can see this room
+    // (same country, or everyone for the global room) — throttled to at
+    // most one per room per player per group_gap_min so chatty rooms
+    // don't spam. Never blocks or fails the send.
+    try {
+      let targets: string[] = [];
+      if (roomRow.country) {
+        const { data: locals } = await admin.from("profiles").select("id").eq("country", roomRow.country);
+        targets = (locals || []).map((r: any) => r.id);
+      } else {
+        const { data: subs } = await admin.from("push_subscriptions").select("user_id");
+        targets = Array.from(new Set((subs || []).map((r: any) => r.user_id)));
+      }
+      targets = targets.filter((id) => id !== user.id);
+      if (targets.length) {
+        const { groupPayload, rulesFromConfig } = await import("@/lib/push/rules");
+        let rules = rulesFromConfig(null);
+        try { rules = rulesFromConfig(await getPlatformConfig(admin, "push")); } catch {}
+        await sendPushToUsers(admin, targets,
+          groupPayload(room, profile?.username || "Someone", clean || (message.audio_url ? "🎤 Voice note" : "📷 Photo")),
+          { notifKey: `group:${room}`, gapMin: rules.group_gap_min, rules });
+      }
+    } catch {}
 
     return NextResponse.json({ message });
   } catch {

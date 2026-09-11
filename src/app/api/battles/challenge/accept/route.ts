@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendPushToUsers } from "@/lib/push/send";
 import { DEFAULT_CONFIG, calcPayout } from "@/lib/battles/battle-helpers";
 import { moneySymbol } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
@@ -188,6 +189,17 @@ export async function POST(req: NextRequest) {
         data: { battle_id: battle.id, stake: challenge.stake },
         read: false,
       });
+    } catch {}
+
+    // Push notification to the challenger — their staked game just went
+    // live and they're usually NOT in the app at this moment.
+    try {
+      const { challengeAcceptedPayload } = await import("@/lib/push/rules");
+      const { data: pushProfile } = await admin.from("profiles")
+        .select("username, display_name").eq("id", user.id).single();
+      await sendPushToUsers(admin, [challenge.challenger_id],
+        challengeAcceptedPayload(pushProfile?.display_name || pushProfile?.username || "Your opponent"),
+        { notifKey: `challenge-accepted:${challenge.challenger_id}`, gapMin: 60 });
     } catch {}
 
     return NextResponse.json({ battleId: battle.id });
