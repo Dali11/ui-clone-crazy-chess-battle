@@ -119,10 +119,11 @@ async function attemptMatch(
       .update({ battle_id: battle.id })
       .eq("id", opponent.id);
 
-    await admin.from("battle_escrow").insert([
+    const { error: escrowErr } = await admin.from("battle_escrow").insert([
       { battle_id: battle.id, player_id: playerId, amount: stake, status: "locked" },
       { battle_id: battle.id, player_id: opponent.player_id, amount: stake, status: "locked" },
     ]);
+    if (escrowErr) console.error("[matchmaker] escrow insert failed:", escrowErr);
 
     const { data: playerQueue } = await admin
       .from("battle_queue")

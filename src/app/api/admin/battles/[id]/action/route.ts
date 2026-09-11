@@ -35,11 +35,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (battle.status !== "pending")
         return NextResponse.json({ error: `Cannot cancel a battle with status "${battle.status}"` }, { status: 400 });
 
+      // AUDIT FIX 2026-09-11: also require no game linked — cancelling a
+      // battle whose game exists would refund stakes on a live board.
       const { data: claimed } = await admin.from("battles")
         .update({ status: "cancelled", notes: `Admin-cancelled by ${user.id} via admin panel.` })
-        .eq("id", battleId).eq("status", "pending").select("id").single();
+        .eq("id", battleId).eq("status", "pending").is("game_id", null).select("id").single();
 
-      if (!claimed) return NextResponse.json({ error: "Battle status changed — refresh and try again." }, { status: 409 });
+      if (!claimed) return NextResponse.json({ error: "Battle status changed or a game already exists — refresh and try again." }, { status: 409 });
 
       const [{ error: c1 }, { error: c2 }] = await Promise.all([
         admin.rpc("credit_wallet", { p_user_id: battle.white_player_id, p_amount: battle.stake }),
@@ -73,7 +75,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       if (gameErr || !gameId) return NextResponse.json({ error: "Game creation failed — try Cancel & Refund instead." }, { status: 500 });
 
-      await admin.from("battles").update({ game_id: gameId, status: "playing", started_at: new Date().toISOString() }).eq("id", battleId);
+      // AUDIT FIX 2026-09-11: atomic claim — two admins double-clicking
+      // used to create two games; the loser of the claim has its fresh
+      // game aborted so no orphan "playing" game pollutes player lists.
+      const { data: claimedBattle } = await admin.from("battles")
+        .update({ game_id: gameId, status: "playing", started_at: new Date().toISOString() })
+        .eq("id", battleId).eq("status", "pending").is("game_id", null)
+        .select("id").single();
+
+      if (!claimedBattle) {
+        await admin.from("games").update({ status: "abort", winner: null, ended_at: new Date().toISOString() }).eq("id", gameId);
+        return NextResponse.json({ error: "Another admin just started this battle — refresh." }, { status: 409 });
+      }
       await applyBattleJoinWindow(admin, gameId);
       return NextResponse.json({ success: true, action: "retry_game", gameId });
     }

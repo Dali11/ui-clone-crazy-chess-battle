@@ -49,7 +49,19 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (claimed) {
-        await admin.rpc("credit_wallet", { p_user_id: claimed.challenger_id, p_amount: claimed.stake });
+        // AUDIT FIX 2026-09-11: the credit error was ignored — a transient
+        // failure silently ate the challenger's stake (status said expired,
+        // so no retry path would ever fire). Revert on failure so
+        // refund-expired / cleanup-expired can retry.
+        const { error: creditErr } = await admin.rpc("credit_wallet", {
+          p_user_id: claimed.challenger_id,
+          p_amount: claimed.stake,
+        });
+        if (creditErr) {
+          console.error("[challenge/accept] expired-challenge refund failed:", creditErr);
+          await admin.from("battle_challenges").update({ status: "pending" }).eq("id", challengeId);
+          return NextResponse.json({ error: "Challenge has expired — refund pending, try again shortly" }, { status: 500 });
+        }
         await admin.from("deposits").insert({
           user_id: claimed.challenger_id,
           amount: claimed.stake,
@@ -113,8 +125,8 @@ export async function POST(req: NextRequest) {
       amount: challenge.stake,
       status: "success",
       method: "battle_escrow",
-      reference: `battle_challenge_accept:${user.id}:${challenge.stake}`,
-    });
+      reference: `battle_challenge_accept:${challenge.id}:${user.id}`,
+    }).then(() => {}, (e: any) => console.error("[challenge/accept] escrow ledger insert failed:", e?.message));
 
     const { data: configRow } = await admin.from("battle_config").select("*").limit(1).single();
     const config = { ...DEFAULT_CONFIG, ...configRow };
@@ -157,6 +169,14 @@ export async function POST(req: NextRequest) {
     }
 
     await admin.from("battle_challenges").update({ battle_id: battle.id }).eq("id", challengeId);
+
+    // AUDIT FIX 2026-09-11: record both stakes in battle_escrow so the
+    // admin panel / audit views can see escrow state for challenge battles
+    // (previously only queue-matched battles had escrow rows).
+    await admin.from("battle_escrow").insert([
+      { battle_id: battle.id, player_id: challenge.challenger_id, amount: challenge.stake, status: "locked" },
+      { battle_id: battle.id, player_id: user.id, amount: challenge.stake, status: "locked" },
+    ]).then(() => {}, (e: any) => console.error("[challenge/accept] escrow insert failed:", e?.message));
 
     // Insert in-app notification for challenger
     try {

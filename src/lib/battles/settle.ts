@@ -51,8 +51,23 @@ export async function settleBattle(
         return { settled: true, result: "already_settled" };
       }
 
-      await admin.rpc("credit_wallet", { p_user_id: battle.white_player_id, p_amount: battle.stake });
-      await admin.rpc("credit_wallet", { p_user_id: battle.black_player_id, p_amount: battle.stake });
+      // AUDIT FIX 2026-09-11: the credit_wallet errors were previously
+      // ignored — a transient RPC failure silently ate a player's stake
+      // forever (the settled flag blocks every retry path). Check both
+      // credits; only then ledger + release the escrow rows.
+      const [wCredit, bCredit] = await Promise.all([
+        admin.rpc("credit_wallet", { p_user_id: battle.white_player_id, p_amount: battle.stake }),
+        admin.rpc("credit_wallet", { p_user_id: battle.black_player_id, p_amount: battle.stake }),
+      ]);
+      if (wCredit.error || bCredit.error) {
+        const failedSide = wCredit.error ? "white" : bCredit.error ? "black" : "?";
+        console.error(`MANUAL INTERVENTION NEEDED: Battle ${battleId} settled (draw refund) but the ${failedSide} refund failed:`, wCredit.error || bCredit.error);
+        await admin
+          .from("battles")
+          .update({ notes: `REFUND_FAILED (${failedSide}) draw_max_armageddon at ${new Date().toISOString()}` })
+          .eq("id", battleId);
+        throw new Error(`Failed to refund stakes (${failedSide}) — battle marked as settled, manual intervention needed`);
+      }
 
       // Ledger both stake refunds (unique references; idempotent on retry).
       const { error: _drawDepErr } = await admin.from("deposits").insert([
@@ -87,8 +102,45 @@ export async function settleBattle(
     });
 
     if (agErr || !agGameId) {
-      console.error("Armageddon game creation failed:", agErr);
-      throw new Error("Failed to start armageddon");
+      // AUDIT FIX 2026-09-11: this used to throw, leaving the battle
+      // permanently stuck (its game is over, heal-stuck only scans
+      // 'pending', and the move route never re-triggers — stakes locked
+      // until an admin noticed). The fair automatic recovery for a draw
+      // that can't get a decider is to refund both stakes.
+      console.error("Armageddon game creation failed — falling back to refund-settle:", agErr);
+      const { data: refunded, error: refundClaimErr } = await admin
+        .from("battles")
+        .update({
+          status: "completed",
+          result: "draw_armageddon_create_failed",
+          settled: true,
+          completed_at: new Date().toISOString(),
+          notes: "Refunded — armageddon decider could not be created (fail-safe)",
+        })
+        .eq("id", battleId)
+        .eq("settled", false)
+        .select("id");
+
+      if (!refundClaimErr && refunded && refunded.length > 0) {
+        const [wCredit, bCredit] = await Promise.all([
+          admin.rpc("credit_wallet", { p_user_id: battle.white_player_id, p_amount: battle.stake }),
+          admin.rpc("credit_wallet", { p_user_id: battle.black_player_id, p_amount: battle.stake }),
+        ]);
+        if (!wCredit.error && !bCredit.error) {
+          await admin.from("deposits").insert([
+            { user_id: battle.white_player_id, amount: battle.stake, status: "success", method: "battle_refund", reference: `battle:${battleId}:draw:white` },
+            { user_id: battle.black_player_id, amount: battle.stake, status: "success", method: "battle_refund", reference: `battle:${battleId}:draw:black` },
+          ]).then(() => {}, () => {});
+          await admin.from("battle_escrow").update({ status: "refunded", released_at: new Date().toISOString() }).eq("battle_id", battleId);
+          return { settled: true, result: "draw_refund_armageddon_create_failed" };
+        }
+        console.error(`MANUAL INTERVENTION NEEDED: Battle ${battleId} refund fallback credits failed:`, wCredit.error || bCredit.error);
+        await admin
+          .from("battles")
+          .update({ notes: `REFUND_FAILED armageddon_create_failed at ${new Date().toISOString()}` })
+          .eq("id", battleId);
+      }
+      throw new Error("Failed to start armageddon AND refund fallback failed — manual intervention needed");
     }
 
     await admin
@@ -139,6 +191,10 @@ export async function settleBattle(
 
   if (creditErr) {
     console.error(`MANUAL INTERVENTION NEEDED: Battle ${battleId} marked settled but payout of ${payout} to ${winnerId} failed`);
+    await admin
+      .from("battles")
+      .update({ notes: `PAYOUT_FAILED to ${winnerId} at ${new Date().toISOString()} — credit the wallet manually` })
+      .eq("id", battleId);
     throw new Error("Failed to pay winner — battle marked as settled, manual intervention needed");
   }
 

@@ -162,8 +162,13 @@ export async function POST(req: NextRequest) {
       console.error("Rematch accept create_game error:", rpcError);
       // Refund if staked
       if (isStakedRematch) {
-        await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake });
-        await admin.rpc("credit_wallet", { p_user_id: offer.requester_id, p_amount: stake });
+        const [aCredit, rCredit] = await Promise.all([
+          admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake }),
+          admin.rpc("credit_wallet", { p_user_id: offer.requester_id, p_amount: stake }),
+        ]);
+        if (aCredit.error || rCredit.error) {
+          console.error(`MANUAL INTERVENTION NEEDED: [rematch/accept] refund after create_game failure failed (offer ${offer.id}):`, aCredit.error || rCredit.error);
+        }
       }
       return NextResponse.json({ error: "Failed to create rematch game" }, { status: 500 });
     }
@@ -192,11 +197,23 @@ export async function POST(req: NextRequest) {
 
       if (battleErr || !battle) {
         console.error("Staked rematch battle creation failed:", battleErr);
-        // Refund
-        await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake });
-        await admin.rpc("credit_wallet", { p_user_id: offer.requester_id, p_amount: stake });
+        // Refund — AUDIT FIX 2026-09-11: check the credits.
+        const [aCredit, rCredit] = await Promise.all([
+          admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake }),
+          admin.rpc("credit_wallet", { p_user_id: offer.requester_id, p_amount: stake }),
+        ]);
+        if (aCredit.error || rCredit.error) {
+          console.error(`MANUAL INTERVENTION NEEDED: [rematch/accept] refund after battle-creation failure failed (offer ${offer.id}):`, aCredit.error || rCredit.error);
+        }
         return NextResponse.json({ error: "Failed to create battle for rematch" }, { status: 500 });
       }
+
+      // AUDIT FIX 2026-09-11: record both stakes in battle_escrow (staked
+      // rematches never had escrow rows — invisible to admin escrow views).
+      await admin.from("battle_escrow").insert([
+        { battle_id: battle.id, player_id: offer.requester_id, amount: stake, status: "locked" },
+        { battle_id: battle.id, player_id: offer.opponent_id, amount: stake, status: "locked" },
+      ]).then(() => {}, (e: any) => console.error("[rematch/accept] escrow insert failed:", e?.message));
 
       // Link battle to the new game AND flip status to "playing" — without
       // this, the battle stays "pending" for the entire game (game_id set

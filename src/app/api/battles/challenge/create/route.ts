@@ -74,21 +74,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to lock stake. Try again." }, { status: 500 });
     }
 
-    // Record the escrow deposit
-    const { error: depositErr } = await admin.from("deposits").insert({
-      user_id: user.id,
-      amount: stake,
-      status: "success",
-      method: "battle_challenge_escrow",
-      reference: `battle_challenge_create:${user.id}:${stake}`,
-    });
+    // AUDIT FIX 2026-09-11: the escrow ledger row is now keyed by the
+    // challenge id (the old user+stake reference collided whenever a
+    // player recreated a challenge at the same stake, silently dropping
+    // audit rows). Inserted after creation; still non-fatal on failure —
+    // the wallet debit is the source of truth.
+    const challengeLedgerRef = `battle_challenge_create`;
 
-    if (depositErr) {
-      console.error("[challenge/create] deposit insert error:", depositErr.message);
-      // Non-fatal — the wallet debit already happened, don't block challenge creation
-    }
-
-    // Create the challenge record (expires in 24 hours)
+    // Create the challenge record (expires in 10 minutes)
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
     const { data: challenge, error: challengeErr } = await admin
@@ -105,10 +98,22 @@ export async function POST(req: NextRequest) {
 
     if (challengeErr || !challenge) {
       console.error("[challenge/create] challenge insert error:", challengeErr?.message || "no row returned");
-      // Refund the debit
-      await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake });
+      // Refund the debit. AUDIT FIX 2026-09-11: check the credit — an
+      // ignored failure here silently ate the stake.
+      const { error: refundErr } = await admin.rpc("credit_wallet", { p_user_id: user.id, p_amount: stake });
+      if (refundErr) {
+        console.error(`MANUAL INTERVENTION NEEDED: [challenge/create] stake refund failed for ${user.id} (MK${stake}):`, refundErr);
+      }
       return NextResponse.json({ error: "Failed to create challenge" }, { status: 500 });
     }
+
+    await admin.from("deposits").insert({
+      user_id: user.id,
+      amount: stake,
+      status: "success",
+      method: "battle_challenge_escrow",
+      reference: `${challengeLedgerRef}:${challenge.id}`,
+    }).then(() => {}, (e: any) => console.error("[challenge/create] deposit insert error:", e?.message));
 
     return NextResponse.json({ challengeId: challenge.id });
   } catch (err: any) {

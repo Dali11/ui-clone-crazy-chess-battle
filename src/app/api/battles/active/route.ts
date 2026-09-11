@@ -188,12 +188,25 @@ export async function GET() {
             const fb = forceClaimed[0];
             // Refund both players — we can't reliably determine the winner
             // if settleBattle already failed, so a refund is the safe path.
-            await admin.rpc("credit_wallet", { p_user_id: fb.white_player_id, p_amount: fb.stake });
-            await admin.rpc("credit_wallet", { p_user_id: fb.black_player_id, p_amount: fb.stake });
-            await admin.from("battle_escrow")
-              .update({ status: "refunded", released_at: new Date().toISOString() })
-              .eq("battle_id", battle.id);
-            console.log("[active] Force-settled and refunded battle", battle.id);
+            // AUDIT FIX 2026-09-11: check the credits (an ignored failure
+            // silently ate the stakes), and ledger the refunds.
+            const [wCredit, bCredit] = await Promise.all([
+              admin.rpc("credit_wallet", { p_user_id: fb.white_player_id, p_amount: fb.stake }),
+              admin.rpc("credit_wallet", { p_user_id: fb.black_player_id, p_amount: fb.stake }),
+            ]);
+            if (wCredit.error || bCredit.error) {
+              console.error(`MANUAL INTERVENTION NEEDED: [active] force-settle refund failed for battle ${battle.id}:`, wCredit.error || bCredit.error);
+              await admin.from("battles").update({ notes: `FORCE_SETTLE_REFUND_FAILED at ${new Date().toISOString()}` }).eq("id", battle.id);
+            } else {
+              await admin.from("deposits").insert([
+                { user_id: fb.white_player_id, amount: fb.stake, status: "success", method: "battle_refund", reference: `force_settle:${battle.id}:white` },
+                { user_id: fb.black_player_id, amount: fb.stake, status: "success", method: "battle_refund", reference: `force_settle:${battle.id}:black` },
+              ]).then(() => {}, () => {});
+              await admin.from("battle_escrow")
+                .update({ status: "refunded", released_at: new Date().toISOString() })
+                .eq("battle_id", battle.id);
+              console.log("[active] Force-settled and refunded battle", battle.id);
+            }
           }
           return NextResponse.json({ active: false });
         }
@@ -224,10 +237,22 @@ export async function GET() {
           .select("id, stake, white_player_id, black_player_id");
         if (forceClaimed && forceClaimed.length > 0) {
           const fb = forceClaimed[0];
-          await admin.rpc("credit_wallet", { p_user_id: fb.white_player_id, p_amount: fb.stake });
-          await admin.rpc("credit_wallet", { p_user_id: fb.black_player_id, p_amount: fb.stake });
-          await admin.from("battle_escrow").update({ status: "refunded", released_at: new Date().toISOString() }).eq("battle_id", battle.id);
-          console.log("[active] Force-settled stuck-pending battle", battle.id, "with refund");
+          // AUDIT FIX 2026-09-11: check the credits + ledger the refunds.
+          const [wCredit, bCredit] = await Promise.all([
+            admin.rpc("credit_wallet", { p_user_id: fb.white_player_id, p_amount: fb.stake }),
+            admin.rpc("credit_wallet", { p_user_id: fb.black_player_id, p_amount: fb.stake }),
+          ]);
+          if (wCredit.error || bCredit.error) {
+            console.error(`MANUAL INTERVENTION NEEDED: [active] stuck-pending refund failed for battle ${battle.id}:`, wCredit.error || bCredit.error);
+            await admin.from("battles").update({ notes: `FORCE_SETTLE_REFUND_FAILED at ${new Date().toISOString()}` }).eq("id", battle.id);
+          } else {
+            await admin.from("deposits").insert([
+              { user_id: fb.white_player_id, amount: fb.stake, status: "success", method: "battle_refund", reference: `force_settle:${battle.id}:white` },
+              { user_id: fb.black_player_id, amount: fb.stake, status: "success", method: "battle_refund", reference: `force_settle:${battle.id}:black` },
+            ]).then(() => {}, () => {});
+            await admin.from("battle_escrow").update({ status: "refunded", released_at: new Date().toISOString() }).eq("battle_id", battle.id);
+            console.log("[active] Force-settled stuck-pending battle", battle.id, "with refund");
+          }
         }
         return NextResponse.json({ active: false });
       }
