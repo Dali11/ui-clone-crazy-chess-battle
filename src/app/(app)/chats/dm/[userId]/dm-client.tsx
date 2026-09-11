@@ -3,8 +3,7 @@
 // A direct-message thread with one player, WhatsApp-style with read ticks.
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import ChatView from "@/components/chat/chat-view";
 import { createClient } from "@/lib/supabase/client";
 
@@ -21,7 +20,7 @@ function colorFor(name: string): string {
 
 export default function DmChatClient({ partnerId }: { partnerId: string }) {
   const [myUserId, setMyUserId] = useState<string | null>(null);
-  const [partner, setPartner] = useState<{ username: string } | null>(null);
+  const [partner, setPartner] = useState<{ username: string; avatarUrl: string | null } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -31,24 +30,22 @@ export default function DmChatClient({ partnerId }: { partnerId: string }) {
       setMyUserId(user.id);
       const { data: profile } = await supabase
         .from("profiles")
-        .select("username")
+        .select("username, avatar_url")
         .eq("id", partnerId)
         .single();
-      setPartner(profile || { username: "player" });
+      setPartner(profile ? { username: profile.username, avatarUrl: profile.avatar_url } : { username: "player", avatarUrl: null });
     })();
   }, [partnerId]);
 
   return (
     <div className="max-w-3xl mx-auto">
-      <Link href="/chats" className="inline-flex items-center gap-1 text-xs text-ccb-muted hover:text-ccb-text mb-1">
-        <ArrowLeft className="w-3.5 h-3.5" /> All chats
-      </Link>
       {partner ? (
         <ChatView
           mode="dm"
           partnerId={partnerId}
           headerTitle={partner.username}
           headerSubtitle="Direct message"
+          headerAvatarUrl={partner.avatarUrl}
           headerIcon={
             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${colorFor(partner.username)}`}>
               {partner.username?.[0]?.toUpperCase() || "?"}

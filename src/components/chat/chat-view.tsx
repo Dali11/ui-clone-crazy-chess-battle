@@ -7,8 +7,9 @@
 // foreign-country rooms and other people's DMs simply never arrive.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { ChevronDown, Loader2, Send, Users, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, ChevronDown, Loader2, Send, Users, Check, CheckCheck } from "lucide-react";
 
 export interface ChatMessage {
   id: number;
@@ -87,12 +88,13 @@ interface Props {
   headerTitle: string;
   headerSubtitle?: string;
   headerIcon?: React.ReactNode;
+  headerAvatarUrl?: string | null;
   myUserId: string | null;
   isAdmin?: boolean;
   onUnauthorized?: () => void;
 }
 
-export default function ChatView({ mode, room, partnerId, headerTitle, headerSubtitle, headerIcon, myUserId, isAdmin = false, onUnauthorized }: Props) {
+export default function ChatView({ mode, room, partnerId, headerTitle, headerSubtitle, headerIcon, headerAvatarUrl, myUserId, isAdmin = false, onUnauthorized }: Props) {
   const supabase = useMemo(() => createClient(), []);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -333,10 +335,26 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
   return (
     <div className="relative flex flex-col h-[calc(100vh-11rem)] min-h-[420px] max-w-3xl mx-auto -mt-2">
       {/* Header */}
-      <div className="flex items-center gap-3 px-3 py-2.5 rounded-t-xl border border-ccb-border bg-ccb-card">
-        <div className="w-10 h-10 rounded-full bg-ccb-primary flex items-center justify-center shrink-0 text-white">
-          {headerIcon ?? <Users className="w-5 h-5" />}
-        </div>
+      <div className="flex items-center gap-2.5 px-2.5 py-2.5 rounded-t-xl border border-ccb-border bg-ccb-card">
+        <Link
+          href="/chats"
+          aria-label="Back to chats"
+          className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
+        {headerAvatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={headerAvatarUrl}
+            alt={headerTitle}
+            className="w-10 h-10 rounded-full object-cover shrink-0 border border-ccb-border"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-ccb-primary flex items-center justify-center shrink-0 text-white overflow-hidden">
+            {headerIcon ?? <Users className="w-5 h-5" />}
+          </div>
+        )}
         <div className="min-w-0">
           <h1 className="font-semibold text-ccb-text truncate">{headerTitle}</h1>
           <p className="text-xs text-ccb-muted truncate">{headerSubtitle}</p>

@@ -45,6 +45,18 @@ function colorFor(name: string): string {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
+function Avatar({ username, url, className }: { username: string; url?: string | null; className?: string }) {
+  if (url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt={username} className={`rounded-full object-cover shrink-0 border border-ccb-border ${className || ""}`} />;
+  }
+  return (
+    <div className={`${colorFor(username)} flex items-center justify-center text-white font-bold shrink-0 ${className || ""}`}>
+      {username?.[0]?.toUpperCase() || "?"}
+    </div>
+  );
+}
+
 function timeShort(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -141,9 +153,7 @@ export default function ChatsClient() {
                 <p className="text-xs text-ccb-muted px-2 pb-2">No players found</p>
               ) : userHits.map((u) => (
                 <Link key={u.id} href={`/chats/dm/${u.id}`} className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-ccb-surface">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 ${colorFor(u.username)}`}>
-                    {u.username?.[0]?.toUpperCase() || "?"}
-                  </div>
+                  <Avatar username={u.username} url={u.avatar_url} className="w-9 h-9 text-sm" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-ccb-text truncate">{u.username}</p>
                     <p className="text-xs text-ccb-muted">Send a message</p>
@@ -191,9 +201,7 @@ export default function ChatsClient() {
                 href={`/chats/dm/${c.partnerId}`}
                 className="flex items-center gap-3 px-3 py-3 border-b border-ccb-border last:border-0 hover:bg-ccb-surface transition-colors"
               >
-                <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 ${colorFor(c.username)}`}>
-                  {c.username?.[0]?.toUpperCase() || "?"}
-                </div>
+                <Avatar username={c.username} url={c.avatarUrl} className="w-11 h-11 text-sm" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-ccb-text truncate">{c.username}</p>
                   <p className={`text-xs truncate ${c.unread > 0 ? "text-ccb-text font-medium" : "text-ccb-muted"}`}>

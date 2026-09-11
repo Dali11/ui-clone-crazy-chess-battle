@@ -4,8 +4,7 @@
 // server-side (API + RLS); an invalid room shows a friendly notice.
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Globe, MessageCircle } from "lucide-react";
+import { Globe, MessageCircle } from "lucide-react";
 import ChatView from "@/components/chat/chat-view";
 import { createClient } from "@/lib/supabase/client";
 
@@ -32,9 +31,6 @@ export default function RoomChatClient({ room }: { room: string }) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <Link href="/chats" className="inline-flex items-center gap-1 text-xs text-ccb-muted hover:text-ccb-text mb-1">
-        <ArrowLeft className="w-3.5 h-3.5" /> All chats
-      </Link>
       <ChatView
         mode="group"
         room={room}
