@@ -50,6 +50,14 @@ export interface LeagueXpConfig {
   promote_count: number;
   demote_count: number;
   tier_cap: number;
+  /**
+   * Owner policy 2026-09-11: standard top-N promotion / bottom-N
+   * relegation is BUILT IN but OFF while the player base grows —
+   * rosters move via the fair-share rebalance only. Flip ON when
+   * Premier approaches the tier cap (~1k players). Cash rewards pay
+   * the top N every week regardless of this flag.
+   */
+  tier_moves_enabled?: boolean;
   rewards_enabled: boolean;
   reward_1_mwk: number;
   reward_2_mwk: number;

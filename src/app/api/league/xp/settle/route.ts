@@ -16,11 +16,13 @@ export const maxDuration = 60;
  *    8th, 15th, 22nd and 1st — owner policy 2026-09-11):
  *    For each tier, ranked by XP desc:
  *      - top `promote_count` (default 5): credited their rank reward to the
- *        wallet (credit_wallet RPC, same path as battle payouts) and
- *        promoted one tier — but only while the league above has a free
- *        slot (tier_cap, default 1000; the Open League is uncapped).
- *      - demotion is config-driven (`demote_count`, currently 0 —
- *        promotion-only mode: nobody gets pushed down).
+ *        wallet (credit_wallet RPC, same path as battle payouts). Tier
+ *        movement (one tier up) happens only while tier_moves_enabled is
+ *        on AND the league above has a free slot (tier_cap, default
+ *        1000; the Open League is uncapped) — currently OFF while the
+ *        player base grows; the fair-share rebalance moves rosters.
+ *      - demotion is config-driven (`demote_count`) and also gated on
+ *        tier_moves_enabled.
  *      - every member's XP resets for the new week and a history snapshot
  *        is written (league_xp_history).
  *      - FAIR-SHARE REBALANCE (owner policy 2026-09-11): after the
@@ -97,6 +99,12 @@ async function runWeeklySettle(
 
   const promoted = cfg.promote_count;
   const demoted = cfg.demote_count;
+  // Owner policy 2026-09-11: standard 5-up/5-down is built in but
+  // switched OFF while the player base grows — the fair-share rebalance
+  // below is the only thing that moves players between leagues. Cash
+  // rewards still pay the top N every week. Flip tier_moves_enabled on
+  // when Premier approaches the 1k cap.
+  const movesOn = cfg.tier_moves_enabled === true;
   // Final tier per member after the standard moves (for the fair-share
   // rebalance below) + players who already moved this run (never moved
   // twice in one settle).
@@ -169,9 +177,9 @@ async function runWeeklySettle(
             console.error("League reward ledger insert failed:", depErr);
           }
         }
-        if (tier < 5 && room > 0) { newTier = tier + 1; didPromote = true; room--; }
-        else if (tier < 5 && room <= 0) capped++;
-      } else if (isBottom && tier > 1) {
+        if (movesOn && tier < 5 && room > 0) { newTier = tier + 1; didPromote = true; room--; }
+        else if (movesOn && tier < 5 && room <= 0) capped++;
+      } else if (isBottom && movesOn && tier > 1) {
         newTier = tier - 1; didDemote = true;
       }
 
