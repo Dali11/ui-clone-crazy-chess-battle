@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import NotificationBell from "./notification-bell";
 import { useCurrency } from "@/hooks/use-currency";
+import { useChatsUnread } from "@/hooks/use-chats-unread";
 
 interface Profile {
   username: string | null;
@@ -34,6 +35,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
   const { formatMoney: fmtCurrency } = useCurrency();
   const isGameRoute = pathname.startsWith("/game/") || pathname.startsWith("/play/computer") || pathname.startsWith("/draughts/game/");
   const [menuOpen, setMenuOpen] = useState(false);
+  const chatsUnread = useChatsUnread();
 
   useEffect(() => {
     setMenuOpen(false);
@@ -291,6 +293,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
             {bottomNav.map((item) => {
               const Icon = item.icon;
               const active = isPathActive(pathname, item.href);
+              const showBadge = item.href === "/chats" && chatsUnread > 0 && !pathname.startsWith("/chats");
               return (
                 <Link
                   key={item.href}
@@ -301,7 +304,14 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
                   {active && (
                     <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-ccb-primary" />
                   )}
-                  <Icon className={`w-5 h-5 transition-colors ${active ? "text-ccb-primary" : "text-gray-400"}`} />
+                  <div className="relative">
+                    <Icon className={`w-5 h-5 transition-colors ${active ? "text-ccb-primary" : "text-gray-400"}`} />
+                    {showBadge && (
+                      <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center shadow-sm border border-white/80">
+                        {chatsUnread > 99 ? "99+" : chatsUnread}
+                      </span>
+                    )}
+                  </div>
                   <span className={`text-[9px] font-medium transition-colors ${active ? "text-ccb-primary" : "text-gray-500"}`}>
                     {item.label}
                   </span>
