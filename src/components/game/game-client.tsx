@@ -631,12 +631,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       } else {
         // Not our turn — queue a premove via tap-to-move. No limit on
         // chain length (chess.com-style: keep stacking, each plays on its
-        // own turn).
-        if (isPromotionMove(selectedSquare, square)) {
-          setPremovePromotion({ from: selectedSquare, to: square });
-        } else {
-          setPremoves((prev) => [...prev, { from: selectedSquare, to: square }]);
-        }
+        // own turn). Promotions are detected at EXECUTION time so a
+        // promotion premove keeps its FIFO place in a mixed chain.
+        setPremoves((prev) => [...prev, { from: selectedSquare, to: square }]);
       }
       setSelectedSquare(null);
       setLegalMoveSquares([]);
@@ -695,17 +692,15 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       if (!piece) return false;
       const isMyPiece = (isWhite && piece.color === "w") || (isBlack && piece.color === "b");
       if (!isMyPiece) return false;
-      if (isPromotionMove(sourceSquare, targetSquare)) {
-        setPremovePromotion({ from: sourceSquare, to: targetSquare });
-      } else {
-        // Queue the drag as a premove — no limit (chess.com-style chain).
-        // If this piece already has a queued premove, the new drag
-        // replaces it instead of leaving two destinations for one piece.
-        setPremoves((prev) => [
-          ...prev.filter((p) => p.from !== sourceSquare),
-          { from: sourceSquare, to: targetSquare },
-        ]);
-      }
+      // Queue the drag as a premove — no limit (chess.com-style chain).
+      // If this piece already has a queued premove, the new drag replaces
+      // it instead of leaving two destinations for one piece. Promotions
+      // are detected at EXECUTION time, so FIFO order is preserved even
+      // in mixed chains.
+      setPremoves((prev) => [
+        ...prev.filter((p) => p.from !== sourceSquare),
+        { from: sourceSquare, to: targetSquare },
+      ]);
       return true;
     },
     [isSpectator, myTurn, gameEnded, fen, makeMove, isPromotionMove, isWhite, isBlack, isLiveView, premoves]
@@ -782,38 +777,50 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     }
     const first = premoves[0];
     if (!first || playedThisTurnRef.current) return;
-    playedThisTurnRef.current = true;
+    // Validate the front premove against the real position. Promotion is
+    // detected HERE (chess.js flags the probed move) rather than at queue
+    // time — a promotion premove keeps its FIFO place in a mixed chain, and
+    // even chained promotions (only detectable once their position exists)
+    // get the real picker instead of a silent auto-queen.
+    let probe: any = null;
+    let chess: any = null;
     try {
-      const chess = new Chess(game.fen);
-      const move = chess.move({ from: first.from, to: first.to, promotion: "q" });
-      if (move !== null) {
-        setFen(chess.fen());
-        setMoveHistory((prev) => [...prev, move.san]);
-        setViewPly((prev) => prev + 1);
-        setLastMove({ from: first.from, to: first.to });
-        playSound(detectMoveSound(move));
-        if (chess.inCheck() && !chess.isCheckmate()) {
-          setTimeout(() => playSound("check"), 100);
-        }
-        makeMove(first.from, first.to).then((res: any) => {
-          if (!res?.success) {
-            // Premove rejected by server — board will auto-correct from server state
-          }
-        });
-        // Executed — keep the rest of the queue for our next turns. Chained
-        // promotions beyond the first are auto-queened here (the picker only
-        // applies to a premove detectable at queue time; deeper chain entries
-        // can't be detected until their position actually exists).
-        setPremoves((prev) => prev.slice(1));
-        return;
-      }
-      // move === null → the premove is no longer legal on the new position
-      // (e.g. the piece was captured, or the move would be self-check).
-      // The chain is broken — cancel everything, standard chess.com behavior.
+      chess = new Chess(game.fen);
+      probe = chess.move({ from: first.from, to: first.to, promotion: "q" });
     } catch {
-      // Invalid position or move — cancel the queue
+      // Invalid position or move — fall through to cancel the queue
     }
-    setPremoves([]);
+    if (!probe || !chess) {
+      // The premove is no longer legal on the new position (e.g. the
+      // piece was captured, or the move would be self-check). The chain
+      // is broken — cancel everything, standard chess.com behavior.
+      setPremoves([]);
+      return;
+    }
+    playedThisTurnRef.current = true;
+    if (probe.promotion) {
+      // Front of the queue is a promotion — defer to the picker. Consuming
+      // this turn's premove slot also prevents the effect from playing the
+      // NEXT chained premove behind the open promotion dialog.
+      setPremoves((prev) => prev.slice(1));
+      setPremovePromotion({ from: first.from, to: first.to });
+      return;
+    }
+    setFen(chess.fen());
+    setMoveHistory((prev) => [...prev, probe.san]);
+    setViewPly((prev) => prev + 1);
+    setLastMove({ from: first.from, to: first.to });
+    playSound(detectMoveSound(probe));
+    if (chess.inCheck() && !chess.isCheckmate()) {
+      setTimeout(() => playSound("check"), 100);
+    }
+    makeMove(first.from, first.to).then((res: any) => {
+      if (!res?.success) {
+        // Premove rejected by server — board will auto-correct from server state
+      }
+    });
+    // Executed — keep the rest of the queue for our next turns.
+    setPremoves((prev) => prev.slice(1));
   }, [myTurn, premoves, premovePromotion, game.fen, gameEnded, makeMove]);
 
   useEffect(() => {

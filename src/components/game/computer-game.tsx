@@ -309,19 +309,31 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
     }
     const first = premoves[0];
     if (!first || playedThisTurnRef.current) return;
-    playedThisTurnRef.current = true;
+    // Validate against the real position; detect promotion HERE (chess.js
+    // flags the probed move) instead of at queue time — FIFO order is
+    // preserved in mixed chains, and chained promotions get the real
+    // picker instead of a silent auto-queen.
+    let probe: any = null;
     try {
-      const game = new Chess(fen);
-      const move = game.move({ from: first.from, to: first.to, promotion: "q" });
-      if (move !== null) {
-        applyMove(first.from, first.to, "q");
-        // Executed — keep the rest of the queue for our next turns
-        setPremoves((prev) => prev.slice(1));
-        return;
-      }
-      // No longer legal — chain is broken, cancel everything
+      probe = new Chess(fen).move({ from: first.from, to: first.to, promotion: "q" });
     } catch {}
-    setPremoves([]);
+    if (!probe) {
+      // No longer legal — chain is broken, cancel everything
+      setPremoves([]);
+      return;
+    }
+    playedThisTurnRef.current = true;
+    if (probe.promotion) {
+      // Front of the queue is a promotion — defer to the picker; the
+      // consumed turn slot prevents the next chained premove from playing
+      // behind the open promotion dialog.
+      setPremoves((prev) => prev.slice(1));
+      setPremovePromotion({ from: first.from, to: first.to });
+      return;
+    }
+    applyMove(first.from, first.to, "q");
+    // Executed — keep the rest of the queue for our next turns
+    setPremoves((prev) => prev.slice(1));
   }, [isPlayerTurn, premoves, premovePromotion, fen, gameEnded, applyMove]);
 
   // Handle piece click — show legal moves or capture (Tap-to-move)
@@ -436,12 +448,10 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
           applyMove(selectedSquare, square, "q");
         }
       } else {
-        // Not our turn — queue a premove, unlimited chain length
-        if (isPromotionMove(selectedSquare, square)) {
-          setPremovePromotion({ from: selectedSquare, to: square });
-        } else {
-          setPremoves((prev) => [...prev, { from: selectedSquare, to: square }]);
-        }
+        // Not our turn — queue a premove, unlimited chain length.
+        // Promotions are detected at EXECUTION time so a promotion
+        // premove keeps its FIFO place in a mixed chain.
+        setPremoves((prev) => [...prev, { from: selectedSquare, to: square }]);
       }
       setSelectedSquare(null);
       setLegalMoveSquares([]);
@@ -478,16 +488,14 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
     if (!piece) return false;
     const isMyPiece = (isPlayerWhite && piece.color === "w") || (!isPlayerWhite && piece.color === "b");
     if (!isMyPiece) return false;
-    if (isPromotionMove(sourceSquare, targetSquare)) {
-      setPremovePromotion({ from: sourceSquare, to: targetSquare });
-    } else {
-      // Queue the drag as a premove — no limit (chess.com-style chain).
-      // If this piece already has a queued premove, the new drag replaces it.
-      setPremoves((prev) => [
-        ...prev.filter((p) => p.from !== sourceSquare),
-        { from: sourceSquare, to: targetSquare },
-      ]);
-    }
+    // Queue the drag as a premove — no limit (chess.com-style chain).
+    // If this piece already has a queued premove, the new drag replaces
+    // it. Promotions are detected at EXECUTION time, so FIFO order is
+    // preserved even in mixed chains.
+    setPremoves((prev) => [
+      ...prev.filter((p) => p.from !== sourceSquare),
+      { from: sourceSquare, to: targetSquare },
+    ]);
     return true;
   }, [isPlayerTurn, gameEnded, isPromotionMove, applyMove, fen, isPlayerWhite, isLiveView, premoves]);
 
