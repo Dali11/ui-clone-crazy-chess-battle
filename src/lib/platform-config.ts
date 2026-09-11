@@ -31,7 +31,7 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     xp_upset_bonus: 0,
     daily_xp_cap: 100,
     promote_count: 5,
-    demote_count: 0, // promotion-only mode — no demotion
+    demote_count: 5, // owner policy 2026-09-11: top promote, bottom demote
     tier_cap: 1000, // max players per league above Open (Open is uncapped)
     rewards_enabled: true,
     // Legacy flat rewards (pre per-tier config) — kept as fallback.
@@ -52,8 +52,9 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     monthly_top_count: 5,
     // Owner policy 2026-09-11: open registration, anyone can join any league.
     registration_open: true,
-    // Season 1 starts Mon 2026-09-14 00:00 CAT — before that, free placement.
-    season_start: "2026-09-14",
+    // Season 1 started Fri 2026-09-11 00:00 CAT (owner policy). Monthly
+    // championships never count XP earned before this date.
+    season_start: "2026-09-11",
     monthly_rewards_t1_mwk: [8000, 4000, 2000, 1000, 500],
     monthly_rewards_t2_mwk: [12000, 6000, 3000, 1600, 600],
     monthly_rewards_t3_mwk: [20000, 10000, 5000, 2400, 1000],

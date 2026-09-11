@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getLeagueXpConfig, currentWeekStart, currentMonthStart, rewardsForTier, monthlyRewardsForTier } from "@/lib/league-xp";
+import { getLeagueXpConfig, currentWeekStart, currentMonthStart, rewardsForTier, monthlyRewardsForTier, CAT_OFFSET_MS } from "@/lib/league-xp";
+import { getExchangeRate } from "@/lib/geo/fx";
+import { COUNTRY_CURRENCY } from "@/lib/geo/currency-map";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,7 +12,8 @@ export const maxDuration = 60;
  * vercel.json). Requires Bearer CRON_SECRET. Two independent settles,
  * each self-guarding, so one daily cron covers both:
  *
- * 1. WEEKLY (only fires right after Monday 00:00 CAT):
+ * 1. WEEKLY (only fires Saturday 00:05 CAT, paying the Friday-to-Friday
+ *    week that just closed — owner policy 2026-09-11):
  *    For each tier, ranked by XP desc:
  *      - top `promote_count` (default 5): credited their rank reward to the
  *        wallet (credit_wallet RPC, same path as battle payouts) and
@@ -56,20 +59,27 @@ async function runSettlement() {
   return NextResponse.json({ ok: true, ...result, monthly });
 }
 
-/** Weekly ladder settle — only acts in the hours right after Monday 00:00 CAT. */
+/**
+ * Weekly ladder settle — runs on SATURDAY 00:05 CAT (cron is daily; this
+ * guard makes every other day a no-op). Owner policy 2026-09-11: XP weeks
+ * run Friday 00:00 CAT to Friday 00:00 CAT, and payouts land Saturday.
+ */
 async function runWeeklySettle(
   admin: ReturnType<typeof createAdminClient>,
   cfg: Awaited<ReturnType<typeof getLeagueXpConfig>>
 ) {
   // ── Boundary guard ───────────────────────────────────────────────────
-  // Settlement is only valid in the hours right after Monday 00:00 CAT.
-  // Anywhere else in the week we would be settling the LIVE week —
-  // paying mid-week and wiping everyone's XP. So: only run when "6 hours
-  // ago" falls in the previous cycle. (The idempotency guard on
-  // week_start additionally prevents double-paying re-runs.)
+  // Only settle on Saturday (CAT), paying for the week that just closed
+  // (Friday boundary). 30h back from Saturday 00:05 lands on Thursday —
+  // safely inside the closing cycle. (The idempotency guard on week_start
+  // additionally prevents double-paying re-runs.)
   const now = new Date();
+  const catNow = new Date(now.getTime() + CAT_OFFSET_MS);
+  if (catNow.getUTCDay() !== 6) {
+    return { skipped: "weekly settle only runs on Saturday (CAT)" };
+  }
   const curWeek = currentWeekStart(now);
-  const closingWeek = currentWeekStart(new Date(now.getTime() - 6 * 60 * 60 * 1000));
+  const closingWeek = currentWeekStart(new Date(now.getTime() - 30 * 60 * 60 * 1000));
   if (closingWeek === curWeek) {
     return { skipped: "not at week boundary", week: curWeek };
   }
@@ -80,6 +90,7 @@ async function runWeeklySettle(
     .select("user_id, tier, xp, week_start, profiles!inner(display_name, username)")
     .order("xp", { ascending: false })
     .order("updated_at", { ascending: true });
+  const fxRates = new Map<string, number>();
   if (error) return { error: error.message };
 
   const promoted = cfg.promote_count;
@@ -123,12 +134,14 @@ async function runWeeklySettle(
           // deposits_reference_unique partial index turns any crash/retry
           // into a no-op instead of a double payout.
           const rewardRef = `league:${closingWeek}:${m.user_id}`;
+          const fxNote = await fxNoteFor(admin, m.user_id, reward, fxRates);
           const { error: depErr } = await admin.from("deposits").insert({
             user_id: m.user_id,
             amount: reward,
             status: "success",
             method: "league_reward",
             reference: rewardRef,
+            admin_notes: fxNote,
           });
           if (depErr && String(depErr.message || "").includes("duplicate key")) {
             // Already paid in a previous run — skip.
@@ -179,6 +192,39 @@ async function runWeeklySettle(
 }
 
 /**
+ * Owner policy 2026-09-11: players are paid the equivalent of their MWK
+ * reward in their own currency at the prevailing FX rate. Wallets hold
+ * MWK value, so the credit is the MWK amount and the ledger row records
+ * the prevailing rate + the player-currency equivalent for payout time.
+ * Rates are memoized per settle run (one FX call per currency).
+ */
+async function fxNoteFor(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  rewardMwk: number,
+  rates: Map<string, number>
+): Promise<string | null> {
+  try {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("country")
+      .eq("id", userId)
+      .maybeSingle();
+    const currency = COUNTRY_CURRENCY[(profile?.country || "MW").toUpperCase()] || "MWK";
+    if (currency === "MWK") return null;
+    if (!rates.has(currency)) {
+      rates.set(currency, await getExchangeRate("MWK", currency));
+    }
+    const rate = rates.get(currency) ?? 1;
+    if (!rate || rate === 1) return null;
+    const converted = Math.round(rewardMwk * rate * 100) / 100;
+    return `FX payout: ${rewardMwk.toLocaleString()} MWK ≈ ${converted.toLocaleString()} ${currency} @ ${rate}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Monthly championship settle — only acts on the 1st of the month.
  * Ranks each tier by XP earned during the month that just closed and
  * pays the configured monthly rewards. No promotion/demotion.
@@ -204,8 +250,12 @@ async function runMonthlySettle(
     return { skipped: "already settled", month: closingMonth };
   }
 
-  // Aggregate the month's XP from the events audit log.
-  const monthStartIso = closingMonth + "T00:00:00+02:00";
+  // Aggregate the month's XP from the events audit log. Season 1 began
+  // 2026-09-11 — the first championship month only counts XP from then.
+  const cycleStart = (cfg.season_start && cfg.season_start > closingMonth)
+    ? cfg.season_start
+    : closingMonth;
+  const monthStartIso = cycleStart + "T00:00:00+02:00";
   const monthEndIso = curMonth + "T00:00:00+02:00";
   const { data: events, error: evErr } = await admin
     .from("league_xp_events")
@@ -226,6 +276,7 @@ async function runMonthlySettle(
 
   const topCount = cfg.monthly_top_count ?? 5;
   let paid = 0, ranked = 0, snapshots = 0;
+  const fxRates = new Map<string, number>();
 
   for (const tier of [1, 2, 3, 4, 5]) {
     const rewards = cfg.monthly_rewards_enabled !== false && cfg.rewards_enabled
@@ -250,12 +301,14 @@ async function runMonthlySettle(
 
       if (reward > 0) {
         const rewardRef = `league_monthly:${closingMonth}:${r.user_id}`;
+        const fxNote = await fxNoteFor(admin, r.user_id, reward, fxRates);
         const { error: depErr } = await admin.from("deposits").insert({
           user_id: r.user_id,
           amount: reward,
           status: "success",
           method: "league_reward",
           reference: rewardRef,
+          admin_notes: fxNote,
         });
         if (depErr && String(depErr.message || "").includes("duplicate key")) {
           // Already paid in a previous run — no-op.

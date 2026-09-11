@@ -8,8 +8,9 @@ import { DEFAULT_CONFIGS } from "@/lib/platform-config";
  * members were Elo-seeded once at launch; tiers move only through
  * weekly results from then on. Players earn XP from every finished PvP
  * game (chess + draughts — bot/computer games never count, so XP cannot
- * be farmed). Standings reset weekly (Monday 00:00 CAT); the settle cron
- * rewards and promotes the top 5 and demotes the bottom 5 of each tier.
+ * be farmed). Standings reset weekly (Friday 00:00 CAT); the settle cron
+ * rewards and promotes the top 5 and demotes the bottom 5 of each tier
+ * (payouts land on Saturday).
  */
 
 // CAT is UTC+2 year-round (no DST) — a fixed offset is exact.
@@ -131,16 +132,20 @@ export async function getLeagueXpConfig(admin?: ReturnType<typeof createAdminCli
   }
 }
 
-/** ISO date (yyyy-mm-dd) of the Monday 00:00 CAT that starts the current cycle. */
+/**
+ * ISO date (yyyy-mm-dd) of the FRIDAY 00:00 CAT that starts the current
+ * cycle. Owner policy 2026-09-11: XP weeks run Friday to Friday; the
+ * settle cron pays out on Saturday.
+ */
 export function currentWeekStart(now = new Date()): string {
   const cat = new Date(now.getTime() + CAT_OFFSET_MS);
-  const day = cat.getUTCDay(); // 0 Sun ... 6 Sat
-  const daysSinceMonday = (day + 6) % 7;
-  const monday = new Date(cat.getTime() - daysSinceMonday * 86400_000);
-  return monday.toISOString().slice(0, 10);
+  const day = cat.getUTCDay(); // 0 Sun ... 5 Fri ... 6 Sat
+  const daysSinceFriday = (day + 2) % 7;
+  const friday = new Date(cat.getTime() - daysSinceFriday * 86400_000);
+  return friday.toISOString().slice(0, 10);
 }
 
-/** ISO date of the NEXT Monday 00:00 CAT (cycle end + 1s boundary). */
+/** ISO date of the NEXT Friday 00:00 CAT (cycle end + 1s boundary). */
 export function nextWeekStart(now = new Date()): string {
   const cur = currentWeekStart(now);
   const next = new Date(cur + "T00:00:00Z").getTime() + 7 * 86400_000;

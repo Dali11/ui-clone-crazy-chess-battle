@@ -8,10 +8,9 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/league/xp/register — join a league (or switch leagues).
  *
- * Owner policy 2026-09-11: registration is open and ANY player can join
- * ANY league — self-select your tier. Joining or switching resets your
- * weekly XP to 0 for the current cycle (fair play — no hopping with a
- * carried score). Tiers above Open respect tier_cap; Open is uncapped.
+ * Owner policy 2026-09-11 (revised): all new players join the Open
+ * League (tier 1). Higher leagues are reached by promotion only —
+ * existing players were seeded once by rating at season start.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -23,6 +22,16 @@ export async function POST(req: NextRequest) {
     const tierNum = Number(tier);
     if (!Number.isInteger(tierNum) || tierNum < 1 || tierNum > LEAGUE_TIERS.length) {
       return NextResponse.json({ error: "Invalid league tier" }, { status: 400 });
+    }
+    // Owner policy 2026-09-11: all new players join the Open League —
+    // self-selecting a higher tier is no longer allowed. Existing players
+    // were seeded by rating once at season start; movement is
+    // promotion/demotion only.
+    if (tierNum !== 1) {
+      return NextResponse.json(
+        { error: "New players join the Open League — higher leagues are reached by climbing the ladder" },
+        { status: 403 }
+      );
     }
 
     const admin = createAdminClient();

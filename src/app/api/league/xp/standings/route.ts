@@ -54,10 +54,15 @@ export async function GET(req: NextRequest) {
       // calendar month for everyone in the player's tier.
       cycleStart = currentMonthStart();
       cycleEnd = nextMonthStart();
+      // Season 1 began 2026-09-11 — the first championship month counts XP
+      // only from that date (owner policy 2026-09-11).
+      const monthCycleStart = (cfg.season_start && cfg.season_start > cycleStart)
+        ? cfg.season_start
+        : cycleStart;
       const { data: events } = await admin
         .from("league_xp_events")
         .select("user_id, amount")
-        .gte("created_at", cycleStart + "T00:00:00+02:00")
+        .gte("created_at", monthCycleStart + "T00:00:00+02:00")
         .lt("created_at", cycleEnd + "T00:00:00+02:00");
       const xpByUser = new Map<string, number>();
       for (const ev of events ?? []) {
@@ -111,6 +116,13 @@ export async function GET(req: NextRequest) {
 
     const myRow = standings.find((s: any) => s.isMe);
     const myRank = myRow?.rank ?? null;
+
+    // All-time rolling XP — every event ever earned, never resets.
+    const { data: myEvents } = await admin
+      .from("league_xp_events")
+      .select("amount")
+      .eq("user_id", user.id);
+    const allTimeXp = (myEvents ?? []).reduce((s, e) => s + (e.amount ?? 0), 0);
     const rewardsOn = cfg.rewards_enabled;
     const monthlyOn = cfg.monthly_rewards_enabled !== false && rewardsOn;
 
@@ -121,6 +133,7 @@ export async function GET(req: NextRequest) {
       tier: LEAGUE_TIERS.find((t) => t.tier === member.tier) ?? LEAGUE_TIERS[0],
       myXp,
       myRank,
+      allTimeXp: allTimeXp ?? 0,
       promoteCount: scope === "month" ? (cfg.monthly_top_count ?? 5) : cfg.promote_count,
       demoteCount: scope === "month" ? 0 : cfg.demote_count,
       tierCap: cfg.tier_cap ?? 1000,

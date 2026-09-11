@@ -36,8 +36,8 @@ interface StandingsResponse {
   /** Payout (MWK) for every league tier — keys are tier numbers. */
   tierRewards?: Record<number, number[]>;
   tiers?: { tier: number; name: string; emoji: string }[];
-  registrationOpen?: boolean;
   seasonStart?: string | null;
+  allTimeXp?: number;
 }
 
 /** Local-currency reward tile: primary = player's currency, secondary = MWK. */
@@ -98,10 +98,6 @@ export default function XpLeagueTab() {
   const [data, setData] = useState<StandingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [showHow, setShowHow] = useState(false);
-  const [regTier, setRegTier] = useState<number | null>(null);
-  const [regBusy, setRegBusy] = useState(false);
-  const [showSwitch, setShowSwitch] = useState(false);
-  const [regError, setRegError] = useState<string | null>(null);
   const currency = useCurrency();
 
   useEffect(() => {
@@ -111,34 +107,6 @@ export default function XpLeagueTab() {
       .then((d) => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
   }, [scope]);
-
-  // Join (or switch) leagues — open registration, self-select any tier.
-  const joinLeague = async (tier: number) => {
-    setRegError(null);
-    setRegBusy(true);
-    setRegTier(tier);
-    try {
-      const res = await fetch("/api/league/xp/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier }),
-      });
-      const d = await res.json();
-      if (!res.ok) {
-        setRegError(d.error || "Failed to join league");
-      } else {
-        setLoading(true);
-        fetch(`/api/league/xp/standings${scope === "month" ? "?scope=month" : ""}`)
-          .then((r) => (r.status === 401 ? null : r.json()))
-          .then((d2) => { setData(d2); setLoading(false); })
-          .catch(() => setLoading(false));
-      }
-    } catch {
-      setRegError("Failed to join league");
-    }
-    setRegBusy(false);
-    setRegTier(null);
-  };
 
   const countdown = useCountdown(data?.cycleEnd);
   const isMonth = scope === "month";
@@ -165,7 +133,7 @@ export default function XpLeagueTab() {
   const rules = data.xpRules;
   const rewards = data.rewards ?? [];
 
-  // ── Not seeded yet: placement explainer ────────────────────────────────
+  // ── Not seeded yet: auto-entry explainer ────────────────────────────────
   if (!data.seeded) {
     return (
       <div className="space-y-4">
@@ -185,55 +153,9 @@ export default function XpLeagueTab() {
             and promoted every week — climb all the way to the Premier League.
           </p>
           <Link href="/play" className="btn-primary w-full flex items-center justify-center gap-2 mt-5 py-3 rounded-xl text-sm font-bold">
-            <Swords className="w-4 h-4" /> Play a placement match
+            <Swords className="w-4 h-4" /> Play your first game
           </Link>
         </div>
-
-        {/* Open registration — pick your league */}
-        {data.registrationOpen && (
-          <div className="card p-4">
-            <h3 className="text-sm font-semibold mb-1">Pick your league</h3>
-            <p className="text-xs text-ccb-muted mb-3">
-              Registration is open — join any league you like. Play free placement matches until the
-              season starts{data.seasonStart ? ` (${new Date(data.seasonStart + "T00:00:00+02:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })})` : ""} to earn XP.
-            </p>
-            {regError && <p className="text-xs text-red-400 mb-2">{regError}</p>}
-            <div className="space-y-2">
-              {(data.tiers ?? []).map((t, i) => {
-                const payout = data.tierRewards?.[t.tier]?.[0] ?? 0;
-                const full = (data.tierCap ?? 1000) > 0 && t.tier > 1;
-                return (
-                  <button
-                    key={t.tier}
-                    onClick={() => joinLeague(t.tier)}
-                    disabled={regBusy}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
-                      i === (data.tiers ?? []).length - 1
-                        ? "border-ccb-primary/50 bg-ccb-primary/10"
-                        : "border-ccb-border bg-ccb-surface hover:border-ccb-primary/40"
-                    } ${regBusy ? "opacity-60" : ""}`}
-                  >
-                    <span className="text-2xl shrink-0">{t.emoji}</span>
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold">{t.name}</div>
-                      <div className="text-[11px] text-ccb-muted">
-                        {payout > 0
-                          ? `Weekly 1st place: ${currency.currencyCode === "MWK" ? `MK ${payout.toLocaleString()}` : currency.formatMoney(payout)}`
-                          : "Uncapped — everyone welcome"}
-                        {full ? ` · max ${((data.tierCap ?? 1000)).toLocaleString()} players` : ""}
-                      </div>
-                    </div>
-                    {regTier === t.tier && regBusy ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-ccb-muted shrink-0" />
-                    ) : (
-                      <span className="text-xs font-bold text-ccb-primary shrink-0">JOIN →</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {data.tiers && (
           <div className="card p-4">
@@ -280,17 +202,17 @@ export default function XpLeagueTab() {
       {/* Weekly | Monthly leaderboard switch */}
       <ScopeToggle scope={scope} setScope={setScope} />
 
-      {/* Season 1 placement banner — until the season starts */}
+      {/* Season banner */}
       {data.seasonStart && (
         <div className="card p-4 border-ccb-primary/30">
           <div className="flex items-start gap-3">
             <Zap className="w-5 h-5 text-ccb-primary shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="text-sm font-semibold">Season 1 starts {new Date(data.seasonStart + "T00:00:00+02:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</h3>
+              <h3 className="text-sm font-semibold">Season 1 is underway</h3>
               <p className="text-xs text-ccb-muted mt-1 leading-relaxed">
-                Until then, play <b className="text-ccb-text">free placement matches</b> on the Play page — every finished
-                game earns XP and books your place in the standings. From the season start, staked challenges
-                count toward the league too.
+                Weeks run <b className="text-ccb-text">Friday to Friday</b> and rewards are paid out every
+                <b className="text-ccb-text"> Saturday</b>. Every finished PvP game earns XP — free matches and staked
+                challenges both count. All-time XP never resets.
               </p>
             </div>
           </div>
@@ -304,48 +226,14 @@ export default function XpLeagueTab() {
             <span className="text-3xl">{data.tier?.emoji}</span>
             <div>
               <h2 className="text-lg font-bold">{data.tier?.name}</h2>
-              <p className="text-xs text-ccb-muted">Your rank: {data.myRank ? `#${data.myRank}` : "—"} · {data.myXp ?? 0} XP</p>
+              <p className="text-xs text-ccb-muted">Your rank: {data.myRank ? `#${data.myRank}` : "—"} · {data.myXp ?? 0} XP · All-time: {data.allTimeXp ?? 0} XP</p>
             </div>
           </div>
           <div className="text-right shrink-0">
-            <div className="text-xs text-ccb-muted">{isMonth ? "Ends on the 1st · 00:00 CAT" : "Resets Monday 00:00 CAT"}</div>
+            <div className="text-xs text-ccb-muted">{isMonth ? "Ends on the 1st · 00:00 CAT" : "Week ends Friday · payouts Saturday"}</div>
             <div className="text-sm font-bold text-ccb-primary tabular-nums">{countdown || "…"}</div>
           </div>
         </div>
-        {data.registrationOpen && (
-          <div className="pt-3 mt-3 border-t border-ccb-border">
-            <button
-              onClick={() => { setShowSwitch(!showSwitch); setRegError(null); }}
-              className="text-xs font-semibold text-ccb-accent hover:underline"
-            >
-              {showSwitch ? "Hide league switcher" : "Switch league"}
-            </button>
-            <span className="text-[10px] text-ccb-muted ml-2">switching resets your weekly XP to 0</span>
-          </div>
-        )}
-        {showSwitch && data.registrationOpen && (
-          <div className="mt-3 space-y-2">
-            {regError && <p className="text-xs text-red-400">{regError}</p>}
-            {(data.tiers ?? []).map((t) => (
-              <button
-                key={t.tier}
-                onClick={() => joinLeague(t.tier)}
-                disabled={regBusy || t.tier === data.tier?.tier}
-                className={`w-full flex items-center gap-2.5 p-2.5 rounded-lg border text-left transition-all ${
-                  t.tier === data.tier?.tier
-                    ? "border-ccb-primary bg-ccb-primary/15"
-                    : "border-ccb-border bg-ccb-surface hover:border-ccb-accent/40"
-                } ${regBusy ? "opacity-60" : ""}`}
-              >
-                <span className="text-lg shrink-0">{t.emoji}</span>
-                <span className="flex-1 text-sm font-semibold">{t.name}</span>
-                <span className="text-[11px] font-semibold text-ccb-muted shrink-0">
-                  {t.tier === data.tier?.tier ? "current" : regTier === t.tier && regBusy ? "joining…" : "join"}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Rewards strip */}
@@ -438,8 +326,8 @@ export default function XpLeagueTab() {
           <div className="px-4 pb-4 space-y-2 text-xs text-ccb-muted leading-relaxed">
             <p>Every finished game earns XP — wins <b className="text-ccb-text">{rules.win} XP</b>, draws <b className="text-ccb-text">{rules.draw} XP</b>{rules.loss > 0 ? <> , losses <b className="text-ccb-text">{rules.loss} XP</b></> : <> — losses earn nothing</>}.{rules.upsetBonus > 0 && <> Beat a higher-rated player for <b className="text-ccb-text">+{rules.upsetBonus} XP</b> extra.</>}</p>
             <p>To keep it fair, you can earn at most <b className="text-ccb-text">{rules.dailyCap} XP per day</b>, and games against the computer never count.</p>
-            <p>Standings reset <b className="text-ccb-text">every Monday at 00:00 CAT</b>. The top {promote} players in each league are rewarded and promoted to the next league up. Every league has its own payout — the higher you climb, the bigger the rewards. Premier League champions stay on top — and nobody gets demoted.</p>
-            <p>Everyone who joins starts in the Open League and climbs the ladder — Open → Amateur → Bronze → Knights Championship → Premier League. The Open League is unlimited; every league above it holds up to {tierCap.toLocaleString()} players, so promotion happens when there&apos;s a free spot.</p>
+            <p>Standings reset <b className="text-ccb-text">every Friday at 00:00 CAT</b> and rewards are paid out every <b className="text-ccb-text">Saturday</b>. The top {promote} players in each league are rewarded and promoted to the next league up; the bottom {demote} are demoted. Every league has its own payout — the higher you climb, the bigger the rewards.</p>
+            <p>Everyone joins the Open League and climbs the ladder — Open → Amateur → Bronze → Knights Championship → Premier League. Existing players were placed by rating when the season started. The Open League is unlimited; every league above it holds up to {tierCap.toLocaleString()} players, so promotion happens when there&apos;s a free spot. You stay in your league unless you are promoted or demoted.</p>
             <p><b className="text-ccb-text">Monthly championship:</b> alongside the weekly ladder, every league also runs a <b className="text-ccb-text">monthly leaderboard</b> from the 1st to the end of the month. The top players in each league earn <b className="text-ccb-text">bigger monthly rewards</b> — same tier, separate prizes, paid on the 1st. Your tier only moves on the weekly cycle.</p>
           </div>
         )}
