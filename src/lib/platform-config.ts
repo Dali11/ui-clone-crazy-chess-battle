@@ -75,6 +75,13 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     draughts_results_script: "",
     leagues_enabled: false,
     leagues_script: "",
+    // Frequency router caps (per player, localStorage-tracked):
+    // min gap between any two ads, max per rolling hour / 24h, and the
+    // end-of-game ad shows only on every Nth finished game.
+    frequency_min_gap_sec: 90,
+    frequency_hourly_cap: 4,
+    frequency_daily_cap: 12,
+    results_every_n: 3,
   },
   deposits: {
     enabled: true,

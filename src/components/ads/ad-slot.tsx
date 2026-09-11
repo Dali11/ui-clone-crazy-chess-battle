@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { decideAd, loadState, saveState, type AdFrequencyCaps } from "@/lib/ads/frequency";
 
 /**
  * AdSlot — renders an ad network snippet (Adsterra) for a given placement,
@@ -16,6 +17,11 @@ import { useEffect, useRef, useState } from "react";
  *    different ad units render on the same page.
  *  - Lazy by construction: mounting an AdSlot (e.g. on the results screen)
  *    is what renders the ad — ads never display during gameplay.
+ *  - FREQUENCY ROUTED: every mount passes the ad-frequency policy
+ *    (src/lib/ads/frequency.ts — nth-game gate, daily/hourly caps, min
+ *    gap between ads) before rendering. Impressions are counted per
+ *    player in localStorage; the policy is admin-configurable in
+ *    Platform Settings → Ads.
  *
  * Speed (the ad chain is 3 serial round-trips: config → invoke.js → banner):
  *  - The config fetch and a preload of each snippet's invoke.js are kicked
@@ -42,6 +48,7 @@ interface PlacementConfig {
 interface AdsConfig {
   enabled: boolean;
   placements: Partial<Record<AdPlacement, PlacementConfig>>;
+  frequency: AdFrequencyCaps;
 }
 
 let configPromise: Promise<AdsConfig | null> | null = null;
@@ -126,12 +133,31 @@ export default function AdSlot({
   const containerRef = useRef<HTMLDivElement>(null);
   const injected = useRef(false);
 
+  const routed = useRef(false); // one router decision per mount (StrictMode-safe)
+
   useEffect(() => {
     let cancelled = false;
     loadAdsConfig().then((cfg) => {
       if (cancelled) return;
       const p = cfg?.placements?.[placement];
-      setScript(cfg?.enabled && p?.enabled && p.script ? p.script : null);
+      if (!cfg?.enabled || !p?.enabled || !p.script) {
+        setScript(null);
+        return;
+      }
+      // Frequency router: nth-game gate, daily/hourly caps, min gap.
+      // ONE decision per mount — a mount is the impression opportunity,
+      // so the game counter counts every finished game even when the
+      // decision is "don't show".
+      if (routed.current) { setScript(null); return; }
+      routed.current = true;
+      const decision = decideAd({
+        placement,
+        caps: cfg.frequency,
+        state: loadState(),
+        now: Date.now(),
+      });
+      saveState(decision.state);
+      if (decision.show) setScript(p.script);
     });
     return () => { cancelled = true; };
   }, [placement]);

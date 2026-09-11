@@ -20,6 +20,12 @@ export async function GET() {
     return NextResponse.json(
       {
         enabled: !!cfg.enabled,
+        frequency: {
+          minGapSec: Number(cfg.frequency_min_gap_sec ?? 90),
+          hourlyCap: Number(cfg.frequency_hourly_cap ?? 4),
+          dailyCap: Number(cfg.frequency_daily_cap ?? 12),
+          resultsEveryN: Number(cfg.results_every_n ?? 3),
+        },
         placements: {
           lobby: { enabled: !!cfg.lobby_enabled, script: String(cfg.lobby_script || "") },
           spectate: { enabled: !!cfg.spectate_enabled, script: String(cfg.spectate_script || "") },

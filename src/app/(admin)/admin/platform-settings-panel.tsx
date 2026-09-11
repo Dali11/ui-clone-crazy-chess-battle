@@ -32,6 +32,10 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "challenge_finished_script", label: "Challenge Finished Ad Script", type: "textarea", group: "control" },
     { key: "leagues_enabled", label: "Leagues Page Ad", type: "toggle", group: "control", help: "Bottom of the League page (weekly + monthly leaderboards) and tournaments page — recommended 320x50 mobile / 728x90 desktop" },
     { key: "leagues_script", label: "Leagues Ad Script", type: "textarea", group: "control", help: "Paste the full Adsterra snippet" },
+    { key: "frequency_min_gap_sec", label: "Min Gap Between Ads", type: "number", group: "control", unit: "sec", help: "Cooldown between any two ads for the same player, across all placements" },
+    { key: "frequency_hourly_cap", label: "Hourly Cap (per player)", type: "number", group: "control", unit: "ads", help: "Max ad impressions per rolling hour, all placements combined. 0 = unlimited" },
+    { key: "frequency_daily_cap", label: "Daily Cap (per player)", type: "number", group: "control", unit: "ads", help: "Max ad impressions per rolling 24h, all placements combined. 0 = unlimited" },
+    { key: "results_every_n", label: "Results Ad Every Nth Game", type: "number", group: "control", unit: "games", help: "Show the end-of-game ad only on every Nth finished game (chess, draughts, battles). 1 = every game" },
   ],
   overview: [
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display", help: "Display stat cards at the top" },
