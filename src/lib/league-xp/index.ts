@@ -59,6 +59,14 @@ export interface LeagueXpConfig {
    */
   tier_moves_enabled?: boolean;
   rewards_enabled: boolean;
+  /**
+   * Owner policy 2026-09-11: kill-switch for WEEKLY cash payouts only.
+   * When false the settle still runs (XP reset, snapshots, rebalance)
+   * and players still see reward amounts everywhere — but no wallet
+   * credits. Used to skip the first partial week (Season 1 began
+   * 2026-09-11 mid-week). Absent = true.
+   */
+  weekly_payouts_enabled?: boolean;
   reward_1_mwk: number;
   reward_2_mwk: number;
   reward_3_mwk: number;

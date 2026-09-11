@@ -13,7 +13,10 @@ export const maxDuration = 60;
  * each self-guarding, so one daily cron covers both:
  *
  * 1. WEEKLY (fires the morning after each calendar week closes — the
- *    8th, 15th, 22nd and 1st — owner policy 2026-09-11):
+ *    8th, 15th, 22nd and 1st — owner policy 2026-09-11). Wallet
+ *    credits are gated on rewards_enabled AND weekly_payouts_enabled —
+ *    the kill-switch that keeps the league visibly running while no
+ *    money moves:
  *    For each tier, ranked by XP desc:
  *      - top `promote_count` (default 5): credited their rank reward to the
  *        wallet (credit_wallet RPC, same path as battle payouts). Tier
@@ -111,6 +114,12 @@ async function runWeeklySettle(
   const finalTier = new Map<string, number>();
   const movedUsers = new Set<string>();
   const cap = cfg.tier_cap > 0 ? cfg.tier_cap : Infinity; // 0/absent = uncapped
+  // Owner policy 2026-09-11: weekly_payouts_enabled is the payout
+  // kill-switch — the league, XP and leaderboard keep running and
+  // players still see reward amounts in the UI; only wallet credits
+  // stop. OFF for the first partial week (Season 1 began 2026-09-11);
+  // first real payout: the settle on 2026-09-22.
+  const payOn = cfg.rewards_enabled && cfg.weekly_payouts_enabled !== false;
   let paid = 0, moves = 0, snapshots = 0, capped = 0;
 
   // Rank within each tier: active members first (by xp desc — the select is
@@ -119,7 +128,7 @@ async function runWeeklySettle(
   // for demotion).
   for (const tier of [1, 2, 3, 4, 5]) {
     // Configurable payout per league — each tier has its own reward set.
-    const rewards = cfg.rewards_enabled ? rewardsForTier(cfg, tier) : [0, 0, 0, 0, 0];
+    const rewards = payOn ? rewardsForTier(cfg, tier) : [0, 0, 0, 0, 0];
     const tierMembers = (members ?? []).filter((m) => m.tier === tier);
     const active = tierMembers.filter((m) => m.week_start === closingWeek);
     // Nobody played in this league this week — nothing to settle, no

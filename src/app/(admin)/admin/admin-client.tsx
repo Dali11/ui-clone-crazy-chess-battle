@@ -12,6 +12,7 @@ import {
   Settings, FileText, SlidersHorizontal, Database, ChevronDown,
 } from "lucide-react";
 import PlatformSettingsPanel from "./platform-settings-panel";
+import LeaguesAdminPanel from "./components/leagues-admin-panel";
 import UserDetailModal from "./user-detail-modal";
 import { type Withdrawal, type Stats, type UserInfo, type Deposit, type Tournament, type GameInfo, type AdminLog, type Tab, localToUTC, utcToLocalInput } from "./types";
 import { ActionButton, ConfigInput } from "./components/shared";
@@ -1360,7 +1361,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {/* LEAGUES MANAGEMENT */}
           {tab === "leagues" && (
             <div className="space-y-4">
-              <PlatformSettingsPanel section="leagues_xp" />
+              <LeaguesAdminPanel />
+              <div className="pt-2">
+                <PlatformSettingsPanel section="leagues_xp" />
+              </div>
             </div>
           )}
 
