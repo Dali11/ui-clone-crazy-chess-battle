@@ -62,8 +62,8 @@ export async function POST(req: NextRequest) {
 
     // Guard: a fixed prize pool backed by the house is only allowed on a
     // paid-entry tournament (or by an admin). Free tournaments must use
-    // entry-fee pools (which collect nothing = no cash prize) or berry
-    // prizes. This closes the unbacked-payout hole.
+    // entry-fee pools (which collect nothing = no cash prize). This
+    // closes the unbacked-payout hole.
 
     const dbType = ["arena", "swiss", "knockout"].includes(type) ? type : "swiss";
     const GAME_TIME_CONTROL_MAP: Record<string, string> = {
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     if (poolSource === "fixed" && !isPaid && !isCreatorAdmin) {
       return NextResponse.json(
-        { error: "Fixed prize pools require a paid entry. Free tournaments can use berry prizes instead." },
+        { error: "Fixed prize pools require a paid entry. Free tournaments can use entry-fee pools instead." },
         { status: 400 }
       );
     }
