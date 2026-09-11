@@ -107,6 +107,10 @@ async function runWeeklySettle(
     const rewards = cfg.rewards_enabled ? rewardsForTier(cfg, tier) : [0, 0, 0, 0, 0];
     const tierMembers = (members ?? []).filter((m) => m.tier === tier);
     const active = tierMembers.filter((m) => m.week_start === closingWeek);
+    // Nobody played in this league this week — nothing to settle, no
+    // phantom snapshots (e.g. the pre-season weeks before the first
+    // real cycle closes).
+    if (active.length === 0) continue;
     const ranked = [
       ...active,
       ...tierMembers.filter((m) => m.week_start !== closingWeek),
