@@ -53,6 +53,33 @@ function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
+// Renders a chat body as text + clickable http(s) links (player request).
+// Only http/https URLs become anchors; everything else stays plain text,
+// so nothing can inject markup. Links open in a new tab, sandboxed.
+function LinkifiedBody({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="underline underline-offset-2 break-all hover:opacity-80"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part.length > 48 ? part.slice(0, 45) + "…" : part}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
 interface Props {
   mode: "group" | "dm";
   room?: string;             // group slug
@@ -387,7 +414,7 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
                             {m.username}
                           </span>
                         )}
-                        <span className="text-[13.5px] sm:text-sm whitespace-pre-wrap break-words block">{m.body}</span>
+                        <span className="text-[13.5px] sm:text-sm whitespace-pre-wrap break-words block"><LinkifiedBody text={m.body} /></span>
                         <span className={`block text-right text-[10px] mt-0.5 flex items-center justify-end gap-1 ${mine ? "text-white/70" : "text-ccb-muted"}`}>
                           {mode === "dm" && mine && (m.read_at
                             ? <CheckCheck className="w-3 h-3" />
