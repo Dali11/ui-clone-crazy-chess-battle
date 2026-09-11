@@ -79,6 +79,8 @@ export default function DraughtsGameClient({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [victoryDismissed, setVictoryDismissed] = useState(false);
+  // League XP earned from this game (shown on the end-of-game screen).
+  const [xpEarned, setXpEarned] = useState<number | null>(null);
   const [activeSheet, setActiveSheet] = useState<"chat" | "menu" | null>(null);
   const [drawOffer, setDrawOffer] = useState<null | "pending" | "offer">(null); // null = no offer, "pending" = we sent, "offer" = opponent sent
   const [previewUserId, setPreviewUserId] = useState<string | null>(null);
@@ -147,6 +149,40 @@ export default function DraughtsGameClient({
     const interval = setInterval(() => setClockTick(t => t + 1), 1000);
     return () => clearInterval(interval);
   }, [gameEnded]);
+
+  // League XP: fetch what this game earned once it ends (3 win / 1 draw /
+  // 0 loss). The server award is fire-and-forget, so retry briefly until
+  // the event row lands. Losses stay 0 → nothing is shown.
+  useEffect(() => {
+    if (!gameEnded) return;
+    let cancelled = false;
+    const attempt = async () => {
+      try {
+        const res = await fetch(`/api/league/xp/game-earned?gameId=${game.id}&kind=draughts`);
+        if (!res.ok) return false;
+        const data = await res.json();
+        if (cancelled) return false;
+        if (typeof data.amount === "number" && data.amount > 0) {
+          setXpEarned(data.amount);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    };
+    const run = async () => {
+      if (await attempt()) return;
+      await new Promise((r) => setTimeout(r, 1200));
+      if (cancelled) return;
+      if (await attempt()) return;
+      await new Promise((r) => setTimeout(r, 2000));
+      if (cancelled) return;
+      await attempt();
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [gameEnded, game.id]);
 
   // Realtime subscription
   useEffect(() => {
@@ -865,6 +901,7 @@ export default function DraughtsGameClient({
         reasonLabel={STATUS_LABELS[game.status] || game.status}
         ratingChange={myRatingChange}
         moveCount={game.move_count || 0}
+        xpEarned={xpEarned}
         adPlacement="draughts_results"
         subtitle={`${game.time_control || "10+0"} · ${game.rated ? "Ranked" : "Casual"} · ${variant}`}
         playerNames={{ white: whiteName, black: blackName }}

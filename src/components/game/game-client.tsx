@@ -102,6 +102,8 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   const [previewUserId, setPreviewUserId] = useState<string | null>(null);
   const [desktopTab, setDesktopTab] = useState<"moves" | "chat">("moves");
   const [armageddonGameId, setArmageddonGameId] = useState<string | null>(null);
+  // League XP earned from this game (shown on the end-of-game screen).
+  const [xpEarned, setXpEarned] = useState<number | null>(null);
   const [armageddonLoading, setArmageddonLoading] = useState(false);
   const [armageddonForfeiting, setArmageddonForfeiting] = useState(false);
   const [armageddonError, setArmageddonError] = useState(false);
@@ -178,6 +180,40 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   // game as soon as the draw is settled, but we gate the redirect behind an
   // explicit player choice instead of yanking them straight into it. Poll
   // battle status until the new armageddon game shows up.
+  // League XP: fetch what this game earned once it ends (3 win / 1 draw /
+  // 0 loss). The server award is fire-and-forget, so retry briefly until
+  // the event row lands. Losses and bot games stay 0 → nothing is shown.
+  useEffect(() => {
+    if (!gameEnded || isSpectator) return;
+    let cancelled = false;
+    const attempt = async () => {
+      try {
+        const res = await fetch(`/api/league/xp/game-earned?gameId=${gameId}&kind=chess`);
+        if (!res.ok) return false;
+        const data = await res.json();
+        if (cancelled) return false;
+        if (typeof data.amount === "number" && data.amount > 0) {
+          setXpEarned(data.amount);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    };
+    const run = async () => {
+      if (await attempt()) return;
+      await new Promise((r) => setTimeout(r, 1200));
+      if (cancelled) return;
+      if (await attempt()) return;
+      await new Promise((r) => setTimeout(r, 2000));
+      if (cancelled) return;
+      await attempt();
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [gameEnded, isSpectator, gameId]);
+
   const isBattleDraw = isBattleGame && gameEnded && game.winner === null && game.status !== "abort";
   useEffect(() => {
     if (!isBattleDraw || !battleInfo?.battleId || isSpectator) return;
@@ -1304,6 +1340,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           ratingChange={myRatingChange}
           moneyEarned={moneyEarned}
           moneyLabel={isBattleGame ? "Battle winnings" : undefined}
+          xpEarned={xpEarned}
           adPlacement={isBattleGame ? "battle_settlement" : "game_results"}
           moveCount={game.move_count}
           subtitle={`${game.time_control} · ${isTournamentGame ? "Tournament" : game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
@@ -1362,6 +1399,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         ratingChange={myRatingChange}
         moneyEarned={moneyEarned}
         moneyLabel={isBattleGame ? "Battle winnings" : undefined}
+        xpEarned={xpEarned}
         adPlacement={isBattleGame ? "battle_settlement" : "game_results"}
         moveCount={game.move_count}
         subtitle={`${game.time_control} · ${isTournamentGame ? "Tournament" : game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}

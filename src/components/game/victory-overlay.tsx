@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Trophy, Handshake, Frown, RefreshCw, Home, Swords, ScanSearch, Clock, Wallet, Check, X, Loader2 } from "lucide-react";
+import { Trophy, Handshake, Frown, RefreshCw, Home, Swords, ScanSearch, Clock, Wallet, Check, X, Loader2, Zap } from "lucide-react";
 import FireworksCanvas from "./fireworks-canvas";
 import AdSlot, { type AdPlacement } from "@/components/ads/ad-slot";
 import { moneySymbol } from "@/lib/geo/format";
@@ -26,6 +26,8 @@ interface VictoryOverlayProps {
   winnerSide?: "white" | "black" | null;
   moneyEarned?: number;     // in MWK
   moneyLabel?: string;       // e.g. "Battle winnings"
+  /** League XP earned from this game (3 win / 1 draw / 0 loss). Null = unknown yet, 0 = show nothing. */
+  xpEarned?: number | null;
   onNewGame?: () => void;
   onRematch?: () => void;
   onReview?: () => void;
@@ -62,6 +64,7 @@ export default function VictoryOverlay({
   subtitle,
   moneyEarned,
   moneyLabel = "Battle winnings",
+  xpEarned = null,
   playerNames,
   winnerSide,
   onNewGame,
@@ -195,7 +198,7 @@ export default function VictoryOverlay({
         <div className="my-4 h-px" style={{ background: `linear-gradient(90deg, transparent, ${accentBorder}, transparent)` }} />
 
         {/* Earnings section */}
-        {hasEarnings && (
+        {(hasEarnings || (xpEarned !== null && xpEarned > 0)) && (
           <div className="mb-4 flex items-center justify-center gap-4">
             {moneyEarned !== undefined && moneyEarned > 0 && (
               <div className="flex flex-col items-center px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}>
@@ -203,6 +206,14 @@ export default function VictoryOverlay({
                   <Wallet className="w-3 h-3" /> {moneyLabel}
                 </span>
                 <span className="text-lg font-extrabold text-emerald-400">{moneySymbol(countryCode)} {moneyEarned.toLocaleString()}</span>
+              </div>
+            )}
+            {xpEarned !== null && xpEarned > 0 && (
+              <div className="flex flex-col items-center px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)" }}>
+                <span className="text-[10px] uppercase tracking-wider text-violet-400/70 font-semibold mb-0.5 flex items-center gap-1">
+                  <Zap className="w-3 h-3" /> League XP
+                </span>
+                <span className="text-lg font-extrabold text-violet-300">+{xpEarned} XP</span>
               </div>
             )}
           </div>

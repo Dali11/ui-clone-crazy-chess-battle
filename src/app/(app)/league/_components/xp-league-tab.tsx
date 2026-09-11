@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, Swords, TrendingUp, ChevronDown, Zap, Gift, ArrowDownCircle, Trophy, Info } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
+import { countryFlag } from "@/lib/geo/flags";
 
 interface Standing {
   userId: string;
@@ -12,6 +13,10 @@ interface Standing {
   xp: number;
   rank: number;
   isMe: boolean;
+  /** ISO-2 country code (for the flag emoji). */
+  country?: string | null;
+  /** Career games played. */
+  games?: number;
 }
 
 interface StandingsResponse {
@@ -268,11 +273,15 @@ export default function XpLeagueTab() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold truncate">
-                      {s.name} {s.isMe && <span className="text-[10px] font-bold text-ccb-primary">YOU</span>}
+                      {s.name}{countryFlag(s.country) && <span className="ml-1">{countryFlag(s.country)}</span>} {s.isMe && <span className="text-[10px] font-bold text-ccb-primary">YOU</span>}
                     </div>
                     <div className="text-[11px] text-ccb-muted">Rating {s.rating}</div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-semibold tabular-nums">{s.games ?? 0}</div>
+                    <div className="text-[10px] text-ccb-muted">Games</div>
+                  </div>
+                  <div className="text-right shrink-0">
                     <div className="text-sm font-bold tabular-nums">{s.xp}</div>
                     <div className="text-[10px] text-ccb-muted">XP</div>
                   </div>
@@ -296,7 +305,7 @@ export default function XpLeagueTab() {
         </button>
         {showHow && rules && (
           <div className="px-4 pb-4 space-y-2 text-xs text-ccb-muted leading-relaxed">
-            <p>Every finished game earns XP — wins <b className="text-ccb-text">{rules.win} XP</b>, draws <b className="text-ccb-text">{rules.draw} XP</b>, losses <b className="text-ccb-text">{rules.loss} XP</b>. Beat a higher-rated player for <b className="text-ccb-text">+{rules.upsetBonus} XP</b> extra.</p>
+            <p>Every finished game earns XP — wins <b className="text-ccb-text">{rules.win} XP</b>, draws <b className="text-ccb-text">{rules.draw} XP</b>{rules.loss > 0 ? <> , losses <b className="text-ccb-text">{rules.loss} XP</b></> : <> — losses earn nothing</>}.{rules.upsetBonus > 0 && <> Beat a higher-rated player for <b className="text-ccb-text">+{rules.upsetBonus} XP</b> extra.</>}</p>
             <p>To keep it fair, you can earn at most <b className="text-ccb-text">{rules.dailyCap} XP per day</b>, and games against the computer never count.</p>
             <p>Standings reset <b className="text-ccb-text">every Monday at 00:00 CAT</b>. The top {promote} players in each league are rewarded and promoted to the next league up. Every league has its own payout — the higher you climb, the bigger the rewards. Premier League champions stay on top — and nobody gets demoted.</p>
             <p>Everyone who joins starts in the Open League and climbs the ladder — Open → Amateur → Bronze → Knights Championship → Premier League. The Open League is unlimited; every league above it holds up to {tierCap.toLocaleString()} players, so promotion happens when there&apos;s a free spot.</p>

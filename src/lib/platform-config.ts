@@ -24,10 +24,11 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
   // default — placements only render when individually toggled here.
   leagues_xp: {
     enabled: true,
-    xp_win: 10,
-    xp_draw: 4,
-    xp_loss: 2,
-    xp_upset_bonus: 2,
+    // Owner policy 2026-09-11: Win 3 / Draw 1 / Loss 0 (same as battles).
+    xp_win: 3,
+    xp_draw: 1,
+    xp_loss: 0,
+    xp_upset_bonus: 0,
     daily_xp_cap: 100,
     promote_count: 5,
     demote_count: 0, // promotion-only mode — no demotion

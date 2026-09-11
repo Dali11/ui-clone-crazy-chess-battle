@@ -84,10 +84,10 @@ export default function TournamentsPage() {
     setJoining(competition.id);
     setJoinMessage(null);
     try {
-      const res = await fetch('/api/league/join', {
+      // Only tournaments exist now (the old weekend "league" join was
+      // retired) — hit the tournament join endpoint directly by id.
+      const res = await fetch(`/api/tournaments/${competition.id}/join`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tournamentId: competition.id, competitionType: 'swiss' }),
       });
       const json = await res.json();
       if (json.success) {

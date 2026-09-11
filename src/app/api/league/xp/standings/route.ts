@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
       }
       const { data: tierRows } = await admin
         .from("league_xp_members")
-        .select("user_id, profiles!inner(display_name, username, rating)")
+        .select("user_id, profiles!inner(display_name, username, rating, country, games_played)")
         .eq("tier", member.tier);
       standings = (tierRows ?? [])
         .filter((r: any) => xpByUser.has(r.user_id))
@@ -70,6 +70,8 @@ export async function GET(req: NextRequest) {
           userId: r.user_id,
           name: r.profiles?.display_name || r.profiles?.username || "Player",
           rating: r.profiles?.rating ?? 400,
+          country: r.profiles?.country ?? null,
+          games: r.profiles?.games_played ?? 0,
           xp: xpByUser.get(r.user_id) ?? 0,
           isMe: r.user_id === user.id,
         }))
@@ -85,7 +87,7 @@ export async function GET(req: NextRequest) {
       // 0 XP; the cron's reset makes this self-correcting.)
       const { data: rows } = await admin
         .from("league_xp_members")
-        .select("user_id, xp, profiles!inner(display_name, username, rating)")
+        .select("user_id, xp, profiles!inner(display_name, username, rating, country, games_played)")
         .eq("tier", member.tier)
         .eq("week_start", cycleStart)
         .order("xp", { ascending: false })
@@ -95,6 +97,8 @@ export async function GET(req: NextRequest) {
         userId: r.user_id,
         name: r.profiles?.display_name || r.profiles?.username || "Player",
         rating: r.profiles?.rating ?? 400,
+        country: r.profiles?.country ?? null,
+        games: r.profiles?.games_played ?? 0,
         xp: r.xp ?? 0,
         rank: i + 1,
         isMe: r.user_id === user.id,
