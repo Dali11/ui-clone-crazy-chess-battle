@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (amount < (zmConfig.min_deposit_zmw || 5)) {
       return NextResponse.json({ error: `Minimum deposit is K${zmConfig.min_deposit_zmw || 5}` }, { status: 400 });
     }
-    if (amount > (zmConfig.max_withdrawal_zmw || 5000) && amount > (zmConfig.max_deposit_zmw || 5000)) {
+    if (amount > (zmConfig.max_deposit_zmw || 5000)) {
       return NextResponse.json({ error: `Maximum deposit is K${zmConfig.max_deposit_zmw || 5000}` }, { status: 400 });
     }
 

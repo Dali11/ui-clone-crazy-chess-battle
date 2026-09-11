@@ -61,7 +61,17 @@ interface WalletClientProps {
 
 const QUICK_AMOUNTS_MWK = [500, 1000, 2000, 5000, 10000, 25000];
 const QUICK_AMOUNTS_INTL = [100, 500, 1000, 2000, 5000, 10000];
-const QUICK_AMOUNTS_ZM = [5, 20, 50, 100, 200, 500];
+// ZM fallback (used only until /api/payments/ontech/config responds) — the
+// real chips are built from the admin-configured min in buildZmQuickAmounts.
+const QUICK_AMOUNTS_ZM_FALLBACK = [5, 20, 50, 100, 200, 500];
+
+/** Scale a set of quick-amount chips off the admin-configured min, capped at max. */
+function buildZmQuickAmounts(min: number, max: number): number[] {
+  const steps = [1, 4, 10, 20, 40, 100].map((m) => min * m);
+  const amounts = Array.from(new Set(steps.filter((a) => a <= max)));
+  if (amounts.length === 0) amounts.push(min);
+  return amounts;
+}
 
 export default function WalletClient({ balance, email, deposits, phone: savedPhone, country }: WalletClientProps) {
   const router = useRouter();
@@ -94,6 +104,9 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [zmAccountNumber, setZmAccountNumber] = useState("");
   const [zmRecipientName, setZmRecipientName] = useState("");
   const [pendingOntechId, setPendingOntechId] = useState<string | null>(null);
+  // Admin-configured ZM limits (Platform Settings → payments_zm) — never hardcode
+  // these client-side; fall back to the same defaults the API uses until loaded.
+  const [zmConfig, setZmConfig] = useState<{ minDepositZmw: number; maxDepositZmw: number; minWithdrawalZmw: number; maxWithdrawalZmw: number } | null>(null);
 
   // Live currency via shared hook — converts MWK to user's local currency
   const { formatMoney: fmtCurrency, currencySymbol: sym, currencyCode: currencyCode, rate: fxRate } = useCurrency(country);
@@ -101,7 +114,15 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const isZambia = country === "ZM";
   const usePawaPay = !isMalawi && !isZambia;
 
-  const quickAmounts = isMalawi ? QUICK_AMOUNTS_MWK : isZambia ? QUICK_AMOUNTS_ZM : QUICK_AMOUNTS_INTL;
+  const zmMinDeposit = zmConfig?.minDepositZmw ?? 5;
+  const zmMaxDeposit = zmConfig?.maxDepositZmw ?? 5000;
+  const zmMinWithdrawal = zmConfig?.minWithdrawalZmw ?? 10;
+  const zmMaxWithdrawal = zmConfig?.maxWithdrawalZmw ?? 5000;
+  const quickAmounts = isMalawi
+    ? QUICK_AMOUNTS_MWK
+    : isZambia
+    ? (zmConfig ? buildZmQuickAmounts(zmMinDeposit, zmMaxDeposit) : QUICK_AMOUNTS_ZM_FALLBACK)
+    : QUICK_AMOUNTS_INTL;
   const formatAmt = (amount: number) => fmtCurrency(amount || 0);
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -234,12 +255,25 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
     return () => { clearInterval(interval); clearTimeout(timeout); };
   }, [pendingChargeId, router]);
 
-  // ─── Fetch ZM banks (Ontech) ──────────────────────────────────────────
+  // ─── Fetch ZM banks + admin-configured deposit/withdraw limits (Ontech) ──
   useEffect(() => {
     if (!isZambia) return;
     fetch("/api/payments/ontech/banks")
       .then((r) => r.json())
       .then((d) => { if (d.banks) setZmBanks(d.banks); })
+      .catch(() => {});
+    fetch("/api/payments/ontech/config")
+      .then((r) => r.json())
+      .then((d) => {
+        if (typeof d.minDepositZmw === "number") {
+          setZmConfig({
+            minDepositZmw: d.minDepositZmw,
+            maxDepositZmw: d.maxDepositZmw,
+            minWithdrawalZmw: d.minWithdrawalZmw,
+            maxWithdrawalZmw: d.maxWithdrawalZmw,
+          });
+        }
+      })
       .catch(() => {});
   }, [isZambia]);
 
@@ -249,6 +283,16 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
     setError(null);
     setSuccess(null);
     try {
+      if (depositAmount < zmMinDeposit) {
+        setError(`Minimum deposit is K${zmMinDeposit.toLocaleString()}`);
+        setLoading(false);
+        return;
+      }
+      if (depositAmount > zmMaxDeposit) {
+        setError(`Maximum deposit is K${zmMaxDeposit.toLocaleString()}`);
+        setLoading(false);
+        return;
+      }
       if (!phone || phone.replace(/\D/g, "").length < 9) {
         setError("Enter a valid Zambian mobile number (e.g. 0971234567)");
         setLoading(false);
@@ -316,6 +360,16 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
     try {
       if (!withdrawAmount || withdrawAmount <= 0) {
         setError("Enter an amount to withdraw");
+        setWithdrawLoading(false);
+        return;
+      }
+      if (withdrawAmount < zmMinWithdrawal) {
+        setError(`Minimum withdrawal is K${zmMinWithdrawal.toLocaleString()}`);
+        setWithdrawLoading(false);
+        return;
+      }
+      if (withdrawAmount > zmMaxWithdrawal) {
+        setError(`Maximum withdrawal is K${zmMaxWithdrawal.toLocaleString()}`);
         setWithdrawLoading(false);
         return;
       }
@@ -611,9 +665,14 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
             <input
               type="number"
               value={depositAmount}
-              onChange={(e) => setDepositAmount(Math.max(100, parseInt(e.target.value) || 0))}
+              onChange={(e) => setDepositAmount(Math.max(isZambia ? zmMinDeposit : 100, parseInt(e.target.value) || 0))}
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
             />
+            {isZambia && (
+              <p className="text-xs text-ccb-muted mt-1.5">
+                Min K{zmMinDeposit.toLocaleString()} · Max K{zmMaxDeposit.toLocaleString()}
+              </p>
+            )}
             <div className="flex gap-2 mt-2 flex-wrap">
               {quickAmounts.map((amt) => (
                 <button
@@ -715,8 +774,10 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
             />
             <div className="flex gap-2 mt-2 flex-wrap">
               {(() => {
-                const minW = withdrawConfig ? withdrawConfig.min_amount : 10000;
-                const maxW = withdrawConfig ? withdrawConfig.max_amount : 500000;
+                // Zambia withdraws in ZMW (Ontech config); everyone else in MWK
+                // (withdrawConfig). Never mix the two currencies' min/max.
+                const minW = isZambia ? zmMinWithdrawal : withdrawConfig ? withdrawConfig.min_amount : 10000;
+                const maxW = isZambia ? zmMaxWithdrawal : withdrawConfig ? withdrawConfig.max_amount : 500000;
                 const amounts = [minW, minW * 2, minW * 5, Math.min(minW * 10, maxW), Math.min(minW * 20, maxW)];
                 const unique = [...new Set(amounts)].filter(a => a <= maxW);
                 return unique.map((amt) => (
@@ -733,7 +794,9 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               })()}
             </div>
             <p className="text-xs text-ccb-muted mt-2">
-              Available: {formatAmt(walletBal)} · Min: {formatAmt(withdrawConfig ? withdrawConfig.min_amount : 10000)}
+              {isZambia
+                ? `Available: ${formatAmt(walletBal)} · Min: K${zmMinWithdrawal.toLocaleString()} · Max: K${zmMaxWithdrawal.toLocaleString()}`
+                : `Available: ${formatAmt(walletBal)} · Min: ${formatAmt(withdrawConfig ? withdrawConfig.min_amount : 10000)}`}
             </p>
           </div>
 
