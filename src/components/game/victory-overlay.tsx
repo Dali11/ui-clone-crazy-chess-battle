@@ -119,7 +119,6 @@ export default function VictoryOverlay({
   const accentBorder = isWin ? "rgba(167,139,250,0.3)" : isDraw ? "rgba(148,163,184,0.2)" : isAbort ? "rgba(100,116,139,0.2)" : "rgba(248,113,113,0.25)";
 
   const headline = isWin ? "Victory" : isDraw ? "Draw" : isAbort ? "Aborted" : "Defeat";
-  const headline2 = isWin ? "You Won" : isDraw ? "Game Drawn" : isAbort ? "Game Aborted" : "You Lost";
 
   const hasEarnings = (isWin && (moneyEarned !== undefined && moneyEarned > 0));
   const isRematchIdle = !!onRematch && (rematchState.status === "idle" || rematchState.status === "declined" || rematchState.status === "cancelled" || rematchState.status === "expired");
@@ -140,17 +139,17 @@ export default function VictoryOverlay({
             poke out above the card without being cut off by the inner
             scroll container's overflow boundary. */}
         <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full flex items-center justify-center z-10"
+          className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full flex items-center justify-center z-10"
           style={{ backgroundColor: "rgba(15,15,22,0.95)", border: `2px solid ${accent}`, boxShadow: `0 0 24px ${accentBg}` }}
         >
-          {isWin && <Trophy className="h-7 w-7" style={{ color: accent }} />}
-          {isDraw && <Handshake className="h-7 w-7" style={{ color: accent }} />}
-          {isAbort && <Clock className="h-7 w-7" style={{ color: accent }} />}
-          {isLoss && <Frown className="h-7 w-7" style={{ color: accent }} />}
+          {isWin && <Trophy className="h-6 w-6" style={{ color: accent }} />}
+          {isDraw && <Handshake className="h-6 w-6" style={{ color: accent }} />}
+          {isAbort && <Clock className="h-6 w-6" style={{ color: accent }} />}
+          {isLoss && <Frown className="h-6 w-6" style={{ color: accent }} />}
         </div>
 
         <div
-          className="relative max-h-[94vh] overflow-y-auto rounded-2xl border p-[18px] text-center shadow-2xl"
+          className="relative max-h-[94vh] overflow-y-auto rounded-2xl border p-4 text-center shadow-2xl"
           style={{
             backgroundColor: "rgba(15,15,22,0.95)",
             borderColor: accentBorder,
@@ -169,9 +168,8 @@ export default function VictoryOverlay({
         )}
 
         {/* Headline */}
-        <div className="mt-5">
+        <div className="mt-4">
           <h2 className="text-xl font-extrabold tracking-tight leading-none" style={{ color: accent }}>{headline}</h2>
-          <p className="text-xs text-white/50 mt-1 font-medium">{headline2}</p>
         </div>
 
         {/* Player names — the actual winning side is celebrated, regardless of viewer's own color */}
@@ -180,7 +178,7 @@ export default function VictoryOverlay({
           const whiteIsWinner = winnerSide ? winnerSide === "white" : isWin;
           const blackIsWinner = winnerSide ? winnerSide === "black" : (!isWin && !isDraw && !isAbort);
           return (
-            <div className="mt-2 flex items-center justify-center gap-1.5 text-sm">
+            <div className="mt-1.5 flex items-center justify-center gap-1.5 text-sm">
               <span className={`inline-flex items-center gap-1 font-semibold ${whiteIsWinner ? "text-white" : "text-white/50"}`}>
                 {whiteIsWinner && <Trophy className="h-3.5 w-3.5" style={{ color: accent }} />}
                 {playerNames.white}
@@ -195,13 +193,13 @@ export default function VictoryOverlay({
         })()}
 
         {/* Divider */}
-        <div className="my-2.5 h-px" style={{ background: `linear-gradient(90deg, transparent, ${accentBorder}, transparent)` }} />
+        <div className="my-2 h-px" style={{ background: `linear-gradient(90deg, transparent, ${accentBorder}, transparent)` }} />
 
         {/* Earnings section */}
         {(hasEarnings || (xpEarned !== null && xpEarned !== 0)) && (
-          <div className="mb-2.5 flex items-center justify-center gap-3">
+          <div className="mb-2 flex items-center justify-center gap-3">
             {moneyEarned !== undefined && moneyEarned > 0 && (
-              <div className="flex flex-col items-center px-3 py-1.5 rounded-xl" style={{ backgroundColor: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}>
+              <div className="flex flex-col items-center px-3 py-1 rounded-xl" style={{ backgroundColor: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}>
                 <span className="text-[10px] uppercase tracking-wider text-emerald-400/70 font-semibold mb-0.5 flex items-center gap-1">
                   <Wallet className="w-3 h-3" /> {moneyLabel}
                 </span>
@@ -209,7 +207,7 @@ export default function VictoryOverlay({
               </div>
             )}
             {xpEarned !== null && xpEarned !== 0 && (
-              <div className="flex flex-col items-center px-3 py-1.5 rounded-xl" style={xpEarned > 0
+              <div className="flex flex-col items-center px-3 py-1 rounded-xl" style={xpEarned > 0
                 ? { backgroundColor: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)" }
                 : { backgroundColor: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
                 <span className="text-[10px] uppercase tracking-wider font-semibold mb-0.5 flex items-center gap-1" style={{ color: xpEarned > 0 ? "rgba(167,139,250,0.7)" : "rgba(239,68,68,0.75)" }}>
@@ -224,7 +222,7 @@ export default function VictoryOverlay({
         )}
 
         {/* Stats row */}
-        <div className="flex items-center justify-center gap-6 mb-2.5">
+        <div className="flex items-center justify-center gap-6 mb-2">
           <div className="flex flex-col items-center">
             <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold mb-0.5">Result</span>
             <span className="text-sm font-semibold text-white/80">{reasonLabel}</span>
@@ -243,7 +241,7 @@ export default function VictoryOverlay({
           </div>
         </div>
 
-        <p className="text-xs text-white/35 mb-3">{subtitle}</p>
+        <p className="text-[10px] text-white/35 mb-2">{subtitle}</p>
 
         {/* Battle draw → mandatory Armageddon decider */}
         {isArmageddonDraw && (
@@ -360,7 +358,7 @@ export default function VictoryOverlay({
           {onPlayAgain && (
             <button
               onClick={onPlayAgain}
-              className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 rounded-xl py-2 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
               style={{ backgroundColor: accent, color: "#0a0a0f", boxShadow: `0 4px 20px ${accentBg}` }}
             >
               <Swords className="w-4 h-4" /> {playAgainLabel}
@@ -375,7 +373,7 @@ export default function VictoryOverlay({
               {isRematchIdle && (
                 <button
                   onClick={onRematch}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
                   style={{ backgroundColor: accentBg, color: accent, border: `1px solid ${accentBorder}` }}
                 >
                   <Swords className="w-3.5 h-3.5" /> Rematch
@@ -385,7 +383,7 @@ export default function VictoryOverlay({
               {!isRematchIdle && onNewGame && (
                 <button
                   onClick={onNewGame}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
                   style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}
                 >
                   <RefreshCw className="w-3.5 h-3.5" /> {newGameLabel}
@@ -395,7 +393,7 @@ export default function VictoryOverlay({
               {onReview && (
                 <button
                   onClick={onReview}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
                   style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}
                 >
                   <ScanSearch className="w-3.5 h-3.5" /> Review Moves
@@ -416,7 +414,7 @@ export default function VictoryOverlay({
               section. Bottom row: below every action so it never pushes
               the result CTAs. */}
           {adPlacement && (
-            <div className="mt-3 max-w-sm mx-auto w-full">
+            <div className="mt-2 max-w-sm mx-auto w-full">
               <AdSlot placement={adPlacement} />
             </div>
           )}
