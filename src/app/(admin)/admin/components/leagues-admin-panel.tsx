@@ -75,6 +75,8 @@ export default function LeaguesAdminPanel() {
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [startDateInput, setStartDateInput] = useState("");
+  const [startDateDirty, setStartDateDirty] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -89,6 +91,12 @@ export default function LeaguesAdminPanel() {
   }, []);
 
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
+  useEffect(() => {
+    if (status?.flags.payoutsStart) {
+      setStartDateInput(status.flags.payoutsStart);
+      setStartDateDirty(false);
+    }
+  }, [status?.flags.payoutsStart]);
 
   const toggle = async (key: string, value: boolean) => {
     setBusyKey(key);
@@ -112,6 +120,30 @@ export default function LeaguesAdminPanel() {
       await fetchStatus();
     } catch {
       setToast({ msg: "Failed to save", ok: false });
+      await fetchStatus();
+    } finally {
+      setBusyKey(null);
+      setTimeout(() => setToast(null), 2500);
+    }
+  };
+
+  const saveStartDate = async (value: string | null) => {
+    setBusyKey("payouts_start");
+    try {
+      const cfgRes = await fetch("/api/admin/platform-settings?section=leagues_xp", { cache: "no-store" });
+      if (!cfgRes.ok) throw new Error("config fetch failed");
+      const { config } = await cfgRes.json();
+      const next = { ...config, payouts_start: value };
+      const res = await fetch("/api/admin/platform-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section: "leagues_xp", config: next }),
+      });
+      if (!res.ok) throw new Error("save failed");
+      setToast({ msg: value ? "Payouts start date saved" : "Date gate removed — payouts follow the toggle", ok: true });
+      await fetchStatus();
+    } catch {
+      setToast({ msg: "Failed to save date", ok: false });
       await fetchStatus();
     } finally {
       setBusyKey(null);
@@ -232,6 +264,53 @@ export default function LeaguesAdminPanel() {
             );
           })}
         </div>
+      </div>
+
+      {/* Payouts start gate — EDITABLE (owner request 2026-09-11: the
+          date must be manageable from this panel, not hardcoded). */}
+      <div className="rounded-xl border border-ccb-border bg-ccb-surface/40 overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-ccb-border bg-ccb-surface/60 text-[11px] uppercase tracking-wide font-semibold text-ccb-muted">
+          Payouts start gate
+        </div>
+        <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-ccb-text">First week that pays out</p>
+            <p className="text-[10px] text-ccb-muted mt-0.5 leading-relaxed">
+              Payouts begin with the league week <b>starting</b> on this date — earlier weeks settle invisibly
+              (league, XP and leaderboards keep running; players keep seeing reward amounts, nothing is paid).
+              Clear it and every closed week pays, as long as the Weekly Cash Payouts switch above is ON.
+              Set it to next week&apos;s start date to skip any week.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="date"
+              value={startDateInput}
+              onChange={(e) => { setStartDateInput(e.target.value); setStartDateDirty(true); }}
+              className="rounded-lg border border-ccb-border bg-ccb-surface px-2.5 py-1.5 text-sm text-ccb-text"
+            />
+            <button
+              onClick={() => saveStartDate(startDateInput || null)}
+              disabled={!startDateDirty || busyKey === "payouts_start" || !status}
+              className="rounded-lg bg-ccb-primary px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => { setStartDateInput(""); setStartDateDirty(true); saveStartDate(null); }}
+              disabled={busyKey === "payouts_start" || !status?.flags.payoutsStart}
+              className="rounded-lg border border-ccb-border px-3 py-1.5 text-xs font-medium text-ccb-muted hover:text-ccb-text disabled:opacity-40"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+        {status?.flags.payoutsStart && (
+          <div className="px-4 pb-3 text-[10px] text-ccb-muted">
+            Current gate: weeks starting on or after <b>{fmtDate(status.flags.payoutsStart)}</b> pay out
+            {status.flags.firstPaidSettle && <> — first paid settle {fmtDate(status.flags.firstPaidSettle)}</>}.
+          </div>
+        )}
       </div>
     </div>
   );
