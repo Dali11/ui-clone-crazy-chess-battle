@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   Home, Swords, User, Wallet, Shield, Coins, Gift,
-  Crown, Disc3, Menu, X, Trophy, Radio, Clock, Play, Settings,
+  Crown, Disc3, Menu, X, Trophy, Radio, Clock, Play, Settings, MessageCircle,
 } from "lucide-react";
 import NotificationBell from "./notification-bell";
 import { useCurrency } from "@/hooks/use-currency";
@@ -67,6 +67,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/league", label: "Leagues", icon: Crown },
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/live", label: "Live", icon: Radio },
+    { href: "/community", label: "Community", icon: MessageCircle },
   ];
 
   // Menu — categorized, ordered by relevance
@@ -86,6 +87,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         { href: "/league", label: "Premium Leagues", icon: Crown },
         { href: "/tournaments", label: "Tournaments", icon: Trophy },
         { href: "/live", label: "Live Matches", icon: Radio },
+        { href: "/community", label: "Community Room", icon: MessageCircle },
       ],
     },
     {

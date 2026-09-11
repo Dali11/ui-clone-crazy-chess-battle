@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
-import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight, Target, Gamepad2, Crown } from "lucide-react";
+import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight, Target, Gamepad2, Crown, MessageCircle } from "lucide-react";
 import WhatsAppBanner from "@/components/layout/whatsapp-banner";
 import AdSlot from "@/components/ads/ad-slot";
 import { moneySymbol } from "@/lib/geo/format";
@@ -216,6 +216,22 @@ export default async function DashboardPage() {
             </div>
           </div>
           <ChevronRight className="w-6 h-6 text-white/70 group-hover:translate-x-1 transition-transform shrink-0" />
+        </div>
+      </Link>
+
+      {/* Community Room — the WhatsApp group, now native */}
+      <Link href="/community" className="block rounded-xl border border-ccb-border bg-ccb-card p-4 group active:scale-[0.98] transition-transform">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-ccb-primary/15 flex items-center justify-center shrink-0">
+              <MessageCircle className="w-5.5 h-5.5 text-ccb-primary" />
+            </div>
+            <div>
+              <h3 className="font-bold text-ccb-text">Community Room</h3>
+              <p className="text-xs text-ccb-muted">Chat with fellow players — the official CCB Malawi room</p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:translate-x-1 transition-transform shrink-0" />
         </div>
       </Link>
 
