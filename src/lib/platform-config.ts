@@ -50,6 +50,10 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     // Monthly championship (calendar month, settled on the 1st)
     monthly_rewards_enabled: true,
     monthly_top_count: 5,
+    // Owner policy 2026-09-11: open registration, anyone can join any league.
+    registration_open: true,
+    // Season 1 starts Mon 2026-09-14 00:00 CAT — before that, free placement.
+    season_start: "2026-09-14",
     monthly_rewards_t1_mwk: [8000, 4000, 2000, 1000, 500],
     monthly_rewards_t2_mwk: [12000, 6000, 3000, 1600, 600],
     monthly_rewards_t3_mwk: [20000, 10000, 5000, 2400, 1000],

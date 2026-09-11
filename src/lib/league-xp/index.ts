@@ -58,6 +58,10 @@ export interface LeagueXpConfig {
   rewards_t5_mwk?: number[];
   /** Monthly championship: separate payouts paid on the 1st of each month. */
   monthly_rewards_enabled?: boolean;
+  /** Owner policy 2026-09-11: open registration — anyone can join any league. */
+  registration_open?: boolean;
+  /** yyyy-mm-dd — Season 1 official start (paid challenges league phase). */
+  season_start?: string;
   monthly_top_count?: number;
   monthly_rewards_t1_mwk?: number[];
   monthly_rewards_t2_mwk?: number[];

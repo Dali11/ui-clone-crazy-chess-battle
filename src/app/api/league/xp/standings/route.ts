@@ -38,6 +38,9 @@ export async function GET(req: NextRequest) {
         rewards: cfg.rewards_enabled ? rewardsForTier(cfg, 1) : [],
         tierRewards: cfg.rewards_enabled ? allTierRewards(cfg) : {},
         tiers: LEAGUE_TIERS,
+        registrationOpen: cfg.registration_open !== false,
+        seasonStart: cfg.season_start ?? null,
+        tierCap: cfg.tier_cap,
       });
     }
 
@@ -121,6 +124,8 @@ export async function GET(req: NextRequest) {
       promoteCount: scope === "month" ? (cfg.monthly_top_count ?? 5) : cfg.promote_count,
       demoteCount: scope === "month" ? 0 : cfg.demote_count,
       tierCap: cfg.tier_cap ?? 1000,
+      registrationOpen: cfg.registration_open !== false,
+      seasonStart: cfg.season_start ?? null,
       cycleStart,
       cycleEnd,
       standings,
