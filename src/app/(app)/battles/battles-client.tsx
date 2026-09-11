@@ -39,13 +39,18 @@ interface BattleConfig {
 }
 
 type View = "main" | "challenge";
+
+// Auto-matchmaking (fixed-stake queue) is hidden until the player base is
+// large enough (~10,000 players). Challenges are the default battles flow.
+// Flip this to true to bring back the find-match landing view.
+const FIND_MATCH_ENABLED = false;
 type BattleState = "select" | "searching" | "matched" | "playing";
 
 export default function BattlesPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
-  const [view, setView] = useState<View>("main");
+  const [view, setView] = useState<View>(FIND_MATCH_ENABLED ? "main" : "challenge");
   const [config, setConfig] = useState<BattleConfig | null>(null);
   const [balance, setBalance] = useState(0);
   const [userCountry, setUserCountry] = useState<string | null>(null);
@@ -529,10 +534,14 @@ export default function BattlesPage() {
   // ===== Challenge a Friend view =====
   if (view === "challenge") {
     return (
-      <div className="max-w-2xl mx-auto space-y-6 pb-20 sm:pb-0 animate-slide-up">
-        <button onClick={() => setView("main")} className="text-sm text-ccb-muted hover:text-ccb-text flex items-center gap-1">
-          <ChevronRight className="w-4 h-4 rotate-180" /> Back
-        </button>
+      <div className="max-w-2xl mx-auto space-y-6 px-4 sm:px-0 pb-20 sm:pb-0 animate-slide-up">
+        {/* Balance + rating header */}
+        <div className="pt-2 sm:pt-4">
+          <div className="flex items-center gap-4 text-sm">
+            <span className="text-ccb-muted">Balance: <span className="font-semibold text-ccb-text">{fmtCurrency(balance)}</span></span>
+            <span className="text-ccb-muted">Rating: <span className="font-semibold text-ccb-text">{myRating}</span></span>
+          </div>
+        </div>
 
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -624,6 +633,37 @@ export default function BattlesPage() {
           {creatingChallenge ? <Loader2 className="w-5 h-5 animate-spin" /> : <Link2 className="w-5 h-5 mr-2" />}
           {creatingChallenge ? "Creating..." : "Create Challenge Link"}
         </button>
+
+        {/* How challenges work */}
+        <div className="p-4 rounded-xl bg-ccb-surface/50 border border-ccb-border">
+          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <Users className="w-4 h-4 text-ccb-muted" /> How Battles Work
+          </h3>
+          <ol className="space-y-2 text-xs text-ccb-muted">
+            <li className="flex gap-2">
+              <span className="font-semibold text-ccb-text">1.</span>
+              <span>Set any stake you like and share the challenge link with a friend</span>
+            </li>
+            <li className="flex gap-2">
+              <span className="font-semibold text-ccb-text">2.</span>
+              <span>When they accept, both stakes lock in escrow</span>
+            </li>
+            <li className="flex gap-2">
+              <span className="font-semibold text-ccb-text">3.</span>
+              <span>Play the game — winner takes the pot (platform keeps {feePct}%)</span>
+            </li>
+            <li className="flex gap-2">
+              <span className="font-semibold text-ccb-text">4.</span>
+              <span>Unaccepted or expired challenges are always fully refunded</span>
+            </li>
+          </ol>
+          <Link
+            href="/how-battles-work"
+            className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-ccb-accent hover:underline"
+          >
+            Learn how battles work <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
       </div>
     );
   }
