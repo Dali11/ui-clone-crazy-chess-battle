@@ -15,7 +15,7 @@ interface Standing {
   isMe: boolean;
   /** ISO-2 country code (for the flag emoji). */
   country?: string | null;
-  /** Career games played. */
+  /** Games finished in the current cycle (week or month). */
   games?: number;
 }
 

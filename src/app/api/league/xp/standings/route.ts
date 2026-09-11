@@ -49,6 +49,49 @@ export async function GET(req: NextRequest) {
     let cycleEnd: string;
     let myXp = 0;
 
+    /**
+     * Games played inside a window, per user, PvP only (bots excluded) —
+     * the standings show cycle activity, not career totals. Owner policy
+     * 2026-09-11: the Games column counts games finished in the current
+     * week (or month for the championship scope).
+     */
+    const cycleGameCounts = async (winStart: string, winEnd: string) => {
+      const startIso = winStart + "T00:00:00+02:00";
+      const endIso = winEnd + "T00:00:00+02:00";
+      const { data: bots } = await admin
+        .from("profiles")
+        .select("id")
+        .like("email", "%@ccb.internal");
+      const botIds = new Set((bots ?? []).map((b: any) => b.id));
+      const counts = new Map<string, number>();
+      const tally = (rows: any[] | null | undefined) => {
+        for (const g of rows ?? []) {
+          if (botIds.has(g.white_player_id) || botIds.has(g.black_player_id)) continue;
+          counts.set(g.white_player_id, (counts.get(g.white_player_id) ?? 0) + 1);
+          counts.set(g.black_player_id, (counts.get(g.black_player_id) ?? 0) + 1);
+        }
+      };
+      const [{ data: chess }, { data: draughts }] = await Promise.all([
+        admin
+          .from("games")
+          .select("white_player_id, black_player_id")
+          .gte("ended_at", startIso)
+          .lt("ended_at", endIso)
+          .neq("status", "abort")
+          .limit(10000),
+        admin
+          .from("draughts_games")
+          .select("white_player_id, black_player_id")
+          .gte("ended_at", startIso)
+          .lt("ended_at", endIso)
+          .neq("status", "abort")
+          .limit(10000),
+      ]);
+      tally(chess);
+      tally(draughts);
+      return counts;
+    };
+
     if (scope === "month") {
       // Monthly championship: aggregate the events audit log over the
       // calendar month for everyone in the player's tier.
@@ -59,6 +102,7 @@ export async function GET(req: NextRequest) {
       const monthCycleStart = (cfg.season_start && cfg.season_start > cycleStart)
         ? cfg.season_start
         : cycleStart;
+      const monthGames = await cycleGameCounts(monthCycleStart, cycleEnd);
       const { data: events } = await admin
         .from("league_xp_events")
         .select("user_id, amount")
@@ -79,7 +123,7 @@ export async function GET(req: NextRequest) {
           name: r.profiles?.display_name || r.profiles?.username || "Player",
           rating: r.profiles?.rating ?? 400,
           country: r.profiles?.country ?? null,
-          games: r.profiles?.games_played ?? 0,
+          games: monthGames.get(r.user_id) ?? 0,
           xp: xpByUser.get(r.user_id) ?? 0,
           isMe: r.user_id === user.id,
         }))
@@ -90,6 +134,7 @@ export async function GET(req: NextRequest) {
     } else {
       cycleStart = currentWeekStart();
       cycleEnd = nextWeekStart();
+      const weekGames = await cycleGameCounts(cycleStart, cycleEnd);
       // Leaderboard = current cycle rows only. (A stale row — game finished
       // in the minutes between Monday 00:00 and the settle cron — displays
       // 0 XP; the cron's reset makes this self-correcting.)
@@ -106,7 +151,7 @@ export async function GET(req: NextRequest) {
         name: r.profiles?.display_name || r.profiles?.username || "Player",
         rating: r.profiles?.rating ?? 400,
         country: r.profiles?.country ?? null,
-        games: r.profiles?.games_played ?? 0,
+        games: weekGames.get(r.user_id) ?? 0,
         xp: r.xp ?? 0,
         rank: i + 1,
         isMe: r.user_id === user.id,
