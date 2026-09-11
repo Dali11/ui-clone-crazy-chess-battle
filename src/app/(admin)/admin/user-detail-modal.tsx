@@ -7,6 +7,7 @@ import {
   TrendingUp, TrendingDown, CheckCircle, XCircle, Clock,
   ShieldCheck, UserRound, ChevronRight, ScrollText,
 } from "lucide-react";
+import { currencySymbolForCountry, currencyCodeForCountry } from "@/lib/geo/format";
 
 interface UserDetailModalProps {
   userId: string;
@@ -22,10 +23,44 @@ export default function UserDetailModal({ userId, onClose, onAction, onDelete, a
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [section, setSection] = useState<"overview" | "games" | "wallet" | "battles" | "tournaments" | "history">("overview");
+  // Every amount in this modal belongs to THIS ONE player — show it in
+  // their own currency (e.g. ZMW for a Zambian player), not MWK. Rate is
+  // fetched for their profile.country via the admin-only ?country= override.
+  const [localRate, setLocalRate] = useState<{ code: string; rate: number } | null>(null);
 
   useEffect(() => {
     fetchUserDetail();
   }, [userId]);
+
+  useEffect(() => {
+    const country = data?.profile?.country;
+    if (!country || country === "MW") { setLocalRate(null); return; }
+    let cancelled = false;
+    fetch(`/api/currency?country=${country}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled && d.rate) setLocalRate({ code: d.currencyCode, rate: d.rate }); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [data?.profile?.country]);
+
+  /** Format an MWK ledger amount in the viewed player's own currency. */
+  const fmtLocal = (amountMWK: number): string => {
+    const country = data?.profile?.country;
+    const value = Math.floor(amountMWK || 0);
+    if (!country || country === "MW" || !localRate || localRate.rate === 1) {
+      return formatMWK(amountMWK);
+    }
+    const converted = Math.round(value * localRate.rate);
+    try {
+      return new Intl.NumberFormat("en", {
+        style: "currency",
+        currency: localRate.code,
+        maximumFractionDigits: 0,
+      }).format(converted);
+    } catch {
+      return `${currencySymbolForCountry(country)} ${converted.toLocaleString("en-US")}`;
+    }
+  };
 
   const fetchUserDetail = async () => {
     setLoading(true);
@@ -139,7 +174,7 @@ export default function UserDetailModal({ userId, onClose, onAction, onDelete, a
                 </div>
                 <div className="card p-3">
                   <div className="text-xs text-ccb-muted">Wallet</div>
-                  <div className="text-lg font-bold text-ccb-primary">{formatMWK(p.wallet_balance || 0)}</div>
+                  <div className="text-lg font-bold text-ccb-primary">{fmtLocal(p.wallet_balance || 0)}</div>
                 </div>
               </div>
 
@@ -168,7 +203,7 @@ export default function UserDetailModal({ userId, onClose, onAction, onDelete, a
                     <div key={r.id} className="flex items-center justify-between text-xs py-1.5">
                       <span>{r.referred?.username || "Unknown"}</span>
                       <div className="flex items-center gap-2">
-                        {r.reward_amount > 0 && <span className="text-ccb-success">{formatMWK(r.reward_amount)}</span>}
+                        {r.reward_amount > 0 && <span className="text-ccb-success">{fmtLocal(r.reward_amount)}</span>}
                         <StatusBadge status={r.status} />
                       </div>
                     </div>
@@ -227,11 +262,14 @@ export default function UserDetailModal({ userId, onClose, onAction, onDelete, a
               <div className="grid grid-cols-2 gap-2">
                 <div className="card p-4 bg-gradient-to-br from-ccb-primary/10 to-transparent">
                   <div className="text-xs text-ccb-muted">CURRENT BALANCE</div>
-                  <div className="text-2xl font-bold text-ccb-primary mt-1">{formatMWK(p.wallet_balance || 0)}</div>
+                  <div className="text-2xl font-bold text-ccb-primary mt-1">{fmtLocal(p.wallet_balance || 0)}</div>
+                  {localRate && (
+                    <div className="text-[10px] text-ccb-muted mt-0.5">Ledger: {formatMWK(p.wallet_balance || 0)}</div>
+                  )}
                 </div>
                 <div className="card p-4">
                   <div className="text-xs text-ccb-muted">REAL CASH DEPOSITED</div>
-                  <div className="text-2xl font-bold text-ccb-success mt-1">{formatMWK(data.cashDepositTotal || 0)}</div>
+                  <div className="text-2xl font-bold text-ccb-success mt-1">{fmtLocal(data.cashDepositTotal || 0)}</div>
                   <div className="text-[10px] text-ccb-muted mt-0.5">Mobile money + card, successful only</div>
                 </div>
               </div>
@@ -260,7 +298,7 @@ export default function UserDetailModal({ userId, onClose, onAction, onDelete, a
                         </div>
                         <div className="text-right">
                           <div className={`text-sm font-semibold ${isIn ? "text-ccb-success" : "text-ccb-danger"}`}>
-                            {isIn ? "+" : ""}{formatMWK(t.display_amount)}
+                            {isIn ? "+" : ""}{fmtLocal(t.display_amount)}
                           </div>
                           <StatusBadge status={t.status} />
                         </div>
@@ -284,7 +322,7 @@ export default function UserDetailModal({ userId, onClose, onAction, onDelete, a
                   <div key={b.id} className="card p-3 flex items-center justify-between">
                     <div>
                       <div className="text-sm font-medium">vs {opponent || "?"}</div>
-                      <div className="text-xs text-ccb-muted">Stake: {formatMWK(b.stake_amount)} · {new Date(b.created_at).toLocaleDateString()}</div>
+                      <div className="text-xs text-ccb-muted">Stake: {fmtLocal(b.stake_amount)} · {new Date(b.created_at).toLocaleDateString()}</div>
                     </div>
                     <div className={`text-sm font-bold ${resultColor}`}>{result}</div>
                   </div>

@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   let countryCode: string | null = null;
+  let requesterIsAdmin = false;
 
   // Try authenticated user's profile country first
   try {
@@ -24,14 +25,23 @@ export async function GET(request: NextRequest) {
     if (user) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("country")
+        .select("country, is_admin")
         .eq("id", user.id)
         .single();
       if (profile?.country) {
         countryCode = profile.country;
       }
+      requesterIsAdmin = !!profile?.is_admin;
     }
   } catch {}
+
+  // Admin override: the admin panel needs the rate for a PLAYER it's
+  // viewing (e.g. their own wallet in the user-detail modal), not the
+  // logged-in admin's own country. Only admins can pass ?country=.
+  const overrideCountry = request.nextUrl.searchParams.get("country");
+  if (overrideCountry && requesterIsAdmin) {
+    countryCode = overrideCountry.toUpperCase();
+  }
 
   // Fall back to IP detection for unauthenticated visitors
   if (!countryCode) {
