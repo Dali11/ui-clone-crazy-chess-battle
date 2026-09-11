@@ -85,30 +85,46 @@ export async function distributePrizes(
     .eq("id", tournamentId)
     .single();
 
-  // Credit winners' wallets (skip already-paid entries)
+  // Credit winners' wallets (exactly-once per payout).
+  //
+  // The audit row is inserted FIRST as a claim: the partial unique index on
+  // deposits(reference) for 'tournament:%:rank:%' refs (migration 055) makes
+  // the insert fail if another finishTournament call already paid this
+  // rank, so a race between the cron, advance-round, admin force-finish and
+  // the manual finish route can never double-credit a wallet. Only after a
+  // successful claim do we credit the wallet.
   for (const payout of payouts) {
     const payoutRef = `tournament:${tournamentId}:rank:${payout.rank}`;
+
+    // Fast path: already paid (idempotent re-run).
     const { data: existing } = await admin
       .from("deposits")
       .select("id")
       .eq("reference", payoutRef)
       .eq("user_id", payout.player_id)
-      .single();
+      .maybeSingle();
     if (existing) continue;
 
-    await admin.rpc("credit_wallet", {
-      p_user_id: payout.player_id,
-      p_amount: payout.amount,
-    });
-
-    const { error: _depErr } = await admin.from("deposits").insert({
+    // Claim: insert the audit row. Unique violation = someone else paid
+    // this rank concurrently — skip without crediting.
+    const { error: claimErr } = await admin.from("deposits").insert({
       user_id: payout.player_id,
       amount: payout.amount,
       status: "success",
       method: "tournament_payout",
       reference: payoutRef,
     });
-    if (_depErr) console.error("Deposit audit log failed:", _depErr);
+    if (claimErr) {
+      if ((claimErr as { code?: string }).code === "23505") continue; // already paid
+      console.error("Tournament payout claim failed (wallet NOT credited):", claimErr);
+      continue;
+    }
+
+    const { error: _creditErr } = await admin.rpc("credit_wallet", {
+      p_user_id: payout.player_id,
+      p_amount: payout.amount,
+    });
+    if (_creditErr) console.error("credit_wallet failed after claim — audit row exists, wallet not credited:", _creditErr);
 
     // Send prize payout email (fire-and-forget)
     try {
