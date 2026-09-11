@@ -77,7 +77,12 @@ async function attemptMatch(
       .select("id")
       .single();
 
-    if (claimErr || !claimed) continue;
+    if (claimErr) {
+      // A real DB error — log it so it can never silently break matching again
+      console.error("[matchmaker] opponent claim failed:", opponent.id, claimErr);
+      continue;
+    }
+    if (!claimed) continue; // another player matched this opponent first
 
     const pot = stake * 2;
     const fee = Math.round(pot * (config.platform_fee_pct / 100));

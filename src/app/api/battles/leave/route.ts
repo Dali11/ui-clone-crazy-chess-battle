@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     // this, two near-simultaneous /leave calls (double-tap on Cancel, or a
     // client retry after a slow response) both see status="waiting" and
     // both credit the wallet — a real duplicate refund a player hit today.
-    const { data: claimed } = await admin
+    const { data: claimed, error: claimErr } = await admin
       .from("battle_queue")
       .update({ status: "left" })
       .eq("id", queueEntry.id)
@@ -40,6 +40,10 @@ export async function POST(req: NextRequest) {
       .select("id")
       .maybeSingle();
 
+    if (claimErr) {
+      console.error("Queue claim failed:", claimErr);
+      return NextResponse.json({ error: "Failed to cancel queue entry" }, { status: 500 });
+    }
     if (!claimed) {
       // Already left/matched by a concurrent request — refund already
       // handled by whichever call won the race. Not an error to the client.

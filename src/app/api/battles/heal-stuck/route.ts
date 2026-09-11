@@ -122,17 +122,26 @@ async function handleHeal(req: NextRequest) {
     // player-visible timeout path (same atomic claim) fires first.
     const { data: queueConfig } = await admin.from("battle_config").select("queue_timeout_s").limit(1).maybeSingle();
     const queueCutoff = new Date(now - ((queueConfig?.queue_timeout_s ?? 120) * 1000 + 60_000)).toISOString();
-    const { data: staleQueues } = await admin.from("battle_queue")
+    const { data: staleQueues, error: queueSelErr } = await admin.from("battle_queue")
       .select("id, player_id, stake, created_at")
       .eq("status", "waiting").lt("created_at", queueCutoff)
       .order("created_at", { ascending: true }).limit(200);
+    if (queueSelErr) {
+      console.error("[heal-stuck] stale queue select failed:", queueSelErr);
+    }
 
     for (const q of staleQueues ?? []) {
       // Atomic claim — matches /api/battles/active and /api/battles/join,
       // so concurrent paths can never double-refund.
-      const { data: claimed } = await admin.from("battle_queue")
+      const { data: claimed, error: claimErr } = await admin.from("battle_queue")
         .update({ status: "expired" }).eq("id", q.id).eq("status", "waiting")
         .select("id, stake").maybeSingle();
+      if (claimErr) {
+        // Real failure (e.g. constraint/index error) — must surface, never swallow
+        console.error("[heal-stuck] queue claim failed:", q.id, claimErr);
+        results.failed++;
+        continue;
+      }
       if (!claimed) continue; // another path handled it
 
       const { error: creditErr } = await admin.rpc("credit_wallet", { p_user_id: q.player_id, p_amount: claimed.stake });
