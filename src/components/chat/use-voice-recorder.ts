@@ -76,10 +76,16 @@ export function useVoiceRecorder() {
         resolveRef.current = null;
         const wasCancelled = cancelledRef.current;
         cancelledRef.current = false;
+        // CRITICAL: capture chunks + mime into locals BEFORE cleanup() —
+        // cleanup() resets chunksRef.current = [], and the old code read it
+        // AFTER, so every recording resolved to null and voice notes never
+        // sent (the composer's send tap silently did nothing).
+        const chunks = chunksRef.current;
+        const mime = rec.mimeType || "audio/webm";
         cleanup();
         if (resolve) {
-          if (wasCancelled || chunksRef.current.length === 0) resolve(null);
-          else resolve({ blob: new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" }), duration, mime: rec.mimeType || "audio/webm" });
+          if (wasCancelled || chunks.length === 0) resolve(null);
+          else resolve({ blob: new Blob(chunks, { type: mime }), duration, mime });
         }
       };
 
