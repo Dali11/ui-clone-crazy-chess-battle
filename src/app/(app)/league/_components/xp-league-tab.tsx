@@ -221,16 +221,16 @@ export default function XpLeagueTab() {
 
       {/* Header: tier + my rank + countdown */}
       <div className="card p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">{data.tier?.emoji}</span>
-            <div>
-              <h2 className="text-lg font-bold">{data.tier?.name}</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-3xl shrink-0">{data.tier?.emoji}</span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold truncate">{data.tier?.name}</h2>
               <p className="text-xs text-ccb-muted">Your rank: {data.myRank ? `#${data.myRank}` : "—"} · {data.myXp ?? 0} XP · All-time: {data.allTimeXp ?? 0} XP</p>
             </div>
           </div>
-          <div className="text-right shrink-0">
-            <div className="text-xs text-ccb-muted">{isMonth ? "Ends on the 1st · 00:00 CAT" : "Week closes 7th/14th/21st/last day · paid next morning"}</div>
+          <div className="text-left sm:text-right shrink-0">
+            <div className="text-xs text-ccb-muted">{isMonth ? "Ends on the 1st · 00:00 CAT" : "Week closes soon · paid next morning"}</div>
             <div className="text-sm font-bold text-ccb-primary tabular-nums">{countdown || "…"}</div>
           </div>
         </div>
