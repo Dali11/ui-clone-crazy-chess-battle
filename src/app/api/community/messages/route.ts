@@ -22,6 +22,16 @@ export async function GET(req: NextRequest) {
     const before = beforeRaw ? Number(beforeRaw) : null;
     const admin = createAdminClient();
 
+    // Country gate: global rooms are for everyone; country rooms only
+    // for players from that country.
+    const { data: roomRow } = await admin.from("community_rooms").select("id, country").eq("id", room).single();
+    if (!roomRow) return NextResponse.json({ error: "Room not found" }, { status: 404 });
+    if (roomRow.country) {
+      const { data: me } = await admin.from("profiles").select("country").eq("id", user.id).single();
+      if (me?.country !== roomRow.country)
+        return NextResponse.json({ error: "This room isn't available in your country" }, { status: 403 });
+    }
+
     let query = admin
       .from("community_messages")
       .select("id, room, user_id, username, avatar_url, body, created_at, deleted_at")
@@ -60,6 +70,15 @@ export async function POST(req: NextRequest) {
     if (!clean) return NextResponse.json({ error: "Empty message" }, { status: 400 });
 
     const admin = createAdminClient();
+
+    // Country gate (same as GET)
+    const { data: roomRow } = await admin.from("community_rooms").select("id, country").eq("id", room).single();
+    if (!roomRow) return NextResponse.json({ error: "Room not found" }, { status: 404 });
+    if (roomRow.country) {
+      const { data: me } = await admin.from("profiles").select("country").eq("id", user.id).single();
+      if (me?.country !== roomRow.country)
+        return NextResponse.json({ error: "This room isn't available in your country" }, { status: 403 });
+    }
 
     // Rate limit: one message per RATE_LIMIT_MS per user
     const since = new Date(Date.now() - RATE_LIMIT_MS).toISOString();

@@ -53,7 +53,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
   const bottomNav = [
     { href: "/play", label: "Play", icon: Swords },
     { href: "/battles", label: "Battles", icon: Coins },
-    { href: "/live", label: "Live", icon: Radio },
+    { href: "/chats", label: "Chats", icon: MessageCircle },
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/league", label: "Leagues", icon: Crown },
   ];
@@ -66,8 +66,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/history", label: "History", icon: Clock },
     { href: "/league", label: "Leagues", icon: Crown },
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
-    { href: "/live", label: "Live", icon: Radio },
-    { href: "/community", label: "Community", icon: MessageCircle },
+    { href: "/chats", label: "Chats", icon: MessageCircle },
   ];
 
   // Menu — categorized, ordered by relevance
@@ -87,7 +86,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         { href: "/league", label: "Premium Leagues", icon: Crown },
         { href: "/tournaments", label: "Tournaments", icon: Trophy },
         { href: "/live", label: "Live Matches", icon: Radio },
-        { href: "/community", label: "Community Room", icon: MessageCircle },
+        { href: "/chats", label: "Chats", icon: MessageCircle },
       ],
     },
     {

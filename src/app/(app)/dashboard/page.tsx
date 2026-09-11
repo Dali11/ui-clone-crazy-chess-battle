@@ -220,15 +220,15 @@ export default async function DashboardPage() {
       </Link>
 
       {/* Community Room — the WhatsApp group, now native */}
-      <Link href="/community" className="block rounded-xl border border-ccb-border bg-ccb-card p-4 group active:scale-[0.98] transition-transform">
+      <Link href="/chats" className="block rounded-xl border border-ccb-border bg-ccb-card p-4 group active:scale-[0.98] transition-transform">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-ccb-primary/15 flex items-center justify-center shrink-0">
               <MessageCircle className="w-5.5 h-5.5 text-ccb-primary" />
             </div>
             <div>
-              <h3 className="font-bold text-ccb-text">Community Room</h3>
-              <p className="text-xs text-ccb-muted">Chat with fellow players — the official CCB Malawi room</p>
+              <h3 className="font-bold text-ccb-text">Chats</h3>
+              <p className="text-xs text-ccb-muted">Group chats & direct messages with fellow players</p>
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:translate-x-1 transition-transform shrink-0" />
