@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Payment gateway not configured" }, { status: 503 });
     }
 
-    const { amount } = await req.json(); // amount in ZMW
+    const { amount, phone: phoneArg } = await req.json(); // amount in ZMW
     if (!amount || typeof amount !== "number" || amount <= 0) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
@@ -43,8 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Maximum deposit is K${zmConfig.max_deposit_zmw || 5000}` }, { status: 400 });
     }
 
-    const { phone } = await req.json();
-    const zmPhone = normalizeZmPhone(phone || profile?.phone || "");
+    const zmPhone = normalizeZmPhone(phoneArg || profile?.phone || "");
     if (!zmPhone) {
       return NextResponse.json({ error: "Enter a valid Zambian mobile number (e.g. 0971234567)" }, { status: 400 });
     }
