@@ -17,11 +17,11 @@ import { DEFAULT_CONFIGS } from "@/lib/platform-config";
 export const CAT_OFFSET_MS = 2 * 60 * 60 * 1000;
 
 export const LEAGUE_TIERS = [
-  { tier: 1, name: "Open League", emoji: "🌍", ratingBand: "Rating 400–649" },
-  { tier: 2, name: "Amateur League", emoji: "🎯", ratingBand: "Rating 650–899" },
-  { tier: 3, name: "Bronze League", emoji: "🥉", ratingBand: "Rating 900–1149" },
-  { tier: 4, name: "Knights Championship", emoji: "♞", ratingBand: "Rating 1150–1399" },
-  { tier: 5, name: "Premier League", emoji: "🏆", ratingBand: "Rating 1400+" },
+  { tier: 1, name: "Open League", emoji: "🌍", ratingBand: "Everyone starts here" },
+  { tier: 2, name: "Amateur League", emoji: "🎯", ratingBand: "Developing players" },
+  { tier: 3, name: "Bronze League", emoji: "🥉", ratingBand: "Intermediate players" },
+  { tier: 4, name: "Knights Championship", emoji: "♞", ratingBand: "Advanced players" },
+  { tier: 5, name: "Premier League", emoji: "🏆", ratingBand: "The platform's best" },
 ] as const;
 
 /** Everyone who joins after launch starts in the Open League (tier 1). */

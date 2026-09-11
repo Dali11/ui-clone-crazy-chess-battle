@@ -169,7 +169,7 @@ export default function XpLeagueTab() {
                   <div className="flex-1">
                     <div className="text-sm font-semibold">{t.name}</div>
                     <div className="text-[11px] text-ccb-muted">
-                      {["Rating 400–649", "Rating 650–899", "Rating 900–1149", "Rating 1150–1399", "Rating 1400+"][i]}
+                      {["Everyone starts here", "Developing players", "Intermediate players", "Advanced players", "The platform's best"][i]}
                     </div>
                   </div>
                   {payout > 0 && (
