@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getLeagueXpConfig, currentWeekStart, currentMonthStart, rewardsForTier, monthlyRewardsForTier, CAT_OFFSET_MS } from "@/lib/league-xp";
+import { getLeagueXpConfig, currentWeekStart, currentMonthStart, monthlyRewardsForTier, CAT_OFFSET_MS } from "@/lib/league-xp";
+import { planWeeklySettlement } from "@/lib/league-xp/plan";
 import { getExchangeRate } from "@/lib/geo/fx";
 import { COUNTRY_CURRENCY } from "@/lib/geo/currency-map";
 
@@ -97,229 +98,119 @@ async function runWeeklySettle(
     .select("user_id, tier, xp, week_start, profiles!inner(display_name, username)")
     .order("xp", { ascending: false })
     .order("updated_at", { ascending: true });
-  const fxRates = new Map<string, number>();
   if (error) return { error: error.message };
 
-  const promoted = cfg.promote_count;
-  const demoted = cfg.demote_count;
-  // Owner policy 2026-09-11: standard 5-up/5-down is built in but
-  // switched OFF while the player base grows — the fair-share rebalance
-  // below is the only thing that moves players between leagues. Cash
-  // rewards still pay the top N every week. Flip tier_moves_enabled on
-  // when Premier approaches the 1k cap.
-  const movesOn = cfg.tier_moves_enabled === true;
-  // Final tier per member after the standard moves (for the fair-share
-  // rebalance below) + players who already moved this run (never moved
-  // twice in one settle).
-  const finalTier = new Map<string, number>();
-  const movedUsers = new Set<string>();
-  const cap = cfg.tier_cap > 0 ? cfg.tier_cap : Infinity; // 0/absent = uncapped
-  // Owner policy 2026-09-11: weekly_payouts_enabled is the payout
-  // kill-switch — the league, XP and leaderboard keep running and
-  // players still see reward amounts in the UI; only wallet credits
-  // stop. OFF for the first partial week (Season 1 began 2026-09-11);
-  // first real payout: the settle on 2026-09-22.
-  const payOn = cfg.rewards_enabled && cfg.weekly_payouts_enabled !== false;
-  let paid = 0, moves = 0, snapshots = 0, capped = 0;
-  // AUDIT FIX 2026-09-11: bulk processing. The old per-member awaits
-  // (~2 queries x 472+ members) blow past the 60s serverless limit as the
-  // player base grows, leaving a half-settled week that can't re-run
-  // until the NEXT boundary. History rows are now collected and bulk-
-  // upserted (idempotent via the unique (week_start, user_id) index), and
-  // member resets are grouped by resulting tier into chunked bulk updates.
-  const historyRows: any[] = [];
-  const updateGroups = new Map<number, string[]>();
+  // ── Decision layer: the pure, unit-tested plan ───────────────────────
+  // planWeeklySettlement is the single source of truth for ranking, the
+  // payout gate (rewards_enabled + admin kill-switch + the payouts_start
+  // date gate — the "automation in code" that turns paying on for the
+  // first eligible week with no external scheduler), standard moves and
+  // the fair-share rebalance. This route only EXECUTES the plan.
+  const plan = planWeeklySettlement({
+    members: (members ?? []).map((m: any) => ({
+      user_id: m.user_id as string,
+      tier: m.tier as number,
+      xp: (m.xp ?? 0) as number,
+      week_start: m.week_start as string,
+      display_name: (m.profiles?.display_name || m.profiles?.username) || "Player",
+    })),
+    cfg,
+    closingWeek,
+    newWeek,
+  });
+  if (!plan.payOn && plan.unpaidReason) {
+    console.log(`[league] payouts OFF for ${closingWeek}: ${plan.unpaidReason}`);
+  }
 
-  // Rank within each tier: active members first (by xp desc — the select is
-  // already ordered), then anyone whose row predates the closing cycle
-  // (no games this week → 0 XP by definition, still reset and eligible
-  // for demotion).
-  for (const tier of [1, 2, 3, 4, 5]) {
-    // Configurable payout per league — each tier has its own reward set.
-    const rewards = payOn ? rewardsForTier(cfg, tier) : [0, 0, 0, 0, 0];
-    const tierMembers = (members ?? []).filter((m) => m.tier === tier);
-    const active = tierMembers.filter((m) => m.week_start === closingWeek);
-    // Nobody played in this league this week — nothing to settle, no
-    // phantom snapshots (e.g. the pre-season weeks before the first
-    // real cycle closes).
-    if (active.length === 0) continue;
-    const ranked = [
-      ...active,
-      ...tierMembers.filter((m) => m.week_start !== closingWeek),
-    ];
-    const n = ranked.length;
-    // Current roster size of the league above — promotion only proceeds
-    // while it has free slots under tier_cap. (Tier 5 never promotes.)
-    const destRoster = (members ?? []).filter((m) => m.tier === tier + 1).length;
-    let room = Math.max(0, cap - destRoster);
+  const fxRates = new Map<string, number>();
 
-    for (let i = 0; i < n; i++) {
-      const m = ranked[i];
-      const rank = i + 1;
-      const isTop = rank <= promoted && m.week_start === closingWeek && m.xp > 0;
-      const isBottom = m.week_start === closingWeek && demoted > 0 && n > promoted + demoted && rank > n - demoted;
-
-      let reward = 0;
-      let newTier = m.tier;
-      let didPromote = false, didDemote = false;
-
-      if (isTop) {
-        reward = rewards[rank - 1] ?? 0;
-        if (reward > 0) {
-          // Idempotency: ledger row FIRST with a unique reference. The
-          // deposits_reference_unique partial index turns any crash/retry
-          // into a no-op instead of a double payout.
-          const rewardRef = `league:${closingWeek}:${m.user_id}`;
-          const fxNote = await fxNoteFor(admin, m.user_id, reward, fxRates);
-          const { error: depErr } = await admin.from("deposits").insert({
-            user_id: m.user_id,
-            amount: reward,
-            status: "success",
-            method: "league_reward",
-            reference: rewardRef,
-            admin_notes: fxNote,
-          });
-          if (depErr && String(depErr.message || "").includes("duplicate key")) {
-            // Already paid in a previous run — skip.
-          } else if (!depErr) {
-            const { error: creditErr } = await admin.rpc("credit_wallet", { p_user_id: m.user_id, p_amount: reward });
-            if (!creditErr) {
-              paid++;
-            } else {
-              // Roll back the ledger claim so a retry can pay properly.
-              await admin.from("deposits").delete().eq("reference", rewardRef);
-              console.error(`League reward credit failed for ${m.user_id}, ledger row rolled back`);
-            }
-          } else {
-            console.error("League reward ledger insert failed:", depErr);
-          }
-        }
-        if (movesOn && tier < 5 && room > 0) { newTier = tier + 1; didPromote = true; room--; }
-        else if (movesOn && tier < 5 && room <= 0) capped++;
-      } else if (isBottom && movesOn && tier > 1) {
-        newTier = tier - 1; didDemote = true;
+  // ── 1) Wallet credits for the paid top ranks ────────────────────────
+  // Idempotent: unique deposits reference (league:<week>:<user>) — a
+  // crash/retry/re-run is a no-op, never a double payout.
+  let paid = 0;
+  for (const p of plan.payouts) {
+    const rewardRef = `league:${plan.closingWeek}:${p.userId}`;
+    const fxNote = await fxNoteFor(admin, p.userId, p.rewardMwk, fxRates);
+    const { error: depErr } = await admin.from("deposits").insert({
+      user_id: p.userId,
+      amount: p.rewardMwk,
+      status: "success",
+      method: "league_reward",
+      reference: rewardRef,
+      admin_notes: fxNote,
+    });
+    if (depErr && String(depErr.message || "").includes("duplicate key")) {
+      // Already paid in a previous run — skip.
+    } else if (!depErr) {
+      const { error: creditErr } = await admin.rpc("credit_wallet", { p_user_id: p.userId, p_amount: p.rewardMwk });
+      if (!creditErr) {
+        paid++;
+      } else {
+        // Roll back the ledger claim so a retry can pay properly.
+        await admin.from("deposits").delete().eq("reference", rewardRef);
+        console.error(`League reward credit failed for ${p.userId}, ledger row rolled back`);
       }
-
-      finalTier.set(m.user_id, newTier);
-      if (didPromote || didDemote) { moves++; movedUsers.add(m.user_id); }
-
-      historyRows.push({
-        week_start: closingWeek,
-        tier,
-        user_id: m.user_id,
-        display_name: ((m as any).profiles?.display_name || (m as any).profiles?.username) || "Player",
-        final_rank: rank,
-        final_xp: m.week_start === closingWeek ? m.xp : 0,
-        reward_mwk: reward,
-        promoted: didPromote,
-        demoted: didDemote,
-      });
-      const group = updateGroups.get(newTier) ?? [];
-      group.push(m.user_id);
-      updateGroups.set(newTier, group);
+    } else {
+      console.error("League reward ledger insert failed:", depErr);
     }
   }
 
-  // ── Bulk: history snapshots + member resets (idempotent) ────────────
-  for (let i = 0; i < historyRows.length; i += 500) {
+  // ── 2) History snapshots (bulk upsert, idempotent via the unique
+  //       (week_start, user_id) index) ──────────────────────────────────
+  let snapshots = 0;
+  for (let i = 0; i < plan.snapshots.length; i += 500) {
     const { data: inserted, error: histErr } = await admin
       .from("league_xp_history")
-      .upsert(historyRows.slice(i, i + 500), { onConflict: "week_start,user_id", ignoreDuplicates: true })
+      .upsert(plan.snapshots.slice(i, i + 500), { onConflict: "week_start,user_id", ignoreDuplicates: true })
       .select("id");
     if (histErr) console.error("[league] history bulk insert failed:", histErr.message);
     else snapshots += inserted?.length ?? 0;
   }
+
+  // ── 3) Reset every member for the new cycle (chunked bulk updates,
+  //       idempotent via the week_start guard) ───────────────────────────
   const resetIso = new Date().toISOString();
-  for (const [groupTier, ids] of updateGroups) {
+  for (const [groupTier, ids] of Object.entries(plan.updateGroups)) {
     for (let i = 0; i < ids.length; i += 100) {
       await admin
         .from("league_xp_members")
-        .update({ xp: 0, week_start: newWeek, tier: groupTier, updated_at: resetIso })
+        .update({ xp: 0, week_start: newWeek, tier: Number(groupTier), updated_at: resetIso })
         .in("user_id", ids.slice(i, i + 100))
         .neq("week_start", newWeek);
     }
   }
 
-  // ── Fair-share rebalance (owner policy 2026-09-11) ────────────────────
-  // Dynamic promotion: after the standard top-5/bottom-5 moves, if the
-  // rosters have drifted from the even share (total / 5 per league, the
-  // top leagues take the remainder), move the difference in one wave —
-  // Open's surplus rides up the chain (only players who earned XP this
-  // week ride the wave), over-shared leagues shed their bottom back
-  // down (inactive players go first). Only fires when drift ≥ 5, so a
-  // normal week is unchanged. Cash rewards never change: only the
-  // standard top 5 per league get paid, no matter how many players
-  // move. Idempotent by construction — after one rebalance the counts
-  // sit at the fair-share fixed point, so a re-run is a no-op.
-  {
-    const all = (members ?? []).map((m: any) => ({
-      user_id: m.user_id as string,
-      tier: (finalTier.get(m.user_id) ?? m.tier) as number,
-      earned: m.week_start === closingWeek && (m.xp ?? 0) > 0,
-      // Sort key: active players rank by this week's XP; inactive rows
-      // sink below every 0-XP player so dead accounts demote first.
-      xp: m.week_start === closingWeek ? (m.xp ?? 0) : -1,
-    }));
-    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    for (const m of all) counts[m.tier]++;
-    const total = all.length;
-    const base = Math.floor(total / 5);
-    const rem = total % 5;
-    const targets: Record<number, number> = {
-      1: base,
-      2: base + (rem > 3 ? 1 : 0),
-      3: base + (rem > 2 ? 1 : 0),
-      4: base + (rem > 1 ? 1 : 0),
-      5: base + (rem > 0 ? 1 : 0),
-    };
-    const nowIso = new Date().toISOString();
-    const pool = (t: number) => all.filter((m) => m.tier === t && !movedUsers.has(m.user_id)).sort((a, b) => b.xp - a.xp);
-
-    // Top-down demotion: leagues over their fair share shed their bottom.
-    let rebalancedDown = 0;
-    for (let t = 5; t >= 2; t--) {
-      const excess = counts[t] - targets[t];
-      if (excess < 5) continue;
-      const bottom = pool(t).slice().reverse().slice(0, excess);
-      if (bottom.length === 0) continue;
+  // ── 4) Fair-share rebalance moves (tier only; XP/week untouched).
+  //       Runs after the resets, same as the original inline logic.
+  const rebalanceByDest = new Map<number, string[]>();
+  for (const mv of [...plan.rebalanceDown, ...plan.rebalanceUp]) {
+    const g = rebalanceByDest.get(mv.toTier) ?? [];
+    g.push(mv.userId);
+    rebalanceByDest.set(mv.toTier, g);
+  }
+  for (const [destTier, ids] of rebalanceByDest) {
+    for (let i = 0; i < ids.length; i += 100) {
       await admin
         .from("league_xp_members")
-        .update({ tier: t - 1, updated_at: nowIso })
-        .in("user_id", bottom.map((m) => m.user_id));
-      rebalancedDown += bottom.length;
-      counts[t] -= bottom.length;
-      counts[t - 1] += bottom.length;
+        .update({ tier: destTier, updated_at: resetIso })
+        .in("user_id", ids.slice(i, i + 100));
     }
-
-    // Bottom-up promotion: Open's surplus rides up the chain, absorbed
-    // by each league's shortfall. Only XP earners ride the wave.
-    let rebalancedUp = 0;
-    let inflow = Math.max(0, counts[1] - targets[1]);
-    if (inflow >= 5) {
-      for (let t = 2; t <= 5 && inflow > 0; t++) {
-        const room = Math.max(0, cap - counts[t]);
-        if (room <= 0) break; // chain blocked at a full league
-        const eligible = pool(t - 1).filter((m) => m.earned);
-        const move = Math.min(inflow, eligible.length, room);
-        if (move <= 0) break;
-        const wave = eligible.slice(0, move);
-        await admin
-          .from("league_xp_members")
-          .update({ tier: t, updated_at: nowIso })
-          .in("user_id", wave.map((m) => m.user_id));
-        rebalancedUp += move;
-        counts[t - 1] -= move;
-        counts[t] += move;
-        for (const m of wave) { m.tier = t; movedUsers.add(m.user_id); }
-        const shortBy = Math.max(0, targets[t] - (counts[t] - move));
-        inflow = move - Math.min(move, shortBy);
-      }
-    }
-    if (rebalancedUp || rebalancedDown) {
-      console.log(`[league] fair-share rebalance: ${rebalancedUp} up, ${rebalancedDown} down`);
-    }
-    return { closingWeek, newWeek, paid, moves, snapshots, cappedAtCapacity: capped, rebalancedUp, rebalancedDown };
   }
+  if (plan.rebalanceUp.length || plan.rebalanceDown.length) {
+    console.log(`[league] fair-share rebalance: ${plan.rebalanceUp.length} up, ${plan.rebalanceDown.length} down`);
+  }
+
+  return {
+    closingWeek,
+    newWeek,
+    paid,
+    moves: plan.totals.moves,
+    snapshots,
+    cappedAtCapacity: plan.totals.capped,
+    rebalancedUp: plan.rebalanceUp.length,
+    rebalancedDown: plan.rebalanceDown.length,
+    payoutGate: plan.payOn ? "open" : (plan.unpaidReason ?? "closed"),
+  };
 }
 
 /**

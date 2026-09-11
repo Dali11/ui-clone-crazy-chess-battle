@@ -42,8 +42,19 @@ export async function GET(req: NextRequest) {
       weekEnd: nextWeekStart(),
       seasonStart: cfg.season_start ?? null,
       flags: {
-        // Effective payout state (what the settle actually does):
-        weeklyPayouts: cfg.rewards_enabled && cfg.weekly_payouts_enabled !== false,
+        // Effective payout state for the week that closes next (what the
+        // next settle actually does): rewards + admin toggle + the
+        // payouts_start date gate built into the settle code.
+        weeklyPayouts:
+          cfg.rewards_enabled &&
+          cfg.weekly_payouts_enabled !== false &&
+          (!cfg.payouts_start || currentWeekStart() >= cfg.payouts_start),
+        // Date gate: the settle pays only for weeks starting on/after
+        // this date ("automation in code" — no external scheduler).
+        payoutsStart: cfg.payouts_start ?? null,
+        firstPaidSettle: cfg.payouts_start
+          ? nextWeekStart(new Date(cfg.payouts_start + "T00:00:00+02:00"))
+          : null,
         // Raw switches:
         rewardsEnabled: cfg.rewards_enabled,
         weeklyPayoutsEnabled: cfg.weekly_payouts_enabled !== false,

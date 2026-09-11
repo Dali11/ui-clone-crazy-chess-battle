@@ -21,6 +21,8 @@ type Status = {
   seasonStart: string | null;
   flags: {
     weeklyPayouts: boolean;
+    payoutsStart: string | null;
+    firstPaidSettle: string | null;
     rewardsEnabled: boolean;
     weeklyPayoutsEnabled: boolean;
     tierMoves: boolean;
@@ -154,8 +156,17 @@ export default function LeaguesAdminPanel() {
         <div className="rounded-xl border border-ccb-border bg-ccb-surface/40 p-3">
           <p className="text-[10px] uppercase tracking-wide font-semibold text-ccb-muted">Weekly payouts</p>
           <p className={`text-sm font-bold mt-1.5 ${status?.flags.weeklyPayouts ? "text-ccb-success" : "text-amber-400"}`}>
-            {status ? (status.flags.weeklyPayouts ? "PAYING" : "PAUSED (invisible to players)") : "—"}
+            {status
+              ? status.flags.weeklyPayouts
+                ? "PAYING"
+                : status.flags.weeklyPayoutsEnabled && status.flags.payoutsStart
+                  ? `OPENS ${fmtDate(status.flags.firstPaidSettle)}`
+                  : "PAUSED (invisible to players)"
+              : "—"}
           </p>
+          {status && !status.flags.weeklyPayouts && status.flags.weeklyPayoutsEnabled && status.flags.payoutsStart && (
+            <p className="text-[10px] text-ccb-muted mt-0.5">Date gate {fmtDate(status.flags.payoutsStart)} — free opening week</p>
+          )}
         </div>
       </div>
 

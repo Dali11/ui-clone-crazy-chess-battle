@@ -67,6 +67,14 @@ export interface LeagueXpConfig {
    * 2026-09-11 mid-week). Absent = true.
    */
   weekly_payouts_enabled?: boolean;
+  /**
+   * Date gate (ISO yyyy-mm-dd): the settle pays only for weeks that START
+   * on or after this date — the in-code replacement for the old one-time
+   * "resume payouts" automation. Season 1's opening week (starting
+   * 2026-09-08) plays for free; the first paid close is the settle after
+   * the week starting on payouts_start (2026-09-15 → pays 2026-09-22).
+   */
+  payouts_start?: string | null;
   reward_1_mwk: number;
   reward_2_mwk: number;
   reward_3_mwk: number;
