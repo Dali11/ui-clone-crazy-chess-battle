@@ -223,7 +223,7 @@ export default function AdSlot({
 
   return (
     <div className={`w-full ${className}`} data-ad-placement={placement}>
-      <p className="text-[10px] uppercase tracking-widest text-ccb-muted/60 mb-1 text-center">Sponsored</p>
+      <p className="text-[10px] uppercase tracking-widest text-ccb-muted/60 mb-0.5 text-center">Sponsored</p>
       <div ref={containerRef} className="w-full overflow-hidden rounded-lg" />
     </div>
   );
