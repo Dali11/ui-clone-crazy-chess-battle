@@ -134,7 +134,15 @@ export async function GET(req: NextRequest) {
     } else {
       cycleStart = currentWeekStart();
       cycleEnd = nextWeekStart();
-      const weekGames = await cycleGameCounts(cycleStart, cycleEnd);
+      // Season 1 began 2026-09-11 mid-week (calendar week 08-14) — clamp
+      // the Games window to season start so it can't count pre-season
+      // games from before the XP reset (same clamp the monthly scope
+      // uses below). Owner-reported 2026-09-11: Games showed nonzero on
+      // day 1 while XP correctly showed 0.
+      const weekGamesStart = (cfg.season_start && cfg.season_start > cycleStart)
+        ? cfg.season_start
+        : cycleStart;
+      const weekGames = await cycleGameCounts(weekGamesStart, cycleEnd);
       // Leaderboard = current cycle rows only. (A stale row — game finished
       // in the minutes between Monday 00:00 and the settle cron — displays
       // 0 XP; the cron's reset makes this self-correcting.)
