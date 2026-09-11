@@ -90,17 +90,22 @@ export async function awardGameXp(opts: {
     const spent = new Map<string, number>();
     for (const e of todayEvents ?? []) spent.set(e.user_id, (spent.get(e.user_id) ?? 0) + e.amount);
 
+    // Grants may be negative (owner policy 2026-09-11: a loss costs XP).
+    // The daily anti-farming cap only limits EARNING — a loss always
+    // deducts so players can never farm their way around it.
     const grants: { userId: string; amount: number; reason: string }[] = [];
-    if (whiteXp > 0) {
-      const room = Math.max(0, cfg.daily_xp_cap - (spent.get(g.white_player_id) ?? 0));
-      const amt = Math.min(whiteXp, room);
-      if (amt > 0) grants.push({ userId: g.white_player_id, amount: amt, reason: draw ? "draw" : whiteWon ? "win" : "loss" });
-    }
-    if (blackXp > 0) {
-      const room = Math.max(0, cfg.daily_xp_cap - (spent.get(g.black_player_id) ?? 0));
-      const amt = Math.min(blackXp, room);
-      if (amt > 0) grants.push({ userId: g.black_player_id, amount: amt, reason: draw ? "draw" : blackWon ? "win" : "loss" });
-    }
+    const grantFor = (userId: string, xp: number, reason: string) => {
+      if (xp === 0) return;
+      if (xp < 0) {
+        grants.push({ userId, amount: xp, reason });
+        return;
+      }
+      const room = Math.max(0, cfg.daily_xp_cap - (spent.get(userId) ?? 0));
+      const amt = Math.min(xp, room);
+      if (amt > 0) grants.push({ userId, amount: amt, reason });
+    };
+    grantFor(g.white_player_id, whiteXp, draw ? "draw" : whiteWon ? "win" : "loss");
+    grantFor(g.black_player_id, blackXp, draw ? "draw" : blackWon ? "win" : "loss");
     if (grants.length === 0) return;
 
     // Insert events; unique(user, kind, game) makes this idempotent.
@@ -125,25 +130,27 @@ export async function awardGameXp(opts: {
       const grant = inserted.find((e) => e.user_id === p);
       if (!grant) continue;
       const { data: member } = await admin.from("league_xp_members").select("*").eq("user_id", p).maybeSingle();
+      // Weekly standings XP is floored at 0 — a loss can drag you down
+      // the ladder but never into negative territory.
       if (!member) {
         // Everyone who joins after the league has started enters in the
         // Open League and climbs through weekly promotion only.
         await admin.from("league_xp_members").insert({
           user_id: p,
           tier: ENTRY_TIER,
-          xp: grant.amount,
+          xp: Math.max(0, grant.amount),
           week_start: week,
         });
       } else if (member.week_start === week) {
         await admin
           .from("league_xp_members")
-          .update({ xp: (member.xp ?? 0) + grant.amount, updated_at: new Date().toISOString() })
+          .update({ xp: Math.max(0, (member.xp ?? 0) + grant.amount), updated_at: new Date().toISOString() })
           .eq("user_id", p);
       } else {
         // Stale week (user played before this week's cron reset ran) — fresh cycle.
         await admin
           .from("league_xp_members")
-          .update({ xp: grant.amount, week_start: week, updated_at: new Date().toISOString() })
+          .update({ xp: Math.max(0, grant.amount), week_start: week, updated_at: new Date().toISOString() })
           .eq("user_id", p);
       }
     }

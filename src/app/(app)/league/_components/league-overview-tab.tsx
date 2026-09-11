@@ -110,8 +110,8 @@ export default function LeagueOverviewTab() {
           <div>
             <h3 className="text-sm font-semibold">All leagues — Season 1</h3>
             <p className="text-xs text-ccb-muted mt-1 leading-relaxed">
-              Weeks run Friday to Friday, rewards paid every Saturday. Top 5 climb, bottom 5 drop.
-              Amounts shown in your currency.
+              Weeks run the 1st–7th, 8th–14th, 15th–21st and 22nd–month end; rewards are paid
+              the morning after each week closes. Top 5 climb, bottom 5 drop. Amounts in your currency.
             </p>
           </div>
         </div>

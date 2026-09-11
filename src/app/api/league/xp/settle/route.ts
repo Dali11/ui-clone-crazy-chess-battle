@@ -12,8 +12,8 @@ export const maxDuration = 60;
  * vercel.json). Requires Bearer CRON_SECRET. Two independent settles,
  * each self-guarding, so one daily cron covers both:
  *
- * 1. WEEKLY (only fires Saturday 00:05 CAT, paying the Friday-to-Friday
- *    week that just closed — owner policy 2026-09-11):
+ * 1. WEEKLY (fires the morning after each calendar week closes — the
+ *    8th, 15th, 22nd and 1st — owner policy 2026-09-11):
  *    For each tier, ranked by XP desc:
  *      - top `promote_count` (default 5): credited their rank reward to the
  *        wallet (credit_wallet RPC, same path as battle payouts) and
@@ -26,8 +26,9 @@ export const maxDuration = 60;
  *    Idempotent guard: members already on the new week are skipped, so a
  *    re-run or overlap with live traffic can never double-pay.
  *
- * 2. MONTHLY (only fires on the 1st, for the month that just closed):
- *    Aggregates league_xp_events over the calendar month, ranks each tier,
+ * 2. MONTHLY (fires on the 30th / last day of short months, only when
+ *    the admin toggle is on): Aggregates league_xp_events month-to-date,
+ *    ranks each tier,
  *    pays the top `monthly_top_count` from the per-tier monthly reward
  *    arrays, and snapshots into league_xp_monthly_history. Tiers never
  *    move on the monthly cycle — it's a championship, not a ladder.
@@ -60,26 +61,22 @@ async function runSettlement() {
 }
 
 /**
- * Weekly ladder settle — runs on SATURDAY 00:05 CAT (cron is daily; this
- * guard makes every other day a no-op). Owner policy 2026-09-11: XP weeks
- * run Friday 00:00 CAT to Friday 00:00 CAT, and payouts land Saturday.
+ * Weekly ladder settle — runs daily at 00:05 CAT, but only acts on the
+ * morning after a calendar week closes (the 8th, 15th, 22nd and 1st).
+ * Owner policy 2026-09-11: weeks are date-anchored — 1st–7th, 8th–14th,
+ * 15th–21st, 22nd–month end — and payouts land the morning after close.
  */
 async function runWeeklySettle(
   admin: ReturnType<typeof createAdminClient>,
   cfg: Awaited<ReturnType<typeof getLeagueXpConfig>>
 ) {
   // ── Boundary guard ───────────────────────────────────────────────────
-  // Only settle on Saturday (CAT), paying for the week that just closed
-  // (Friday boundary). 30h back from Saturday 00:05 lands on Thursday —
-  // safely inside the closing cycle. (The idempotency guard on week_start
-  // additionally prevents double-paying re-runs.)
+  // 2 hours back from 00:05 crosses the week boundary only on the day
+  // after a week closes; every other day is a no-op. (The idempotency
+  // guard on week_start additionally prevents double-paying re-runs.)
   const now = new Date();
-  const catNow = new Date(now.getTime() + CAT_OFFSET_MS);
-  if (catNow.getUTCDay() !== 6) {
-    return { skipped: "weekly settle only runs on Saturday (CAT)" };
-  }
   const curWeek = currentWeekStart(now);
-  const closingWeek = currentWeekStart(new Date(now.getTime() - 30 * 60 * 60 * 1000));
+  const closingWeek = currentWeekStart(new Date(now.getTime() - 2 * 60 * 60 * 1000));
   if (closingWeek === curWeek) {
     return { skipped: "not at week boundary", week: curWeek };
   }
@@ -229,20 +226,35 @@ async function fxNoteFor(
 }
 
 /**
- * Monthly championship settle — only acts on the 1st of the month.
- * Ranks each tier by XP earned during the month that just closed and
- * pays the configured monthly rewards. No promotion/demotion.
+ * Monthly championship settle — pays out on the 30th of each month (or the
+ * last day of shorter months). Ranks each tier by XP earned month-to-date
+ * and pays the configured monthly rewards. No promotion/demotion. Fully
+ * gated on the admin "Monthly Championship Enabled" toggle.
  */
 async function runMonthlySettle(
   admin: ReturnType<typeof createAdminClient>,
   cfg: Awaited<ReturnType<typeof getLeagueXpConfig>>
 ) {
-  const now = new Date();
-  const closingMonth = currentMonthStart(new Date(now.getTime() - 6 * 60 * 60 * 1000));
-  const curMonth = currentMonthStart(now);
-  if (closingMonth === curMonth) {
-    return { skipped: "not at month boundary", month: curMonth };
+  // Monthly PAYOUTS are admin-configurable (platform_settings → XP
+  // Leagues → Monthly Championship Enabled). Owner policy 2026-09-11:
+  // payouts disabled for now — the monthly RANKINGS keep running, only
+  // the cash payouts are skipped.
+  if (cfg.monthly_rewards_enabled === false || cfg.rewards_enabled === false) {
+    return { skipped: "monthly payouts disabled in admin settings" };
   }
+
+  // Owner policy 2026-09-11: the monthly championship pays out on the
+  // 30th (last day for shorter months) — the rankings cover the whole
+  // month-to-date at payout time.
+  const now = new Date();
+  const catNow = new Date(now.getTime() + CAT_OFFSET_MS);
+  const catDay = catNow.getUTCDate();
+  const daysInMonth = new Date(Date.UTC(catNow.getUTCFullYear(), catNow.getUTCMonth() + 1, 0)).getUTCDate();
+  const isLastDay = catDay === daysInMonth;
+  if (catDay !== 30 && !(catDay < 30 && isLastDay)) {
+    return { skipped: "monthly settle only runs on the 30th (CAT)" };
+  }
+  const closingMonth = currentMonthStart(now);
 
   // Already settled this month? Unique history index makes re-runs no-ops,
   // but skip the work entirely if a snapshot exists.
@@ -260,7 +272,9 @@ async function runMonthlySettle(
     ? cfg.season_start
     : closingMonth;
   const monthStartIso = cycleStart + "T00:00:00+02:00";
-  const monthEndIso = curMonth + "T00:00:00+02:00";
+  // The championship pays on the 30th, so the window closes NOW — the
+  // ranking covers month-to-date at payout time.
+  const monthEndIso = now.toISOString();
   const { data: events, error: evErr } = await admin
     .from("league_xp_events")
     .select("user_id, amount")
@@ -283,9 +297,8 @@ async function runMonthlySettle(
   const fxRates = new Map<string, number>();
 
   for (const tier of [1, 2, 3, 4, 5]) {
-    const rewards = cfg.monthly_rewards_enabled !== false && cfg.rewards_enabled
-      ? monthlyRewardsForTier(cfg, tier)
-      : [];
+    // (monthly_rewards_enabled already checked by the early return above)
+    const rewards = cfg.rewards_enabled ? monthlyRewardsForTier(cfg, tier) : [];
     const rows = (members ?? [])
       .filter((m: any) => m.tier === tier && xpByUser.has(m.user_id))
       .map((m: any) => ({

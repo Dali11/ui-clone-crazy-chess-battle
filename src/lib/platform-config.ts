@@ -27,7 +27,7 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     // Owner policy 2026-09-11: Win 3 / Draw 1 / Loss 0 (same as battles).
     xp_win: 3,
     xp_draw: 1,
-    xp_loss: 0,
+    xp_loss: -1, // owner policy 2026-09-11: losses deduct XP (floored at 0)
     xp_upset_bonus: 0,
     daily_xp_cap: 100,
     promote_count: 5,

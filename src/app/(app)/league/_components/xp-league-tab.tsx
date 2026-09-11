@@ -210,9 +210,9 @@ export default function XpLeagueTab() {
             <div className="flex-1">
               <h3 className="text-sm font-semibold">Season 1 is underway</h3>
               <p className="text-xs text-ccb-muted mt-1 leading-relaxed">
-                Weeks run <b className="text-ccb-text">Friday to Friday</b> and rewards are paid out every
-                <b className="text-ccb-text"> Saturday</b>. Every finished PvP game earns XP — free matches and staked
-                challenges both count. All-time XP never resets.
+                Weeks run <b className="text-ccb-text">the 1st–7th, 8th–14th, 15th–21st and 22nd–month end</b> —
+                rewards are paid out the morning after each week closes. Every finished PvP game earns XP, and a
+                loss costs XP too. All-time XP never resets.
               </p>
             </div>
           </div>
@@ -230,7 +230,7 @@ export default function XpLeagueTab() {
             </div>
           </div>
           <div className="text-right shrink-0">
-            <div className="text-xs text-ccb-muted">{isMonth ? "Ends on the 1st · 00:00 CAT" : "Week ends Friday · payouts Saturday"}</div>
+            <div className="text-xs text-ccb-muted">{isMonth ? "Ends on the 1st · 00:00 CAT" : "Week closes 7th/14th/21st/last day · paid next morning"}</div>
             <div className="text-sm font-bold text-ccb-primary tabular-nums">{countdown || "…"}</div>
           </div>
         </div>
@@ -324,11 +324,11 @@ export default function XpLeagueTab() {
         </button>
         {showHow && rules && (
           <div className="px-4 pb-4 space-y-2 text-xs text-ccb-muted leading-relaxed">
-            <p>Every finished game earns XP — wins <b className="text-ccb-text">{rules.win} XP</b>, draws <b className="text-ccb-text">{rules.draw} XP</b>{rules.loss > 0 ? <> , losses <b className="text-ccb-text">{rules.loss} XP</b></> : <> — losses earn nothing</>}.{rules.upsetBonus > 0 && <> Beat a higher-rated player for <b className="text-ccb-text">+{rules.upsetBonus} XP</b> extra.</>}</p>
+            <p>Every finished game earns XP — wins <b className="text-ccb-text">{rules.win} XP</b>, draws <b className="text-ccb-text">{rules.draw} XP</b>{rules.loss !== 0 ? <> , losses <b className="text-ccb-text">{rules.loss} XP</b></> : <> — losses earn nothing</>}.{rules.upsetBonus > 0 && <> Beat a higher-rated player for <b className="text-ccb-text">+{rules.upsetBonus} XP</b> extra.</>}</p>
             <p>To keep it fair, you can earn at most <b className="text-ccb-text">{rules.dailyCap} XP per day</b>, and games against the computer never count.</p>
-            <p>Standings reset <b className="text-ccb-text">every Friday at 00:00 CAT</b> and rewards are paid out every <b className="text-ccb-text">Saturday</b>. The top {promote} players in each league are rewarded and promoted to the next league up; the bottom {demote} are demoted. Every league has its own payout — the higher you climb, the bigger the rewards.</p>
+            <p>Weeks run the <b className="text-ccb-text">1st–7th, 8th–14th, 15th–21st and 22nd–month end</b> — rewards are paid the morning after each week closes. The top {promote} players in each league are rewarded and promoted to the next league up; the bottom {demote} are demoted. Every league has its own payout — the higher you climb, the bigger the rewards.</p>
             <p>Everyone joins the Open League and climbs the ladder — Open → Amateur → Bronze → Knights Championship → Premier League. Existing players were placed by rating when the season started. The Open League is unlimited; every league above it holds up to {tierCap.toLocaleString()} players, so promotion happens when there&apos;s a free spot. You stay in your league unless you are promoted or demoted.</p>
-            <p><b className="text-ccb-text">Monthly championship:</b> alongside the weekly ladder, every league also runs a <b className="text-ccb-text">monthly leaderboard</b> from the 1st to the end of the month. The top players in each league earn <b className="text-ccb-text">bigger monthly rewards</b> — same tier, separate prizes, paid on the 1st. Your tier only moves on the weekly cycle.</p>
+            <p><b className="text-ccb-text">Monthly championship:</b> alongside the weekly ladder, every league also runs a <b className="text-ccb-text">monthly leaderboard</b> from the 1st to the end of the month. The top players in each league earn <b className="text-ccb-text">bigger monthly rewards</b> — same tier, separate prizes, paid on the 30th. Your tier only moves on the weekly cycle.</p>
           </div>
         )}
       </div>

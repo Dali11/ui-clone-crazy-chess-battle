@@ -8,9 +8,9 @@ import { DEFAULT_CONFIGS } from "@/lib/platform-config";
  * members were Elo-seeded once at launch; tiers move only through
  * weekly results from then on. Players earn XP from every finished PvP
  * game (chess + draughts — bot/computer games never count, so XP cannot
- * be farmed). Standings reset weekly (Friday 00:00 CAT); the settle cron
- * rewards and promotes the top 5 and demotes the bottom 5 of each tier
- * (payouts land on Saturday).
+ * be farmed). Standings reset every calendar week (1st–7th, 8th–14th,
+ * 15th–21st, 22nd–month end); the settle cron pays out the morning after
+ * each week closes and promotes the top 5 / demotes the bottom 5.
  */
 
 // CAT is UTC+2 year-round (no DST) — a fixed offset is exact.
@@ -33,7 +33,12 @@ export const ENTRY_TIER = 1;
  * cash, so league XP is a small participation bonus and the ladder can't
  * be bought with stakes. Normal PvP games keep cfg rates (10/4/2 + upset).
  */
-export const BATTLE_XP = { win: 3, draw: 1, loss: 0 } as const;
+/**
+ * XP for staked battle games (flat rates — no rating bonus). Owner policy
+ * 2026-09-11: a loss costs XP (floored at 0 on the weekly standings) to
+ * make players fight for the win.
+ */
+export const BATTLE_XP = { win: 3, draw: 1, loss: -1 } as const;
 
 export interface LeagueXpConfig {
   enabled: boolean;
@@ -133,21 +138,30 @@ export async function getLeagueXpConfig(admin?: ReturnType<typeof createAdminCli
 }
 
 /**
- * ISO date (yyyy-mm-dd) of the FRIDAY 00:00 CAT that starts the current
- * cycle. Owner policy 2026-09-11: XP weeks run Friday to Friday; the
- * settle cron pays out on Saturday.
+ * ISO date (yyyy-mm-dd) of the calendar week start in CAT. Owner policy
+ * 2026-09-11: weeks are date-anchored inside each month — the 1st–7th,
+ * 8th–14th, 15th–21st and 22nd–month end. The settle cron pays out the
+ * morning after each week closes (the 8th, 15th, 22nd and the 1st).
  */
 export function currentWeekStart(now = new Date()): string {
   const cat = new Date(now.getTime() + CAT_OFFSET_MS);
-  const day = cat.getUTCDay(); // 0 Sun ... 5 Fri ... 6 Sat
-  const daysSinceFriday = (day + 2) % 7;
-  const friday = new Date(cat.getTime() - daysSinceFriday * 86400_000);
-  return friday.toISOString().slice(0, 10);
+  const day = cat.getUTCDate();
+  const weekDay = day <= 7 ? 1 : day <= 14 ? 8 : day <= 21 ? 15 : 22;
+  return cat.toISOString().slice(0, 8) + String(weekDay).padStart(2, "0");
 }
 
-/** ISO date of the NEXT Friday 00:00 CAT (cycle end + 1s boundary). */
+/**
+ * ISO date of the next calendar week start (CAT). 1→8→15→22, and the
+ * 22nd rolls over to the 1st of the next month (the last week runs to
+ * month end, so it can be 7–9 days long).
+ */
 export function nextWeekStart(now = new Date()): string {
   const cur = currentWeekStart(now);
+  if (cur.endsWith("-22")) {
+    const d = new Date(cur + "T00:00:00Z");
+    const nextMonth = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    return nextMonth.toISOString().slice(0, 10);
+  }
   const next = new Date(cur + "T00:00:00Z").getTime() + 7 * 86400_000;
   return new Date(next).toISOString().slice(0, 10);
 }
