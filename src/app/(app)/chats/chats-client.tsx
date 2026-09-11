@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Globe, Loader2, MessageCircle, Mic, Search, Pin } from "lucide-react";
+import { Globe, Image as ImageIcon, Loader2, MessageCircle, Mic, Search, Pin } from "lucide-react";
 
 interface Group {
   id: string;
@@ -14,6 +14,7 @@ interface Group {
   country: string | null;
   lastBody: string | null;
   lastVoice: boolean;
+  lastImage: boolean;
   lastDeleted: boolean;
   lastAt: string | null;
 }
@@ -24,6 +25,7 @@ interface Conversation {
   avatarUrl: string | null;
   lastBody: string | null;
   lastVoice: boolean;
+  lastImage: boolean;
   lastDeleted: boolean;
   lastMine: boolean;
   lastAt: string;
@@ -184,7 +186,8 @@ export default function ChatsClient() {
                   <p className="text-xs text-ccb-muted truncate flex items-center gap-1">
                     {g.lastAt ? (
                       g.lastDeleted ? <em className="text-ccb-muted/70">This message was deleted</em>
-                      : g.lastVoice ? <><Mic className="w-3 h-3 shrink-0" /> Voice note</>
+                      : g.lastImage ? <><ImageIcon className="w-3 h-3 shrink-0" />{g.lastBody || "Photo"}</>
+                      : g.lastVoice ? <><Mic className="w-3 h-3 shrink-0" />{g.lastBody || "Voice note"}</>
                       : g.lastBody || "—"
                     ) : "No messages yet"}
                   </p>
@@ -213,7 +216,8 @@ export default function ChatsClient() {
                   <p className={`text-xs truncate flex items-center gap-1 ${c.unread > 0 ? "text-ccb-text font-medium" : "text-ccb-muted"}`}>
                     {c.lastAt ? (
                       c.lastDeleted ? <em className="text-ccb-muted/70">This message was deleted</em>
-                      : c.lastVoice ? <>{c.lastMine ? "You: " : ""}<Mic className="w-3 h-3 shrink-0" /> Voice note</>
+                      : c.lastImage ? <>{c.lastMine ? "You: " : ""}<ImageIcon className="w-3 h-3 shrink-0" />{c.lastBody || "Photo"}</>
+                      : c.lastVoice ? <>{c.lastMine ? "You: " : ""}<Mic className="w-3 h-3 shrink-0" />{c.lastBody || "Voice note"}</>
                       : <>{c.lastMine ? "You: " : ""}{c.lastBody || "—"}</>
                     ) : "—"}
                   </p>

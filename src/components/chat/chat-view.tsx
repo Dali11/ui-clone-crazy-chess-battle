@@ -9,9 +9,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, ChevronDown, Loader2, Mic, Send, Trash2, Users, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, ChevronDown, Loader2, Mic, Paperclip, Send, Trash2, Users, Check, CheckCheck, X } from "lucide-react";
 import VoiceBubble from "./voice-bubble";
 import { useVoiceRecorder } from "./use-voice-recorder";
+import { compressImage } from "./compress-image";
 
 export interface ChatMessage {
   id: number;
@@ -26,6 +27,7 @@ export interface ChatMessage {
   read_at?: string | null;  // dms
   audio_url?: string | null;
   audio_duration?: number | null;
+  image_url?: string | null;
 }
 
 const MAX_BODY = 500;
@@ -113,6 +115,9 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
   const [deleting, setDeleting] = useState(false);
   const [uploadingVoice, setUploadingVoice] = useState(false);
   const mic = useVoiceRecorder();
+  const [pendingImage, setPendingImage] = useState<{ blob: Blob; preview: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -287,25 +292,63 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
     setLoadingOlder(false);
   }, [loadingOlder, hasMore, messages, listUrl]);
 
+  // ── Image attachment ────────────────────────────────────────────────
+  const pickImage = useCallback(() => fileInputRef.current?.click(), []);
+
+  const onFileChosen = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Only images can be attached");
+      return;
+    }
+    try {
+      const { blob } = await compressImage(file);
+      setPendingImage({ blob, preview: URL.createObjectURL(blob) });
+    } catch {
+      setError("Couldn't process that image — try a different one");
+    }
+  }, []);
+
+  const clearPendingImage = useCallback(() => {
+    if (pendingImage) URL.revokeObjectURL(pendingImage.preview);
+    setPendingImage(null);
+  }, [pendingImage]);
+
   // ── Send ───────────────────────────────────────────────────────────
   const send = useCallback(async () => {
     const body = input.trim();
-    if (!body || sending) return;
+    if ((!body && !pendingImage) || sending || uploadingVoice) return;
     setSending(true);
     setError(null);
     try {
+      let imageUrl: string | null = null;
+      if (pendingImage) {
+        const path = `${myUserId}/${crypto.randomUUID()}.jpg`;
+        const { error: upErr } = await supabase.storage
+          .from("chat-images")
+          .upload(path, pendingImage.blob, { contentType: "image/jpeg" });
+        if (upErr) throw new Error("upload");
+        const { data: pub } = supabase.storage.from("chat-images").getPublicUrl(path);
+        imageUrl = pub.publicUrl;
+      }
       const url = mode === "group"
         ? "/api/community/messages"
         : `/api/chats/dm/${partnerId}`;
+      const payload = mode === "group"
+        ? { room, body, ...(imageUrl ? { imageUrl } : {}) }
+        : { body, ...(imageUrl ? { imageUrl } : {}) };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mode === "group" ? { room, body } : { body }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (res.ok && data.message) {
         appendMessage(data.message);
         setInput("");
+        clearPendingImage();
         if (mode === "dm") markRead();
       } else {
         setError(data.error || "Couldn't send — try again");
@@ -314,7 +357,7 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
       setError("Couldn't send — check your connection");
     }
     setSending(false);
-  }, [input, sending, mode, room, partnerId, appendMessage, markRead]);
+  }, [input, sending, uploadingVoice, pendingImage, mode, room, partnerId, myUserId, supabase, appendMessage, markRead, clearPendingImage]);
 
   // ── Voice notes ─────────────────────────────────────────────────────
   const sendVoice = useCallback(async () => {
@@ -485,6 +528,16 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
                             {m.username}
                           </span>
                         )}
+                        {m.image_url && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={m.image_url}
+                            alt={m.body ? "Chat image" : "Shared image"}
+                            onClick={(e) => { e.stopPropagation(); setLightbox(m.image_url!); }}
+                            className="rounded-xl max-w-full w-[220px] max-h-[300px] object-cover cursor-zoom-in select-none"
+                          />
+                        )}
+                        {(m.body || m.audio_url) && m.image_url && <div className="h-1" />}
                         {m.audio_url && (
                           <VoiceBubble id={m.id} url={m.audio_url} duration={m.audio_duration} mine={!!mine} />
                         )}
@@ -546,35 +599,70 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
           </button>
         </div>
       ) : (
-        <div className="mt-2 flex items-center gap-2">
-          <div className="flex-1 flex items-center rounded-full border border-ccb-border bg-ccb-card px-4 py-2 focus-within:border-ccb-primary/50 transition-colors">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value.slice(0, MAX_BODY))}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={mode === "group" ? `Message ${headerTitle}…` : "Type a message…"}
-              maxLength={MAX_BODY}
-              className="flex-1 bg-transparent text-sm text-ccb-text placeholder:text-ccb-muted outline-none"
-            />
-            {input.length > MAX_BODY - 50 && (
-              <span className="text-[10px] text-ccb-muted ml-2">{MAX_BODY - input.length}</span>
+        <div className="mt-2">
+          {pendingImage && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <div className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={pendingImage.preview} alt="Attachment preview" className="w-16 h-16 rounded-lg object-cover border border-ccb-border" />
+                <button
+                  onClick={clearPendingImage}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-ccb-text text-white flex items-center justify-center shadow"
+                  aria-label="Remove attachment"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              <span className="text-xs text-ccb-muted">Add a caption, then send</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 flex items-center rounded-full border border-ccb-border bg-ccb-card px-4 py-2 focus-within:border-ccb-primary/50 transition-colors">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value.slice(0, MAX_BODY))}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder={mode === "group" ? `Message ${headerTitle}…` : "Type a message…"}
+                maxLength={MAX_BODY}
+                className="flex-1 bg-transparent text-sm text-ccb-text placeholder:text-ccb-muted outline-none min-w-0"
+              />
+              {input.length > MAX_BODY - 50 && (
+                <span className="text-[10px] text-ccb-muted ml-2 shrink-0">{MAX_BODY - input.length}</span>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={onFileChosen}
+                className="hidden"
+              />
+              <button
+                onClick={pickImage}
+                className="ml-2 shrink-0 text-ccb-muted hover:text-ccb-text transition-colors"
+                aria-label="Attach image"
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
+            </div>
+            {input.trim() || pendingImage ? (
+              <button
+                onClick={send}
+                disabled={sending || uploadingVoice}
+                className="w-10 h-10 rounded-full bg-ccb-primary text-white flex items-center justify-center disabled:opacity-40 shrink-0"
+                aria-label="Send"
+              >
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            ) : (
+              <button
+                onClick={mic.start}
+                className="w-10 h-10 rounded-full bg-ccb-primary text-white flex items-center justify-center shrink-0"
+                aria-label="Record voice note"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
             )}
           </div>
-          <button
-            onClick={mic.start}
-            className="w-10 h-10 rounded-full bg-ccb-card border border-ccb-border text-ccb-muted hover:text-ccb-text flex items-center justify-center shrink-0"
-            aria-label="Record voice note"
-          >
-            <Mic className="w-4 h-4" />
-          </button>
-          <button
-            onClick={send}
-            disabled={!input.trim() || sending}
-            className="w-10 h-10 rounded-full bg-ccb-primary text-white flex items-center justify-center disabled:opacity-40 shrink-0"
-            aria-label="Send"
-          >
-            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          </button>
         </div>
       )}
       {(error || mic.error) && messages.length > 0 && (
@@ -582,6 +670,24 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
       )}
       {(mic.error && messages.length === 0) && (
         <p className="text-xs text-destructive mt-1 px-2">{mic.error}</p>
+      )}
+
+      {/* Image lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightbox} alt="Shared image" className="max-w-full max-h-full object-contain" />
+          <button
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center backdrop-blur"
+            aria-label="Close image"
+            onClick={() => setLightbox(null)}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       )}
 
       {/* Delete confirm sheet */}
