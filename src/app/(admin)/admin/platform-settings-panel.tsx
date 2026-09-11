@@ -77,6 +77,13 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     ]},
     { key: "page_size", label: "Page Size", type: "number", group: "display", help: "Records per page" },
   ],
+  payments_zm: [
+    { key: "enabled", label: "Zambia Payments Enabled", type: "toggle", group: "control", help: "Master switch for Ontech deposits + withdrawals (Airtel/MTN/Zamtel + Zambian banks)" },
+    { key: "min_deposit_zmw", label: "Minimum Deposit", type: "number", group: "control", unit: "ZMW", help: "Smallest deposit Zambian players can make (wallet UI quick-amounts scale off this)" },
+    { key: "max_deposit_zmw", label: "Maximum Deposit", type: "number", group: "control", unit: "ZMW" },
+    { key: "min_withdrawal_zmw", label: "Minimum Withdrawal", type: "number", group: "control", unit: "ZMW" },
+    { key: "max_withdrawal_zmw", label: "Maximum Withdrawal", type: "number", group: "control", unit: "ZMW" },
+  ],
   battles: [
     { key: "enabled", label: "Battles Enabled", type: "toggle", group: "control", help: "Allow staked battles" },
     { key: "min_stake", label: "Min Stake", type: "number", group: "control", unit: "MWK" },
@@ -165,6 +172,7 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
 
 function formatValue(value: any, unit?: string): string {
   if (unit === "MWK") return `MWK ${value.toLocaleString()}`;
+  if (unit === "ZMW") return `K${value.toLocaleString()}`;
   if (unit === "%") return `${value}%`;
   if (unit === "days") return `${value} day${value !== 1 ? "s" : ""}`;
   if (unit === "weeks") return `${value} week${value !== 1 ? "s" : ""}`;
@@ -187,6 +195,7 @@ const SECTION_LABELS: Record<string, string> = {
   push: "Push Notifications",
   verification: "Verification",
   logs: "Admin Logs",
+  payments_zm: "Zambia Payments (Ontech)",
 };
 
 // ─── Component ────────────────────────────────────────────────────────────

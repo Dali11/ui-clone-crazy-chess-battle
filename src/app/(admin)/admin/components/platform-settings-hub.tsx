@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Gamepad2,
   Swords, Shield, Calendar, Crown,
   Search, SlidersHorizontal, Database, ChevronDown, ScrollText,
-  ShieldCheck, DollarSign, Megaphone, Zap, Radio } from "lucide-react";
+  ShieldCheck, DollarSign, Megaphone, Zap, Radio, Globe } from "lucide-react";
 import PlatformSettingsPanel from "../platform-settings-panel";
 
 function PlatformSettingsHubBase() {
@@ -18,6 +18,7 @@ function PlatformSettingsHubBase() {
     { id: "push", label: "Push", icon: Radio, desc: "Notifications, throttle gaps" },
     { id: "battles", label: "Battles", icon: Swords, desc: "Stakes, fees, auto-cancel" },
     { id: "withdrawals", label: "Withdrawals", icon: ArrowDownUp, desc: "Limits, fees, approval" },
+    { id: "payments_zm", label: "Zambia", icon: Globe, desc: "Ontech K-amount limits, mobile + bank" },
     { id: "deposits", label: "Deposits", icon: DollarSign, desc: "Limits, auto-credit, approval" },
     { id: "tournaments", label: "Tournaments", icon: Trophy, desc: "Approval, max players" },
     { id: "games", label: "Games", icon: Gamepad2, desc: "Spectators, concurrency" },
