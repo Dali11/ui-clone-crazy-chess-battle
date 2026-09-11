@@ -949,7 +949,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   // ============ SHARED BOARD COLUMN ============
   const boardColumn = (topPlayer: any, bottomPlayer: any, showControls: boolean) => (
-    <div className="relative flex flex-col h-full w-full lg:w-[600px] lg:max-w-[600px] lg:h-auto lg:shrink-0 lg:my-auto">
+    <div className="relative flex flex-col h-full w-full lg:w-[600px] lg:max-w-[600px] lg:shrink-0 lg:my-auto">
       {/* Mobile top bar */}
       <div className="lg:hidden shrink-0 flex items-center justify-between px-3 pt-[max(0.875rem,env(safe-area-inset-top))] pb-2 h-auto min-h-12 border-b border-ccb-border">
         <Link href="/play" className="p-1.5 -ml-1.5 text-ccb-muted hover:text-ccb-primary">
