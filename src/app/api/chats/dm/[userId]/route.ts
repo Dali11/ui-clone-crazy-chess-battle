@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ userId: str
 
     let query = admin
       .from("direct_messages")
-      .select("id, sender_id, recipient_id, body, created_at, read_at, deleted_at")
+      .select("id, sender_id, recipient_id, body, created_at, read_at, deleted_at, audio_url, audio_duration")
       .or(`and(sender_id.eq.${user.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${user.id})`)
       .order("id", { ascending: false })
       .limit(PAGE_SIZE);
@@ -61,13 +61,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ userId: st
     if (partnerId === user.id)
       return NextResponse.json({ error: "Can't message yourself" }, { status: 400 });
 
-    const { body: bodyRaw } = await req.json();
+    const { body: bodyRaw, audioUrl, audioDuration } = await req.json();
     const body = typeof bodyRaw === "string" ? bodyRaw.trim() : "";
-    if (!body) return NextResponse.json({ error: "Empty message" }, { status: 400 });
+    const audio = typeof audioUrl === "string" ? audioUrl.trim() : "";
+    const dur = Number.isFinite(audioDuration) ? Math.min(Math.max(Math.round(audioDuration), 0), 300) : null;
+    if (audio && !audio.startsWith(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/chat-voice/`))
+      return NextResponse.json({ error: "Invalid audio" }, { status: 400 });
+    if (!body && !audio) return NextResponse.json({ error: "Empty message" }, { status: 400 });
     if (body.length > MAX_BODY)
       return NextResponse.json({ error: `Max ${MAX_BODY} characters` }, { status: 400 });
     const clean = body.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
-    if (!clean) return NextResponse.json({ error: "Empty message" }, { status: 400 });
+    if (!clean && !audio) return NextResponse.json({ error: "Empty message" }, { status: 400 });
 
     const admin = createAdminClient();
 
@@ -87,8 +91,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ userId: st
 
     const { data: message, error } = await admin
       .from("direct_messages")
-      .insert({ sender_id: user.id, recipient_id: partnerId, body: clean })
-      .select("id, sender_id, recipient_id, body, created_at, read_at, deleted_at")
+      .insert({ sender_id: user.id, recipient_id: partnerId, body: clean, audio_url: audio || null, audio_duration: audio ? dur : null })
+      .select("id, sender_id, recipient_id, body, created_at, read_at, deleted_at, audio_url, audio_duration")
       .single();
     if (error || !message) return NextResponse.json({ error: "Failed to send" }, { status: 500 });
 

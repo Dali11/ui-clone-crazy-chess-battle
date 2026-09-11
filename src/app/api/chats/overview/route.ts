@@ -31,7 +31,7 @@ export async function GET() {
     for (const r of rooms || []) {
       const { data: last } = await admin
         .from("community_messages")
-        .select("body, deleted_at, created_at, username")
+        .select("body, deleted_at, created_at, username, audio_url")
         .eq("room", r.id)
         .order("id", { ascending: false })
         .limit(1);
@@ -40,6 +40,7 @@ export async function GET() {
         name: r.name,
         country: r.country,
         lastBody: last?.[0]?.body || null,
+        lastVoice: !last?.[0]?.body && !!last?.[0]?.audio_url,
         lastDeleted: !!last?.[0]?.deleted_at,
         lastAt: last?.[0]?.created_at || null,
       });
@@ -48,7 +49,7 @@ export async function GET() {
     // ── DM conversations (recent window, grouped by partner) ───────
     const { data: myDms } = await admin
       .from("direct_messages")
-      .select("id, sender_id, recipient_id, body, created_at, read_at, deleted_at")
+      .select("id, sender_id, recipient_id, body, created_at, read_at, deleted_at, audio_url")
       .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
       .order("id", { ascending: false })
       .limit(300);
@@ -79,6 +80,7 @@ export async function GET() {
       username: partnerMap.get(partnerId)?.username || "player",
       avatarUrl: partnerMap.get(partnerId)?.avatar_url || null,
       lastBody: last.deleted_at ? null : last.body,
+      lastVoice: !last.deleted_at && !last.body && !!last.audio_url,
       lastDeleted: !!last.deleted_at,
       lastMine: last.sender_id === user.id,
       lastAt: last.created_at,

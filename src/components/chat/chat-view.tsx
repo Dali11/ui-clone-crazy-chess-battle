@@ -9,7 +9,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, ChevronDown, Loader2, Send, Users, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, ChevronDown, Loader2, Mic, Send, Trash2, Users, Check, CheckCheck } from "lucide-react";
+import VoiceBubble from "./voice-bubble";
+import { useVoiceRecorder } from "./use-voice-recorder";
 
 export interface ChatMessage {
   id: number;
@@ -22,6 +24,8 @@ export interface ChatMessage {
   sender_id?: string;       // dms
   recipient_id?: string;    // dms
   read_at?: string | null;  // dms
+  audio_url?: string | null;
+  audio_duration?: number | null;
 }
 
 const MAX_BODY = 500;
@@ -107,6 +111,8 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
   const [atBottom, setAtBottom] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [uploadingVoice, setUploadingVoice] = useState(false);
+  const mic = useVoiceRecorder();
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -310,6 +316,53 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
     setSending(false);
   }, [input, sending, mode, room, partnerId, appendMessage, markRead]);
 
+  // ── Voice notes ─────────────────────────────────────────────────────
+  const sendVoice = useCallback(async () => {
+    if (sending || uploadingVoice) return;
+    setUploadingVoice(true);
+    try {
+      const clip = await mic.stop();
+      if (!clip) { setUploadingVoice(false); return; }
+      if (clip.blob.size > 8 * 1024 * 1024) {
+        setError("Voice note too long — keep it under 2 minutes");
+        setUploadingVoice(false);
+        return;
+      }
+      const ext = clip.mime.includes("mp4") ? "m4a" : "webm";
+      const path = `${myUserId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("chat-voice")
+        .upload(path, clip.blob, { contentType: clip.mime });
+      if (upErr) {
+        setError("Couldn't upload the voice note — check your connection");
+        setUploadingVoice(false);
+        return;
+      }
+      const { data: pub } = supabase.storage.from("chat-voice").getPublicUrl(path);
+
+      const url = mode === "group"
+        ? "/api/community/messages"
+        : `/api/chats/dm/${partnerId}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mode === "group"
+          ? { room, body: "", audioUrl: pub.publicUrl, audioDuration: clip.duration }
+          : { body: "", audioUrl: pub.publicUrl, audioDuration: clip.duration }),
+      });
+      const data = await res.json();
+      if (res.ok && data.message) {
+        appendMessage(data.message);
+        if (mode === "dm") markRead();
+      } else {
+        setError(data.error || "Couldn't send — try again");
+      }
+    } catch {
+      setError("Couldn't send the voice note — try again");
+    }
+    setUploadingVoice(false);
+  }, [mode, room, partnerId, myUserId, supabase, mic, sending, uploadingVoice, appendMessage, markRead]);
+
   // ── Delete ────────────────────────────────────────────────────────
   const confirmDelete = useCallback(async () => {
     if (!deleteTarget || deleting) return;
@@ -432,7 +485,12 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
                             {m.username}
                           </span>
                         )}
-                        <span className="text-[13.5px] sm:text-sm whitespace-pre-wrap break-words block"><LinkifiedBody text={m.body} /></span>
+                        {m.audio_url && (
+                          <VoiceBubble id={m.id} url={m.audio_url} duration={m.audio_duration} mine={!!mine} />
+                        )}
+                        {m.body && (
+                          <span className="text-[13.5px] sm:text-sm whitespace-pre-wrap break-words block"><LinkifiedBody text={m.body} /></span>
+                        )}
                         <span className={`block text-right text-[10px] mt-0.5 flex items-center justify-end gap-1 ${mine ? "text-white/70" : "text-ccb-muted"}`}>
                           {mode === "dm" && mine && (m.read_at
                             ? <CheckCheck className="w-3 h-3" />
@@ -461,31 +519,70 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
         </button>
       )}
 
-      {/* Composer */}
-      <div className="mt-2 flex items-center gap-2">
-        <div className="flex-1 flex items-center rounded-full border border-ccb-border bg-ccb-card px-4 py-2 focus-within:border-ccb-primary/50 transition-colors">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value.slice(0, MAX_BODY))}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder={mode === "group" ? `Message ${headerTitle}…` : "Type a message…"}
-            maxLength={MAX_BODY}
-            className="flex-1 bg-transparent text-sm text-ccb-text placeholder:text-ccb-muted outline-none"
-          />
-          {input.length > MAX_BODY - 50 && (
-            <span className="text-[10px] text-ccb-muted ml-2">{MAX_BODY - input.length}</span>
-          )}
+      {/* Composer (recording bar replaces it while recording) */}
+      {mic.recording ? (
+        <div className="mt-2 flex items-center gap-2">
+          <div className="flex-1 flex items-center gap-3 rounded-full border border-ccb-border bg-ccb-card px-4 py-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+            <span className="text-sm text-ccb-text tabular-nums font-medium">
+              {Math.floor(mic.elapsed / 60)}:{String(mic.elapsed % 60).padStart(2, "0")}
+            </span>
+            <span className="text-xs text-ccb-muted">Recording…</span>
+          </div>
+          <button
+            onClick={mic.cancel}
+            className="w-10 h-10 rounded-full bg-ccb-card border border-ccb-border text-ccb-muted flex items-center justify-center shrink-0"
+            aria-label="Cancel voice note"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={sendVoice}
+            disabled={uploadingVoice}
+            className="w-10 h-10 rounded-full bg-ccb-primary text-white flex items-center justify-center disabled:opacity-40 shrink-0"
+            aria-label="Send voice note"
+          >
+            {uploadingVoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          </button>
         </div>
-        <button
-          onClick={send}
-          disabled={!input.trim() || sending}
-          className="w-10 h-10 rounded-full bg-ccb-primary text-white flex items-center justify-center disabled:opacity-40 shrink-0"
-          aria-label="Send"
-        >
-          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        </button>
-      </div>
-      {error && messages.length > 0 && <p className="text-xs text-destructive mt-1 px-2">{error}</p>}
+      ) : (
+        <div className="mt-2 flex items-center gap-2">
+          <div className="flex-1 flex items-center rounded-full border border-ccb-border bg-ccb-card px-4 py-2 focus-within:border-ccb-primary/50 transition-colors">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value.slice(0, MAX_BODY))}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+              placeholder={mode === "group" ? `Message ${headerTitle}…` : "Type a message…"}
+              maxLength={MAX_BODY}
+              className="flex-1 bg-transparent text-sm text-ccb-text placeholder:text-ccb-muted outline-none"
+            />
+            {input.length > MAX_BODY - 50 && (
+              <span className="text-[10px] text-ccb-muted ml-2">{MAX_BODY - input.length}</span>
+            )}
+          </div>
+          <button
+            onClick={mic.start}
+            className="w-10 h-10 rounded-full bg-ccb-card border border-ccb-border text-ccb-muted hover:text-ccb-text flex items-center justify-center shrink-0"
+            aria-label="Record voice note"
+          >
+            <Mic className="w-4 h-4" />
+          </button>
+          <button
+            onClick={send}
+            disabled={!input.trim() || sending}
+            className="w-10 h-10 rounded-full bg-ccb-primary text-white flex items-center justify-center disabled:opacity-40 shrink-0"
+            aria-label="Send"
+          >
+            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          </button>
+        </div>
+      )}
+      {(error || mic.error) && messages.length > 0 && (
+        <p className="text-xs text-destructive mt-1 px-2">{error || mic.error}</p>
+      )}
+      {(mic.error && messages.length === 0) && (
+        <p className="text-xs text-destructive mt-1 px-2">{mic.error}</p>
+      )}
 
       {/* Delete confirm sheet */}
       {deleteTarget && (
