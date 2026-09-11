@@ -14,6 +14,7 @@ import { getStoredBoardTheme, type BoardTheme } from "@/lib/game/board-themes";
 import { useBoardSize } from "@/hooks/use-board-size";
 import { useLockBodyScroll } from "@/hooks/use-lock-body-scroll";
 import { useRematch } from "@/hooks/use-rematch";
+import { useWakeLock } from "@/hooks/use-wake-lock";
 import MoveScroller from "./move-scroller";
 import CapturedPieces from "./captured-pieces";
 import VictoryOverlay, { type GameOutcome, type RematchState } from "./victory-overlay";
@@ -167,6 +168,12 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     }, 4000);
     return () => clearInterval(interval);
   }, [gameEnded, isSpectator, checkTimeout]);
+
+  // Keep the screen awake while an active game is in progress — a screen
+  // timeout was silently killing the presence poll above and getting
+  // idle-but-present players auto-resigned regardless of whose turn it
+  // was (see src/hooks/use-wake-lock.ts).
+  useWakeLock(!gameEnded && !isSpectator && game.status === "playing");
 
   const myRatingChange = isWhite ? game.white_rating_change : game.black_rating_change;
 
