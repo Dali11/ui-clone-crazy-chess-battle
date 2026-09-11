@@ -40,6 +40,16 @@ export function useWakeLock(active: boolean) {
           lock.release().catch(() => {});
           return;
         }
+        // The browser auto-releases the lock whenever the page is hidden
+        // (user switches apps, opens another tab). Listen for that release
+        // so `lockRef.current` never goes stale — otherwise the
+        // visibilitychange handler below would see a dead sentinel object
+        // and never re-acquire, leaving the screen unprotected after a
+        // brief app-switch. That was exactly the false-abandonment bug
+        // this hook exists to prevent.
+        lock.addEventListener("release", () => {
+          if (lockRef.current === lock) lockRef.current = null;
+        });
         lockRef.current = lock;
       } catch {
         // Permission denied / not allowed in this context — silent no-op,
