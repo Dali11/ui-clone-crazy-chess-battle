@@ -130,8 +130,11 @@ export async function awardGameXp(opts: {
       const grant = inserted.find((e) => e.user_id === p);
       if (!grant) continue;
       const { data: member } = await admin.from("league_xp_members").select("*").eq("user_id", p).maybeSingle();
-      // Weekly standings XP is floored at 0 — a loss can drag you down
-      // the ladder but never into negative territory.
+      // AUDIT FIX 2026-09-11 (owner reversal): weekly XP is NO LONGER
+      // floored at 0. A loss when you're already at 0 used to clamp back
+      // to 0 — indistinguishable on the leaderboard from a player who
+      // never played. Losses now genuinely go negative so the standings
+      // reflect what actually happened.
       if (!member) {
         // Owner policy 2026-09-11 (reaffirmed): ALL new players join the
         // Open League and climb through weekly promotion only. The weekly
@@ -140,19 +143,19 @@ export async function awardGameXp(opts: {
         await admin.from("league_xp_members").insert({
           user_id: p,
           tier: ENTRY_TIER,
-          xp: Math.max(0, grant.amount),
+          xp: grant.amount,
           week_start: week,
         });
       } else if (member.week_start === week) {
         await admin
           .from("league_xp_members")
-          .update({ xp: Math.max(0, (member.xp ?? 0) + grant.amount), updated_at: new Date().toISOString() })
+          .update({ xp: (member.xp ?? 0) + grant.amount, updated_at: new Date().toISOString() })
           .eq("user_id", p);
       } else {
         // Stale week (user played before this week's cron reset ran) — fresh cycle.
         await admin
           .from("league_xp_members")
-          .update({ xp: Math.max(0, grant.amount), week_start: week, updated_at: new Date().toISOString() })
+          .update({ xp: grant.amount, week_start: week, updated_at: new Date().toISOString() })
           .eq("user_id", p);
       }
     }

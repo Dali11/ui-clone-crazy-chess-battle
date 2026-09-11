@@ -227,7 +227,7 @@ export default function XpLeagueTab() {
             <span className="text-3xl shrink-0">{data.tier?.emoji}</span>
             <div className="min-w-0">
               <h2 className="text-lg font-bold truncate">{data.tier?.name}</h2>
-              <p className="text-xs text-ccb-muted">Your rank: {data.myRank ? `#${data.myRank}` : "—"} · {data.myXp ?? 0} XP · All-time: {data.allTimeXp ?? 0} XP</p>
+              <p className="text-xs text-ccb-muted">Your rank: {data.myRank ? `#${data.myRank}` : "—"} · <span className={(data.myXp ?? 0) < 0 ? "text-destructive font-semibold" : ""}>{data.myXp ?? 0} XP</span> · All-time: {data.allTimeXp ?? 0} XP</p>
             </div>
           </div>
           <div className="text-left sm:text-right shrink-0">
@@ -307,7 +307,7 @@ export default function XpLeagueTab() {
                     <div className="text-[10px] text-ccb-muted">Games</div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-sm font-bold tabular-nums">{s.xp}</div>
+                    <div className={`text-sm font-bold tabular-nums ${s.xp < 0 ? "text-destructive" : ""}`}>{s.xp}</div>
                     <div className="text-[10px] text-ccb-muted">XP</div>
                   </div>
                 </div>

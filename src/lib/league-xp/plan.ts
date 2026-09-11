@@ -195,11 +195,18 @@ export function planWeeklySettlement(args: {
   const rebalanceUp: RebalanceMove[] = [];
   const rebalanceDown: RebalanceMove[] = [];
   {
+    // AUDIT FIX 2026-09-11: the stale-member sentinel used to be -1, which
+    // collided with a genuinely active player's real weekly XP once losses
+    // stopped flooring at 0 (a single-loss player nets exactly -1). Bumped
+    // to a value no real weekly XP total can ever reach, so "didn't play
+    // this week" and "played and lost" can never be confused when the
+    // rebalance sorts by xp ascending/descending.
+    const STALE_XP_SENTINEL = -1_000_000;
     const all = members.map((m) => ({
       user_id: m.user_id,
       tier: finalTier.get(m.user_id) ?? m.tier,
       earned: m.week_start === closingWeek && (m.xp ?? 0) > 0,
-      xp: m.week_start === closingWeek ? (m.xp ?? 0) : -1,
+      xp: m.week_start === closingWeek ? (m.xp ?? 0) : STALE_XP_SENTINEL,
     }));
     const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     for (const m of all) counts[m.tier]++;

@@ -35,8 +35,9 @@ export const ENTRY_TIER = 1;
  */
 /**
  * XP for staked battle games (flat rates — no rating bonus). Owner policy
- * 2026-09-11: a loss costs XP (floored at 0 on the weekly standings) to
- * make players fight for the win.
+ * 2026-09-11 (reversal same day): a loss costs XP, and weekly standings
+ * can go negative — no floor. Makes players fight for the win, and keeps
+ * the leaderboard honest about who's actually losing vs never played.
  */
 export const BATTLE_XP = { win: 3, draw: 1, loss: -1 } as const;
 
