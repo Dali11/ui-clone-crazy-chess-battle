@@ -181,11 +181,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Notify the user
     try {
+      // Ontech (ZM) rows: amount is MWK (wallet) but fee/net/amount_local are ZMW —
+      // show the player their own currency, not a mix.
+      const isZmRow = provider === "ontech" && withdrawal.currency === "ZMW";
+      const nBody = isZmRow
+        ? `Your withdrawal of K${withdrawal.amount_local} (fee: K${fee}, payout: K${netAmount}) has been processed to ${withdrawal.phone} via ${withdrawal.operator_name}.`
+        : `Your withdrawal of ${grossAmount.toLocaleString()} (fee: ${fee.toLocaleString()}, payout: ${netAmount.toLocaleString()}) has been processed to ${withdrawal.phone} via ${withdrawal.operator_name}.`;
       await admin.from("notifications").insert({
         user_id: withdrawal.user_id,
         type: "withdrawal_approved",
         title: "Withdrawal approved",
-        body: `Your withdrawal of ${grossAmount.toLocaleString()} (fee: ${fee.toLocaleString()}, payout: ${netAmount.toLocaleString()}) has been processed to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
+        body: nBody,
         data: { gross_amount: grossAmount, fee, net_amount: netAmount, phone: withdrawal.phone, operator: withdrawal.operator_name, provider },
         read: false,
       });
