@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, ChevronDown, Loader2, Mic, Paperclip, Play, Send, Trash2, Users, Check, CheckCheck, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Copy, CornerUpLeft, Loader2, Mic, MoreVertical, Paperclip, Play, Send, Trash2, Users, Check, CheckCheck, X } from "lucide-react";
 import VoiceBubble from "./voice-bubble";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { compressImage } from "./compress-image";
@@ -28,6 +28,9 @@ export interface ChatMessage {
   audio_url?: string | null;
   audio_duration?: number | null;
   image_url?: string | null;
+  reply_to_id?: string | number | null;
+  reply_username?: string | null;
+  reply_preview?: string | null;
 }
 
 const MAX_BODY = 500;
@@ -159,11 +162,16 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
   const [error, setError] = useState<string | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
+  const [actionsTarget, setActionsTarget] = useState<ChatMessage | null>(null);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [copied, setCopied] = useState(false);
+  const pressTimerRef = useRef<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [uploadingVoice, setUploadingVoice] = useState(false);
   const mic = useVoiceRecorder();
   const [pendingImage, setPendingImage] = useState<{ blob: Blob; preview: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -399,8 +407,8 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
         ? "/api/community/messages"
         : `/api/chats/dm/${partnerId}`;
       const payload = mode === "group"
-        ? { room, body, ...(imageUrl ? { imageUrl } : {}) }
-        : { body, ...(imageUrl ? { imageUrl } : {}) };
+        ? { room, body, ...(imageUrl ? { imageUrl } : {}), ...(replyTo ? { replyToId: replyTo.id } : {}) }
+        : { body, ...(imageUrl ? { imageUrl } : {}), ...(replyTo ? { replyToId: replyTo.id } : {}) };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -410,6 +418,7 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
       if (res.ok && data.message) {
         appendMessage(data.message);
         setInput("");
+        setReplyTo(null);
         clearPendingImage();
         if (mode === "dm") markRead();
       } else {
@@ -419,7 +428,7 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
       setError("Couldn't send — check your connection");
     }
     setSending(false);
-  }, [input, sending, uploadingVoice, pendingImage, mode, room, partnerId, myUserId, supabase, appendMessage, markRead, clearPendingImage]);
+  }, [input, sending, uploadingVoice, pendingImage, replyTo, mode, room, partnerId, myUserId, supabase, appendMessage, markRead, clearPendingImage]);
 
   // ── Voice notes ─────────────────────────────────────────────────────
   const sendVoice = useCallback(async () => {
@@ -481,6 +490,37 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
     } catch {}
     setDeleting(false);
   }, [deleteTarget, deleting, mode, partnerId]);
+
+  // ── Message actions (WhatsApp-style): long-press / right-click /
+  // hover ⋮ opens a sheet with Reply, Copy and Delete. ──────────────
+  const startPress = useCallback((m: ChatMessage) => {
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = window.setTimeout(() => {
+      pressTimerRef.current = null;
+      setActionsTarget(m);
+      try { navigator.vibrate?.(10); } catch {}
+    }, 450);
+  }, []);
+  const cancelPress = useCallback(() => {
+    if (pressTimerRef.current) { clearTimeout(pressTimerRef.current); pressTimerRef.current = null; }
+  }, []);
+  useEffect(() => () => { if (pressTimerRef.current) clearTimeout(pressTimerRef.current); }, []);
+
+  const messagePreview = useCallback((m: ChatMessage) =>
+    m.body ? (m.body.length > 90 ? m.body.slice(0, 90) + "…" : m.body)
+    : m.image_url ? "📷 Photo" : m.audio_url ? "🎤 Voice note" : "Message", []);
+
+  const copyBody = useCallback(async (m: ChatMessage) => {
+    try { await navigator.clipboard.writeText(m.body || ""); } catch {}
+    setCopied(true);
+    setTimeout(() => { setCopied(false); setActionsTarget(null); }, 900);
+  }, []);
+
+  const startReply = useCallback((m: ChatMessage) => {
+    setReplyTo(m);
+    setActionsTarget(null);
+    inputRef.current?.focus();
+  }, []);
 
   const canDelete = useCallback((m: ChatMessage) => {
     if (mode === "group") {
@@ -572,7 +612,7 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
                       </span>
                     </div>
                   )}
-                  <div className={`flex items-end gap-1.5 ${mine ? "justify-end" : "justify-start"} ${grouped ? "mt-0.5" : "mt-2"}`}>
+                  <div className={`group/msg flex items-end gap-1.5 ${mine ? "justify-end" : "justify-start"} ${grouped ? "mt-0.5" : "mt-2"}`}>
                     {!mine && mode === "group" && (
                       grouped ? <div className="w-7 shrink-0" /> : <MsgAvatar username={m.username || "?"} url={m.avatar_url} />
                     )}
@@ -581,8 +621,13 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
                         This message was deleted
                       </div>
                     ) : (
+                      <>
                       <button
-                        onClick={() => canDelete(m) && setDeleteTarget(m)}
+                        onPointerDown={() => startPress(m)}
+                        onPointerUp={cancelPress}
+                        onPointerLeave={cancelPress}
+                        onPointerCancel={cancelPress}
+                        onContextMenu={(e) => { e.preventDefault(); cancelPress(); setActionsTarget(m); }}
                         className={`max-w-[78%] text-left rounded-2xl px-3 py-2 ${mine
                           ? "bg-ccb-primary text-white rounded-br-sm"
                           : "bg-ccb-card text-ccb-text border border-ccb-border rounded-bl-sm"
@@ -591,6 +636,16 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
                         {!mine && mode === "group" && !grouped && (
                           <span className={`block text-[11px] font-semibold ${colorFor(m.username || "").replace("bg-", "text-")}`}>
                             {m.username}
+                          </span>
+                        )}
+                        {m.reply_to_id && (
+                          <span className={`block mb-1 rounded-lg border-l-2 px-2 py-1 ${mine ? "border-white/70 bg-white/15" : "border-ccb-primary bg-ccb-primary/10"}`}>
+                            <span className={`block text-[11px] font-semibold ${mine ? "text-white" : "text-ccb-primary"}`}>
+                              {m.reply_username || "player"}
+                            </span>
+                            <span className={`block text-[11px] truncate ${mine ? "text-white/80" : "text-ccb-muted"}`}>
+                              {m.reply_preview}
+                            </span>
                           </span>
                         )}
                         {m.image_url && (
@@ -616,6 +671,14 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
                           {timeLabel(m.created_at)}
                         </span>
                       </button>
+                      <button
+                        onClick={() => setActionsTarget(m)}
+                        aria-label="Message actions"
+                        className="opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity text-ccb-muted hover:text-ccb-text self-center shrink-0"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -681,9 +744,24 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
               <span className="text-xs text-ccb-muted">Add a caption, then send</span>
             </div>
           )}
+          {replyTo && (
+            <div className="flex items-center gap-2 px-3 py-2 mb-1 rounded-lg bg-ccb-surface border border-ccb-border">
+              <CornerUpLeft className="w-3.5 h-3.5 text-ccb-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-ccb-primary truncate">
+                  Replying to {mode === "group" ? (replyTo.username || "message") : (senderOf(replyTo) === myUserId ? "yourself" : headerTitle)}
+                </p>
+                <p className="text-[11px] text-ccb-muted truncate">{messagePreview(replyTo)}</p>
+              </div>
+              <button onClick={() => setReplyTo(null)} aria-label="Cancel reply" className="shrink-0 text-ccb-muted hover:text-ccb-text">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <div className="flex-1 flex items-center rounded-full border border-ccb-border bg-ccb-card px-4 py-2 focus-within:border-ccb-primary/50 transition-colors">
               <input
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value.slice(0, MAX_BODY))}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
@@ -752,6 +830,46 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+      )}
+
+      {/* Message actions sheet */}
+      {actionsTarget && (
+        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/50" onClick={() => setActionsTarget(null)}>
+          <div
+            className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl bg-ccb-card border border-ccb-border p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] sm:pb-2 space-y-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-3 pt-1.5 pb-1">
+              <p className="text-[11px] text-ccb-muted truncate">
+                {actionsTarget.username || headerTitle} · {messagePreview(actionsTarget)}
+              </p>
+            </div>
+            <button
+              onClick={() => startReply(actionsTarget)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-ccb-text hover:bg-ccb-surface transition-colors"
+            >
+              <CornerUpLeft className="w-4 h-4 text-ccb-primary" /> Reply
+            </button>
+            {!!actionsTarget.body && (
+              <button
+                onClick={() => copyBody(actionsTarget)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-ccb-text hover:bg-ccb-surface transition-colors"
+              >
+                {copied
+                  ? <><Check className="w-4 h-4 text-ccb-success" /> Copied</>
+                  : <><Copy className="w-4 h-4 text-ccb-primary" /> Copy text</>}
+              </button>
+            )}
+            {canDelete(actionsTarget) && (
+              <button
+                onClick={() => { setDeleteTarget(actionsTarget); setActionsTarget(null); }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-400 hover:bg-ccb-surface transition-colors"
+              >
+                <Trash2 className="w-4 h-4" /> Delete
+              </button>
+            )}
+          </div>
         </div>
       )}
 

@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ userId: str
 
     let query = admin
       .from("direct_messages")
-      .select("id, sender_id, recipient_id, body, created_at, read_at, deleted_at, audio_url, audio_duration, image_url")
+      .select("id, sender_id, recipient_id, body, created_at, read_at, deleted_at, audio_url, audio_duration, image_url, reply_to_id, reply_username, reply_preview")
       .or(`and(sender_id.eq.${user.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${user.id})`)
       .order("id", { ascending: false })
       .limit(PAGE_SIZE);
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ userId: st
     if (partnerId === user.id)
       return NextResponse.json({ error: "Can't message yourself" }, { status: 400 });
 
-    const { body: bodyRaw, audioUrl, audioDuration, imageUrl } = await req.json();
+    const { body: bodyRaw, audioUrl, audioDuration, imageUrl, replyToId } = await req.json();
     const body = typeof bodyRaw === "string" ? bodyRaw.trim() : "";
     const audio = typeof audioUrl === "string" ? audioUrl.trim() : "";
     const image = typeof imageUrl === "string" ? imageUrl.trim() : "";
@@ -84,6 +84,24 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ userId: st
     if (!partner) return NextResponse.json({ error: "User not found" }, { status: 404 });
     const { data: senderProfile } = await admin.from("profiles").select("username").eq("id", user.id).single();
 
+    // Quoted reply: the original must belong to this same conversation
+    // (either direction) and not be deleted. Snapshot username + preview.
+    let reply = null;
+    if (replyToId && (typeof replyToId === "string" || typeof replyToId === "number")) {
+      const { data: orig } = await admin
+        .from("direct_messages")
+        .select("id, sender_id, recipient_id, body, audio_url, image_url, deleted_at")
+        .eq("id", replyToId)
+        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${user.id})`)
+        .is("deleted_at", null)
+        .single();
+      if (orig) {
+        const { data: origSender } = await admin.from("profiles").select("username").eq("id", orig.sender_id).single();
+        const preview = orig.body ? orig.body.slice(0, 120) : (orig.image_url ? "📷 Photo" : orig.audio_url ? "🎤 Voice note" : "Message");
+        reply = { id: orig.id, username: origSender?.username || "player", preview };
+      }
+    }
+
     // Rate limit: one message per RATE_LIMIT_MS per sender
     const since = new Date(Date.now() - RATE_LIMIT_MS).toISOString();
     const { data: recent } = await admin
@@ -97,8 +115,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ userId: st
 
     const { data: message, error } = await admin
       .from("direct_messages")
-      .insert({ sender_id: user.id, recipient_id: partnerId, body: clean, audio_url: audio || null, audio_duration: audio ? dur : null, image_url: image || null })
-      .select("id, sender_id, recipient_id, body, created_at, read_at, deleted_at, audio_url, audio_duration, image_url")
+      .insert({ sender_id: user.id, recipient_id: partnerId, body: clean, audio_url: audio || null, audio_duration: audio ? dur : null, image_url: image || null,
+        reply_to_id: reply?.id || null, reply_username: reply?.username || null, reply_preview: reply?.preview || null })
+      .select("id, sender_id, recipient_id, body, created_at, read_at, deleted_at, audio_url, audio_duration, image_url, reply_to_id, reply_username, reply_preview")
       .single();
     if (error || !message) return NextResponse.json({ error: "Failed to send" }, { status: 500 });
 

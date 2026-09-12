@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
     let query = admin
       .from("community_messages")
-      .select("id, room, user_id, username, avatar_url, body, created_at, deleted_at, audio_url, audio_duration, image_url")
+      .select("id, room, user_id, username, avatar_url, body, created_at, deleted_at, audio_url, audio_duration, image_url, reply_to_id, reply_username, reply_preview")
       .eq("room", room)
       .order("id", { ascending: false })
       .limit(PAGE_SIZE);
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { room: roomRaw, body: bodyRaw, audioUrl, audioDuration, imageUrl } = await req.json();
+    const { room: roomRaw, body: bodyRaw, audioUrl, audioDuration, imageUrl, replyToId } = await req.json();
     const room = typeof roomRaw === "string" && roomRaw.trim() ? roomRaw.trim() : "malawi";
     const body = typeof bodyRaw === "string" ? bodyRaw.trim() : "";
     const audio = typeof audioUrl === "string" ? audioUrl.trim() : "";
@@ -108,6 +108,24 @@ export async function POST(req: NextRequest) {
       .eq("id", user.id)
       .single();
 
+    // Quoted reply: the original must be in the same room (and not
+    // deleted). Snapshot username + preview so the quote survives the
+    // original scrolling out of the loaded window or being deleted.
+    let reply = null;
+    if (replyToId && (typeof replyToId === "string" || typeof replyToId === "number")) {
+      const { data: orig } = await admin
+        .from("community_messages")
+        .select("id, username, body, audio_url, image_url, deleted_at")
+        .eq("id", replyToId)
+        .eq("room", room)
+        .is("deleted_at", null)
+        .single();
+      if (orig) {
+        const preview = orig.body ? orig.body.slice(0, 120) : (orig.image_url ? "📷 Photo" : orig.audio_url ? "🎤 Voice note" : "Message");
+        reply = { id: orig.id, username: orig.username || "player", preview };
+      }
+    }
+
     const { data: message, error } = await admin
       .from("community_messages")
       .insert({
@@ -119,8 +137,11 @@ export async function POST(req: NextRequest) {
         audio_url: audio || null,
         audio_duration: audio ? dur : null,
         image_url: image || null,
+        reply_to_id: reply?.id || null,
+        reply_username: reply?.username || null,
+        reply_preview: reply?.preview || null,
       })
-      .select("id, room, user_id, username, avatar_url, body, created_at, deleted_at, audio_url, audio_duration, image_url")
+      .select("id, room, user_id, username, avatar_url, body, created_at, deleted_at, audio_url, audio_duration, image_url, reply_to_id, reply_username, reply_preview")
       .single();
     if (error || !message) return NextResponse.json({ error: "Failed to send" }, { status: 500 });
 
