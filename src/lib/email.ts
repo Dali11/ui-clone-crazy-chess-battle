@@ -525,9 +525,9 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
         body: `
           <h2 style="margin:0 0 16px;font-size:20px;color:#f59e0b;">Membership Expired</h2>
           <p style="margin:0 0 16px;font-size:15px;color:#9ca3af;line-height:1.6;">
-            Your ${data.planName || "membership"} has expired. Renew to keep access to exclusive tournaments and features.
+            Your ${data.planName || "membership"} has expired. Renew to keep your ad-free experience and support the platform's cash rewards.
           </p>
-          ${button(`${BASE_URL}/league/subscribe`, "Renew Membership")}
+          ${button(`${BASE_URL}/membership`, "Renew Membership")}
         `,
       };
     }

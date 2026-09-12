@@ -216,9 +216,9 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
             <Crown className="w-4 h-4 text-ccb-primary" />
             <span className="text-xs sm:text-sm text-ccb-primary font-semibold">Crazy Chess Battles Club</span>
           </div>
-          <h2 className="text-xl sm:text-3xl font-bold mb-4">Unlock Premium Competitions</h2>
+          <h2 className="text-xl sm:text-3xl font-bold mb-4">Join the Club, Kill the Ads</h2>
           <p className="text-sm sm:text-base text-ccb-muted mb-8 max-w-2xl mx-auto">
-            Join the Crazy Chess Battles Club for {formatMembershipPrice(convertedMembershipPrice, membershipDisplaySymbol)} to unlock the full competitive experience.
+            One flat price — {formatMembershipPrice(convertedMembershipPrice, membershipDisplaySymbol)} — for a completely ad-free experience. Your membership keeps the cash rewards flowing for every player.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-left max-w-2xl mx-auto mb-8">
@@ -227,8 +227,8 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                 <Trophy className="w-4 h-4 text-ccb-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-sm">Premium Leagues & Sponsored Competitions</h3>
-                <p className="text-xs sm:text-sm text-ccb-muted">Exclusive access to high-stakes leagues and sponsored events with bigger prize pools.</p>
+                <h3 className="font-semibold text-sm">You Fund the Cash Rewards</h3>
+                <p className="text-xs sm:text-sm text-ccb-muted">Weekly league payouts and battle pots stay real money because members cover the platform.</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -236,8 +236,8 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                 <GraduationCap className="w-4 h-4 text-ccb-accent" />
               </div>
               <div>
-                <h3 className="font-semibold text-sm">Crazy Chess Academy</h3>
-                <p className="text-xs sm:text-sm text-ccb-muted">Structured lessons and training to level up your game, from beginner to advanced.</p>
+                <h3 className="font-semibold text-sm">First Look at New Perks</h3>
+                <p className="text-xs sm:text-sm text-ccb-muted">Member-only features land in your account first as the Club grows.</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -245,8 +245,8 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                 <Headphones className="w-4 h-4 text-ccb-success" />
               </div>
               <div>
-                <h3 className="font-semibold text-sm">Priority Support</h3>
-                <p className="text-xs sm:text-sm text-ccb-muted">Fast-track responses and dedicated help when you need it.</p>
+                <h3 className="font-semibold text-sm">No Lost Days</h3>
+                <p className="text-xs sm:text-sm text-ccb-muted">Renew anytime — extra days stack on top of your current membership, never restart it.</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -260,7 +260,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
             </div>
           </div>
 
-          <Link href="/league/subscribe" className="btn-primary inline-flex items-center gap-2">
+          <Link href="/membership" className="btn-primary inline-flex items-center gap-2">
             <Crown className="w-4 h-4" /> View Membership Plans
           </Link>
         </div>

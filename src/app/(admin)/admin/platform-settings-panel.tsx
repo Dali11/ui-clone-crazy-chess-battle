@@ -38,6 +38,11 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "owner_user_id", label: "Owner user ID", type: "text", group: "control", help: "Who receives revenue. Empty = your admin account (Arthur)" },
     { key: "epoch", label: "First sweep starts from", type: "text", group: "control", help: "ISO date — revenue earned after this is swept (only used before the first credited sweep)" },
   ],
+  membership: [
+    { key: "enabled", label: "Membership purchases enabled", type: "toggle", group: "control", help: "Master switch — OFF hides the buy form and blocks the purchase API" },
+    { key: "price_mwk", label: "Price", type: "number", unit: "MWK", group: "control", help: "Charged per period via Malawi mobile money (PayChangu). Revenue is swept weekly with fees" },
+    { key: "period_days", label: "Period", type: "number", unit: "days", group: "control", help: "Days each purchase adds (renewals stack — no lost days)" },
+  ],
   ads: [
     { key: "enabled", label: "Ads Enabled (Global)", type: "toggle", group: "control", help: "Master switch — nothing renders anywhere when off" },
     { key: "lobby_enabled", label: "Lobby Ad", type: "toggle", group: "control", help: "Dashboard lobby — recommended 320x50 mobile / 728x90 desktop banner" },
@@ -213,6 +218,7 @@ const SECTION_LABELS: Record<string, string> = {
   logs: "Admin Logs",
   payments_zm: "Zambia Payments (Ontech)",
   revenue_sweep: "Revenue Sweep",
+  membership: "Membership",
 };
 
 // ─── Component ────────────────────────────────────────────────────────────

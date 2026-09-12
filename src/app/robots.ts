@@ -15,7 +15,7 @@ export default function robots(): MetadataRoute.Robots {
           "/league",
           "/league",
           "/tournaments",
-          "/league/subscribe",
+          "/membership",
           "/draughts",
           "/login",
           "/signup",

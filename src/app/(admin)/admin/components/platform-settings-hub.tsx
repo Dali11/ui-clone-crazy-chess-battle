@@ -27,6 +27,7 @@ function PlatformSettingsHubBase() {
     { id: "verification", label: "Verification", icon: ShieldCheck, desc: "ID, selfie, auto-approve" },
     { id: "logs", label: "Logs", icon: ScrollText, desc: "Retention period" },
     { id: "revenue_sweep", label: "Revenue Sweep", icon: Wallet, desc: "Weekly auto-withdrawal of platform fees" },
+    { id: "membership", label: "Membership", icon: Crown, desc: "MK/month supporter plan — price, switch" },
     { id: "overview", label: "Dashboard", icon: LayoutDashboard, desc: "Refresh, KPI cards" },
   ];
 
