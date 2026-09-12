@@ -23,7 +23,7 @@ export async function GET() {
     const cfg = await getPlatformConfig(admin, "revenue_sweep");
 
     // All-time revenue (whole history)
-    const [battlesRes, withdrawalsRes] = await Promise.all([
+    const [battlesRes, withdrawalsRes, membershipRes] = await Promise.all([
       admin
         .from("battles")
         .select("stake, winner_payout")
@@ -36,11 +36,17 @@ export async function GET() {
         .eq("status", "completed")
         .gt("fee", 0)
         .neq("payment_provider", "ontech"),
+      admin
+        .from("deposits")
+        .select("amount")
+        .eq("method", "membership_purchase")
+        .eq("status", "success"),
     ]);
     const battleFeeSum = (battlesRes.data || []).reduce(
       (s, b) => s + Math.max(0, (b.stake || 0) * 2 - (b.winner_payout || 0)), 0);
     const withdrawalFeeSum = (withdrawalsRes.data || []).reduce((s, w) => s + (w.fee || 0), 0);
-    const allTime = battleFeeSum + withdrawalFeeSum;
+    const membershipSum = (membershipRes.data || []).reduce((s, m) => s + (m.amount || 0), 0);
+    const allTime = battleFeeSum + withdrawalFeeSum + membershipSum;
 
     // Swept so far (credited sweeps)
     const { data: sweptRows } = await admin
@@ -60,7 +66,7 @@ export async function GET() {
       .limit(12);
 
     return NextResponse.json({
-      allTime: { battleFees: battleFeeSum, withdrawalFees: withdrawalFeeSum, total: allTime },
+      allTime: { battleFees: battleFeeSum, withdrawalFees: withdrawalFeeSum, membershipRevenue: membershipSum, total: allTime },
       swept,
       unswept: pending,
       window,

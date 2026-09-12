@@ -83,9 +83,38 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true, message: "Already processing" });
       }
 
-      // We won the race. (Weekend-league membership payments are retired —
-      // nothing creates membership: references anymore; every deposit now
-      // credits the wallet.)
+      // Membership purchases: extend membership instead of crediting the
+      // wallet. (The legacy weekend-league membership payments are
+      // retired — this branch is the new membership plan.)
+      if (deposit.method === "membership_purchase") {
+        const { extendMembership } = await import("@/lib/membership/membership");
+        const { data: mp } = await admin
+          .from("profiles")
+          .select("membership_until")
+          .eq("id", deposit.user_id)
+          .single();
+        const now = new Date().toISOString();
+        const until = extendMembership(mp?.membership_until, now, 30);
+        await admin.from("profiles").update({ membership_until: until }).eq("id", deposit.user_id);
+
+        await admin
+          .from("deposits")
+          .update({ status: "success", updated_at: now })
+          .eq("id", deposit.id);
+
+        try {
+          await admin.from("notifications").insert({
+            user_id: deposit.user_id,
+            type: "membership_active",
+            title: "Membership active 🎉",
+            body: `You're a member until ${until.slice(0, 10)} — ads are off. Thanks for supporting Crazy Chess Battles!`,
+            data: { until, amount: deposit.amount },
+            read: false,
+          });
+        } catch {}
+
+        return NextResponse.json({ received: true, message: "Membership activated" });
+      }
 
       // Normal deposit — credit wallet
       await admin.rpc('credit_wallet', {

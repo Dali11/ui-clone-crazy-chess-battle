@@ -77,6 +77,40 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount });
       }
 
+      // Membership purchases don't credit the wallet — they extend membership.
+      // The cash stays in the platform's PayChangu merchant account (revenue,
+      // swept weekly to the owner).
+      if (deposit.method === "membership_purchase") {
+        const { extendMembership } = await import("@/lib/membership/membership");
+        const { data: mp } = await admin
+          .from("profiles")
+          .select("membership_until")
+          .eq("id", deposit.user_id)
+          .single();
+        const now = new Date().toISOString();
+        const until = extendMembership(mp?.membership_until, now, 30);
+        await admin.from("profiles")
+          .update({ membership_until: until })
+          .eq("id", deposit.user_id);
+
+        await admin.from("deposits")
+          .update({ status: "success", updated_at: now })
+          .eq("id", deposit.id);
+
+        try {
+          await admin.from("notifications").insert({
+            user_id: deposit.user_id,
+            type: "membership_active",
+            title: "Membership active 🎉",
+            body: `You're a member until ${until.slice(0, 10)} — ads are off. Thanks for supporting Crazy Chess Battles!`,
+            data: { until, amount: deposit.amount },
+            read: false,
+          });
+        } catch {}
+
+        return NextResponse.json({ status: "success", membership: true, until, depositId: deposit.id, amount: deposit.amount });
+      }
+
       // We won the race — safe to credit the wallet
       await admin.rpc("credit_wallet", {
         p_user_id: user.id,

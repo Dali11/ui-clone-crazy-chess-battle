@@ -37,7 +37,25 @@ describe("computeRevenueFromRows", () => {
 
   it("empty rows = zero revenue", () => {
     const r = computeRevenueFromRows([], []);
-    expect(r).toEqual({ battleFees: 0, withdrawalFees: 0, total: 0 });
+    expect(r).toEqual({ battleFees: 0, withdrawalFees: 0, membershipRevenue: 0, total: 0 });
+  });
+
+  it("membership purchases count as platform revenue", () => {
+    const r = computeRevenueFromRows(
+      [{ stake: 1000, winner_payout: 1800 }], // 200
+      [{ fee: 50 }],
+      [{ amount: 10000 }, { amount: 10000 }]  // two MK10k memberships
+    );
+    expect(r.battleFees).toBe(200);
+    expect(r.withdrawalFees).toBe(50);
+    expect(r.membershipRevenue).toBe(20000);
+    expect(r.total).toBe(20250);
+  });
+
+  it("membership rows default to empty (backwards compatible)", () => {
+    const r = computeRevenueFromRows([{ stake: 100, winner_payout: 180 }], []);
+    expect(r.membershipRevenue).toBe(0);
+    expect(r.total).toBe(20);
   });
 });
 

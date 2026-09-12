@@ -30,6 +30,7 @@ export interface SweepWindow {
 export interface WindowRevenue {
   battleFees: number;
   withdrawalFees: number;
+  membershipRevenue: number;
   total: number;
 }
 
@@ -42,14 +43,16 @@ export function battleFee(stake: number | null, winnerPayout: number | null): nu
   return Math.max(0, pot - payout);
 }
 
-/** Sum revenue from raw rows (battles + completed non-Ontech withdrawals). */
+/** Sum revenue from raw rows (battles + completed non-Ontech withdrawals + memberships). */
 export function computeRevenueFromRows(
   battles: { stake: number | null; winner_payout: number | null }[],
-  withdrawals: { fee: number | null }[]
+  withdrawals: { fee: number | null }[],
+  membershipPurchases: { amount: number | null }[] = []
 ): WindowRevenue {
   const battleFees = battles.reduce((sum, b) => sum + battleFee(b.stake, b.winner_payout), 0);
   const withdrawalFees = withdrawals.reduce((sum, w) => sum + Math.max(0, w.fee || 0), 0);
-  return { battleFees, withdrawalFees, total: battleFees + withdrawalFees };
+  const membershipRevenue = membershipPurchases.reduce((sum, m) => sum + Math.max(0, m.amount || 0), 0);
+  return { battleFees, withdrawalFees, membershipRevenue, total: battleFees + withdrawalFees + membershipRevenue };
 }
 
 /** Decide what a sweep should do given config + computed revenue. */
@@ -69,7 +72,7 @@ export async function computeWindowRevenue(
   admin: ReturnType<typeof createAdminClient>,
   window: SweepWindow
 ): Promise<WindowRevenue> {
-  const [battlesRes, withdrawalsRes] = await Promise.all([
+  const [battlesRes, withdrawalsRes, membershipRes] = await Promise.all([
     admin
       .from("battles")
       .select("stake, winner_payout")
@@ -84,7 +87,15 @@ export async function computeWindowRevenue(
       .eq("status", "completed")
       .gt("fee", 0)
       .gte("processed_at", window.startISO)
-      .lt("processed_at", window.endISO)
+      .lt("processed_at", window.endISO),
+    // Membership purchases: player cash → platform PayChangu account (revenue)
+    admin
+      .from("deposits")
+      .select("amount")
+      .eq("method", "membership_purchase")
+      .eq("status", "success")
+      .gte("created_at", window.startISO)
+      .lt("created_at", window.endISO)
   ]);
 
   // Withdrawal fees: MWK-denominated rows only — Ontech ZM rows store ZMW fees
@@ -95,7 +106,11 @@ export async function computeWindowRevenue(
     (sum, b) => sum + battleFee(b.stake, b.winner_payout),
     0
   );
-  return { battleFees, withdrawalFees, total: battleFees + withdrawalFees };
+  const membershipRevenue = (membershipRes.data || []).reduce(
+    (sum, m) => sum + Math.max(0, m.amount || 0),
+    0
+  );
+  return { battleFees, withdrawalFees, membershipRevenue, total: battleFees + withdrawalFees + membershipRevenue };
 }
 
 /** Window = last CREDITED sweep's end → now (revenue from skipped runs carries). */
@@ -122,6 +137,7 @@ export interface SweepResult {
   windowEnd?: string;
   battleFees?: number;
   withdrawalFees?: number;
+  membershipRevenue?: number;
   total?: number;
   credited?: boolean;
   payoutStatus?: string;
@@ -174,6 +190,7 @@ export async function runRevenueSweep(opts: {
       window_end: window.endISO,
       battle_fees_mwk: revenue.battleFees,
       withdrawal_fees_mwk: revenue.withdrawalFees,
+      membership_fees_mwk: revenue.membershipRevenue,
       total_mwk: revenue.total,
       credited: false,
       payout_status: "skipped_below_min",
@@ -182,7 +199,7 @@ export async function runRevenueSweep(opts: {
     return {
       ok: true, action: "below_min",
       windowStart: window.startISO, windowEnd: window.endISO,
-      battleFees: revenue.battleFees, withdrawalFees: revenue.withdrawalFees,
+      battleFees: revenue.battleFees, withdrawalFees: revenue.withdrawalFees, membershipRevenue: revenue.membershipRevenue,
       total: revenue.total, credited: false, payoutStatus: "skipped_below_min",
       message: `MK${revenue.total.toLocaleString()} below minimum — carried over`,
     };
@@ -192,7 +209,7 @@ export async function runRevenueSweep(opts: {
     return {
       ok: true, action: "sweep",
       windowStart: window.startISO, windowEnd: window.endISO,
-      battleFees: revenue.battleFees, withdrawalFees: revenue.withdrawalFees,
+      battleFees: revenue.battleFees, withdrawalFees: revenue.withdrawalFees, membershipRevenue: revenue.membershipRevenue,
       total: revenue.total, credited: false, payoutStatus: "dry",
       message: "Dry run — nothing moved",
     };
@@ -209,6 +226,7 @@ export async function runRevenueSweep(opts: {
       window_end: window.endISO,
       battle_fees_mwk: revenue.battleFees,
       withdrawal_fees_mwk: revenue.withdrawalFees,
+      membership_fees_mwk: revenue.membershipRevenue,
       total_mwk: revenue.total,
       credited: false,
       payout_status: "credit_failed",

@@ -196,6 +196,14 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     // First sweep window start (no credited sweep exists yet)
     epoch: "2026-09-01T00:00:00.000Z",
   },
+  membership: {
+    // MK10,000/month supporter membership. Members are ad-free; purchase
+    // rides the PayChangu MW mobile-money rails (deposits method
+    // 'membership_purchase'); revenue is swept weekly with fees.
+    enabled: true,
+    price_mwk: 10000,
+    period_days: 30,
+  },
 };
 
 // ─── Legacy table sync map ────────────────────────────────────────────────

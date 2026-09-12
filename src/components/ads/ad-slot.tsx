@@ -123,6 +123,23 @@ if (typeof window !== "undefined") {
 
 /* ---------- Component ---------- */
 
+// Membership cache (module scope, shared by every AdSlot instance):
+// members never see ads. Short TTL so a fresh purchase takes effect
+// on the next page without per-mount requests.
+let memberCache: { value: boolean; at: number } | null = null;
+async function isMemberSuppressed(): Promise<boolean> {
+  if (memberCache && Date.now() - memberCache.at < 30_000) return memberCache.value;
+  try {
+    const r = await fetch("/api/membership/status");
+    if (!r.ok) return false;
+    const d = await r.json();
+    memberCache = { value: !!d.member, at: Date.now() };
+    return memberCache.value;
+  } catch {
+    return false; // fail open: show ads rather than lose revenue on a blip
+  }
+}
+
 export default function AdSlot({
   placement,
   className = "",
@@ -138,10 +155,16 @@ export default function AdSlot({
 
   useEffect(() => {
     let cancelled = false;
-    loadAdsConfig().then((cfg) => {
+    loadAdsConfig().then(async (cfg) => {
       if (cancelled) return;
       const p = cfg?.placements?.[placement];
       if (!cfg?.enabled || !p?.enabled || !p.script) {
+        setScript(null);
+        return;
+      }
+      // Members are ad-free — skip before the frequency router so the
+      // impression counters don't tick for them.
+      if (await isMemberSuppressed()) {
         setScript(null);
         return;
       }

@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     const origin = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
       req.nextUrl.origin.replace(/\/$/, "");
     const link = `${origin}/battle-challenge/${challengeId}`;
-    const body = `⚔️ ${me.username || "A player"} challenges you to a chess battle! Tap to see the stake and accept: ${link}`;
+    const body = `⚔️ ${me.username || "A player"} challenges you to a chess battle! See the stake and accept:\n${link}`;
 
     const rows = toInvite.map((r) => ({
       sender_id: user.id,

@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, ChevronDown, Loader2, Mic, Paperclip, Send, Trash2, Users, Check, CheckCheck, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Loader2, Mic, Paperclip, Play, Send, Trash2, Users, Check, CheckCheck, X } from "lucide-react";
 import VoiceBubble from "./voice-bubble";
 import { useVoiceRecorder } from "./use-voice-recorder";
 import { compressImage } from "./compress-image";
@@ -84,15 +84,39 @@ function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
-// Renders a chat body as text + clickable http(s) links (player request).
-// Only http/https URLs become anchors; everything else stays plain text,
-// so nothing can inject markup. Links open in a new tab, sandboxed.
+// Challenge links (quick-match announces + battle challenge invites) render
+// as a tappable "Play Now" button instead of a bare URL — same-origin only,
+// via next/link for instant SPA nav. Every other http(s) URL stays a plain
+// clickable anchor (player request). Nothing else can inject markup.
+const CHALLENGE_LINK_RE = /^https?:\/\/[^\s/]+\/((?:draughts\/)?(?:battle-)?challenge\/[a-zA-Z0-9-]+)\/?$/;
+
 function LinkifiedBody({ text }: { text: string }) {
   const parts = text.split(/(https?:\/\/[^\s]+)/g);
   return (
     <>
-      {parts.map((part, i) =>
-        /^https?:\/\//.test(part) ? (
+      {parts.map((part, i) => {
+        if (!/^https?:\/\//.test(part)) return <span key={i}>{part}</span>;
+
+        const challengeMatch = part.match(CHALLENGE_LINK_RE);
+        // Only turn same-origin challenge links into a button — a foreign
+        // domain that happens to share the path shape stays a plain link
+        // (so the real destination is never hidden from the player).
+        const sameOrigin = typeof window !== "undefined" && part.startsWith(window.location.origin + "/");
+        if (challengeMatch && sameOrigin) {
+          return (
+            <Link
+              key={i}
+              href={`/${challengeMatch[1]}`}
+              onClick={(e) => e.stopPropagation()}
+              className="mt-1.5 mb-0.5 inline-flex items-center gap-1.5 rounded-full bg-ccb-primary px-4 py-1.5 text-xs font-semibold text-white hover:bg-ccb-primary/90 transition-colors"
+            >
+              <Play className="w-3 h-3 fill-current" />
+              Play Now
+            </Link>
+          );
+        }
+
+        return (
           <a
             key={i}
             href={part}
@@ -103,10 +127,8 @@ function LinkifiedBody({ text }: { text: string }) {
           >
             {part.length > 48 ? part.slice(0, 45) + "…" : part}
           </a>
-        ) : (
-          <span key={i}>{part}</span>
-        )
-      )}
+        );
+      })}
     </>
   );
 }
