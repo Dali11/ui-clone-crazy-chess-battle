@@ -17,6 +17,7 @@ export interface Stats {
   activeTournaments: number;
   pendingWithdrawals: number;
   pendingDeposits: number;
+  openIntegrityFlags?: number;
   pendingTournamentApprovals?: number;
   totalDeposits: number;
   totalWithdrawals: number;
@@ -114,7 +115,7 @@ export interface AdminLog {
   profiles: { username: string; display_name: string } | null;
 }
 
-export type Tab = "overview" | "users" | "withdrawals" | "tournaments" | "games" | "deposits" | "battles" | "logs" | "leagues" | "seasons" | "membership" | "verification" | "settings";
+export type Tab = "overview" | "users" | "withdrawals" | "tournaments" | "games" | "deposits" | "battles" | "integrity" | "logs" | "leagues" | "seasons" | "membership" | "verification" | "settings";
 
 /** Convert datetime-local (user's local TZ) to UTC ISO string for API */
 export function localToUTC(localValue: string): string {

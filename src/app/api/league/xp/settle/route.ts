@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getLeagueXpConfig, currentWeekStart, currentMonthStart, monthlyRewardsForTier, CAT_OFFSET_MS } from "@/lib/league-xp";
 import { planWeeklySettlement } from "@/lib/league-xp/plan";
 import { getExchangeRate } from "@/lib/geo/fx";
+import { heldNote } from "@/lib/integrity/detect";
 import { COUNTRY_CURRENCY } from "@/lib/geo/currency-map";
 
 export const dynamic = "force-dynamic";
@@ -127,10 +128,47 @@ async function runWeeklySettle(
   // ── 1) Wallet credits for the paid top ranks ────────────────────────
   // Idempotent: unique deposits reference (league:<week>:<user>) — a
   // crash/retry/re-run is a no-op, never a double payout.
+  //
+  // INTEGRITY HOLD: players with OPEN integrity flags (anti-cheat, see
+  // Admin → Integrity) get their payout parked as a 'pending' deposit
+  // with a HELD note — the wallet is NOT credited. Dismissing the flag
+  // in the admin panel releases every held payout with one click.
+  const { data: openFlags } = await admin
+    .from("integrity_flags")
+    .select("user_id, type")
+    .eq("status", "open");
+  const heldTypes = new Map<string, string[]>();
+  for (const f of openFlags ?? []) {
+    const list = heldTypes.get(f.user_id) ?? [];
+    list.push(f.type);
+    heldTypes.set(f.user_id, list);
+  }
+
   let paid = 0;
+  const held: { userId: string; rewardMwk: number; types: string[] }[] = [];
   for (const p of plan.payouts) {
     const rewardRef = `league:${plan.closingWeek}:${p.userId}`;
     const fxNote = await fxNoteFor(admin, p.userId, p.rewardMwk, fxRates);
+    const flagTypes = heldTypes.get(p.userId);
+    if (flagTypes?.length) {
+      // Park the payout as pending (ledger claim — no double on re-run)
+      // and skip the wallet credit until an admin resolves the flags.
+      const { error: holdErr } = await admin.from("deposits").insert({
+        user_id: p.userId,
+        amount: p.rewardMwk,
+        status: "pending",
+        method: "league_reward",
+        reference: rewardRef,
+        admin_notes: `${heldNote(flagTypes)} — ${fxNote}`,
+      });
+      if (holdErr && !String(holdErr.message || "").includes("duplicate key")) {
+        console.error("League reward HOLD insert failed:", holdErr);
+      } else if (!holdErr) {
+        held.push({ userId: p.userId, rewardMwk: p.rewardMwk, types: flagTypes });
+        console.log(`[league] payout HELD for ${p.userId} (${flagTypes.join(", ")})`);
+      }
+      continue;
+    }
     const { error: depErr } = await admin.from("deposits").insert({
       user_id: p.userId,
       amount: p.rewardMwk,
@@ -210,6 +248,7 @@ async function runWeeklySettle(
     rebalancedUp: plan.rebalanceUp.length,
     rebalancedDown: plan.rebalanceDown.length,
     payoutGate: plan.payOn ? "open" : (plan.unpaidReason ?? "closed"),
+    heldForIntegrity: held,
   };
 }
 

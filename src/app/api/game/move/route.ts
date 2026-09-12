@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     // Load current game state
     const { data: game } = await supabase
       .from("games")
-      .select("id, white_player_id, black_player_id, fen, pgn, turn, status, move_count, white_clock_ms, black_clock_ms, last_move_at, increment_seconds, tournament_id, created_at, white_rating, black_rating, rated, white_last_seen, black_last_seen")
+      .select("id, white_player_id, black_player_id, fen, pgn, turn, status, move_count, white_clock_ms, black_clock_ms, last_move_at, increment_seconds, tournament_id, created_at, white_rating, black_rating, rated, white_last_seen, black_last_seen, move_times")
       .eq("id", gameId)
       .single();
 
@@ -78,6 +78,17 @@ export async function POST(req: NextRequest) {
     // started (last_move_at set by cron or previous move).
     const engineLastMoveAt = game.last_move_at || new Date().toISOString();
 
+    // Anti-cheat telemetry: per-move think time for THIS mover. Only when a
+    // previous move exists (the first move's "think time" is just game-start
+    // latency, meaningless). Capped at 1h to keep clock anomalies out.
+    const moverColor = game.turn === "white" ? "w" : "b";
+    const priorMoveTimes = Array.isArray(game.move_times) ? game.move_times : [];
+    const thinkEntry =
+      game.last_move_at && elapsedMs >= 0 && elapsedMs <= 3_600_000
+        ? [{ u: moverColor, ms: Math.round(elapsedMs) }]
+        : [];
+    const moveTimes = priorMoveTimes.concat(thinkEntry).slice(-300);
+
     const result = validateAndApplyMove(
       game.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
       move,
@@ -104,6 +115,7 @@ export async function POST(req: NextRequest) {
       white_clock_ms: result.whiteClockMs,
       black_clock_ms: result.blackClockMs,
       last_move_at: new Date().toISOString(),
+      move_times: moveTimes,
     };
 
     if (gameEnded) {

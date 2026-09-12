@@ -134,6 +134,10 @@ export async function GET(req: NextRequest) {
       .from("deposits").select("*", { count: "exact", head: true })
       .in("status", ["pending", "processing"]);
 
+    const { count: openIntegrityFlags } = await admin
+      .from("integrity_flags").select("id", { count: "exact", head: true })
+      .eq("status", "open");
+
     const depositsData = await fetchAll(() =>
       admin.from("deposits").select("amount")
         .eq("status", "success")
@@ -325,6 +329,7 @@ export async function GET(req: NextRequest) {
       pendingTournamentApprovals: pendingTournamentApprovals ?? 0,
       pendingWithdrawals: pendingWithdrawals ?? 0,
       pendingDeposits: pendingDeposits ?? 0,
+      openIntegrityFlags: openIntegrityFlags ?? 0,
       totalDeposits,
       totalWithdrawals,
       totalBattleVolume,

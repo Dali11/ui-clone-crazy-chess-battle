@@ -161,6 +161,22 @@ export async function POST(req: NextRequest) {
 
     // ─── Load platform config ──────────────────────────────────────────
     const admin = createAdminClient();
+
+    // Integrity hold: an OPEN anti-cheat flag freezes withdrawals until an
+    // admin resolves it (Admin → Integrity). Message is deliberately
+    // neutral — never accuse, just pause.
+    const { count: openFlag } = await admin
+      .from("integrity_flags")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "open");
+    if ((openFlag ?? 0) > 0) {
+      return NextResponse.json(
+        { error: "Your account is under a routine review, so withdrawals are temporarily paused. This usually resolves within 24 hours — we'll email you as soon as it's complete." },
+        { status: 403 },
+      );
+    }
+
     const wConfig = await getPlatformConfig(admin, "withdrawals");
 
     // Get user's currency symbol

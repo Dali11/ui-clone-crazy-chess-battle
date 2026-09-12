@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Check, X, Coins, Smartphone, Shield, Clock,
   TrendingUp, Wallet, AlertCircle, ChevronRight, Gamepad2,
   Ban, Star, DollarSign, Search, Save, ScrollText, Swords,
-  ShieldCheck, UserRound, XCircle,
+  ShieldCheck, UserRound, XCircle, ShieldAlert,
   Menu, LogOut, Crown, Play,
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
   Settings, FileText, SlidersHorizontal, Database, ChevronDown,
@@ -22,6 +22,7 @@ import ResultOverrideModal from "./components/result-override-modal";
 import OverviewPanel from "./components/overview-panel";
 import TournamentsPanel from "./components/tournaments-panel";
 import WithdrawalsPanel from "./components/withdrawals-panel";
+import IntegrityPanel from "./components/integrity-panel";
 import DepositsPanel from "./components/deposits-panel";
 
 
@@ -31,6 +32,11 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
+  const [integrityFlags, setIntegrityFlags] = useState<any[]>([]);
+  const [integrityLoading, setIntegrityLoading] = useState(false);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanResult, setScanResult] = useState<Record<string, any> | null>(null);
+  const [integrityActionLoading, setIntegrityActionLoading] = useState<string | null>(null);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [games, setGames] = useState<GameInfo[]>([]);
   const [logs, setLogs] = useState<AdminLog[]>([]);
@@ -145,6 +151,57 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     setLogs(data.logs || []);
   }, []);
 
+  const fetchIntegrity = useCallback(async () => {
+    setIntegrityLoading(true);
+    try {
+      const res = await fetch("/api/admin/integrity/flags?status=all");
+      const data = await res.json();
+      setIntegrityFlags(data.flags || []);
+    } finally {
+      setIntegrityLoading(false);
+    }
+  }, []);
+
+  const runIntegrityScan = useCallback(async () => {
+    setScanLoading(true);
+    try {
+      const res = await fetch("/api/admin/integrity/scan", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setScanResult(data);
+        await fetchIntegrity();
+        await fetchStats();
+      } else {
+        alert(`Scan failed: ${data.error || "unknown error"}`);
+      }
+    } finally {
+      setScanLoading(false);
+    }
+  }, [fetchIntegrity, fetchStats]);
+
+  const handleIntegrityAction = useCallback(async (flagId: string, action: "dismiss" | "confirm" | "reopen") => {
+    setIntegrityActionLoading(flagId);
+    try {
+      const res = await fetch("/api/admin/integrity/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flagId, action }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.released > 0) {
+          alert(`Flag ${action}ed — released ${data.released} held payout(s) to the player's wallet.`);
+        }
+        await fetchIntegrity();
+        await fetchStats();
+      } else {
+        alert(`Action failed: ${data.error || "unknown error"}`);
+      }
+    } finally {
+      setIntegrityActionLoading(null);
+    }
+  }, [fetchIntegrity, fetchStats]);
+
 
   const fetchWithdrawalConfig = useCallback(async () => {
     const res = await fetch("/api/admin/withdrawal-config");
@@ -201,6 +258,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       if (tab === "logs") await fetchLogs();
       if (tab === "battles") await fetchBattleStats();
       
+      if (tab === "integrity") await fetchIntegrity();
       if (tab === "verification") await fetchVerificationPlayers();
       setLoading(false);
     };
@@ -795,6 +853,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     { id: "games", label: "Games", icon: Gamepad2 },
     { id: "deposits", label: "Deposits", icon: DollarSign, badge: stats?.pendingDeposits || undefined },
     { id: "battles", label: "Battles", icon: Swords },
+    { id: "integrity", label: "Integrity", icon: ShieldAlert, badge: stats?.openIntegrityFlags || undefined },
     { id: "logs", label: "Logs", icon: ScrollText },
     { id: "leagues", label: "Leagues", icon: Crown },
     { id: "verification", label: "Verification", icon: ShieldCheck },
@@ -1329,6 +1388,20 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
 
           {tab === "battles" && (
           <BattlesAdminPanel formatMWK={formatMWK} formatDate={formatDate} />
+        )}
+
+        {/* INTEGRITY / ANTI-CHEAT */}
+          {tab === "integrity" && (
+          <IntegrityPanel
+            flags={integrityFlags}
+            loading={integrityLoading}
+            scanLoading={scanLoading}
+            scanResult={scanResult}
+            onScan={runIntegrityScan}
+            onAction={handleIntegrityAction}
+            actionLoading={integrityActionLoading}
+            formatDate={formatDate}
+          />
         )}
 
         {/* ADMIN LOGS */}
