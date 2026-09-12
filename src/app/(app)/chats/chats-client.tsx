@@ -6,12 +6,13 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { X, Bell, Globe, Image as ImageIcon, Loader2, MessageCircle, Mic, Search, Pin } from "lucide-react";
+import { X, Bell, Image as ImageIcon, Loader2, Mic, Search, Pin } from "lucide-react";
 
 interface Group {
   id: string;
   name: string;
   country: string | null;
+  imageUrl: string | null;
   lastBody: string | null;
   lastVoice: boolean;
   lastImage: boolean;
@@ -233,8 +234,9 @@ export default function ChatsClient() {
                 href={`/chats/${g.id}`}
                 className="flex items-center gap-3 px-3 py-3 border-b border-ccb-border last:border-0 hover:bg-ccb-surface transition-colors"
               >
-                <div className="w-11 h-11 rounded-xl bg-ccb-primary flex items-center justify-center shrink-0 text-white">
-                  {g.country ? <MessageCircle className="w-5 h-5" /> : <Globe className="w-5 h-5" />}
+                <div className="w-11 h-11 rounded-xl bg-ccb-surface border border-ccb-border overflow-hidden shrink-0 flex items-center justify-center text-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={g.imageUrl || "/logo-badge.png"} alt={g.name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-ccb-text truncate">{g.name}</p>

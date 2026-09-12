@@ -757,9 +757,9 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
 
       {/* Delete confirm sheet */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" onClick={() => setDeleteTarget(null)}>
+        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/50" onClick={() => setDeleteTarget(null)}>
           <div
-            className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl bg-ccb-card border border-ccb-border p-4 space-y-3"
+            className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl bg-ccb-card border border-ccb-border p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-4 space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-sm text-ccb-text">Delete this message?</p>

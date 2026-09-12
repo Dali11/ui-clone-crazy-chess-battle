@@ -17,6 +17,7 @@ export default function RoomChatClient({ room }: { room: string }) {
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
+  const [roomIcon, setRoomIcon] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -26,8 +27,15 @@ export default function RoomChatClient({ room }: { room: string }) {
       setMyUserId(user.id);
       const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
       setIsAdmin(profile?.is_admin === true);
+      // Admin-configured room icon (falls back to the platform logo).
+      const { data: roomRow } = await supabase
+        .from("community_rooms")
+        .select("image_url")
+        .eq("id", room)
+        .maybeSingle();
+      setRoomIcon(roomRow?.image_url || null);
     })();
-  }, []);
+  }, [room]);
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -37,6 +45,7 @@ export default function RoomChatClient({ room }: { room: string }) {
         headerTitle={ROOM_TITLES[room] || room}
         headerSubtitle={unavailable ? "Not available" : "Official community room"}
         headerIcon={room === "global" ? <Globe className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
+        headerAvatarUrl={roomIcon || "/logo-badge.png"}
         myUserId={myUserId}
         isAdmin={isAdmin}
         onUnauthorized={() => setUnavailable(true)}

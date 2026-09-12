@@ -12,6 +12,7 @@ import {
   Settings, FileText, SlidersHorizontal, Database, ChevronDown,
 } from "lucide-react";
 import PlatformSettingsPanel from "./platform-settings-panel";
+import CommunityRoomsCard from "./components/community-rooms-card";
 import LeaguesAdminPanel from "./components/leagues-admin-panel";
 import UserDetailModal from "./user-detail-modal";
 import { type Withdrawal, type Stats, type UserInfo, type Deposit, type Tournament, type GameInfo, type AdminLog, type Tab, localToUTC, utcToLocalInput } from "./types";
@@ -1022,6 +1023,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {tab === "users" && (
             <div className="space-y-3">
               <PlatformSettingsPanel section="users" />
+              <CommunityRoomsCard />
 
               {/* KPIs */}
               {userKpis && (

@@ -22,7 +22,7 @@ export async function GET() {
     const myCountry = profile?.country || null;
 
     // ── Groups: global + my country ──────────────────────────────
-    let roomsQuery = admin.from("community_rooms").select("id, name, country").order("id");
+    let roomsQuery = admin.from("community_rooms").select("id, name, country, image_url").order("id");
     const { data: rooms } = myCountry
       ? await roomsQuery.or(`country.is.null,country.eq.${myCountry}`)
       : await roomsQuery.is("country", null);
@@ -39,6 +39,7 @@ export async function GET() {
         id: r.id,
         name: r.name,
         country: r.country,
+        imageUrl: r.image_url,
         lastBody: last?.[0]?.body || null,
         lastVoice: !!last?.[0]?.audio_url,
         lastImage: !!last?.[0]?.image_url,
