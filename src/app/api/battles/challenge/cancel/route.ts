@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { removeBattleChallengeDMs } from "@/lib/chat/challenge-messages";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -61,6 +62,9 @@ export async function POST(req: NextRequest) {
       await admin.from("battle_challenges").update({ status: "pending" }).eq("id", challengeId);
       return NextResponse.json({ error: "Failed to refund stake" }, { status: 500 });
     }
+
+    // Cancelled — the invite DMs disappear from every recipient's chat.
+    await removeBattleChallengeDMs(admin, challengeId);
 
     // Audit log
     await admin.from("deposits").insert({

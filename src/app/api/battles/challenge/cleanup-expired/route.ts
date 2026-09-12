@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  removeBattleChallengeDMs,
+  removeQuickMatchAnnounceMessages,
+} from "@/lib/chat/challenge-messages";
 
 /**
  * Cleanup expired pending challenges and refund escrowed stakes.
@@ -108,6 +112,9 @@ async function handleCleanup(req: NextRequest) {
         });
         if (depErr) console.error(`Audit log failed for challenge ${claimed.id}:`, depErr);
 
+        // Expired + refunded — the invite DMs disappear.
+        await removeBattleChallengeDMs(admin, claimed.id);
+
         battlesRefunded++;
       }
     }
@@ -130,6 +137,11 @@ async function handleCleanup(req: NextRequest) {
         .select("id");
 
       regularCleaned = updated?.length || 0;
+
+      // Their announce messages in country rooms disappear too.
+      for (const c of updated ?? []) {
+        await removeQuickMatchAnnounceMessages(admin, c.id);
+      }
     }
 
     console.log(

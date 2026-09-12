@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { removeQuickMatchAnnounceMessages } from "@/lib/chat/challenge-messages";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -47,6 +48,8 @@ export async function POST(req: NextRequest) {
     // Check expiry
     if (challenge.expires_at && new Date(challenge.expires_at) < new Date()) {
       await createAdminClient().from("challenges").update({ status: "expired" }).eq("id", challengeId);
+      // The announce message in the country room dies with the challenge.
+      await removeQuickMatchAnnounceMessages(admin, challengeId);
       return NextResponse.json({ error: "Challenge has expired" }, { status: 400 });
     }
 
@@ -62,6 +65,9 @@ export async function POST(req: NextRequest) {
     if (claimError || !claimed) {
       return NextResponse.json({ error: "Challenge is no longer available" }, { status: 400 });
     }
+
+    // Accepted — the announce message in the country room disappears.
+    await removeQuickMatchAnnounceMessages(admin, challengeId);
 
     // Determine colors
     let whitePlayer = challenge.challenger_id;

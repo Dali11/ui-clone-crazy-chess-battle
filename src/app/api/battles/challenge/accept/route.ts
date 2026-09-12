@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { removeBattleChallengeDMs } from "@/lib/chat/challenge-messages";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUsers } from "@/lib/push/send";
@@ -70,6 +71,8 @@ export async function POST(req: NextRequest) {
           method: "battle_refund",
           reference: `expired_challenge:${challengeId}`,
         }).then(() => {}, () => {});
+        // Expired — the invite DMs disappear.
+        await removeBattleChallengeDMs(admin, challengeId);
       }
       return NextResponse.json({ error: "Challenge has expired" }, { status: 400 });
     }
@@ -128,6 +131,9 @@ export async function POST(req: NextRequest) {
       method: "battle_escrow",
       reference: `battle_challenge_accept:${challenge.id}:${user.id}`,
     }).then(() => {}, (e: any) => console.error("[challenge/accept] escrow ledger insert failed:", e?.message));
+
+    // Accepted — the invite DMs disappear from every recipient's chat.
+    await removeBattleChallengeDMs(admin, challengeId);
 
     const { data: configRow } = await admin.from("battle_config").select("*").limit(1).single();
     const config = { ...DEFAULT_CONFIG, ...configRow };

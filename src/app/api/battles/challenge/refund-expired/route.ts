@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { removeBattleChallengeDMs } from "@/lib/chat/challenge-messages";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -83,6 +84,9 @@ export async function POST(req: NextRequest) {
       reference: `expired_challenge:${challengeId}`,
     });
     if (depErr) console.error("Refund audit log failed:", depErr);
+
+    // Refunded after expiry — the invite DMs disappear.
+    await removeBattleChallengeDMs(admin, challengeId);
 
     return NextResponse.json({ success: true, refunded: claimed.stake });
   } catch (e: any) {

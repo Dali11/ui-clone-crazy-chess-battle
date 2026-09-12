@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { removeQuickMatchAnnounceMessages } from "@/lib/chat/challenge-messages";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -26,12 +27,18 @@ export async function POST(req: NextRequest) {
 
     // Cancel any auto-posted announce challenge links — the search is over.
     // (Manual challenge links are untouched.)
-    await admin
+    const { data: cancelled } = await admin
       .from("challenges")
       .update({ status: "cancelled" })
       .eq("challenger_id", user.id)
       .eq("source", "quick_match_announce")
-      .eq("status", "pending");
+      .eq("status", "pending")
+      .select("id");
+
+    // Their announce messages disappear from the country room too.
+    for (const c of cancelled ?? []) {
+      await removeQuickMatchAnnounceMessages(admin, c.id);
+    }
 
     return NextResponse.json({ success: true });
   } catch (e: any) {

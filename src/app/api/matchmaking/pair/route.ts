@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { removeQuickMatchAnnounceMessages } from "@/lib/chat/challenge-messages";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // This endpoint is called by Vercel Cron every 10 seconds
@@ -83,10 +84,15 @@ export async function GET(req: NextRequest) {
           if (gameId) {
             await supabase.from("matchmaking_queue").delete().in("id", [white.id, black.id]);
             // They're matched — their auto-posted announce links are now stale.
-            await supabase.from("challenges").update({ status: "cancelled" })
+            const { data: staleLinks } = await supabase.from("challenges").update({ status: "cancelled" })
               .eq("source", "quick_match_announce")
               .eq("status", "pending")
-              .in("challenger_id", [white.player_id, black.player_id]);
+              .in("challenger_id", [white.player_id, black.player_id])
+              .select("id");
+            // And the announce messages vanish from the country rooms.
+            for (const c of staleLinks ?? []) {
+              await removeQuickMatchAnnounceMessages(supabase, c.id);
+            }
             paired++;
           }
 

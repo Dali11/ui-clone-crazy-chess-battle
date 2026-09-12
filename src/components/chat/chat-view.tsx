@@ -193,6 +193,12 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
     }));
   }, []);
 
+  // Hard deletes (e.g. expired/accepted challenge links) vanish live.
+  const removeMessage = useCallback((id?: string | number) => {
+    if (id === undefined) return;
+    setMessages((prev) => prev.filter((x) => x.id !== id && String(x.id) !== String(id)));
+  }, []);
+
   // ── Endpoints per mode ─────────────────────────────────────────────
   const listUrl = useCallback((before?: number) => {
     if (mode === "group") {
@@ -249,9 +255,12 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
       .on("postgres_changes",
         { event: "UPDATE", schema: "public", table: "community_messages", filter: `room=eq.${room}` },
         (payload) => { applyUpdate(payload.new as ChatMessage); })
+      .on("postgres_changes",
+        { event: "DELETE", schema: "public", table: "community_messages", filter: `room=eq.${room}` },
+        (payload) => { removeMessage((payload.old as { id?: string | number })?.id); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [supabase, mode, room, appendMessage, applyUpdate]);
+  }, [supabase, mode, room, appendMessage, applyUpdate, removeMessage]);
 
   const myId = myUserId;
 
@@ -271,6 +280,9 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
       .on("postgres_changes",
         { event: "UPDATE", schema: "public", table: "direct_messages", filter: `recipient_id=eq.${myId ?? "none"}` },
         (payload) => { applyUpdate(payload.new as ChatMessage); })
+      .on("postgres_changes",
+        { event: "DELETE", schema: "public", table: "direct_messages", filter: `recipient_id=eq.${myId ?? "none"}` },
+        (payload) => { removeMessage((payload.old as { id?: string | number })?.id); })
       .subscribe();
     const outChannel = supabase
       .channel(`dm-out:${partnerId}`)
@@ -280,13 +292,16 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
       .on("postgres_changes",
         { event: "UPDATE", schema: "public", table: "direct_messages", filter: `sender_id=eq.${myId ?? "none"}` },
         (payload) => { applyUpdate(payload.new as ChatMessage); })
+      .on("postgres_changes",
+        { event: "DELETE", schema: "public", table: "direct_messages", filter: `sender_id=eq.${myId ?? "none"}` },
+        (payload) => { removeMessage((payload.old as { id?: string | number })?.id); })
       .subscribe();
     return () => {
       supabase.removeChannel(inChannel);
       supabase.removeChannel(outChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, partnerId, myId, appendMessage, applyUpdate, markRead]);
+  }, [mode, partnerId, myId, appendMessage, applyUpdate, removeMessage, markRead]);
 
   // ── Auto-scroll stickiness ────────────────────────────────────────
   useEffect(() => {
