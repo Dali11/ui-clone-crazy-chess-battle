@@ -245,7 +245,7 @@ export async function runRevenueSweep(opts: {
     if (!wErr && wid) {
       withdrawalId = wid as string;
       const provider = cfg.dest_provider === "pawapay" ? "pawapay" : "paychangu";
-      await admin
+      const { error: wdMetaErr } = await admin
         .from("withdrawals")
         .update({
           payment_provider: provider,
@@ -253,10 +253,10 @@ export async function runRevenueSweep(opts: {
           currency: "MWK",
           fee: 0,
           net_amount: revenue.total,
-          notes: "Weekly platform revenue sweep (auto)",
+          admin_notes: "Weekly platform revenue sweep (auto)",
         })
-        .eq("id", withdrawalId)
-        .then(() => {}, () => {});
+        .eq("id", withdrawalId);
+      if (wdMetaErr) console.error("Revenue sweep withdrawal metadata update failed:", wdMetaErr);
       payoutStatus = "pending";
     } else {
       payoutStatus = "withdrawal_failed";
