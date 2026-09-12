@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchByIdChunks } from "@/lib/supabase/fetch-all";
-import { isHeldNote } from "@/lib/integrity/detect";
-
 export const dynamic = "force-dynamic";
 
 /**
@@ -70,4 +68,3 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ flags: enriched, openCount: openCount ?? 0 });
 }
 
-export { isHeldNote };
