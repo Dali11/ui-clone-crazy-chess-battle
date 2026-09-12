@@ -82,7 +82,9 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
     const dry = body?.dry === true;
-    const result = await runRevenueSweep({ force: !dry, dry });
+    // Always force: admins explicitly clicked the button. The dry flag exits
+    // inside the sweep BEFORE any wallet credit / withdrawal is touched.
+    const result = await runRevenueSweep({ force: true, dry });
     return NextResponse.json(result, { status: result.ok ? 200 : 500 });
   } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
