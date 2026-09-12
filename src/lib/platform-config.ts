@@ -126,7 +126,6 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     enabled: true,
     min_stake: 500,
     max_stake: 50_000,
-    platform_fee_pct: 10,
     auto_cancel_minutes: 10,
     stake_levels: [500, 1000, 2000, 5000, 10000],
     show_kpi_cards: true,
@@ -237,7 +236,6 @@ export const LEGACY_SYNC: Record<string, { table: string; fieldMap: Record<strin
     table: "battle_config",
     fieldMap: {
       enabled: "enabled",
-      platform_fee_pct: "platform_fee_pct",
     },
   },
 };

@@ -115,7 +115,6 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "enabled", label: "Battles Enabled", type: "toggle", group: "control", help: "Allow staked battles" },
     { key: "min_stake", label: "Min Stake", type: "number", group: "control", unit: "MWK" },
     { key: "max_stake", label: "Max Stake", type: "number", group: "control", unit: "MWK" },
-    { key: "platform_fee_pct", label: "Platform Fee", type: "number", group: "control", unit: "%", help: "Platform cut of each battle" },
     { key: "auto_cancel_minutes", label: "Auto-Cancel", type: "number", group: "control", unit: "min", help: "Cancel unmatched battles after N minutes" },
     { key: "stake_levels", label: "Stake Levels (comma-separated)", type: "text", group: "control", help: "MWK values players can choose: 500,1000,2000,5000,10000" },
     { key: "show_kpi_cards", label: "Show KPI Cards", type: "toggle", group: "display" },
