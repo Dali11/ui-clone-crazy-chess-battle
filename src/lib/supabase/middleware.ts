@@ -43,7 +43,7 @@ export async function updateSession(request: NextRequest) {
 
   // Redirect to signup if not authenticated and trying to access protected routes
   // Signup is the default auth flow; login remains available as a secondary option.
-  const protectedRoutes = ["/dashboard", "/play", "/wallet", "/history", "/admin", "/challenge", "/battle-challenge", "/game", "/league", "/membership"];
+  const protectedRoutes = ["/dashboard", "/play", "/wallet", "/history", "/admin", "/challenge", "/battle-challenge", "/game", "/league", "/membership", "/affiliate"];
   const isProtected = protectedRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   );
