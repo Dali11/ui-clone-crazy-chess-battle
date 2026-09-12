@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Gamepad2,
   Swords, Shield, Calendar, Crown,
   Search, SlidersHorizontal, Database, ChevronDown, ScrollText,
-  ShieldCheck, DollarSign, Megaphone, Zap, Radio, Globe, Wallet } from "lucide-react";
+  ShieldCheck, DollarSign, Megaphone, Zap, Radio, Globe, Wallet, Gift } from "lucide-react";
 import PlatformSettingsPanel from "../platform-settings-panel";
 
 function PlatformSettingsHubBase() {
@@ -28,6 +28,7 @@ function PlatformSettingsHubBase() {
     { id: "logs", label: "Logs", icon: ScrollText, desc: "Retention period" },
     { id: "revenue_sweep", label: "Revenue Sweep", icon: Wallet, desc: "Weekly auto-withdrawal of platform fees" },
     { id: "membership", label: "Membership", icon: Crown, desc: "MK/month supporter plan — price, switch" },
+    { id: "affiliate", label: "Affiliate", icon: Gift, desc: "25% referrer commissions on memberships" },
     { id: "overview", label: "Dashboard", icon: LayoutDashboard, desc: "Refresh, KPI cards" },
   ];
 

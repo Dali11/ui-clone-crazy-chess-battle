@@ -204,6 +204,12 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     price_mwk: 10000,
     period_days: 30,
   },
+  affiliate: {
+    // 25% commission to a player's referrer on every membership they buy.
+    // OFF by default — flipping it on makes each MK10,000 sale pay the
+    // referrer MK2,500 to their wallet (ledgered, withdrawable).
+    enabled: false,
+  },
 };
 
 // ─── Legacy table sync map ────────────────────────────────────────────────

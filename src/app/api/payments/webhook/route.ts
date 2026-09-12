@@ -94,7 +94,10 @@ export async function POST(req: NextRequest) {
           .eq("id", deposit.user_id)
           .single();
         const now = new Date().toISOString();
-        const until = extendMembership(mp?.membership_until, now, 30);
+        const { getPlatformConfig } = await import("@/lib/platform-config");
+        const memCfg = await getPlatformConfig(admin, "membership");
+        const periodDays = Number(memCfg.period_days) || 30;
+        const until = extendMembership(mp?.membership_until, now, periodDays);
         await admin.from("profiles").update({ membership_until: until }).eq("id", deposit.user_id);
 
         await admin
@@ -112,6 +115,21 @@ export async function POST(req: NextRequest) {
             read: false,
           });
         } catch {}
+
+        // Affiliate commission (when the buyer used a referral link and the
+        // program switch is ON): pays the referrer 25%, properly ledgered.
+        // Wrapped so a commission failure never blocks membership activation.
+        try {
+          const affCfg = await getPlatformConfig(admin, "affiliate");
+          if (affCfg.enabled) {
+            await admin.rpc("process_affiliate_commission", {
+              p_user_id: deposit.user_id,
+              p_amount: Math.round(deposit.amount),
+            });
+          }
+        } catch (affErr) {
+          console.error("affiliate commission failed:", affErr);
+        }
 
         return NextResponse.json({ received: true, message: "Membership activated" });
       }

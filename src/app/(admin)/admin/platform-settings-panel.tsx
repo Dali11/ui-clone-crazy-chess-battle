@@ -38,6 +38,9 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "owner_user_id", label: "Owner user ID", type: "text", group: "control", help: "Who receives revenue. Empty = your admin account (Arthur)" },
     { key: "epoch", label: "First sweep starts from", type: "text", group: "control", help: "ISO date — revenue earned after this is swept (only used before the first credited sweep)" },
   ],
+  affiliate: [
+    { key: "enabled", label: "Affiliate commissions enabled", type: "toggle", group: "control", help: "ON = membership purchases pay the buyer's referrer 25% (MK2,500 per MK10,000 sale) to their wallet. Referral tracking works while OFF; only payouts pause" },
+  ],
   membership: [
     { key: "enabled", label: "Membership purchases enabled", type: "toggle", group: "control", help: "Master switch — OFF hides the buy form and blocks the purchase API" },
     { key: "price_mwk", label: "Price", type: "number", unit: "MWK", group: "control", help: "Charged per period via Malawi mobile money (PayChangu). Revenue is swept weekly with fees" },
@@ -219,6 +222,7 @@ const SECTION_LABELS: Record<string, string> = {
   payments_zm: "Zambia Payments (Ontech)",
   revenue_sweep: "Revenue Sweep",
   membership: "Membership",
+  affiliate: "Affiliate",
 };
 
 // ─── Component ────────────────────────────────────────────────────────────

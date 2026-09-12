@@ -23,6 +23,7 @@ interface Referral {
 }
 
 interface AffiliateClientProps {
+  affiliateEnabled: boolean;
   refCode: string;
   baseUrl: string;
   walletBalance: number;
@@ -46,6 +47,7 @@ import { useCurrency } from "@/hooks/use-currency";
 
 
 export default function AffiliateClient({
+  affiliateEnabled,
   refCode,
   baseUrl,
   walletBalance,
@@ -97,6 +99,16 @@ export default function AffiliateClient({
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 max-w-2xl mx-auto space-y-4 pb-8">
+      {/* Paused notice — tracking still works, payouts wait for the switch */}
+      {!affiliateEnabled && (
+        <div className="rounded-xl border border-ccb-accent/30 bg-ccb-accent/10 p-4 text-center">
+          <p className="text-sm font-semibold text-ccb-accent">Commissions are paused for a moment</p>
+          <p className="text-xs text-ccb-muted mt-1">
+            Your referral links still track every sign-up — commissions will be credited automatically when the program resumes.
+          </p>
+        </div>
+      )}
+
       {/* HERO — compact for mobile */}
       <div className="bg-gradient-to-br from-ccb-primary/15 via-ccb-card to-ccb-card border border-ccb-primary/20 rounded-2xl p-5">
         <div className="flex items-center gap-2.5 mb-3">

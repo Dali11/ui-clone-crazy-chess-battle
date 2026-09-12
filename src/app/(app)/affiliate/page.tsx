@@ -69,16 +69,19 @@ export default async function AffiliatePage() {
 
   // Get membership pricing from platform settings (admin-configurable)
   const mConfig = await getPlatformConfig(admin, "membership");
-  const membershipPrice = mConfig.monthly_price || 10000; // MWK
+  const membershipPrice = mConfig.monthly_price || mConfig.price_mwk || 10000; // MWK
   const membershipCurrency = mConfig.currency || "MWK";
   const yearlyPrice = mConfig.yearly_price || membershipPrice * 10; // 10 months (2 free)
   const commissionRate = 0.25;
+  const affConfig = await getPlatformConfig(admin, "affiliate");
+  const affiliateEnabled = !!affConfig.enabled;
 
   const refCode = profile?.referral_code || profile?.username || "";
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://crazychessbattles.live";
 
   return (
     <AffiliateClient
+      affiliateEnabled={affiliateEnabled}
       refCode={refCode}
       baseUrl={baseUrl}
       walletBalance={profile?.wallet_balance || 0}
