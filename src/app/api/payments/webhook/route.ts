@@ -46,14 +46,14 @@ export async function POST(req: NextRequest) {
     // Fetch the deposit (charge_id for mobile money, tx_ref for card/standard checkout)
     let { data: deposit } = await admin
       .from("deposits")
-      .select("id, user_id, amount, status, reference")
+      .select("id, user_id, amount, status, reference, method")
       .eq("charge_id", chargeId)
       .single();
 
     if (!deposit) {
       const { data: txDeposit } = await admin
         .from("deposits")
-        .select("id, user_id, amount, status, reference")
+        .select("id, user_id, amount, status, reference, method")
         .eq("tx_ref", chargeId)
         .single();
       deposit = txDeposit;
