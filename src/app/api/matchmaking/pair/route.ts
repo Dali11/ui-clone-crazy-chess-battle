@@ -82,6 +82,11 @@ export async function GET(req: NextRequest) {
 
           if (gameId) {
             await supabase.from("matchmaking_queue").delete().in("id", [white.id, black.id]);
+            // They're matched — their auto-posted announce links are now stale.
+            await supabase.from("challenges").update({ status: "cancelled" })
+              .eq("source", "quick_match_announce")
+              .eq("status", "pending")
+              .in("challenger_id", [white.player_id, black.player_id]);
             paired++;
           }
 

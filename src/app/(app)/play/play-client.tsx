@@ -32,6 +32,7 @@ export default function PlayPage() {
   const [selectedTC, setSelectedTC] = useState("rapid15");
   const [rated, setRated] = useState(true);
   const [searchState, setSearchState] = useState<SearchState>("idle");
+  const [announced, setAnnounced] = useState(false);
   const [copied, setCopied] = useState(false);
   const [challengeUrl, setChallengeUrl] = useState<string | null>(null);
   const [creatingChallenge, setCreatingChallenge] = useState(false);
@@ -67,6 +68,7 @@ export default function PlayPage() {
     setSearchState("searching");
     setSearchSeconds(0);
     setAdminNotified(false);
+    setAnnounced(false);
 
     searchIntervalRef.current = setInterval(() => {
       setSearchSeconds((s) => s + 1);
@@ -112,6 +114,19 @@ export default function PlayPage() {
           .subscribe();
         matchChannelRef.current = channel;
 
+        // While they wait, quietly post a tappable challenge link to their
+        // country group so nearby players can start the game with one tap.
+        fetch("/api/matchmaking/announce", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ timeControl: selectedTC, rated }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (d?.posted) setAnnounced(true);
+          })
+          .catch(() => {});
+
         matchTimeoutRef.current = setTimeout(async () => {
           cleanupSearch();
           fetch("/api/matchmaking/leave", {
@@ -129,7 +144,7 @@ export default function PlayPage() {
           } catch {}
 
           setSearchState("noPlayers");
-        }, 20000);
+        }, 60000);
         return;
       }
 
@@ -227,6 +242,11 @@ export default function PlayPage() {
             {timeControls.find((t) => t.id === selectedTC)?.desc} · {rated ? "Ranked" : "Casual"}
           </p>
           <p className="text-xs text-ccb-muted mt-2 tabular-nums">{searchSeconds}s elapsed</p>
+          {announced && (
+            <p className="text-[11px] text-ccb-primary/80 mt-1">
+              ♟️ Challenge link posted to your country group — anyone there can tap to play you now.
+            </p>
+          )}
         </div>
         <button onClick={handleCancel} className="btn-secondary px-8">
           <X className="w-4 h-4 mr-1.5" /> Cancel Search
@@ -370,7 +390,7 @@ export default function PlayPage() {
       </button>
 
       <p className="text-xs text-ccb-muted text-center">
-        No opponent found in 20s? You'll get the option to play the computer.
+        No opponent found in 60s? You'll get the option to play the computer.
       </p>
 
       {/* Divider */}

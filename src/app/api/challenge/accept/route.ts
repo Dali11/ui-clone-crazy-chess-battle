@@ -109,6 +109,19 @@ export async function POST(req: NextRequest) {
       .update({ game_id: game.id })
       .eq("id", challengeId);
 
+    // Quick-Match interop: if the challenger is still sitting in the
+    // matchmaking queue (their search auto-created this link), remove
+    // their queue row — the DELETE fires their realtime listener and
+    // redirects them straight into the new game. Same for the acceptor's
+    // own queue entry, and cancel any other auto-posted announce links
+    // for either player so nobody joins a stale match.
+    await admin.from("matchmaking_queue").delete()
+      .in("player_id", [challenge.challenger_id, user.id]);
+    await admin.from("challenges").update({ status: "cancelled" })
+      .eq("source", "quick_match_announce")
+      .eq("status", "pending")
+      .in("challenger_id", [challenge.challenger_id, user.id]);
+
     return NextResponse.json({ gameId: game.id });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Server error" }, { status: 500 });

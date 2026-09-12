@@ -24,6 +24,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Cancel any auto-posted announce challenge links — the search is over.
+    // (Manual challenge links are untouched.)
+    await admin
+      .from("challenges")
+      .update({ status: "cancelled" })
+      .eq("challenger_id", user.id)
+      .eq("source", "quick_match_announce")
+      .eq("status", "pending");
+
     return NextResponse.json({ success: true });
   } catch (e: any) {
     return NextResponse.json(
