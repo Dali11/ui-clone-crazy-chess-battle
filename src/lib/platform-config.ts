@@ -177,6 +177,25 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     page_size: 50,
     show_kpi_cards: true,
   },
+  revenue_sweep: {
+    // Weekly platform revenue sweep (cron Mon 00:15 CAT). Revenue = battle
+    // fees + MWK withdrawal fees accumulated since the last credited sweep.
+    // OFF until the owner sets a payout destination and flips it on.
+    enabled: false,
+    // Execute the payout automatically (PayChangu MW). When off, the sweep
+    // creates a pending withdrawal for one-click admin approval.
+    auto_payout: false,
+    // Sweep only above this amount (smaller windows carry over)
+    min_mwk: 1000,
+    // Owner = who receives the revenue. Empty = first admin profile.
+    owner_user_id: "",
+    // Payout destination (Malawi mobile money — 08x TNM, 09x Airtel)
+    dest_phone: "",
+    dest_operator: "", // empty = auto-detect from number
+    dest_provider: "paychangu", // paychangu | pawapay
+    // First sweep window start (no credited sweep exists yet)
+    epoch: "2026-09-01T00:00:00.000Z",
+  },
 };
 
 // ─── Legacy table sync map ────────────────────────────────────────────────

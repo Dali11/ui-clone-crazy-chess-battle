@@ -22,6 +22,22 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "group_gap_min", label: "Group gap", type: "number", unit: "min", group: "control", help: "Max one notification per room per player in this window" },
     { key: "turn_gap_min", label: "Turn reminder gap", type: "number", unit: "min", group: "control", help: "Max one 'your move' per game in this window" },
   ],
+  revenue_sweep: [
+    { key: "enabled", label: "Weekly sweep enabled", type: "toggle", group: "control", help: "Cron runs Mon 00:15 CAT. OFF until you set a payout destination below" },
+    { key: "auto_payout", label: "Auto-execute payout", type: "toggle", group: "control", help: "ON = money sent to your number automatically. OFF = weekly withdrawal created pending for one-click approval" },
+    { key: "min_mwk", label: "Minimum sweep amount", type: "number", unit: "MWK", group: "control", help: "Windows below this carry over to the next week" },
+    { key: "dest_phone", label: "Payout mobile number", type: "text", group: "control", help: "Your Malawi mobile money number (08x TNM, 09x Airtel)" },
+    {
+      key: "dest_provider", label: "Payout provider", type: "select", group: "control",
+      options: [
+        { value: "paychangu", label: "PayChangu (MW mobile money)" },
+        { value: "pawapay", label: "PawaPay" },
+      ],
+      help: "Where the automatic payout executes",
+    },
+    { key: "owner_user_id", label: "Owner user ID", type: "text", group: "control", help: "Who receives revenue. Empty = your admin account (Arthur)" },
+    { key: "epoch", label: "First sweep starts from", type: "text", group: "control", help: "ISO date — revenue earned after this is swept (only used before the first credited sweep)" },
+  ],
   ads: [
     { key: "enabled", label: "Ads Enabled (Global)", type: "toggle", group: "control", help: "Master switch — nothing renders anywhere when off" },
     { key: "lobby_enabled", label: "Lobby Ad", type: "toggle", group: "control", help: "Dashboard lobby — recommended 320x50 mobile / 728x90 desktop banner" },
@@ -196,6 +212,7 @@ const SECTION_LABELS: Record<string, string> = {
   verification: "Verification",
   logs: "Admin Logs",
   payments_zm: "Zambia Payments (Ontech)",
+  revenue_sweep: "Revenue Sweep",
 };
 
 // ─── Component ────────────────────────────────────────────────────────────
@@ -307,6 +324,9 @@ export default function PlatformSettingsPanel({ section }: { section: string }) 
           </div>
 
           <div className="p-4 space-y-5">
+            {/* Revenue sweep summary + history (custom block) */}
+            {section === "revenue_sweep" && <RevenueSweepCard />}
+
             {/* Control settings */}
             {controlFields.length > 0 && (
               <div className="space-y-2.5">
@@ -468,6 +488,160 @@ function FieldRow({
           ))}
         </select>
       )}
+    </div>
+  );
+}
+
+
+// ─── Revenue Sweep card — summary, dry run, manual sweep, history ─────────
+
+interface SweepSummary {
+  allTime: { battleFees: number; withdrawalFees: number; total: number };
+  swept: number;
+  unswept: { battleFees: number; withdrawalFees: number; total: number };
+  window: { startISO: string; endISO: string };
+  history: {
+    id: string;
+    window_start: string;
+    window_end: string;
+    battle_fees_mwk: number;
+    withdrawal_fees_mwk: number;
+    total_mwk: number;
+    credited: boolean;
+    payout_status: string;
+    notes?: string | null;
+  }[];
+}
+
+function RevenueSweepCard() {
+  const [data, setData] = useState<SweepSummary | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/revenue-sweep");
+      if (res.ok) setData(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const runSweep = async (dry: boolean) => {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/revenue-sweep", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dry }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setMsg(result.error || "Failed");
+      } else if (result.action === "disabled") {
+        setMsg("Sweep is disabled — enable it above first");
+      } else if (result.action === "dry") {
+        setMsg(`Dry run: would sweep MK${(result.total || 0).toLocaleString()} (${result.windowStart?.slice(0, 10)} → ${result.windowEnd?.slice(0, 10)})`);
+      } else {
+        setMsg(`Swept MK${(result.total || 0).toLocaleString()} — payout: ${result.payoutStatus}`);
+        load();
+      }
+    } catch {
+      setMsg("Failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!data) return null;
+
+  const statusLabel = (s: string) =>
+    s === "paid" ? "text-emerald-400" :
+    s === "pending" ? "text-amber-400" :
+    s.startsWith("skipped") || s === "wallet_only" ? "text-ccb-muted" :
+    s.includes("failed") ? "text-red-400" : "text-ccb-text";
+
+  return (
+    <div className="space-y-4">
+      {/* Stat tiles */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-xl border border-ccb-border bg-ccb-surface/60 p-3">
+          <p className="text-[10px] uppercase tracking-wide font-semibold text-ccb-muted/70">All-time revenue</p>
+          <p className="text-lg font-bold text-ccb-text mt-0.5">MK{data.allTime.total.toLocaleString()}</p>
+          <p className="text-[10px] text-ccb-muted">battles + withdrawal fees</p>
+        </div>
+        <div className="rounded-xl border border-ccb-border bg-ccb-surface/60 p-3">
+          <p className="text-[10px] uppercase tracking-wide font-semibold text-ccb-muted/70">Swept to owner</p>
+          <p className="text-lg font-bold text-ccb-text mt-0.5">MK{data.swept.toLocaleString()}</p>
+          <p className="text-[10px] text-ccb-muted">credited withdrawals</p>
+        </div>
+        <div className="rounded-xl border border-ccb-border bg-ccb-surface/60 p-3">
+          <p className="text-[10px] uppercase tracking-wide font-semibold text-ccb-muted/70">Unswept (next window)</p>
+          <p className="text-lg font-bold text-ccb-primary mt-0.5">MK{data.unswept.total.toLocaleString()}</p>
+          <p className="text-[10px] text-ccb-muted">since {data.window.startISO.slice(0, 10)}</p>
+        </div>
+        <div className="rounded-xl border border-ccb-border bg-ccb-surface/60 p-3">
+          <p className="text-[10px] uppercase tracking-wide font-semibold text-ccb-muted/70">Next auto sweep</p>
+          <p className="text-lg font-bold text-ccb-text mt-0.5">Mon 00:15</p>
+          <p className="text-[10px] text-ccb-muted">weekly, CAT</p>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => runSweep(true)}
+          disabled={busy}
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-ccb-border bg-ccb-surface text-ccb-text hover:bg-ccb-surface/70 disabled:opacity-50"
+        >
+          {busy ? "..." : "Dry run (preview)"}
+        </button>
+        <button
+          onClick={() => runSweep(false)}
+          disabled={busy}
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-ccb-primary text-white hover:bg-ccb-primary/90 disabled:opacity-50"
+        >
+          {busy ? "..." : "Run sweep now"}
+        </button>
+        {msg && <span className="text-xs text-ccb-muted">{msg}</span>}
+      </div>
+
+      {/* History */}
+      {data.history.length > 0 && (
+        <div className="rounded-xl border border-ccb-border overflow-hidden">
+          <div className="px-3 py-2 bg-ccb-surface/60 border-b border-ccb-border">
+            <p className="text-xs font-semibold text-ccb-text">Sweep history</p>
+          </div>
+          <div className="divide-y divide-ccb-border/60">
+            {data.history.map((h) => (
+              <div key={h.id} className="flex items-center gap-3 px-3 py-2 text-xs">
+                <span className="text-ccb-muted w-24 shrink-0">
+                  {new Date(h.window_end).toLocaleDateString()}
+                </span>
+                <span className="text-ccb-muted flex-1">
+                  {new Date(h.window_start).toLocaleDateString()} → {new Date(h.window_end).toLocaleDateString()}
+                </span>
+                <span className="text-ccb-muted shrink-0 hidden sm:inline">
+                  battles MK{h.battle_fees_mwk.toLocaleString()} · fees MK{h.withdrawal_fees_mwk.toLocaleString()}
+                </span>
+                <span className="font-semibold text-ccb-text shrink-0">
+                  MK{h.total_mwk.toLocaleString()}
+                </span>
+                <span className={`font-semibold shrink-0 w-24 text-right ${statusLabel(h.payout_status)}`}>
+                  {h.payout_status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="text-[11px] text-ccb-muted/70">
+        Ad revenue (Adsterra) is paid to your external account directly — not part of this sweep.
+        Bank transfer: payouts go to your mobile money number (08x/09x); forward to your bank from your provider dashboard, or approve the pending withdrawal manually.
+      </p>
     </div>
   );
 }

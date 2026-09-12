@@ -37,6 +37,10 @@
     {
       "path": "/api/league/xp/settle",
       "schedule": "5 22 * * *"
+    },
+    {
+      "path": "/api/cron/revenue-sweep",
+      "schedule": "15 22 * * 0"
     }
   ],
   "headers": [
