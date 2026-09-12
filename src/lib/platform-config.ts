@@ -204,6 +204,13 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     price_mwk: 10000,
     period_days: 30,
   },
+  integrity: {
+    // Usernames never flagged by integrity scans — owner's own accounts +
+    // test accounts (comma-separated, case-insensitive, matching profiles.username).
+    // Open flags on these accounts are auto-dismissed on every scan —
+    // an open flag blocks that account's withdrawals.
+    owner_usernames: "",
+  },
   affiliate: {
     // 25% commission to a player's referrer on every membership they buy.
     // OFF by default — flipping it on makes each MK10,000 sale pay the

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { getPlatformConfig } from "@/lib/platform-config";
 import {
   findPhoneClusters, roboticVerdict, playerTimes,
   type PhoneRow,
@@ -42,7 +43,26 @@ export async function POST(req: NextRequest) {
     ...depositRows.map((d: any) => ({ userId: d.user_id as string, phone: d.phone, source: "deposit" as const })),
     ...withdrawalRows.map((w: any) => ({ userId: w.user_id as string, phone: w.phone, source: "withdrawal" as const })),
   ];
-  const clusters = findPhoneClusters(phoneRows);
+
+  // ── Owner/test-account whitelist ──────────────────────────────────
+  // The owner's own accounts (and test accounts) legitimately share
+  // payment phones and play each other while testing the platform —
+  // they must never be flagged, and an open flag on the OWNER account
+  // would block his own withdrawals. Usernames come from Platform
+  // Settings → Integrity (comma-separated, case-insensitive).
+  const integCfg = await getPlatformConfig(admin, "integrity");
+  const ownerNames = String(integCfg.owner_usernames || "")
+    .split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+  let whitelistIds = new Set<string>();
+  if (ownerNames.length > 0) {
+    const allProfiles = await fetchAll(() =>
+      admin.from("profiles").select("id, username").not("username", "is", null));
+    for (const p of allProfiles) {
+      if (ownerNames.includes((p.username || "").toLowerCase())) whitelistIds.add(p.id);
+    }
+  }
+
+  const clusters = findPhoneClusters(phoneRows.filter((r) => !whitelistIds.has(r.userId)));
 
   // Cross-reference: games/battles BETWEEN cluster members (the classic
   // farm pattern — one person feeding a main account).
@@ -100,6 +120,7 @@ export async function POST(req: NextRequest) {
     }
   }
   for (const [uid, r] of roboticByUser) {
+    if (whitelistIds.has(uid)) continue;
     upserts.push({
       user_id: uid,
       type: "robotic_move_times",
@@ -125,6 +146,19 @@ export async function POST(req: NextRequest) {
       if (!error) created++; else console.error("[integrity] insert failed:", error);
     }
   }
+  // Auto-dismiss stale open flags on whitelisted accounts (e.g. flags from
+  // before the whitelist existed). Admin decisions on real players stand.
+  let whitelistDismissed = 0;
+  if (whitelistIds.size > 0) {
+    const now = new Date().toISOString();
+    const { error } = await admin
+      .from("integrity_flags")
+      .update({ status: "dismissed", resolved_at: now, updated_at: now })
+      .eq("status", "open")
+      .in("user_id", Array.from(whitelistIds));
+    if (!error) whitelistDismissed = 1; // count unknown (no rows-affected in JS client)
+  }
+
   const { count: openFlags } = await admin
     .from("integrity_flags").select("id", { count: "exact", head: true }).eq("status", "open");
 
@@ -139,6 +173,7 @@ export async function POST(req: NextRequest) {
     flagsCreated: created,
     flagsRefreshed: refreshed,
     skippedResolved,
+    whitelistDismissed,
     openFlags: openFlags ?? 0,
   });
 }

@@ -38,6 +38,9 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "owner_user_id", label: "Owner user ID", type: "text", group: "control", help: "Who receives revenue. Empty = your admin account (Arthur)" },
     { key: "epoch", label: "First sweep starts from", type: "text", group: "control", help: "ISO date — revenue earned after this is swept (only used before the first credited sweep)" },
   ],
+  integrity: [
+    { key: "owner_usernames", label: "Owner / test account whitelist", type: "text", group: "control", help: "Comma-separated usernames that integrity scans never flag (your own accounts + test accounts — they legitimately share phones and play each other while testing). Case-insensitive" },
+  ],
   affiliate: [
     { key: "enabled", label: "Affiliate commissions enabled", type: "toggle", group: "control", help: "ON = membership purchases pay the buyer's referrer 25% (MK2,500 per MK10,000 sale) to their wallet. Referral tracking works while OFF; only payouts pause" },
   ],
@@ -223,6 +226,7 @@ const SECTION_LABELS: Record<string, string> = {
   revenue_sweep: "Revenue Sweep",
   membership: "Membership",
   affiliate: "Affiliate",
+  integrity: "Integrity",
 };
 
 // ─── Component ────────────────────────────────────────────────────────────
