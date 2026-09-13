@@ -197,25 +197,10 @@ export async function POST(
               await admin.from("games").insert(gameRows);
             }
 
-            // Byes in group stage — credit the player
+            // Byes in group stage — credit the player (atomic, migration 071 RPC)
             const byePairings = pairings.filter((p) => p.bye);
             for (const p of byePairings) {
-              const { data: byePart } = await admin
-                .from("tournament_participants")
-                .select("score, wins, games_played")
-                .eq("tournament_id", tournamentId)
-                .eq("player_id", p.bye!)
-                .single();
-              if (byePart) {
-                await admin.from("tournament_participants")
-                  .update({
-                    score: byePart.score + 1,
-                    wins: byePart.wins + 1,
-                    games_played: byePart.games_played + 1,
-                  })
-                  .eq("player_id", p.bye!)
-                  .eq("tournament_id", tournamentId);
-              }
+              await admin.rpc("credit_tournament_bye", { p_tournament_id: tournamentId, p_player_id: p.bye! });
             }
 
             await admin.from("tournaments").update({ current_round: nextRound }).eq("id", tournamentId);
@@ -300,25 +285,10 @@ export async function POST(
               await admin.from("games").insert(gameRows);
             }
 
-            // Handle byes
+            // Handle byes (atomic, migration 071 RPC)
             const byePairings = pairings.filter((p) => p.bye);
             for (const p of byePairings) {
-              const { data: byePart } = await admin
-                .from("tournament_participants")
-                .select("score, wins, games_played")
-                .eq("tournament_id", tournamentId)
-                .eq("player_id", p.bye!)
-                .single();
-              if (byePart) {
-                await admin.from("tournament_participants")
-                  .update({
-                    score: byePart.score + 1,
-                    wins: byePart.wins + 1,
-                    games_played: byePart.games_played + 1,
-                  })
-                  .eq("player_id", p.bye!)
-                  .eq("tournament_id", tournamentId);
-              }
+              await admin.rpc("credit_tournament_bye", { p_tournament_id: tournamentId, p_player_id: p.bye! });
             }
 
             await admin.from("tournaments").update({ current_round: nextRound }).eq("id", tournamentId);
@@ -418,25 +388,10 @@ export async function POST(
           .eq("round_number", nextRound);
       }
 
-      // Handle byes (auto-advance)
+      // Handle byes (auto-advance) — atomic, migration 071 RPC
       const byePairings = pairings.filter((p) => p.bye);
       for (const p of byePairings) {
-        const { data: byePart } = await admin
-          .from("tournament_participants")
-          .select("score, wins, games_played")
-          .eq("tournament_id", tournamentId)
-          .eq("player_id", p.bye!)
-          .single();
-        if (byePart) {
-          await admin.from("tournament_participants")
-            .update({
-              score: byePart.score + 1,
-              wins: byePart.wins + 1,
-              games_played: byePart.games_played + 1,
-            })
-            .eq("player_id", p.bye!)
-            .eq("tournament_id", tournamentId);
-        }
+        await admin.rpc("credit_tournament_bye", { p_tournament_id: tournamentId, p_player_id: p.bye! });
       }
 
       await admin.from("tournaments").update({ current_round: nextRound }).eq("id", tournamentId);
@@ -532,18 +487,9 @@ export async function POST(
 
     if (byePairings.length > 0) {
       writes.push(
-        ...byePairings.map((p) => {
-          const byeParticipant = participants.find((pp) => pp.player_id === p.bye);
-          return admin
-            .from("tournament_participants")
-            .update({
-              score: (byeParticipant?.score || 0) + 1,
-              wins: (byeParticipant?.wins || 0) + 1,
-              games_played: (byeParticipant?.games_played || 0) + 1,
-            })
-            .eq("player_id", p.bye)
-            .eq("tournament_id", tournamentId);
-        })
+        ...byePairings.map((p) =>
+          admin.rpc("credit_tournament_bye", { p_tournament_id: tournamentId, p_player_id: p.bye })
+        )
       );
     }
 

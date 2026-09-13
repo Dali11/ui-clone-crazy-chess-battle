@@ -183,18 +183,9 @@ async function handleAutoAdvance(req: NextRequest) {
         if (gameRows.length > 0) writes.push(admin.from("games").insert(gameRows));
         if (byePairings.length > 0) {
           writes.push(
-            ...byePairings.map((p) => {
-              const byeP = participants.find((pp) => pp.player_id === p.bye);
-              return admin
-                .from("tournament_participants")
-                .update({
-                  score: (byeP?.score || 0) + 1,
-                  wins: (byeP?.wins || 0) + 1,
-                  games_played: (byeP?.games_played || 0) + 1,
-                })
-                .eq("player_id", p.bye)
-                .eq("tournament_id", tournament.id);
-            })
+            ...byePairings.map((p) =>
+              admin.rpc("credit_tournament_bye", { p_tournament_id: tournament.id, p_player_id: p.bye })
+            )
           );
         }
         await Promise.all(writes);

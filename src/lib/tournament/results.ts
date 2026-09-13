@@ -104,32 +104,64 @@ async function _processTournamentGameResult(result: GameResult) {
   // NORMAL GAME
   // ═══════════════════════════════════════════════════════════════════
 
-  // Idempotency: check if this game's result was already processed
-  if (existingRound?.pairings) {
-    const pairings = existingRound.pairings as Array<Record<string, unknown>>;
-    const alreadyProcessed = pairings.some(
-      (p) =>
-        p.result !== null &&
-        p.result !== undefined &&
-        ((p.white === result.whitePlayerId && p.black === result.blackPlayerId) ||
-          (p.white === result.blackPlayerId && p.black === result.whitePlayerId))
-    );
-    if (alreadyProcessed) {
-      console.log("[processTournamentGameResult] Game already processed, skipping", result.gameId);
-      return;
-    }
+  // ═══════════════════════════════════════════════════════════════════
+  // NORMAL GAME — atomic exactly-once processing via SQL RPC
+  //
+  // process_tournament_result (migration 071) does claim + stats +
+  // per-board pairing write in ONE transaction. The old JS path used a
+  // read-then-write for stats and rewrote the whole pairings array —
+  // concurrent processors (browser heartbeats, timeout-check polls, cron
+  // sweeps all trigger this) erased each other's pairing result, and the
+  // reconcile sweep then reprocessed the erased game → double-counted
+  // standings ("3 played in 2 rounds", inflated scores).
+  // ═══════════════════════════════════════════════════════════════════
+
+  const isDraw = result.winner === "draw" || result.status === "draw" || result.status === "stalemate";
+  const normalizedResult = isDraw ? "draw" : result.winner;
+
+  if (normalizedResult !== "white" && normalizedResult !== "black" && normalizedResult !== "draw") {
+    console.error("[processTournamentGameResult] Unusable result for game", result.gameId,
+      "winner:", result.winner, "status:", result.status, "— not processing");
+    return;
   }
 
-  const whiteWon = result.winner === "white";
-  const blackWon = result.winner === "black";
-  const isDraw = result.winner === "draw" || result.status === "draw" || result.status === "stalemate";
+  const isKnockoutDraw = isDraw && tournamentInfo?.type === "knockout";
 
-  // Update participant stats
-  await _updateParticipantStats(admin, tournamentId, result.whitePlayerId, whiteWon, blackWon, isDraw);
-  await _updateParticipantStats(admin, tournamentId, result.blackPlayerId, blackWon, whiteWon, isDraw);
+  const { data: rpc, error: rpcErr } = await admin.rpc("process_tournament_result", {
+    p_game_id: result.gameId,
+    p_tournament_id: tournamentId,
+    p_round_number: roundNumber,
+    p_white_id: result.whitePlayerId,
+    p_black_id: result.blackPlayerId,
+    p_result: normalizedResult,
+    p_keep_open: isKnockoutDraw, // knockout draw: round stays open pending Armageddon
+  });
+
+  if (rpcErr) {
+    console.error("[processTournamentGameResult] RPC failed for game", result.gameId, rpcErr.message);
+    return;
+  }
+
+  if (rpc?.pairing_found === false) {
+    // The game ended but no board in the round matches it — the result would
+    // be silently lost and the round would stall. Log loudly so the
+    // reconciliation sweep / a human can pick it up.
+    console.error(
+      "[processTournamentGameResult] NO MATCHING PAIRING for game", result.gameId,
+      "in round", roundNumber, "of tournament", tournamentId,
+      "— players", result.whitePlayerId, "vs", result.blackPlayerId
+    );
+    return;
+  }
+
+  if (rpc?.first_time !== true) {
+    // Repair call: stats were already applied by the first processor — this
+    // invocation only healed a clobbered pairing result. Never re-add stats.
+    console.log("[processTournamentGameResult] Repair-only reprocess (stats already applied) for game", result.gameId);
+  }
 
   // ─── Knockout draw: trigger Armageddon tiebreak ───
-  if (isDraw && tournamentInfo?.type === "knockout") {
+  if (isKnockoutDraw) {
     console.log("[processTournamentGameResult] Knockout draw — triggering Armageddon tiebreak for game", result.gameId);
 
     try {
@@ -142,9 +174,15 @@ async function _processTournamentGameResult(result: GameResult) {
         game.black_rating || 1200,
       );
 
-      // Update pairing: mark as "draw" and link the tiebreak game.
-      // Round is NOT complete — the tiebreak is still pending.
-      const pairings = existingRound.pairings as Array<Record<string, unknown>>;
+      // Link the tiebreak game on the pairing (result "draw" was already set
+      // atomically by the RPC; this only adds tiebreak_game_id). Re-read the
+      // pairings so a concurrent result from another board is preserved.
+      const { data: freshPair } = await admin
+        .from("tournament_rounds")
+        .select("id, pairings")
+        .eq("id", existingRound.id)
+        .single();
+      const pairings = (freshPair?.pairings || []) as Array<Record<string, unknown>>;
       const updatedPairings = pairings.map((p) => {
         if (
           (p.white === result.whitePlayerId && p.black === result.blackPlayerId) ||
@@ -163,66 +201,43 @@ async function _processTournamentGameResult(result: GameResult) {
       console.log("[processTournamentGameResult] Armageddon tiebreak created:", tiebreak.gameId);
     } catch (e) {
       console.error("[processTournamentGameResult] Failed to create Armageddon tiebreak, falling back to seed-based advancement:", e);
-      // Fallback: set pairing result to "draw" (advance-round will use seed)
-      const pairings = existingRound.pairings as Array<Record<string, unknown>>;
-      const updatedPairings = pairings.map((p) => {
-        if (
-          (p.white === result.whitePlayerId && p.black === result.blackPlayerId) ||
-          (p.white === result.blackPlayerId && p.black === result.whitePlayerId)
-        ) {
-          return { ...p, result: "draw" };
-        }
-        return p;
-      });
+      // Tiebreak creation failed — let the round complete so advance-round
+      // falls back to higher-seed advancement (pairing already says "draw").
+      const { data: freshPair } = await admin
+        .from("tournament_rounds")
+        .select("pairings")
+        .eq("id", existingRound.id)
+        .single();
+      const pairings = (freshPair?.pairings || []) as Array<Record<string, unknown>>;
+      const allDone = pairings.every((p) => (p.result !== null && p.result !== undefined) || p.bye || (p as any).is_third_place);
+      if (!allDone) return;
 
-      const allDone = updatedPairings.every((p) => (p.result !== null && p.result !== undefined) || p.bye || (p as any).is_third_place);
       await admin
         .from("tournament_rounds")
-        .update({ pairings: updatedPairings, is_complete: allDone })
+        .update({ is_complete: true })
         .eq("id", existingRound.id);
 
-      if (allDone) await _checkAndFinishRound(admin, tournamentId, updatedPairings, tournamentInfo?.type || "swiss");
+      await _checkAndFinishRound(admin, tournamentId, pairings, "knockout");
     }
 
     return; // Don't proceed — tiebreak is pending (or fallback applied)
   }
 
-  // ─── Normal decisive result (or non-knockout draw) ───
-  const pairings = existingRound.pairings as Array<Record<string, unknown>>;
-  const matchesPairing = (p: Record<string, unknown>) =>
-    (p.white === result.whitePlayerId && p.black === result.blackPlayerId) ||
-    (p.white === result.blackPlayerId && p.black === result.whitePlayerId);
-  if (!pairings.some(matchesPairing)) {
-    // The game ended but no pairing in this round matches its players — the
-    // result would be silently lost and the round would stall. Log loudly
-    // so the reconciliation sweep / a human can pick it up.
-    console.error(
-      "[processTournamentGameResult] NO MATCHING PAIRING for game", result.gameId,
-      "in round", roundNumber, "of tournament", tournamentId,
-      "— players", result.whitePlayerId, "vs", result.blackPlayerId,
-      "— round pairings:", JSON.stringify(pairings)
+  // ─── Round completion ───
+  if (rpc?.round_complete === true) {
+    // Re-read the round's pairings for _checkAndFinishRound (knockout counts
+    // bracket winners from them) instead of trusting a stale in-memory copy.
+    const { data: freshPair } = await admin
+      .from("tournament_rounds")
+      .select("pairings")
+      .eq("id", existingRound.id)
+      .single();
+    await _checkAndFinishRound(
+      admin,
+      tournamentId,
+      (freshPair?.pairings || []) as Array<Record<string, unknown>>,
+      tournamentInfo?.type || "swiss",
     );
-    return;
-  }
-  const updatedPairings = pairings.map((p) => matchesPairing(p) ? { ...p, result: result.winner } : p);
-
-  // Round is complete when all non-3rd-place pairings have results (or byes).
-  const allDone = updatedPairings.every((p) => (p.result !== null && p.result !== undefined) || p.bye || (p as any).is_third_place);
-
-  const { error: roundUpdateErr } = await admin
-    .from("tournament_rounds")
-    .update({ pairings: updatedPairings, is_complete: allDone })
-    .eq("id", existingRound.id);
-
-  if (roundUpdateErr) {
-    console.error("[processTournamentGameResult] Failed to update round pairings", existingRound.id, roundUpdateErr.message);
-    return;
-  }
-
-  console.log("[processTournamentGameResult] Round updated successfully", existingRound.id, "allDone:", allDone);
-
-  if (allDone) {
-    await _checkAndFinishRound(admin, tournamentId, updatedPairings, tournamentInfo?.type || "swiss");
   }
 }
 
@@ -288,44 +303,6 @@ async function _processTiebreakResult(
 // ═══════════════════════════════════════════════════════════════════════
 // HELPER: Update participant stats
 // ═══════════════════════════════════════════════════════════════════════
-
-async function _updateParticipantStats(
-  admin: ReturnType<typeof createAdminClient>,
-  tournamentId: string,
-  playerId: string,
-  won: boolean,
-  lost: boolean,
-  drew: boolean,
-) {
-  const { data: stats, error } = await admin
-    .from("tournament_participants")
-    .select("score, wins, losses, draws, games_played")
-    .eq("tournament_id", tournamentId)
-    .eq("player_id", playerId)
-    .single();
-
-  if (error || !stats) {
-    console.error("[processTournamentGameResult] Failed to fetch participant stats", playerId, error?.message);
-    return;
-  }
-
-  const { error: updateErr } = await admin
-    .from("tournament_participants")
-    .update({
-      score: stats.score + (won ? 1 : drew ? 0.5 : 0),
-      wins: stats.wins + (won ? 1 : 0),
-      losses: stats.losses + (lost ? 1 : 0),
-      draws: stats.draws + (drew ? 1 : 0),
-      games_played: stats.games_played + 1,
-    })
-    .eq("tournament_id", tournamentId)
-    .eq("player_id", playerId);
-
-  if (updateErr) {
-    console.error("[processTournamentGameResult] Failed to update participant stats", playerId, updateErr.message);
-  }
-}
-
 // ═══════════════════════════════════════════════════════════════════════
 // HELPER: Check if round is complete and finish tournament if needed
 // ═══════════════════════════════════════════════════════════════════════
@@ -377,7 +354,8 @@ export type ManualOverrideReason =
   | "tournament_not_found"
   | "no_round"
   | "no_matching_pairing"
-  | "already_recorded";
+  | "already_recorded"
+  | "stats_failed";
 
 export interface ManualOverrideOutcome {
   ok: boolean;
@@ -483,8 +461,6 @@ export async function recordManualTournamentResult(opts: {
   }
 
   // ── No usable game row: record directly ──
-  const whiteWon = opts.winner === "white";
-  const blackWon = opts.winner === "black";
   const isDraw = opts.winner === "draw";
 
   // Knockout draw: create the Armageddon tiebreak exactly like the normal flow.
@@ -514,8 +490,17 @@ export async function recordManualTournamentResult(opts: {
     }
   }
 
-  await _updateParticipantStats(admin, opts.tournamentId, opts.whiteId, whiteWon, blackWon, isDraw);
-  await _updateParticipantStats(admin, opts.tournamentId, opts.blackId, blackWon, whiteWon, isDraw);
+  // Atomic stats (no read-then-write — migration 071 RPC)
+  const { error: statsErr } = await admin.rpc("apply_tournament_stats", {
+    p_tournament_id: opts.tournamentId,
+    p_white_id: opts.whiteId,
+    p_black_id: opts.blackId,
+    p_result: opts.winner,
+  });
+  if (statsErr) {
+    console.error("[recordManualTournamentResult] stats RPC failed:", statsErr.message);
+    return { ok: false, reason: "stats_failed" };
+  }
 
   const updatedPairings = pairings.map((p) =>
     matchesPairing(p) ? { ...p, result: opts.winner } : p

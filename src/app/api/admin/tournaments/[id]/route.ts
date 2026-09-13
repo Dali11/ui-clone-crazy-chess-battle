@@ -394,17 +394,9 @@ export async function PATCH(
         await admin.from("games").insert(gameRows);
       }
 
-      // Award byes
+      // Award byes (atomic, migration 071 RPC)
       for (const p of byePairings) {
-        const byeParticipant = participants.find((pp) => pp.player_id === p.bye);
-        await admin.from("tournament_participants")
-          .update({
-            score: (byeParticipant?.score || 0) + 1,
-            wins: (byeParticipant?.wins || 0) + 1,
-            games_played: (byeParticipant?.games_played || 0) + 1,
-          })
-          .eq("player_id", p.bye)
-          .eq("tournament_id", tournamentId);
+        await admin.rpc("credit_tournament_bye", { p_tournament_id: tournamentId, p_player_id: p.bye });
       }
 
       await admin.from("tournaments")

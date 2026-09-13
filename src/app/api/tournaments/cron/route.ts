@@ -728,22 +728,7 @@ async function handleTournamentCron(req: NextRequest) {
 
           // Handle byes
           for (const p of koByePairings) {
-            const { data: byePart } = await admin
-              .from("tournament_participants")
-              .select("score, wins, games_played")
-              .eq("tournament_id", tournament.id)
-              .eq("player_id", p.bye!)
-              .single();
-            if (byePart) {
-              await admin.from("tournament_participants")
-                .update({
-                  score: byePart.score + 1,
-                  wins: byePart.wins + 1,
-                  games_played: byePart.games_played + 1,
-                })
-                .eq("player_id", p.bye!)
-                .eq("tournament_id", tournament.id);
-            }
+            await admin.rpc("credit_tournament_bye", { p_tournament_id: tournament.id, p_player_id: p.bye! });
           }
 
           const _advanced = await atomicAdvanceRound(admin, tournament.id, tournament.current_round, nextRound);
@@ -884,18 +869,9 @@ async function handleTournamentCron(req: NextRequest) {
         // Handle byes
         if (byePairings.length > 0) {
           await Promise.all(
-            byePairings.map((p) => {
-              const byeP = participants.find((pp: any) => pp.player_id === p.bye);
-              return admin
-                .from("tournament_participants")
-                .update({
-                  score: ((byeP as any)?.score || 0) + 1,
-                  wins: ((byeP as any)?.wins || 0) + 1,
-                  games_played: ((byeP as any)?.games_played || 0) + 1,
-                })
-                .eq("player_id", p.bye!)
-                .eq("tournament_id", tournament.id);
-            })
+            byePairings.map((p) =>
+              admin.rpc("credit_tournament_bye", { p_tournament_id: tournament.id, p_player_id: p.bye })
+            )
           );
         }
 
@@ -1362,17 +1338,9 @@ async function handleTournamentCron(req: NextRequest) {
 
             if (byePairings.length > 0) {
               await Promise.all(
-                byePairings.map((p) => {
-                  const byeP = participants.find((pp: any) => pp.player_id === p.bye);
-                  return admin.from("tournament_participants")
-                    .update({
-                      score: ((byeP as any)?.score || 0) + 1,
-                      wins: ((byeP as any)?.wins || 0) + 1,
-                      games_played: ((byeP as any)?.games_played || 0) + 1,
-                    })
-                    .eq("player_id", p.bye!)
-                    .eq("tournament_id", tournament.id);
-                })
+                byePairings.map((p) =>
+                  admin.rpc("credit_tournament_bye", { p_tournament_id: tournament.id, p_player_id: p.bye })
+                )
               );
             }
 
