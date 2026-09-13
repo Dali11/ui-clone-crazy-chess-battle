@@ -51,11 +51,11 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
   }, [menuOpen]);
 
   // Bottom nav: Play · Battles · Live · Tournaments · Leagues
-  // (Game History stays reachable via the menu and the desktop nav)
+  // (Chats moved to a floating bubble — bottom-right, above this nav)
   const bottomNav = [
     { href: "/play", label: "Play", icon: Swords },
     { href: "/battles", label: "Battles", icon: Coins },
-    { href: "/chats", label: "Chats", icon: MessageCircle },
+    { href: "/live", label: "Live", icon: Radio },
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/league", label: "Leagues", icon: Crown },
   ];
@@ -293,7 +293,6 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
             {bottomNav.map((item) => {
               const Icon = item.icon;
               const active = isPathActive(pathname, item.href);
-              const showBadge = item.href === "/chats" && chatsUnread > 0 && !pathname.startsWith("/chats");
               return (
                 <Link
                   key={item.href}
@@ -304,14 +303,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
                   {active && (
                     <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-ccb-primary" />
                   )}
-                  <div className="relative">
-                    <Icon className={`w-5 h-5 transition-colors ${active ? "text-ccb-primary" : "text-gray-400"}`} />
-                    {showBadge && (
-                      <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center shadow-sm border border-white/80">
-                        {chatsUnread > 99 ? "99+" : chatsUnread}
-                      </span>
-                    )}
-                  </div>
+                  <Icon className={`w-5 h-5 transition-colors ${active ? "text-ccb-primary" : "text-gray-400"}`} />
                   <span className={`text-[9px] font-medium transition-colors ${active ? "text-ccb-primary" : "text-gray-500"}`}>
                     {item.label}
                   </span>
@@ -320,6 +312,24 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
             })}
           </div>
         </nav>
+      )}
+
+      {/* === FLOATING CHATS BUBBLE (mobile): bottom-right, above the bottom nav === */}
+      {!isGameRoute && !pathname.startsWith("/chats") && (
+        <Link
+          href="/chats"
+          prefetch={true}
+          aria-label={`Chats${chatsUnread > 0 ? ` (${chatsUnread} unread)` : ""}`}
+          className="sm:hidden fixed right-4 z-[90] w-14 h-14 rounded-full bg-ccb-primary text-white flex items-center justify-center shadow-xl shadow-black/25 active:scale-90 transition-transform"
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 76px)" }}
+        >
+          <MessageCircle className="w-6 h-6" />
+          {chatsUnread > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md border-2 border-ccb-dark">
+              {chatsUnread > 99 ? "99+" : chatsUnread}
+            </span>
+          )}
+        </Link>
       )}
     </>
   );
