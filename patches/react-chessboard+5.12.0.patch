@@ -1,0 +1,14 @@
+diff --git a/node_modules/react-chessboard/dist/index.js b/node_modules/react-chessboard/dist/index.js
+index 1e67f53..789a767 100644
+--- a/node_modules/react-chessboard/dist/index.js
++++ b/node_modules/react-chessboard/dist/index.js
+@@ -5160,7 +5160,8 @@ function ChessboardProvider({ children, options, }) {
+                 distance: dragActivationDistance,
+             }
+             : undefined,
+-    }), useSensor(KeyboardSensor), useSensor(TouchSensor), useSensor(MouseSensor));
++    }), useSensor(KeyboardSensor), useSensor(TouchSensor, { activationConstraint: { distance: 12 } }), useSensor(MouseSensor, { activationConstraint: { distance: 12 } }));
++    // CCB PATCH (2026-09-13): require 12px of movement before a piece drag activates. Without this, ANY finger jitter during a mobile tap (even 1-2px) starts a drag, which resets the Square's isClickingOnMobile flag and kills the tap's onSquareClick — tap-to-move pieces felt 'frozen' on phones while drag-and-drop worked fine. 12px is standard touch slop: taps stay taps, real drags still drag.
+     // collision detection that first tries pointer-based detection and then falls back to rectangle intersection for keyboards
+     function collisionDetection(args) {
+         // if a pointer is found, return those
