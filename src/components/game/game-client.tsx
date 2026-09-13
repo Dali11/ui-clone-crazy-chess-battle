@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Chessboard } from "react-chessboard";
 import { customPieces } from "@/lib/game/piece-styles";
+import { getPremoveGhosts } from "@/lib/game/premove-ghost";
 import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
 import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Swords, RefreshCw, Radio, Wifi, WifiOff, Share2, Check } from "lucide-react";
@@ -396,6 +397,18 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     }
   }, [viewPly, moveHistory]);
 
+  // Queued premove chain (promotion premove keeps its FIFO slot inline)
+  const queuedPremoves = useMemo(
+    () => (premovePromotion ? [...premoves, { from: premovePromotion.from, to: premovePromotion.to }] : premoves),
+    [premoves, premovePromotion]
+  );
+
+  // chess.com-style ghost pieces: a faded copy of the piece that each
+  // queued premove will deliver, drawn on its destination square so the
+  // player can SEE the projected piece and knows they can tap it to
+  // chain the next hop.
+  const premoveGhosts = useMemo(() => getPremoveGhosts(fen, isWhite, queuedPremoves), [fen, isWhite, queuedPremoves]);
+
   const squareStyles = useMemo(() => {
     const styles: Record<string, React.CSSProperties> = {};
     if (lastMove) {
@@ -420,7 +433,6 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       };
     }
     // Premove queue — every queued premove gets the amber highlight
-    const queuedPremoves = premovePromotion ? [...premoves, { from: premovePromotion.from, to: premovePromotion.to }] : premoves;
     for (const p of queuedPremoves) {
       styles[p.from] = {
         ...styles[p.from],
@@ -434,7 +446,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       };
     }
     return styles;
-  }, [lastMove, checkSquare, legalMoveSquares, selectedSquare, premoves, premovePromotion, isLiveView]);
+  }, [lastMove, checkSquare, legalMoveSquares, selectedSquare, queuedPremoves, isLiveView]);
 
   const getLiveClock = (player: "white" | "black") => {
     if (!game.last_move_at || !game.white_clock_ms || !game.black_clock_ms) return "—";
@@ -1033,6 +1045,44 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         },
         allowDragging: !gameEnded && !isSpectator && isLiveView && !isWaiting,
         squareStyles: squareStyles,
+        // chess.com-style premove ghosts: faded piece on each premove
+        // destination. Non-ghost squares render the library default
+        // (width/height/squareStyles) so nothing else changes.
+        squareRenderer: ({ square, children }) => {
+          const pieceKey = premoveGhosts[square];
+          const Ghost = pieceKey ? customPieces[pieceKey as keyof typeof customPieces] : null;
+          return (
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                ...(Ghost ? { position: "relative" } : {}),
+                ...squareStyles[square],
+              }}
+            >
+              {children}
+              {Ghost && (
+                // pointer-events-none: taps/drags pass through to the square
+                // itself, so tap-chaining off the ghost square is unchanged
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    pointerEvents: "none",
+                    opacity: 0.45,
+                  }}
+                >
+                  <div style={{ width: "100%", height: "100%" }}>
+                    <Ghost />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        },
         showAnimations: false,
         animationDurationInMs: 0,
         showNotation: true,
@@ -1045,7 +1095,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       }}
     />
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [displayFen, isWhite, isSpectator, gameEnded, isLiveView, isWaiting, squareStyles, boardTheme, boardSize, onDrop, handlePieceClick, handleSquareClick]);
+  ), [displayFen, isWhite, isSpectator, gameEnded, isLiveView, isWaiting, squareStyles, premoveGhosts, boardTheme, boardSize, onDrop, handlePieceClick, handleSquareClick]);
 
   // ============ SHARED BOARD COLUMN ============
   const boardColumn = (topPlayer: any, bottomPlayer: any, showControls: boolean) => (

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Chessboard } from "react-chessboard";
 import { customPieces } from "@/lib/game/piece-styles";
+import { getPremoveGhosts } from "@/lib/game/premove-ghost";
 import { Chess } from "chess.js";
 import { Clock, Flag, ArrowLeft, Bot, Volume2, VolumeX, List, Palette, X, ChevronLeft, ChevronRight, MoreVertical, MessageCircle, RotateCcw, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -116,6 +117,18 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
   const captured = useMemo(() => getCapturedPieces(fen), [fen]);
   const checkSquare = useMemo(() => getCheckSquare(fen), [fen]);
 
+  // Queued premove chain (promotion premove keeps its FIFO slot inline)
+  const queuedPremoves = useMemo(
+    () => (premovePromotion ? [...premoves, { from: premovePromotion.from, to: premovePromotion.to }] : premoves),
+    [premoves, premovePromotion]
+  );
+
+  // chess.com-style ghost pieces: a faded copy of the piece that each
+  // queued premove will deliver, drawn on its destination square so the
+  // player can SEE the projected piece and knows they can tap it to
+  // chain the next hop.
+  const premoveGhosts = useMemo(() => getPremoveGhosts(fen, isPlayerWhite, queuedPremoves), [fen, isPlayerWhite, queuedPremoves]);
+
   const squareStyles = useMemo(() => {
     const styles: Record<string, React.CSSProperties> = {};
     if (lastMove) {
@@ -142,7 +155,6 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
       };
     }
     // Premove queue highlight — amber/orange on every queued premove
-    const queuedPremoves = premovePromotion ? [...premoves, { from: premovePromotion.from, to: premovePromotion.to }] : premoves;
     for (const p of queuedPremoves) {
       styles[p.from] = {
         ...styles[p.from],
@@ -156,7 +168,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
       };
     }
     return styles;
-  }, [lastMove, checkSquare, legalMoveSquares, selectedSquare, premoves, premovePromotion, isLiveView]);
+  }, [lastMove, checkSquare, legalMoveSquares, selectedSquare, queuedPremoves, isLiveView]);
 
   // Live clock tick
   useEffect(() => {
@@ -721,6 +733,44 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
         },
         allowDragging: !gameEnded && isLiveView,
         squareStyles: squareStyles,
+        // chess.com-style premove ghosts: faded piece on each premove
+        // destination. Non-ghost squares render the library default
+        // (width/height/squareStyles) so nothing else changes.
+        squareRenderer: ({ square, children }) => {
+          const pieceKey = premoveGhosts[square];
+          const Ghost = pieceKey ? customPieces[pieceKey as keyof typeof customPieces] : null;
+          return (
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                ...(Ghost ? { position: "relative" } : {}),
+                ...squareStyles[square],
+              }}
+            >
+              {children}
+              {Ghost && (
+                // pointer-events-none: taps/drags pass through to the square
+                // itself, so tap-chaining off the ghost square is unchanged
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    pointerEvents: "none",
+                    opacity: 0.45,
+                  }}
+                >
+                  <div style={{ width: "100%", height: "100%" }}>
+                    <Ghost />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        },
         showAnimations: false,
         animationDurationInMs: 0,
         showNotation: true,
@@ -733,7 +783,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
       }}
     />
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [displayFen, isPlayerWhite, gameEnded, isLiveView, squareStyles, boardTheme, boardSize, onDrop, handlePieceClick, handleSquareClick]);
+  ), [displayFen, isPlayerWhite, gameEnded, isLiveView, squareStyles, premoveGhosts, boardTheme, boardSize, onDrop, handlePieceClick, handleSquareClick]);
 
   // BUGFIX: this effect used to only update `reviewFen` and never touch
   // `lastMove`, so the purple "last move" highlight always showed the
