@@ -82,6 +82,17 @@ export function challengeAcceptedPayload(acceptorName: string): PushPayload {
   };
 }
 
+// Free Quick Match challenge accepted — deep-links straight to the board.
+// The challenger may be away from the app; clocks wait for them (join window).
+export function quickMatchAcceptedPayload(gameId: string, acceptorName: string): PushPayload {
+  return {
+    title: "Match accepted! ♟️",
+    body: `${acceptorName} accepted your Quick Match — get to the board, clocks wait 2 minutes!`,
+    url: `/game/${gameId}`,
+    tag: `quick-match-${gameId}`,
+  };
+}
+
 // Suppress turn notifications while the opponent is actively on the game
 // (their heartbeat updates last_seen every few seconds).
 export const TURN_ACTIVE_SUPPRESS_MS = 90_000;

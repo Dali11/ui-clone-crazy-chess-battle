@@ -101,8 +101,9 @@ export default async function ChallengePage({
       };
       const timeControl = `${challenge.initial_minutes}+${challenge.increment_seconds}`;
 
-      // Game still in progress — spectator landing
-      if (game.status === "playing") {
+      // Game still in progress — spectator landing ("waiting" = the 2-minute
+      // join window hasn't elapsed yet; the game is about to start)
+      if (game.status === "playing" || game.status === "waiting") {
         return (
           <ChallengeTaken
             gameId={challenge.game_id}

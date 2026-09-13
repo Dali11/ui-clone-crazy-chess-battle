@@ -41,7 +41,8 @@ export default function ChallengeAccept({
         throw new Error(data.error || "Failed to accept challenge");
       }
 
-      // Redirect to the game
+      // Redirect to the game — as a player when we accepted it, as a
+      // spectator when someone beat us to it (the race the API resolves).
       router.push(`/game/${data.gameId}`);
     } catch (err: any) {
       setError(err.message || "Something went wrong");

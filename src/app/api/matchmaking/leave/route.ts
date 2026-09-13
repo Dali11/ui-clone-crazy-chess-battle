@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { removeQuickMatchAnnounceMessages } from "@/lib/chat/challenge-messages";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -25,21 +24,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Cancel any auto-posted announce challenge links — the search is over.
-    // (Manual challenge links are untouched.)
-    const { data: cancelled } = await admin
-      .from("challenges")
-      .update({ status: "cancelled" })
-      .eq("challenger_id", user.id)
-      .eq("source", "quick_match_announce")
-      .eq("status", "pending")
-      .select("id");
-
-    // Their announce messages disappear from the country room too.
-    for (const c of cancelled ?? []) {
-      await removeQuickMatchAnnounceMessages(admin, c.id);
-    }
-
+    // The announce link SURVIVES the search ending. Players who see the
+    // room post / push notification can still tap in for the full 10-minute
+    // link window — the challenge expires on its own at expires_at (the
+    // cleanup cron sweeps it), or cancels when the challenger starts another
+    // game. Killing it here made every link "expire" the second the 60s
+    // search ended, which is exactly what players complained about.
     return NextResponse.json({ success: true });
   } catch (e: any) {
     return NextResponse.json(

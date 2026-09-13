@@ -33,6 +33,7 @@ export default function PlayPage() {
   const [rated, setRated] = useState(true);
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [announced, setAnnounced] = useState(false);
+  const [announceChallengeId, setAnnounceChallengeId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [challengeUrl, setChallengeUrl] = useState<string | null>(null);
   const [creatingChallenge, setCreatingChallenge] = useState(false);
@@ -48,6 +49,36 @@ export default function PlayPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
+
+  // Live subscription to the auto-posted announce challenge: the Quick
+  // Match link stays tappable for its full 10-minute window even after the
+  // search ends, so we keep listening for an acceptance the whole time the
+  // player is on this page and drop them straight into the game.
+  useEffect(() => {
+    if (!announceChallengeId) return;
+    const channel = supabase
+      .channel(`announce:${announceChallengeId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "challenges",
+          filter: `id=eq.${announceChallengeId}`,
+        },
+        (payload: any) => {
+          const rec = payload.new;
+          if (rec.status === "accepted" && rec.game_id) {
+            cleanupSearch();
+            router.push(`/game/${rec.game_id}`);
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [announceChallengeId, supabase, router]);
 
   const cleanupSearch = () => {
     if (matchChannelRef.current) {
@@ -123,6 +154,7 @@ export default function PlayPage() {
         })
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => {
+            if (d?.challengeId) setAnnounceChallengeId(d.challengeId);
             if (d?.posted) setAnnounced(true);
           })
           .catch(() => {});

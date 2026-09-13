@@ -26,7 +26,7 @@ import {
 } from "@/lib/game/draughts-engine";
 import {
   Flag, Timer, ArrowLeft, X, MessageCircle, Handshake,
-  ChevronLeft, ChevronRight, Swords, Disc3, Clock,
+  ChevronLeft, ChevronRight, Swords, Disc3, Clock, Share2, Check,
 } from "lucide-react";
 
 // Map DB turn ('white'/'black') to engine Color ('w'/'b')
@@ -82,6 +82,24 @@ export default function DraughtsGameClient({
   // League XP earned from this game (shown on the end-of-game screen).
   const [xpEarned, setXpEarned] = useState<number | null>(null);
   const [activeSheet, setActiveSheet] = useState<"chat" | "menu" | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+  const handleShare = async () => {
+    const url = typeof window !== "undefined" ? window.location.href : `https://crazychessbattles.live/draughts/game/${game.id}`;
+    const shareData = { title: "Crazy Chess Battles", text: `Watch ${whiteName} vs ${blackName} live on Crazy Chess Battles!`, url };
+    try {
+      if (typeof navigator !== "undefined" && (navigator as any).share) {
+        await (navigator as any).share(shareData);
+        return;
+      }
+    } catch {
+      // User cancelled or share failed — fall through to clipboard
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {}
+  };
   const [drawOffer, setDrawOffer] = useState<null | "pending" | "offer">(null); // null = no offer, "pending" = we sent, "offer" = opponent sent
   const [previewUserId, setPreviewUserId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -613,7 +631,13 @@ export default function DraughtsGameClient({
               <Disc3 className="w-3.5 h-3.5 text-ccb-primary" />
               <span className="text-sm font-bold text-ccb-text">Crazy Draughts Battles ⚔️</span>
             </div>
-            <div className="w-7" />
+            <button
+              onClick={handleShare}
+              className="p-1.5 -mr-1.5 text-ccb-muted hover:text-ccb-primary"
+              title="Share this game"
+            >
+              {shareCopied ? <Check className="w-4 h-4 text-ccb-success" /> : <Share2 className="w-4 h-4" />}
+            </button>
           </div>
 
           {/* Connecting indicator */}
@@ -877,10 +901,13 @@ export default function DraughtsGameClient({
               <MessageCircle className="w-4 h-4 text-ccb-muted" />
               <span className="text-sm font-medium">Chat</span>
               {unreadCount > 0 && (
-                <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none">
+                <span className="ml-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
+              <button onClick={handleShare} className="ml-auto flex items-center gap-1 text-xs text-ccb-muted hover:text-ccb-primary transition-colors">
+                {shareCopied ? <><Check className="w-3.5 h-3.5 text-ccb-success" /> Copied!</> : <><Share2 className="w-3.5 h-3.5" /> Share</>}
+              </button>
             </div>
             <GameChat
               gameId={game.id}

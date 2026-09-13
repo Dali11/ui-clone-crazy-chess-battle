@@ -6,7 +6,7 @@ import { Chessboard } from "react-chessboard";
 import { customPieces } from "@/lib/game/piece-styles";
 import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
-import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Swords, RefreshCw, Radio, Wifi, WifiOff } from "lucide-react";
+import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Swords, RefreshCw, Radio, Wifi, WifiOff, Share2, Check } from "lucide-react";
 import Link from "next/link";
 import { getCapturedPieces, getCheckSquare, getSeamlessBoardStyles } from "@/lib/game/board-helpers";
 import { playSound, detectMoveSound, setSoundEnabled } from "@/lib/game/sound";
@@ -819,6 +819,25 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     setSoundEnabled(newVal);
   };
 
+  const [shareCopied, setShareCopied] = useState(false);
+  const handleShare = async () => {
+    const url = typeof window !== "undefined" ? window.location.href : `https://crazychessbattles.live/game/${gameId}`;
+    const shareData = { title: "Crazy Chess Battles", text: `Watch ${whiteName} vs ${blackName} live on Crazy Chess Battles!`, url };
+    try {
+      if (typeof navigator !== "undefined" && (navigator as any).share) {
+        await (navigator as any).share(shareData);
+        return;
+      }
+    } catch {
+      // User cancelled or share failed — fall through to clipboard
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {}
+  };
+
   // Auto-execute the premove queue when it becomes our turn — chess.com
   // behavior: only the FIRST queued premove plays; the rest stay queued for
   // our subsequent turns as the opponent replies. If the first premove is
@@ -1043,6 +1062,13 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         </div>
         <div className="flex items-center gap-0.5">
           <ConnectionStatus quality={connectionQuality} />
+          <button
+            onClick={handleShare}
+            className="p-1.5 text-ccb-muted hover:text-ccb-primary"
+            title="Share this game"
+          >
+            {shareCopied ? <Check className="w-4 h-4 text-ccb-success" /> : <Share2 className="w-4 h-4" />}
+          </button>
           <button
             onClick={() => window.location.reload()}
             className="p-1.5 -mr-1 text-ccb-muted hover:text-ccb-primary"
@@ -1316,6 +1342,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
               <span>Sound</span>
               {soundOn ? <Volume2 className="w-4 h-4 text-ccb-primary" /> : <VolumeX className="w-4 h-4 text-ccb-muted" />}
             </button>
+            <button onClick={handleShare} className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-ccb-surface transition-colors text-sm">
+              <span>{shareCopied ? "Link Copied!" : "Share Game"}</span>
+              {shareCopied ? <Check className="w-4 h-4 text-ccb-success" /> : <Share2 className="w-4 h-4 text-ccb-muted" />}
+            </button>
             <button onClick={() => { setActiveSheet("theme"); }} className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-ccb-surface transition-colors text-sm">
               <span>Board Theme</span>
               <Palette className="w-4 h-4 text-ccb-muted" />
@@ -1343,6 +1373,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
             <Link href="/history" className="text-sm text-ccb-muted hover:text-ccb-primary flex items-center gap-1">
               <Clock className="w-4 h-4" /> History
             </Link>
+            <button onClick={handleShare} className="text-sm text-ccb-muted hover:text-ccb-primary flex items-center gap-1">
+              {shareCopied ? <><Check className="w-4 h-4 text-ccb-success" /> Copied!</> : <><Share2 className="w-4 h-4" /> Share</>}
+            </button>
           </div>
           <div className="flex items-center gap-1.5">
             {isSpectator && <span className="flex items-center gap-1 text-xs text-ccb-muted"><Eye className="w-3.5 h-3.5" />Spectating</span>}

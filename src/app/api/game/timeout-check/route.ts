@@ -74,7 +74,9 @@ export async function POST(req: NextRequest) {
           .in("status", ["playing", "draw_armageddon"])
           .limit(1)
           .maybeSingle();
-        if (battle) {
+        // Battles start early; free challenge games (Quick Match accept)
+        // start early too. Tournament games keep their synchronized start.
+        if (battle || !game.tournament_id) {
           const nowIso = new Date().toISOString();
           await admin
             .from("games")
