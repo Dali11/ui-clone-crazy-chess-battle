@@ -205,12 +205,12 @@ begin
            count(*)::int as games_played
     from (
       -- byes: 1 point, 1 win, 1 game
-      select pr->>'bye' as player_id, 'win'::text as res, 1.0::real as pts
+      select (pr->>'bye')::uuid as player_id, 'win'::text as res, 1.0::real as pts
       from tournament_rounds r, jsonb_array_elements(r.pairings) pr
       where r.tournament_id = p_tournament_id and pr->>'bye' is not null
       union all
       -- decisive/draw results: one row per PLAYER
-      select pr->>'white' as player_id,
+      select (pr->>'white')::uuid as player_id,
              case pr->>'result' when 'white' then 'win' when 'black' then 'loss' else 'draw' end,
              case pr->>'result' when 'white' then 1.0::real when 'black' then 0.0::real else 0.5::real end
       from tournament_rounds r, jsonb_array_elements(r.pairings) pr
@@ -218,7 +218,7 @@ begin
         and pr->>'result' is not null
         and pr->>'white' is not null and pr->>'black' is not null
       union all
-      select pr->>'black' as player_id,
+      select (pr->>'black')::uuid as player_id,
              case pr->>'result' when 'black' then 'win' when 'white' then 'loss' else 'draw' end,
              case pr->>'result' when 'black' then 1.0::real when 'white' then 0.0::real else 0.5::real end
       from tournament_rounds r, jsonb_array_elements(r.pairings) pr
