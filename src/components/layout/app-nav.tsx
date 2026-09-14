@@ -11,6 +11,7 @@ import {
 import NotificationBell from "./notification-bell";
 import { useCurrency } from "@/hooks/use-currency";
 import { useChatsUnread } from "@/hooks/use-chats-unread";
+import { Users } from "lucide-react";
 
 interface Profile {
   username: string | null;
@@ -69,6 +70,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/league", label: "Leagues", icon: Crown },
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/chats", label: "Chats", icon: MessageCircle },
+    { href: "/friends", label: "Friends", icon: Users },
   ];
 
   // Menu — categorized, ordered by relevance
@@ -89,6 +91,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         { href: "/tournaments", label: "Tournaments", icon: Trophy },
         { href: "/live", label: "Live Matches", icon: Radio },
         { href: "/chats", label: "Chats", icon: MessageCircle },
+        { href: "/friends", label: "Friends", icon: Users },
       ],
     },
     {

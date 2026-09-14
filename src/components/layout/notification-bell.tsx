@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, Check, X, Swords, Trophy, MessageSquare } from "lucide-react";
+import { Bell, Check, X, Swords, Trophy, MessageSquare, UserPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Notification {
@@ -101,7 +101,26 @@ export default function NotificationBell() {
   const getIcon = (type: string) => {
     if (type === "rematch" || type === "rematch_accepted" || type === "rematch_declined") return Swords;
     if (type === "tournament") return Trophy;
+    if (type === "friend_request" || type === "friend_accepted") return UserPlus;
+    if (type === "challenge_received") return Swords;
     return Bell;
+  };
+
+  const respondFriend = async (requestId: string, notifId: string, action: "accept" | "decline") => {
+    try {
+      await fetch("/api/friends/respond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, action }),
+      });
+      await fetch("/api/notifications/mark-read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: notifId }),
+      });
+      setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {}
   };
 
   const formatTime = (dateStr: string) => {
@@ -187,6 +206,34 @@ export default function NotificationBell() {
                               <X className="w-3 h-3" /> Decline
                             </button>
                           </div>
+                        )}
+
+                        {/* Friend request — accept/decline inline */}
+                        {notif.type === "friend_request" && notif.data?.requestId && (
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => respondFriend(notif.data.requestId, notif.id, "accept")}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+                            >
+                              <Check className="w-3 h-3" /> Accept
+                            </button>
+                            <button
+                              onClick={() => respondFriend(notif.data.requestId, notif.id, "decline")}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                            >
+                              <X className="w-3 h-3" /> Decline
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Friend accepted — go to friends */}
+                        {notif.type === "friend_accepted" && (
+                          <a
+                            href="/friends"
+                            className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-ccb-primary hover:text-ccb-primary/80"
+                          >
+                            <UserPlus className="w-3 h-3" /> See your friends →
+                          </a>
                         )}
 
                         {/* Rematch accepted — link to game */}

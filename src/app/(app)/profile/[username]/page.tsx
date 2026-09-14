@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Image from "next/image";
+import AddFriendButton from "@/components/profile/add-friend-button";
 
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
@@ -106,6 +107,9 @@ export default async function ProfilePage({
             <div className="flex items-center gap-3 mt-2">
               <span className={`text-lg font-bold ${tier.color}`}>{profile.rating}</span>
               <span className={`badge bg-ccb-surface ${tier.color}`}>{tier.label}</span>
+            </div>
+            <div className="mt-3">
+              <AddFriendButton userId={profile.id} />
             </div>
           </div>
         </div>

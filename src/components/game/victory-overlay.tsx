@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Trophy, Handshake, Frown, RefreshCw, Home, Swords, ScanSearch, Clock, Wallet, Check, X, Loader2, Zap } from "lucide-react";
+import { Trophy, Handshake, Frown, RefreshCw, Home, Swords, ScanSearch, Clock, Wallet, Check, X, Loader2, Zap, UserPlus, UserCheck } from "lucide-react";
 import FireworksCanvas from "./fireworks-canvas";
 import AdSlot, { type AdPlacement } from "@/components/ads/ad-slot";
 import { moneySymbol } from "@/lib/geo/format";
@@ -42,6 +42,8 @@ interface VictoryOverlayProps {
   incomingRematchStake?: number;
   incomingRematchError?: string;
   countryCode?: string | null;
+  /** Auth user id of the opponent — shows an "Add friend" pill post-game. */
+  opponentId?: string | null;
   newGameLabel?: string;
   playAgainLabel?: string;
   lobbyHref?: string;
@@ -53,6 +55,38 @@ interface VictoryOverlayProps {
   armageddonForfeiting?: boolean;
   onStartArmageddon?: () => void;
   onResignArmageddon?: () => void;
+}
+
+// ─── Add-friend pill (self-contained; shows only when opponentId set) ───
+function useFriendPill(visible: boolean, opponentId: string | null) {
+  const [state, setState] = useState<"hidden" | "none" | "pending" | "accepted" | "busy" | "error">("hidden");
+
+  useEffect(() => {
+    if (!visible || !opponentId) { setState("hidden"); return; }
+    let alive = true;
+    fetch(`/api/friends/status?userId=${opponentId}`)
+      .then((r) => (r.ok ? r.json() : { status: "none" }))
+      .then((d) => { if (alive) setState(d.status === "self" || d.status === "pending_in" ? "hidden" : (d.status === "accepted" ? "accepted" : "none")); })
+      .catch(() => { if (alive) setState("none"); });
+    return () => { alive = false; };
+  }, [visible, opponentId]);
+
+  const add = async () => {
+    if (!opponentId) return;
+    setState("busy");
+    try {
+      const res = await fetch("/api/friends/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: opponentId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setState(data.status === "accepted" ? "accepted" : "pending");
+      else setState("error");
+    } catch { setState("error"); }
+  };
+
+  return { state, add };
 }
 
 export default function VictoryOverlay({
@@ -81,6 +115,7 @@ export default function VictoryOverlay({
   incomingRematchStake = 0,
   countryCode,
   incomingRematchError,
+  opponentId = null,
   newGameLabel = "New Game",
   playAgainLabel = "Play Again",
   lobbyHref = "/play",
@@ -121,6 +156,8 @@ export default function VictoryOverlay({
   const headline = isWin ? "Victory" : isDraw ? "Draw" : isAbort ? "Aborted" : "Defeat";
 
   const hasEarnings = (isWin && (moneyEarned !== undefined && moneyEarned > 0));
+  const { state: friendState, add: addFriend } = useFriendPill(visible && !isAbort, opponentId);
+
   const isRematchIdle = !!onRematch && (rematchState.status === "idle" || rematchState.status === "declined" || rematchState.status === "cancelled" || rematchState.status === "expired");
 
   return (
@@ -278,6 +315,31 @@ export default function VictoryOverlay({
           <div className="mb-3 px-4 py-3 rounded-xl flex items-center justify-center gap-2" style={{ backgroundColor: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)" }}>
             <X className="w-4 h-4 text-red-400" />
             <span className="text-sm font-medium text-red-400">Opponent declined the rematch</span>
+          </div>
+        )}
+
+        {/* Add opponent as friend */}
+        {friendState !== "hidden" && (
+          <div className="mb-2 flex justify-center">
+            {friendState === "accepted" ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-400" style={{ backgroundColor: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)" }}>
+                <UserCheck className="w-3.5 h-3.5" /> You&apos;re friends
+              </span>
+            ) : friendState === "pending" ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-white/50" style={{ border: "1px solid rgba(255,255,255,0.15)" }}>
+                <UserCheck className="w-3.5 h-3.5" /> Friend request sent
+              </span>
+            ) : (
+              <button
+                onClick={addFriend}
+                disabled={friendState === "busy"}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold text-white/85 transition-colors hover:text-white disabled:opacity-60"
+                style={{ border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.04)" }}
+              >
+                {friendState === "busy" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+                {friendState === "error" ? "Try again" : "Add opponent as friend"}
+              </button>
+            )}
           </div>
         )}
 

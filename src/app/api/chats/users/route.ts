@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     const admin = createAdminClient();
     const { data: users } = await admin
       .from("profiles")
-      .select("id, username, avatar_url")
+      .select("id, username, display_name, avatar_url, rating")
       .ilike("username", `%${q}%`)
       .neq("id", user.id)
       .limit(10);

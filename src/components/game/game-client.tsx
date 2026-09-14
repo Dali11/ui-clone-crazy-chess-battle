@@ -1517,6 +1517,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           subtitle={`${game.time_control} · ${isTournamentGame ? "Tournament" : game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
           playerNames={{ white: whiteName, black: blackName }}
           winnerSide={game.winner as "white" | "black" | null}
+          opponentId={isSpectator ? null : (isWhite ? game.black_player_id : game.white_player_id)}
           lobbyHref={isTournamentGame ? `/tournament/${tournamentId}` : isBattleGame ? "/battles" : "/play"}
           newGameLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "New Game"}
           playAgainLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "Play Again"}
@@ -1576,6 +1577,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         subtitle={`${game.time_control} · ${isTournamentGame ? "Tournament" : game.rated ? "Ranked" : "Casual"}${isBattleGame ? " · Staked" : ""}`}
         playerNames={{ white: whiteName, black: blackName }}
         winnerSide={game.winner as "white" | "black" | null}
+          opponentId={isSpectator ? null : (isWhite ? game.black_player_id : game.white_player_id)}
         lobbyHref={isTournamentGame ? `/tournament/${tournamentId}` : isBattleGame ? "/battles" : "/play"}
         newGameLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "New Game"}
         playAgainLabel={isTournamentGame ? "Back to Tournament" : isBattleGame ? "New Match" : "Play Again"}

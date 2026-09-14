@@ -93,6 +93,26 @@ export function quickMatchAcceptedPayload(gameId: string, acceptorName: string):
   };
 }
 
+// Friend request received
+export function friendRequestPayload(fromUsername: string, senderId: string): PushPayload {
+  return {
+    title: "New friend request 👥",
+    body: fromUsername ? `${fromUsername} wants to be your friend` : "Someone wants to be your friend",
+    url: "/friends",
+    tag: `friend-request-${senderId}`,
+  };
+}
+
+// Friend request accepted
+export function friendAcceptedPayload(acceptorName: string, acceptorId: string): PushPayload {
+  return {
+    title: "Friend request accepted 🎉",
+    body: acceptorName ? `${acceptorName} is now your friend — challenge them anytime!` : "You have a new friend",
+    url: "/friends",
+    tag: `friend-accepted-${acceptorId}`,
+  };
+}
+
 // Suppress turn notifications while the opponent is actively on the game
 // (their heartbeat updates last_seen every few seconds).
 export const TURN_ACTIVE_SUPPRESS_MS = 90_000;
