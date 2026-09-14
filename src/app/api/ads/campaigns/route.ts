@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { validateDraft, adPriceForWeeks, type CampaignDraft } from "@/lib/ads/direct-pricing";
+import { getServerCurrency } from "@/lib/geo/server-currency";
 
 export const dynamic = "force-dynamic";
 
@@ -51,10 +52,17 @@ export async function POST(req: Request) {
 
   // Wallet balance check (debit_wallet also enforces it, but a clean
   // pre-check gives a friendlier error than a raw RPC failure).
-  const { data: profile } = await admin.from("profiles").select("wallet_balance").eq("id", user.id).single();
+  const { data: profile } = await admin.from("profiles").select("wallet_balance,country").eq("id", user.id).single();
   if ((profile?.wallet_balance || 0) < price) {
     return NextResponse.json({ error: `Insufficient wallet balance — need MK${price.toLocaleString()}. Top up your wallet first.` }, { status: 400 });
   }
+
+  // Every advertiser is quoted and charged in their own currency — the
+  // wallet ledger stays MWK internally (platform's base unit, same as
+  // league payouts), but we record the prevailing forex-converted amount
+  // for the audit trail, same pattern as league payout FX snapshots.
+  const buyerCurrency = await getServerCurrency(profile?.country);
+  const localAmount = Math.round(price * buyerCurrency.rate);
 
   const { error: debitErr } = await admin.rpc("debit_wallet", { p_user_id: user.id, p_amount: price });
   if (debitErr) return NextResponse.json({ error: "Failed to debit wallet. Try again." }, { status: 500 });
@@ -87,8 +95,18 @@ export async function POST(req: Request) {
     method: "ad_purchase",
     amount: -price,
     reference: `ad_campaign:${campaign.id}`,
-    admin_notes: `Direct ad campaign purchase (${body.weeks}w @ MK${price})`,
+    admin_notes: buyerCurrency.currencyCode === "MWK"
+      ? `Direct ad campaign purchase (${body.weeks}w @ MK${price})`
+      : `Direct ad campaign purchase (${body.weeks}w @ MK${price} = ${buyerCurrency.currencySymbol}${localAmount.toLocaleString()} at ${buyerCurrency.rate.toFixed(4)} fx)`,
   }).then((r) => { if (r.error) console.error("[ads/campaigns] ledger insert failed:", r.error.message); });
 
-  return NextResponse.json({ campaign: { id: campaign.id, status: "pending_review", price_mwk: price } });
+  return NextResponse.json({
+    campaign: {
+      id: campaign.id,
+      status: "pending_review",
+      price_mwk: price,
+      charged_local: localAmount,
+      currency_code: buyerCurrency.currencyCode,
+    },
+  });
 }

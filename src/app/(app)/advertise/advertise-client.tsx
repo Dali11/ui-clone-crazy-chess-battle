@@ -8,8 +8,9 @@
 // Backend: GET /api/ads/config (pricing), GET/POST /api/ads/campaigns.
 
 import { useCallback, useEffect, useState } from "react";
-import { BarChart3, ExternalLink, Eye, Loader2, Megaphone, MousePointerClick } from "lucide-react";
+import { BarChart3, ExternalLink, Eye, Loader2, MousePointerClick } from "lucide-react";
 import { adTiers, type AdWeeks } from "@/lib/ads/direct-pricing";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Campaign {
   id: string;
@@ -29,8 +30,6 @@ interface Campaign {
   created_at: string;
 }
 
-const fmtMK = (n: number) => `MK${n.toLocaleString("en-MW")}`;
-
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   pending_review: { label: "In review", cls: "bg-yellow-500/15 text-yellow-500" },
   active: { label: "Live", cls: "bg-emerald-500/15 text-emerald-500" },
@@ -41,6 +40,7 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 };
 
 export default function AdvertiseClient() {
+  const { formatMoney } = useCurrency();
   const [enabled, setEnabled] = useState(false);
   const [tiers, setTiers] = useState<{ weeks: number; priceMwk: number }[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -99,7 +99,10 @@ export default function AdvertiseClient() {
       if (!res.ok) {
         setError(d.error || "Couldn't create the campaign. Try again.");
       } else {
-        setSuccess(`Campaign submitted — paid ${fmtMK(d.campaign.price_mwk)} from your wallet. We'll review it shortly.`);
+        const charged = d.campaign.currency_code && d.campaign.currency_code !== "MWK"
+          ? new Intl.NumberFormat("en", { style: "currency", currency: d.campaign.currency_code, maximumFractionDigits: 0 }).format(d.campaign.charged_local)
+          : `MK${d.campaign.price_mwk.toLocaleString()}`;
+        setSuccess(`Campaign submitted — paid ${charged} from your wallet. We'll review it shortly.`);
         setBusinessName(""); setHeadline(""); setBody(""); setImageUrl(""); setTargetUrl(""); setWeeks(1);
         refresh();
       }
@@ -120,14 +123,9 @@ export default function AdvertiseClient() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-ccb-primary/15 flex items-center justify-center">
-          <Megaphone className="w-5 h-5 text-ccb-primary" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-ccb-text">Advertise on Crazy Chess Battles</h1>
-          <p className="text-sm text-ccb-muted">Flat weekly rates. No bidding, no bots — real players, real clicks.</p>
-        </div>
+      <div>
+        <h1 className="text-xl font-bold text-ccb-text">Advertise on Crazy Chess Battles</h1>
+        <p className="text-sm text-ccb-muted">Flat weekly rates. No bidding, no bots — real players, real clicks.</p>
       </div>
 
       {!enabled ? (
@@ -151,7 +149,7 @@ export default function AdvertiseClient() {
               >
                 <p className="text-sm font-bold text-ccb-text">{t.weeks} {t.weeks === 1 ? "week" : "weeks"}</p>
                 <p className="text-xs text-ccb-muted">{t.weeks === 1 ? "full price" : t.weeks === 2 ? "5% off" : "12.5% off"}</p>
-                <p className="mt-1 text-base font-bold text-ccb-primary">{fmtMK(t.priceMwk)}</p>
+                <p className="mt-1 text-base font-bold text-ccb-primary">{formatMoney(t.priceMwk)}</p>
               </button>
             ))}
           </div>
@@ -209,7 +207,7 @@ export default function AdvertiseClient() {
               className="w-full rounded-md bg-ccb-primary px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Buy {weeks} {weeks === 1 ? "week" : "weeks"} — {fmtMK(tiers.find((t) => t.weeks === weeks)?.priceMwk || 0)} from wallet
+              Buy {weeks} {weeks === 1 ? "week" : "weeks"} — {formatMoney(tiers.find((t) => t.weeks === weeks)?.priceMwk || 0)} from wallet
             </button>
             <p className="text-[11px] text-ccb-muted">
               Paid from your CCB wallet balance. Every campaign is reviewed before it goes live — usually same day.
@@ -231,7 +229,7 @@ export default function AdvertiseClient() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-ccb-text truncate">{c.headline}</p>
-                    <p className="text-xs text-ccb-muted truncate">{c.business_name} · {c.weeks}w · {fmtMK(c.price_mwk)}</p>
+                    <p className="text-xs text-ccb-muted truncate">{c.business_name} · {c.weeks}w · {formatMoney(c.price_mwk)}</p>
                   </div>
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls}`}>{badge.label}</span>
                 </div>
