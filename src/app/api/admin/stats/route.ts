@@ -7,7 +7,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
  * GET /api/admin/stats
  *
  * Query params (all optional):
- *   range   - "1d" | "7d" | "30d" | "3m" | "6m" | "1y" | "all" (default "30d")
+ *   range   - "today" | "7d" | "30d" | "3m" | "6m" | "1y" | "all" (default "30d")
  *             Scopes the NEW range-based fields (rangeStats, revenueBreakdown, series).
  *             Does NOT affect the legacy top-level fields below — those stay all-time
  *             snapshots so the sidebar badges (pendingWithdrawals etc.) never change
@@ -16,15 +16,22 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
  *             revenueBreakdown, and series to users from that country.
  */
 
-const RANGE_MS: Record<string, number | null> = {
-  "1d": 24 * 60 * 60 * 1000,
-  "7d": 7 * 24 * 60 * 60 * 1000,
-  "30d": 30 * 24 * 60 * 60 * 1000,
-  "3m": 90 * 24 * 60 * 60 * 1000,
-  "6m": 180 * 24 * 60 * 60 * 1000,
-  "1y": 365 * 24 * 60 * 60 * 1000,
-  all: null,
-};
+// CAT is UTC+2 year-round (no DST) — a fixed offset is exact.
+// All day/week/month boundaries below anchor to CAT wall-clock, so "Today"
+// means midnight Blantyre/Lusaka time — NOT UTC midnight (= 02:00 CAT) and
+// NOT a rolling 24h window that spills into yesterday.
+const CAT_OFFSET_MS = 2 * 60 * 60 * 1000;
+
+/** Real UTC instant for a CAT wall-clock date/time. */
+function catInstant(year: number, month: number, day: number, hour = 0): Date {
+  return new Date(Date.UTC(year, month, day, hour) - CAT_OFFSET_MS);
+}
+
+/** CAT wall-clock date label (e.g. "14/9") for a UTC instant. */
+function catDayLabel(t: Date): string {
+  const c = new Date(t.getTime() + CAT_OFFSET_MS);
+  return `${c.getUTCDate()}/${c.getUTCMonth() + 1}`;
+}
 
 interface Bucket {
   start: Date;
@@ -33,46 +40,55 @@ interface Bucket {
 }
 
 function buildBuckets(range: string): Bucket[] {
-  const now = new Date();
+  const cat = new Date(Date.now() + CAT_OFFSET_MS); // CAT wall-clock (read via UTC getters)
+  const y = cat.getUTCFullYear();
+  const mo = cat.getUTCMonth();
+  const d = cat.getUTCDate();
+  const h = cat.getUTCHours();
   const buckets: Bucket[] = [];
 
-  if (range === "1d") {
-    const startHour = new Date(now);
-    startHour.setMinutes(0, 0, 0);
-    for (let i = 23; i >= 0; i--) {
-      const start = new Date(startHour.getTime() - i * 3600_000);
-      const end = new Date(start.getTime() + 3600_000);
-      buckets.push({ start, end, label: `${String(start.getHours()).padStart(2, "0")}:00` });
+  if (range === "today" || range === "1d") {
+    // "Today": midnight CAT → now, one bucket per elapsed CAT hour
+    // (the last bucket is the current, partial hour). No yesterday spillover.
+    for (let i = 0; i <= h; i++) {
+      const start = catInstant(y, mo, d, i);
+      buckets.push({ start, end: new Date(start.getTime() + 3600_000), label: `${String(i).padStart(2, "0")}:00` });
     }
-  } else if (range === "7d" || range === "30d") {
+    return buckets;
+  }
+
+  if (range === "7d" || range === "30d") {
+    // Last N calendar days in CAT, today included as the final (partial) day.
     const days = range === "7d" ? 7 : 30;
-    const startDay = new Date(now);
-    startDay.setHours(0, 0, 0, 0);
+    const todayMidnight = catInstant(y, mo, d);
     for (let i = days - 1; i >= 0; i--) {
-      const start = new Date(startDay.getTime() - i * 86_400_000);
-      const end = new Date(start.getTime() + 86_400_000);
-      buckets.push({ start, end, label: `${start.getDate()}/${start.getMonth() + 1}` });
+      const start = new Date(todayMidnight.getTime() - i * 86_400_000);
+      buckets.push({ start, end: new Date(start.getTime() + 86_400_000), label: catDayLabel(start) });
     }
-  } else if (range === "3m" || range === "6m") {
+    return buckets;
+  }
+
+  if (range === "3m" || range === "6m") {
+    // Rolling weeks anchored to CAT midnight (last bucket covers today).
     const weeks = range === "3m" ? 13 : 26;
-    const startDay = new Date(now);
-    startDay.setHours(0, 0, 0, 0);
+    const todayMidnight = catInstant(y, mo, d);
     for (let i = weeks - 1; i >= 0; i--) {
-      const end = new Date(startDay.getTime() - i * 7 * 86_400_000 + 86_400_000);
+      const end = new Date(todayMidnight.getTime() + 86_400_000 - i * 7 * 86_400_000);
       const start = new Date(end.getTime() - 7 * 86_400_000);
-      buckets.push({ start, end, label: `${start.getDate()}/${start.getMonth() + 1}` });
+      buckets.push({ start, end, label: catDayLabel(start) });
     }
-  } else {
-    // "1y" or "all" — 12 monthly buckets
-    for (let i = 11; i >= 0; i--) {
-      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-      buckets.push({ start, end, label: start.toLocaleString("en-US", { month: "short" }) });
-    }
+    return buckets;
+  }
+
+  // "1y" / "all" — 12 monthly buckets on CAT calendar months.
+  for (let i = 11; i >= 0; i--) {
+    const start = catInstant(y, mo - i, 1);
+    const end = catInstant(y, mo - i + 1, 1);
+    const c = new Date(start.getTime() + CAT_OFFSET_MS);
+    buckets.push({ start, end, label: c.toLocaleString("en-US", { month: "short", timeZone: "UTC" }) });
   }
   return buckets;
 }
-
 
 function bucketIndexFor(buckets: Bucket[], dateStr: string): number {
   const t = new Date(dateStr).getTime();
@@ -100,9 +116,8 @@ export async function GET(req: NextRequest) {
     const range = searchParams.get("range") || "30d";
     const country = searchParams.get("country") || "all";
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayISO = today.toISOString();
+    const cat = new Date(Date.now() + CAT_OFFSET_MS);
+    const todayISO = catInstant(cat.getUTCFullYear(), cat.getUTCMonth(), cat.getUTCDate()).toISOString();
 
     // ───────────────────────── LEGACY ALL-TIME FIELDS ─────────────────────────
     // Unchanged from before — sidebar badges and other consumers depend on these

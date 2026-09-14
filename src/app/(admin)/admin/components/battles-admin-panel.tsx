@@ -55,7 +55,7 @@ interface CountryInfo {
 }
 
 const RANGES = [
-  { id: "1d", label: "1D" },
+  { id: "today", label: "Today" },
   { id: "7d", label: "7D" },
   { id: "30d", label: "30D" },
   { id: "3m", label: "3M" },

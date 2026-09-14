@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
  * status, country, and search filters.
  *
  * Query params:
- *   range    - "1d" | "7d" | "30d" | "3m" | "6m" | "1y" | "all" (default "7d")
+ *   range    - "today" | "7d" | "30d" | "3m" | "6m" | "1y" | "all" (default "7d")
  *   status   - "all" | "stuck" | "pending" | "playing" | "completed" |
  *              "disputed" | "cancelled" (default "all")
  *   country  - ISO 3166-1 alpha-2 country code, or "all" (default "all")
@@ -18,15 +18,24 @@ import { createClient } from "@/lib/supabase/server";
  *   limit    - page size (default 25, max 100)
  */
 
-const RANGE_MS: Record<string, number | null> = {
-  "1d": 24 * 60 * 60 * 1000,
-  "7d": 7 * 24 * 60 * 60 * 1000,
-  "30d": 30 * 24 * 60 * 60 * 1000,
-  "3m": 90 * 24 * 60 * 60 * 1000,
-  "6m": 180 * 24 * 60 * 60 * 1000,
-  "1y": 365 * 24 * 60 * 60 * 1000,
-  all: null,
-};
+// CAT is UTC+2 year-round (no DST) — a fixed offset is exact. Scopes are
+// CALENDAR-anchored (today starts at CAT midnight), not rolling windows:
+// "today" never spills into yesterday, "7d"/"30d" start at a CAT midnight.
+const CAT_OFFSET_MS = 2 * 60 * 60 * 1000;
+
+function rangeStartISO(range: string): string | null {
+  if (range === "all") return null;
+  const now = new Date();
+  const cat = new Date(now.getTime() + CAT_OFFSET_MS);
+  const midnight = Date.UTC(cat.getUTCFullYear(), cat.getUTCMonth(), cat.getUTCDate()) - CAT_OFFSET_MS;
+  const days = range === "today" || range === "1d" ? 0
+    : range === "7d" ? 6
+    : range === "30d" ? 29
+    : range === "3m" ? 89
+    : range === "6m" ? 179
+    : 364; // "1y"
+  return new Date(midnight - days * 86_400_000).toISOString();
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -46,8 +55,7 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "25", 10) || 25));
 
-    const rangeMs = RANGE_MS[range] ?? RANGE_MS["7d"];
-    const sinceISO = rangeMs ? new Date(Date.now() - rangeMs).toISOString() : null;
+    const sinceISO = rangeStartISO(range) ?? rangeStartISO("7d");
     const stuckCutoffISO = new Date(Date.now() - 60_000).toISOString();
 
     // Resolve player-id restriction from country/search filters

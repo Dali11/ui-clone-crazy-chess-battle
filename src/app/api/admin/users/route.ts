@@ -33,8 +33,14 @@ export async function GET(req: NextRequest) {
     const rows = await fetchAll(() =>
       admin.from("profiles")
         .select("created_at, is_banned, is_admin, games_played, wallet_balance, rating"));
-    const d7 = Date.now() - 7 * 864e5;
-    const d30 = Date.now() - 30 * 864e5;
+    // CAT (UTC+2, no DST) calendar-day anchoring — "new in 7d/30d" counts the
+    // last 7/30 calendar days including today (today starts at CAT midnight),
+    // matching the Overview/Battles panel scope semantics.
+    const CAT_OFFSET_MS = 2 * 60 * 60 * 1000;
+    const cat = new Date(Date.now() + CAT_OFFSET_MS);
+    const midnight = Date.UTC(cat.getUTCFullYear(), cat.getUTCMonth(), cat.getUTCDate()) - CAT_OFFSET_MS;
+    const d7 = midnight - 6 * 864e5;
+    const d30 = midnight - 29 * 864e5;
     const rated = rows.filter((r: any) => r.rating != null);
     const kpis = {
       total: rows.length,
