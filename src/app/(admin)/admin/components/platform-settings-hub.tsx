@@ -7,6 +7,7 @@ import {
   Search, SlidersHorizontal, Database, ChevronDown, ScrollText,
   ShieldCheck, DollarSign, Megaphone, Zap, Radio, Globe, Wallet, Gift } from "lucide-react";
 import PlatformSettingsPanel from "../platform-settings-panel";
+import DirectAdsPanel from "./direct-ads-panel";
 
 function PlatformSettingsHubBase() {
   const [settingsSection, setSettingsSection] = useState<string>("all");
@@ -29,6 +30,7 @@ function PlatformSettingsHubBase() {
     { id: "revenue_sweep", label: "Revenue Sweep", icon: Wallet, desc: "Weekly auto-withdrawal of platform fees" },
     { id: "membership", label: "Membership", icon: Crown, desc: "MK/month supporter plan — price, switch" },
     { id: "affiliate", label: "Affiliate", icon: Gift, desc: "25% referrer commissions on memberships" },
+    { id: "direct_ads", label: "Direct Ads", icon: Megaphone, desc: "Self-serve weekly banner ads — price, approve campaigns" },
     { id: "integrity", label: "Integrity", icon: ShieldCheck, desc: "Anti-cheat scan whitelist (owner/test accounts)" },
     { id: "overview", label: "Dashboard", icon: LayoutDashboard, desc: "Refresh, KPI cards" },
   ];
@@ -124,6 +126,7 @@ function PlatformSettingsHubBase() {
               {isExpanded && (
                 <div className="px-4 pb-4 border-t border-ccb-border/50">
                   <PlatformSettingsPanel section={s.id} />
+                  {s.id === "direct_ads" && <DirectAdsPanel />}
                 </div>
               )}
             </div>

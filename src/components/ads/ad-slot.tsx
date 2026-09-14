@@ -41,6 +41,15 @@ export type AdPlacement =
   | "leagues"
   | "leagues_inline";
 
+export interface DirectCreative {
+  id: string;
+  headline: string;
+  body: string | null;
+  image_url: string | null;
+  target_url: string;
+  business_name: string;
+}
+
 interface PlacementConfig {
   enabled: boolean;
   script: string;
@@ -48,6 +57,7 @@ interface PlacementConfig {
 
 interface AdsConfig {
   enabled: boolean;
+  directAds?: { enabled: boolean; pricePerWeekMwk: number };
   placements: Partial<Record<AdPlacement, PlacementConfig>>;
   frequency: AdFrequencyCaps;
 }
@@ -148,6 +158,7 @@ export default function AdSlot({
   className?: string;
 }) {
   const [script, setScript] = useState<string | null>(null);
+  const [direct, setDirect] = useState<DirectCreative | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const injected = useRef(false);
 
@@ -157,31 +168,53 @@ export default function AdSlot({
     let cancelled = false;
     loadAdsConfig().then(async (cfg) => {
       if (cancelled) return;
+      // Members are ad-free for BOTH direct ads and the network.
+      if (await isMemberSuppressed()) {
+        setScript(null);
+        setDirect(null);
+        return;
+      }
+      // Frequency router FIRST — direct ads obey the same caps; a mount
+      // is the impression opportunity either way.
+      if (routed.current) { setScript(null); setDirect(null); return; }
+      routed.current = true;
+      const decision = decideAd({
+        placement,
+        caps: cfg?.frequency || { minGapSec: 90, hourlyCap: 4, dailyCap: 12, resultsEveryN: 3 },
+        state: loadState(),
+        now: Date.now(),
+      });
+      saveState(decision.state);
+      if (!decision.show) { setScript(null); setDirect(null); return; }
+
+      // Direct campaigns take priority over the ad network (they're the
+      // paid inventory). One rotation fetch per mount, cached briefly.
+      if (cfg?.directAds?.enabled) {
+        try {
+          const r = await fetch("/api/ads/active", { cache: "no-store" });
+          if (r.ok) {
+            const d = await r.json();
+            if (!cancelled && d.campaign) {
+              setDirect(d.campaign);
+              fetch("/api/ads/track", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ campaignId: d.campaign.id, kind: "impression" }),
+              }).catch(() => {});
+              return;
+            }
+          }
+        } catch { /* fall through to network */ }
+      }
+      if (cancelled) return;
+      setDirect(null);
+
       const p = cfg?.placements?.[placement];
       if (!cfg?.enabled || !p?.enabled || !p.script) {
         setScript(null);
         return;
       }
-      // Members are ad-free — skip before the frequency router so the
-      // impression counters don't tick for them.
-      if (await isMemberSuppressed()) {
-        setScript(null);
-        return;
-      }
-      // Frequency router: nth-game gate, daily/hourly caps, min gap.
-      // ONE decision per mount — a mount is the impression opportunity,
-      // so the game counter counts every finished game even when the
-      // decision is "don't show".
-      if (routed.current) { setScript(null); return; }
-      routed.current = true;
-      const decision = decideAd({
-        placement,
-        caps: cfg.frequency,
-        state: loadState(),
-        now: Date.now(),
-      });
-      saveState(decision.state);
-      if (decision.show) setScript(p.script);
+      setScript(p.script);
     });
     return () => { cancelled = true; };
   }, [placement]);
@@ -241,6 +274,39 @@ export default function AdSlot({
     );
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, [script]);
+
+  if (direct) {
+    const trackClick = () => {
+      fetch("/api/ads/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaignId: direct.id, kind: "click" }),
+      }).catch(() => {});
+    };
+    return (
+      <div className={`w-full ${className}`} data-ad-placement={placement}>
+        <p className="text-[10px] uppercase tracking-widest text-ccb-muted/60 mb-0.5 text-center">Sponsored</p>
+        <a
+          href={direct.target_url}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          onClick={trackClick}
+          className="block w-full overflow-hidden rounded-lg border border-ccb-border bg-ccb-surface hover:border-ccb-primary/40 transition-colors"
+        >
+          {direct.image_url ? (
+            <img src={direct.image_url} alt={direct.business_name} className="w-full h-16 object-cover" />
+          ) : null}
+          <div className="px-3 py-2 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-ccb-text truncate">{direct.headline}</p>
+              {direct.body ? <p className="text-[11px] text-ccb-muted truncate">{direct.body}</p> : null}
+            </div>
+            <span className="shrink-0 text-[11px] font-bold text-ccb-primary">Visit →</span>
+          </div>
+        </a>
+      </div>
+    );
+  }
 
   if (!script) return null;
 

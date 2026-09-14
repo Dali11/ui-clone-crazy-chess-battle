@@ -33,6 +33,8 @@ export const LEDGER_METHOD_META: Record<string, LedgerMeta> = {
 
   // Tournament economy
   tournament_entry: { label: "Tournament Entry Fee", direction: "out" },
+  ad_purchase: { label: "Ad Campaign Purchase", direction: "out" },
+  ad_refund: { label: "Ad Campaign Refund", direction: "in" },
   tournament_payout: { label: "Tournament Prize", direction: "in" },
   tournament_creator_profit: { label: "Tournament Creator Earnings", direction: "in" },
   tournament_payout_reversal: { label: "Admin Correction — Prize Reversed", direction: "out" },

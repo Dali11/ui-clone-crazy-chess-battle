@@ -17,9 +17,20 @@ export async function GET() {
 
     const cfg = { ...DEFAULT_CONFIGS.ads, ...(data?.config || {}) };
 
+    const { data: directRow } = await admin
+      .from("platform_settings")
+      .select("config")
+      .eq("section", "direct_ads")
+      .maybeSingle();
+    const direct = { ...DEFAULT_CONFIGS.direct_ads, ...(directRow?.config || {}) };
+
     return NextResponse.json(
       {
         enabled: !!cfg.enabled,
+        directAds: {
+          enabled: !!direct.enabled,
+          pricePerWeekMwk: Number(direct.price_per_week_mwk || 5000),
+        },
         frequency: {
           minGapSec: Number(cfg.frequency_min_gap_sec ?? 90),
           hourlyCap: Number(cfg.frequency_hourly_cap ?? 4),

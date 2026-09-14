@@ -216,6 +216,13 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     // referrer MK2,500 to their wallet (ledgered, withdrawable).
     enabled: false,
   },
+  direct_ads: {
+    // Self-serve direct advertising: players buy flat weekly banner
+    // campaigns from their wallet; admin approves each campaign before
+    // it serves in every AdSlot. Replaces the Adsterra network.
+    enabled: false,
+    price_per_week_mwk: 5000,
+  },
 };
 
 // ─── Legacy table sync map ────────────────────────────────────────────────

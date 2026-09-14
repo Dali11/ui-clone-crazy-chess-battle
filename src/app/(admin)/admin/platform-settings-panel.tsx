@@ -44,6 +44,10 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
   affiliate: [
     { key: "enabled", label: "Affiliate commissions enabled", type: "toggle", group: "control", help: "ON = membership purchases pay the buyer's referrer 25% (MK2,500 per MK10,000 sale) to their wallet. Referral tracking works while OFF; only payouts pause" },
   ],
+  direct_ads: [
+    { key: "enabled", label: "Self-serve direct ads enabled", type: "toggle", group: "control", help: "ON = /advertise sells flat weekly campaigns from wallet balance; paid campaigns take priority over the ad network in every slot" },
+    { key: "price_per_week_mwk", label: "Price per week", type: "number", unit: "MWK", group: "control", help: "Base weekly rate. 2 weeks = 1.9x, 4 weeks = 3.5x (rounded to MK50)" },
+  ],
   membership: [
     { key: "enabled", label: "Membership purchases enabled", type: "toggle", group: "control", help: "Master switch — OFF hides the buy form and blocks the purchase API" },
     { key: "price_mwk", label: "Price", type: "number", unit: "MWK", group: "control", help: "Charged per period via Malawi mobile money (PayChangu). Revenue is swept weekly with fees" },
@@ -210,6 +214,7 @@ function formatValue(value: any, unit?: string): string {
 
 const SECTION_LABELS: Record<string, string> = {
   ads: "Ads",
+  direct_ads: "Direct Ads",
   overview: "Overview",
   deposits: "Deposits",
   withdrawals: "Withdrawals",
