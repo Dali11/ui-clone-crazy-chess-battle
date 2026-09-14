@@ -142,12 +142,19 @@ export default function VictoryOverlay({
     setShowButtons(false);
   }, [visible]);
 
-  if (!visible) return null;
-
   const isWin = outcome === "win";
   const isDraw = outcome === "draw";
   const isLoss = outcome === "loss";
   const isAbort = outcome === "abort";
+
+  // Rules-of-Hooks: this hook must run on every render regardless of
+  // `visible`, otherwise the hidden->visible transition (e.g. right when
+  // a game ends) calls a different number of hooks between renders and
+  // React throws "Rendered fewer hooks than expected" (minified #300).
+  // useFriendPill itself no-ops internally when its `visible` arg is false.
+  const { state: friendState, add: addFriend } = useFriendPill(visible && !isAbort, opponentId);
+
+  if (!visible) return null;
 
   const accent = isWin ? "#a78bfa" : isDraw ? "#94a3b8" : isAbort ? "#64748b" : "#f87171";
   const accentBg = isWin ? "rgba(167,139,250,0.12)" : isDraw ? "rgba(148,163,184,0.1)" : isAbort ? "rgba(100,116,139,0.1)" : "rgba(248,113,113,0.1)";
@@ -156,7 +163,6 @@ export default function VictoryOverlay({
   const headline = isWin ? "Victory" : isDraw ? "Draw" : isAbort ? "Aborted" : "Defeat";
 
   const hasEarnings = (isWin && (moneyEarned !== undefined && moneyEarned > 0));
-  const { state: friendState, add: addFriend } = useFriendPill(visible && !isAbort, opponentId);
 
   const isRematchIdle = !!onRematch && (rematchState.status === "idle" || rematchState.status === "declined" || rematchState.status === "cancelled" || rematchState.status === "expired");
 

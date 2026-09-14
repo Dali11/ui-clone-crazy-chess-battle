@@ -89,12 +89,6 @@ export function ErrorPage({
         }}
       />
 
-      {error && (
-        <div style={{position:"fixed",top:0,left:0,right:0,background:"#000",color:"#0f0",fontSize:10,padding:8,zIndex:9999,maxHeight:"40vh",overflow:"auto",textAlign:"left",fontFamily:"monospace"}}>
-          DEBUG: {error.message}
-          <pre>{error.stack}</pre>
-        </div>
-      )}
       <div className="relative z-10 text-center max-w-md w-full animate-fade-in">
         {/* Chess piece with glow */}
         <div className="relative inline-block mb-8">
