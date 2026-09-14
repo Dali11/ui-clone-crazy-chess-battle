@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { isChunkError, recoverFromChunkError } from "@/components/ChunkErrorRecovery";
 
 type ErrorVariant = "404" | "500" | "error" | "offline";
 
@@ -53,7 +54,16 @@ export function ErrorPage({
   const config = VARIANTS[variant];
 
   useEffect(() => {
-    if (error) console.error("[error-page]", error);
+    if (!error) return;
+    console.error("[error-page]", error);
+    // Stale-bundle error (deploy rotated the chunk hashes out from under
+    // this open tab): auto-reload for a fresh bundle instead of showing
+    // the scary fallback screen. React funnels next/dynamic import
+    // failures straight into this boundary — they never reach the
+    // window-level listener in ChunkErrorRecovery, so it's replicated here.
+    if (isChunkError(error.message)) {
+      recoverFromChunkError();
+    }
   }, [error]);
 
   const title = customTitle || config.title;

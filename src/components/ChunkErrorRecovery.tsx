@@ -17,7 +17,14 @@ import { useEffect } from "react";
 const RELOAD_GUARD_KEY = "ccb_chunk_reload_guard";
 const RELOAD_GUARD_TTL_MS = 15_000;
 
-function isChunkError(message: string | undefined | null): boolean {
+// Exported so error.tsx / ErrorPage can run the same detection: Next.js
+// routes dynamic-import (next/dynamic) chunk failures into the nearest
+// React error boundary as a thrown render error — they never reach
+// window's 'error'/'unhandledrejection' listeners below. Without this,
+// a stale tab hitting a page with a next/dynamic component (e.g.
+// /play/computer's ssr:false chess board) during a deploy shows the
+// scary "Something went wrong" screen instead of silently recovering.
+export function isChunkError(message: string | undefined | null): boolean {
   if (!message) return false;
   return (
     /ChunkLoadError/i.test(message) ||
@@ -27,7 +34,7 @@ function isChunkError(message: string | undefined | null): boolean {
   );
 }
 
-function recoverFromChunkError() {
+export function recoverFromChunkError() {
   try {
     const last = sessionStorage.getItem(RELOAD_GUARD_KEY);
     const now = Date.now();
