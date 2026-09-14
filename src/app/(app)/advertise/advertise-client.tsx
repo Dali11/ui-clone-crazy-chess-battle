@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { BarChart3, ExternalLink, Eye, Loader2, MousePointerClick } from "lucide-react";
-import { adTiers, type AdWeeks } from "@/lib/ads/direct-pricing";
+import { adTiers, AD_TARGET_COUNTRIES, type AdWeeks } from "@/lib/ads/direct-pricing";
 import { useCurrency } from "@/hooks/use-currency";
 import { compressImage } from "@/components/chat/compress-image";
 import { createClient } from "@/lib/supabase/client";
@@ -24,6 +24,8 @@ interface Campaign {
   target_url: string;
   weeks: number;
   price_mwk: number;
+  target_country: string | null;
+  target_gender: string | null;
   status: string;
   starts_at: string | null;
   ends_at: string | null;
@@ -31,6 +33,17 @@ interface Campaign {
   clicks: number;
   reject_reason: string | null;
   created_at: string;
+}
+
+const COUNTRY_LABELS: Record<string, string> = { MW: "Malawi", ZM: "Zambia", KE: "Kenya" };
+
+/** Short audience description for a campaign, e.g. "MW · male" or "Everyone". */
+function audienceLabel(c: string | null, g: string | null): string {
+  const parts: string[] = [];
+  if (c) parts.push(COUNTRY_LABELS[c] || c);
+  if (g === "male") parts.push("Men");
+  if (g === "female") parts.push("Women");
+  return parts.length ? parts.join(" · ") : "Everyone";
 }
 
 /** Human ratio label: 1200x628 -> "1.91:1". Squares show "1:1" exactly. */
@@ -73,13 +86,18 @@ export default function AdvertiseClient() {
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [targetUrl, setTargetUrl] = useState("");
   const [weeks, setWeeks] = useState<AdWeeks>(1);
+  const [targetCountry, setTargetCountry] = useState<string>("");
+  const [targetGender, setTargetGender] = useState<string>("");
+  const [audience, setAudience] = useState<{ total: number; countries: Record<string, { total: number; male: number; female: number }> } | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [cfgR, mineR] = await Promise.all([
+      const [cfgR, mineR, audR] = await Promise.all([
         fetch("/api/ads/config", { cache: "no-store" }),
         fetch("/api/ads/campaigns", { cache: "no-store" }),
+        fetch("/api/ads/audience", { cache: "no-store" }),
       ]);
+      if (audR.ok) setAudience(await audR.json());
       const cfg = await cfgR.json();
       setEnabled(!!cfg.directAds?.enabled);
       setTiers(adTiers(Number(cfg.directAds?.pricePerWeekMwk) || 5000));
@@ -139,6 +157,8 @@ export default function AdvertiseClient() {
           image_url: imageUrl || null,
           target_url: targetUrl,
           weeks,
+          target_country: targetCountry || null,
+          target_gender: targetGender || null,
         }),
       });
       const d = await res.json();
@@ -301,6 +321,48 @@ export default function AdvertiseClient() {
               />
             </div>
 
+            {/* Audience targeting */}
+            <div className="rounded-md border border-ccb-border bg-ccb-bg p-3 space-y-2">
+              <label className="text-xs font-medium text-ccb-muted">Who should see your ad? (optional)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={targetCountry} onChange={(e) => setTargetCountry(e.target.value)}
+                  className="w-full rounded-md border border-ccb-border bg-ccb-surface px-2 py-2 text-sm text-ccb-text focus:border-ccb-primary outline-none"
+                >
+                  <option value="">All countries</option>
+                  {AD_TARGET_COUNTRIES.map((c) => (
+                    <option key={c} value={c}>{COUNTRY_LABELS[c] || c}</option>
+                  ))}
+                </select>
+                <select
+                  value={targetGender} onChange={(e) => setTargetGender(e.target.value)}
+                  className="w-full rounded-md border border-ccb-border bg-ccb-surface px-2 py-2 text-sm text-ccb-text focus:border-ccb-primary outline-none"
+                >
+                  <option value="">All genders</option>
+                  <option value="male">Men only</option>
+                  <option value="female">Women only</option>
+                </select>
+              </div>
+              {audience && (
+                <p className="text-[11px] text-ccb-muted">
+                  {(() => {
+                    const all = audience.total;
+                    if (!targetCountry && !targetGender) return `Reaches all ${all.toLocaleString()} players.`;
+                    const c = targetCountry ? (audience.countries[targetCountry] || { total: 0, male: 0, female: 0 }) : null;
+                    if (targetCountry && targetGender) {
+                      const n = targetGender === "male" ? c!.male : c!.female;
+                      return `Reaches ~${n.toLocaleString()} ${targetGender === "male" ? "men" : "women"} who play in ${COUNTRY_LABELS[targetCountry]} (players who haven't set their gender in Settings never see gender-targeted ads — consider leaving gender on "All" to reach the full country).`;
+                    }
+                    if (targetCountry) return `Reaches ~${c!.total.toLocaleString()} players in ${COUNTRY_LABELS[targetCountry]} (of ${all.toLocaleString()} total).`;
+                    const n = targetGender === "male" ? (audience.countries.ZZ?.male ?? 0) : (audience.countries.ZZ?.female ?? 0);
+                    const male = Object.values(audience.countries).reduce((a, x) => a + x.male, 0);
+                    const female = Object.values(audience.countries).reduce((a, x) => a + x.female, 0);
+                    return `Reaches ~${(targetGender === "male" ? male : female).toLocaleString()} players who have set their gender (of ${all.toLocaleString()} total).`;
+                  })()}
+                </p>
+              )}
+            </div>
+
             {error && <p className="text-sm text-red-500">{error}</p>}
             {success && <p className="text-sm text-emerald-500">{success}</p>}
 
@@ -331,7 +393,7 @@ export default function AdvertiseClient() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-ccb-text truncate">{c.headline}</p>
-                    <p className="text-xs text-ccb-muted truncate">{c.business_name} · {c.weeks}w · {formatMoney(c.price_mwk)}</p>
+                    <p className="text-xs text-ccb-muted truncate">{c.business_name} · {c.weeks}w · {formatMoney(c.price_mwk)} · {audienceLabel(c.target_country, c.target_gender)}</p>
                   </div>
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls}`}>{badge.label}</span>
                 </div>

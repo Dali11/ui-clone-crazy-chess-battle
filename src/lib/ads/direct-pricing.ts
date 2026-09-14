@@ -36,7 +36,19 @@ export interface CampaignDraft {
   image_url?: string | null;
   target_url: string;
   weeks: number;
+  /** ISO country code or null = all countries. */
+  target_country?: string | null;
+  /** "male" | "female" or null = all genders. */
+  target_gender?: string | null;
 }
+
+/** Countries where CCB has a real player base — the only ones the
+ *  /advertise form offers for targeting. NULL = don't target (everyone). */
+export const AD_TARGET_COUNTRIES = ["MW", "ZM", "KE"] as const;
+export type AdTargetCountry = (typeof AD_TARGET_COUNTRIES)[number];
+
+export const AD_TARGET_GENDERS = ["male", "female"] as const;
+export type AdTargetGender = (typeof AD_TARGET_GENDERS)[number];
 
 /** Server-side validation — same rules the UI hints at. */
 export function validateDraft(d: Partial<CampaignDraft>): string | null {
@@ -48,5 +60,9 @@ export function validateDraft(d: Partial<CampaignDraft>): string | null {
   if (d.image_url && !isSafeTargetUrl(d.image_url)) return "Image URL must be https";
   if (!d.target_url || !isSafeTargetUrl(d.target_url)) return "Destination link must be a valid https URL";
   if (!AD_WEEK_OPTIONS.includes((d.weeks ?? 0) as AdWeeks)) return "Choose 1, 2 or 4 weeks";
+  if (d.target_country && !AD_TARGET_COUNTRIES.includes(d.target_country as AdTargetCountry))
+    return "Unsupported target country";
+  if (d.target_gender && !AD_TARGET_GENDERS.includes(d.target_gender as AdTargetGender))
+    return "Gender targeting supports male or female only";
   return null;
 }

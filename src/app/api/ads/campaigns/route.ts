@@ -19,7 +19,7 @@ export async function GET() {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("ad_campaigns")
-    .select("id,business_name,headline,body,image_url,target_url,weeks,price_mwk,status,starts_at,ends_at,impressions,clicks,reject_reason,created_at")
+    .select("id,business_name,headline,body,image_url,target_url,weeks,price_mwk,target_country,target_gender,status,starts_at,ends_at,impressions,clicks,reject_reason,created_at")
     .eq("advertiser_id", user.id)
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: "Failed to load campaigns" }, { status: 500 });
@@ -78,6 +78,8 @@ export async function POST(req: Request) {
       target_url: body.target_url!.trim(),
       weeks: body.weeks!,
       price_mwk: price,
+      target_country: body.target_country || null,
+      target_gender: body.target_gender || null,
       status: "pending_review",
     })
     .select("id")

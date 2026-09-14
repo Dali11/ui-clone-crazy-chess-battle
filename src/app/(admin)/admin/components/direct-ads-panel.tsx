@@ -16,6 +16,8 @@ interface AdCampaign {
   target_url: string;
   weeks: number;
   price_mwk: number;
+  target_country: string | null;
+  target_gender: string | null;
   status: string;
   starts_at: string | null;
   ends_at: string | null;
@@ -82,7 +84,7 @@ export default function DirectAdsPanel() {
             <div className="min-w-0">
               <p className="text-sm font-bold text-ccb-text truncate">{c.headline}</p>
               <p className="text-xs text-ccb-muted truncate">
-                {c.business_name} · by {c.advertiser?.username || "?"} ({c.advertiser?.email || "no email"})
+                {c.business_name} · by {c.advertiser?.username || "?"} ({c.advertiser?.email || "no email"}) · Audience: {(c.target_country ? c.target_country : "all countries") + (c.target_gender ? ` · ${c.target_gender}` : "")}
               </p>
               {c.body && <p className="text-xs text-ccb-muted truncate mt-0.5">{c.body}</p>}
               <a href={c.target_url} target="_blank" rel="noopener noreferrer nofollow" className="text-[11px] text-ccb-primary break-all hover:underline">
