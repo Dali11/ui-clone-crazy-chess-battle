@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
-  Home, Swords, User, Wallet, Shield, Coins, Gift, Megaphone,
+  Home, Swords, User, Wallet, Shield, Coins, Gift,
   Crown, Disc3, Menu, X, Trophy, Radio, Clock, Play, Settings, MessageCircle,
 } from "lucide-react";
 import NotificationBell from "./notification-bell";
@@ -100,7 +100,6 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         { href: "/settings", label: "Settings & Profile", icon: Settings },
         { href: "/wallet", label: "Wallet", icon: Wallet },
         { href: "/affiliate", label: "Affiliate", icon: Gift },
-        { href: "/advertise", label: "Advertise Your Business", icon: Megaphone },
         { href: "/history", label: "Game History", icon: Clock },
       ],
     },
