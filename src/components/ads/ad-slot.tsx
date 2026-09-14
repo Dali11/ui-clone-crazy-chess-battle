@@ -294,7 +294,12 @@ export default function AdSlot({
           className="block w-full overflow-hidden rounded-lg border border-ccb-border bg-ccb-surface hover:border-ccb-primary/40 transition-colors"
         >
           {direct.image_url ? (
-            <img src={direct.image_url} alt={direct.business_name} className="w-full h-16 object-cover" />
+            <div className="w-full flex justify-center bg-ccb-bg/60">
+              {/* Ratio-aware: contain (never crop) so square, 1.91:1, 16:9
+                  and wide banners all render intact instead of being
+                  sliced by a fixed-height crop. */}
+              <img src={direct.image_url} alt={direct.business_name} className="w-full max-h-28 object-contain" />
+            </div>
           ) : null}
           <div className="px-3 py-2 flex items-center gap-3">
             <div className="min-w-0 flex-1">

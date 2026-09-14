@@ -11,6 +11,9 @@ import { useCallback, useEffect, useState } from "react";
 import { BarChart3, ExternalLink, Eye, Loader2, MousePointerClick } from "lucide-react";
 import { adTiers, type AdWeeks } from "@/lib/ads/direct-pricing";
 import { useCurrency } from "@/hooks/use-currency";
+import { compressImage } from "@/components/chat/compress-image";
+import { createClient } from "@/lib/supabase/client";
+import { ImagePlus, Upload, X } from "lucide-react";
 
 interface Campaign {
   id: string;
@@ -28,6 +31,17 @@ interface Campaign {
   clicks: number;
   reject_reason: string | null;
   created_at: string;
+}
+
+/** Human ratio label: 1200x628 -> "1.91:1". Squares show "1:1" exactly. */
+function ratioLabel(w: number, h: number): string {
+  const g = (a: number, b: number): number => (b === 0 ? a : g(b, a % b));
+  const d = g(w, h) || 1;
+  const rw = Math.round(w / d);
+  const rh = Math.round(h / d);
+  // Collapse non-round ratios to a decimal (1.91:1); keep small ints exact.
+  if (rw <= 40 && rh <= 40) return `${rw}:${rh}`;
+  return `${(w / h).toFixed(2)}:1`;
 }
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
@@ -54,6 +68,9 @@ export default function AdvertiseClient() {
   const [headline, setHeadline] = useState("");
   const [body, setBody] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [imageDims, setImageDims] = useState<{ w: number; h: number } | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const [targetUrl, setTargetUrl] = useState("");
   const [weeks, setWeeks] = useState<AdWeeks>(1);
 
@@ -78,6 +95,35 @@ export default function AdvertiseClient() {
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Advertiser uploads their creative: validate -> compress (max 1280px
+  // JPEG q0.8, same util as chat photos) -> upload to the public
+  // 'ad-creatives' bucket -> use the public URL in the campaign.
+  const pickImage = async (file: File) => {
+    setError(null);
+    if (!file.type.startsWith("image/") || file.type === "image/gif") {
+      setError("Please pick a JPG, PNG or WebP image.");
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const { blob, width, height } = await compressImage(file);
+      const supabase = createClient();
+      const path = `${crypto.randomUUID()}.jpg`;
+      const { error: upErr } = await supabase.storage
+        .from("ad-creatives")
+        .upload(path, blob, { contentType: "image/jpeg" });
+      if (upErr) throw new Error(upErr.message);
+      const { data: pub } = supabase.storage.from("ad-creatives").getPublicUrl(path);
+      setImageUrl(pub.publicUrl);
+      setImageDims({ w: width, h: height });
+      setShowUrlInput(false);
+    } catch {
+      setError("Couldn't upload that image. Try a smaller file (under 8MB).");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,13 +228,69 @@ export default function AdvertiseClient() {
               />
               <p className="mt-0.5 text-[11px] text-ccb-muted">{body.length}/120</p>
             </div>
-            <div>
-              <label className="text-xs font-medium text-ccb-muted">Banner image URL (optional)</label>
-              <input
-                value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} type="url"
-                placeholder="https://… (wide banner, e.g. 1200×300)"
-                className="mt-1 w-full rounded-md border border-ccb-border bg-ccb-bg px-3 py-2 text-sm text-ccb-text placeholder:text-ccb-muted/50 focus:border-ccb-primary outline-none"
-              />
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-ccb-muted">Banner image (optional — shows your logo or promo graphic)</label>
+
+              {!imageUrl ? (
+                <label className={`flex items-center justify-center gap-2 rounded-md border border-dashed border-ccb-border bg-ccb-bg px-3 py-4 text-sm cursor-pointer hover:border-ccb-primary/50 ${uploadingImage ? "opacity-60 pointer-events-none" : ""}`}>
+                  {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin text-ccb-muted" /> : <ImagePlus className="w-4 h-4 text-ccb-muted" />}
+                  {uploadingImage ? "Uploading…" : "Upload an image (JPG, PNG or WebP)"}
+                  <input
+                    type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) pickImage(f); e.currentTarget.value = ""; }}
+                  />
+                </label>
+              ) : (
+                <div className="rounded-md border border-ccb-border bg-ccb-bg px-3 py-2 flex items-center gap-2">
+                  <p className="text-xs text-ccb-muted flex-1 truncate">
+                    Uploaded{imageDims ? ` — ${imageDims.w}×${imageDims.h} (${ratioLabel(imageDims.w, imageDims.h)})` : ""}
+                  </p>
+                  <button
+                    type="button" onClick={() => { setImageUrl(""); setImageDims(null); }}
+                    className="text-ccb-muted hover:text-red-500"
+                    aria-label="Remove image"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {!showUrlInput ? (
+                <button type="button" onClick={() => setShowUrlInput(true)} className="text-[11px] text-ccb-muted underline underline-offset-2">
+                  Have an image link instead? Paste a URL
+                </button>
+              ) : (
+                <input
+                  value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImageDims(null); }} type="url"
+                  placeholder="https://…"
+                  className="w-full rounded-md border border-ccb-border bg-ccb-bg px-3 py-2 text-sm text-ccb-text placeholder:text-ccb-muted/50 focus:border-ccb-primary outline-none"
+                />
+              )}
+
+              <p className="text-[11px] text-ccb-muted">
+                Best sizes: <span className="text-ccb-text">1200×628</span> (link ad), <span className="text-ccb-text">1080×1080</span> (square) or a wide banner up to 6:1. We never crop your image — it scales to fit.
+              </p>
+
+              {/* Live preview — exactly how the ad renders in the app */}
+              {imageUrl && (
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-ccb-muted/60 mb-0.5 text-center">Sponsored</p>
+                  <div className="w-full overflow-hidden rounded-lg border border-ccb-border bg-ccb-surface">
+                    <div className="w-full flex justify-center bg-ccb-bg/60">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imageUrl} alt="Your banner" className="w-full max-h-28 object-contain" />
+                    </div>
+                    <div className="px-3 py-2 flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-ccb-text truncate">{headline || "Your headline appears here"}</p>
+                        {body ? <p className="text-[11px] text-ccb-muted truncate">{body}</p> : null}
+                      </div>
+                      <span className="shrink-0 text-[11px] font-bold text-ccb-primary">Visit →</span>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-[11px] text-ccb-muted text-center">Live preview — exactly what players see.</p>
+                </div>
+              )}
             </div>
             <div>
               <label className="text-xs font-medium text-ccb-muted">Destination link * (https only)</label>
