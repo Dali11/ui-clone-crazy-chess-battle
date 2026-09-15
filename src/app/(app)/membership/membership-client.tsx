@@ -140,7 +140,7 @@ export default function MembershipClient() {
         </div>
         <h1 className="text-xl sm:text-2xl font-bold mb-2">Membership</h1>
         <p className="text-sm text-ccb-muted">
-          $10 a month. Zero ads. 1.5x league XP. Every cent keeps the cash rewards flowing.
+          $10 a month. Zero ads. 1.5x league XP. Every cent keeps the leagues, tournaments and community running.
         </p>
       </div>
 
@@ -191,14 +191,14 @@ export default function MembershipClient() {
               <Zap className="w-5 h-5 text-ccb-primary shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold">1.5x league XP, always on</p>
-                <p className="text-xs text-ccb-muted">Earn league XP half again as fast for as long as your membership runs — climb to the money leagues sooner.</p>
+                <p className="text-xs text-ccb-muted">Earn league XP half again as fast for as long as your membership runs — climb the weekly tables sooner.</p>
               </div>
             </li>
             <li className="flex items-start gap-3">
               <ShieldCheck className="w-5 h-5 text-ccb-primary shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold">You fund the cash rewards</p>
-                <p className="text-xs text-ccb-muted">Weekly league payouts and battle pots stay real money because members cover the platform.</p>
+                <p className="text-sm font-semibold">You power the club</p>
+                <p className="text-xs text-ccb-muted">Your membership funds the weekly XP leagues, tournaments and community events for every player.</p>
               </div>
             </li>
             <li className="flex items-start gap-3">

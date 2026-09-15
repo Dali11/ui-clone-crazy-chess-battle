@@ -100,6 +100,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         { href: "/settings", label: "Settings & Profile", icon: Settings },
         { href: "/wallet", label: "Wallet", icon: Wallet },
         { href: "/affiliate", label: "Affiliate", icon: Gift },
+        { href: "/membership", label: "Club Membership", icon: Crown },
         { href: "/history", label: "Game History", icon: Clock },
       ],
     },
