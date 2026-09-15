@@ -107,7 +107,8 @@ export async function getActiveConfig(
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(`PawaPay active-conf failed: ${data.message || res.statusText}`);
+    const msg = data?.failureReason?.failureMessage || data?.message || res.statusText;
+    throw new Error(`PawaPay active-conf failed: ${msg}`);
   }
   return data as PawaPayActiveConfig;
 }
