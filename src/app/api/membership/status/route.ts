@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { isMember, daysRemaining } from "@/lib/membership/membership";
+import { getExchangeRate } from "@/lib/geo/fx";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +39,22 @@ export async function GET() {
       country = profile?.country || null;
     }
 
+    // USD $10/month pricing (owner decision 2026-09-15) — show both the
+    // dollar price and the MWK figure the mobile-money rails will charge.
+    let priceMwk: number | null = null;
+    if (country === "MW" && cfg.enabled) {
+      const rate = await getExchangeRate("USD", "MWK");
+      if (rate >= 500 && rate <= 5000) priceMwk = Math.round((cfg.price_usd || 10) * rate);
+    }
+
     return NextResponse.json({
       member,
       until,
       daysLeft,
       enabled: !!cfg.enabled,
-      price: cfg.price_mwk || 10000,
+      currency: "USD",
+      priceUsd: cfg.price_usd || 10,
+      priceMwk,
       periodDays: cfg.period_days || 30,
       // MW-only for now (PayChangu rails); ZM/other countries: coming soon
       available: country === "MW",

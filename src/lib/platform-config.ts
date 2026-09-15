@@ -209,11 +209,16 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     epoch: "2026-09-01T00:00:00.000Z",
   },
   membership: {
-    // MK10,000/month supporter membership. Members are ad-free; purchase
-    // rides the PayChangu MW mobile-money rails (deposits method
-    // 'membership_purchase'); revenue is swept weekly with fees.
+    // $10/month supporter membership (owner decision 2026-09-15: priced
+    // in USD). Members are ad-free AND earn 1.5x league XP for the
+    // duration of their membership. Purchase rides the PayChangu MW
+    // mobile-money rails: the USD price is converted to MWK at the live
+    // rate at charge time (deposits method 'membership_purchase');
+    // revenue is swept weekly with fees. Affiliate commission stays 25%
+    // of the charged amount.
     enabled: true,
-    price_mwk: 10000,
+    currency: "USD",
+    price_usd: 10,
     period_days: 30,
   },
   integrity: {

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { effectiveXpMultiplier, applyXpMultiplier } from "./boost";
 import { currentWeekStart, getLeagueXpConfig, ENTRY_TIER, BATTLE_XP } from "./index";
 
 /**
@@ -44,7 +45,7 @@ export async function awardGameXp(opts: {
     // Bot / computer opponents never earn or award XP (anti-farming).
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, rating, email")
+      .select("id, rating, email, membership_until")
       .in("id", [g.white_player_id, g.black_player_id]);
     const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
     const white = byId.get(g.white_player_id);
@@ -77,8 +78,25 @@ export async function awardGameXp(opts: {
       return xp;
     };
 
-    const whiteXp = amountFor(whiteWon, blackWon, blackRating, whiteRating);
-    const blackXp = amountFor(blackWon, whiteWon, whiteRating, blackRating);
+    // ── XP multipliers (owner decision 2026-09-15) ──────────────────────
+    // Referral boost (2x/1.5x/1.25x for 1 week, from activated referrals)
+    // and member 1.5x (while subscribed) — never stacked, higher wins.
+    // Boosts apply to POSITIVE XP only; the daily cap counts boosted
+    // credit, so a multiplier reaches the cap faster, never beyond it.
+    const { data: boostRows } = await admin
+      .from("league_xp_members")
+      .select("user_id, xp_boost_multiplier, xp_boost_until")
+      .in("user_id", [g.white_player_id, g.black_player_id]);
+    const boostByUser = new Map((boostRows ?? []).map((b) => [b.user_id, b]));
+    const multFor = (userId: string) =>
+      effectiveXpMultiplier({
+        boostMultiplier: boostByUser.get(userId)?.xp_boost_multiplier ?? null,
+        boostUntil: boostByUser.get(userId)?.xp_boost_until ?? null,
+        membershipUntil: byId.get(userId)?.membership_until ?? null,
+      });
+
+    const whiteXp = applyXpMultiplier(amountFor(whiteWon, blackWon, blackRating, whiteRating), multFor(g.white_player_id));
+    const blackXp = applyXpMultiplier(amountFor(blackWon, whiteWon, whiteRating, blackRating), multFor(g.black_player_id));
 
     // Daily cap per player (anti-farming): count today's events first.
     const todayStart = new Date(new Date().getTime() + 2 * 3600_000).toISOString().slice(0, 10) + "T00:00:00.000Z";
@@ -124,8 +142,25 @@ export async function awardGameXp(opts: {
       .select("user_id, amount");
     if (insertError || !inserted?.length) return; // conflict => already processed
 
-    // Upsert memberships + add XP.
     const playerRows = [g.white_player_id, g.black_player_id];
+
+    // ── Referral activation hook (owner decision 2026-09-15) ────────────
+    // A finished game counts toward the referred player's activation
+    // (3 games) — staked battles activate immediately. The DB function
+    // ignores players without a pending referral and is idempotent.
+    // Never throws: activation problems must not break game settlement.
+    for (const p of playerRows) {
+      try {
+        await admin.rpc("check_referral_activation", {
+          p_user_id: p,
+          p_action: isBattle ? "battle" : "game",
+        });
+      } catch (actErr) {
+        console.error("referral activation check failed:", actErr);
+      }
+    }
+
+    // Upsert memberships + add XP.
     for (const p of playerRows) {
       const grant = inserted.find((e) => e.user_id === p);
       if (!grant) continue;

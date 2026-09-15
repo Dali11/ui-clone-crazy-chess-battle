@@ -10,7 +10,7 @@
 // (the cash is platform revenue, swept weekly to the owner).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Ban, Check, CheckCircle2, Crown, Loader2, ShieldCheck } from "lucide-react";
+import { Ban, Check, CheckCircle2, Crown, Loader2, ShieldCheck, Zap } from "lucide-react";
 import { detectOperator } from "@/lib/operator";
 
 interface Status {
@@ -18,7 +18,10 @@ interface Status {
   until: string | null;
   daysLeft: number;
   enabled: boolean;
-  price: number;
+  currency: "USD";
+  priceUsd: number;
+  /** Live-rate MWK equivalent the mobile-money rails will charge (MW only). */
+  priceMwk: number | null;
   periodDays: number;
   available: boolean;
 }
@@ -122,8 +125,10 @@ export default function MembershipClient() {
     );
   }
 
-  const price = status?.price || 10000;
+  const price = status?.priceUsd || 10;
+  const priceMwk = status?.priceMwk ?? null;
   const period = status?.periodDays || 30;
+  const fmtUsd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 sm:py-10">
@@ -135,7 +140,7 @@ export default function MembershipClient() {
         </div>
         <h1 className="text-xl sm:text-2xl font-bold mb-2">Membership</h1>
         <p className="text-sm text-ccb-muted">
-          One flat price. Zero ads. Every kwacha keeps the cash rewards flowing.
+          $10 a month. Zero ads. 1.5x league XP. Every cent keeps the cash rewards flowing.
         </p>
       </div>
 
@@ -167,8 +172,11 @@ export default function MembershipClient() {
         /* Buy card */
         <div className="rounded-2xl border border-ccb-border bg-card p-6">
           <div className="text-center mb-6">
-            <p className="text-3xl font-bold">{fmtMK(price)}</p>
-            <p className="text-sm text-ccb-muted">every {period} days · mobile money</p>
+            <p className="text-3xl font-bold">{fmtUsd(price)}</p>
+            <p className="text-sm text-ccb-muted">
+              every {period} days · mobile money
+              {priceMwk ? <> · charged as <span className="font-semibold text-ccb-foreground">{fmtMK(priceMwk)}</span></> : null}
+            </p>
           </div>
 
           <ul className="space-y-3 mb-6">
@@ -177,6 +185,13 @@ export default function MembershipClient() {
               <div>
                 <p className="text-sm font-semibold">Zero ads, everywhere</p>
                 <p className="text-xs text-ccb-muted">No banners between your games, on any page, for your whole membership.</p>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <Zap className="w-5 h-5 text-ccb-primary shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold">1.5x league XP, always on</p>
+                <p className="text-xs text-ccb-muted">Earn league XP half again as fast for as long as your membership runs — climb to the money leagues sooner.</p>
               </div>
             </li>
             <li className="flex items-start gap-3">
@@ -232,7 +247,7 @@ export default function MembershipClient() {
                 ) : polling ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Waiting for your PIN…</>
                 ) : (
-                  <><Crown className="w-4 h-4" /> Join the Club — {fmtMK(price)}</>
+                  <><Crown className="w-4 h-4" /> Join the Club — {fmtUsd(price)}</>
                 )}
               </button>
               <p className="text-xs text-ccb-muted text-center mt-3">

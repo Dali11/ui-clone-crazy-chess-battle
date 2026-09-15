@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Swords, TrendingUp, ChevronDown, Zap, Gift, ArrowDownCircle, Trophy, Info } from "lucide-react";
+import { Loader2, Swords, TrendingUp, ChevronDown, Zap, Gift, ArrowDownCircle, Trophy, Info, Share2, X } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
 import { formatUsd } from "@/lib/geo/format";
 import { countryFlag } from "@/lib/geo/flags";
@@ -32,6 +32,8 @@ interface StandingsResponse {
   demoteCount?: number;
   tierCap?: number;
   cycleEnd?: string;
+  /** ISO week-start (YYYY-MM-DD), used to key the once-per-week season notice dismissal. */
+  cycleStart?: string;
   standings?: Standing[];
   xpRules?: { win: number; draw: number; loss: number; upsetBonus: number; dailyCap: number };
   rewards?: number[];
@@ -42,6 +44,12 @@ interface StandingsResponse {
   tiers?: { tier: number; name: string; emoji: string }[];
   seasonStart?: string | null;
   allTimeXp?: number;
+  /** Referral XP boost (owner decision 2026-09-15), null when none active. */
+  xpBoost?: { multiplier: number; until: string } | null;
+  /** Membership 1.5x XP currently active. */
+  memberBoost?: boolean;
+  /** Referrals activated in the last 7 days. */
+  activeReferrals?: number;
 }
 
 /**
@@ -105,6 +113,10 @@ export default function XpLeagueTab() {
   const [data, setData] = useState<StandingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [showHow, setShowHow] = useState(false);
+  // Season notice: shown once per week (owner decision 2026-09-15) — dismiss
+  // persists in localStorage keyed by the week's cycleStart, so it reappears
+  // automatically once a new week starts.
+  const [seasonDismissed, setSeasonDismissed] = useState(false);
   const currency = useCurrency();
 
   useEffect(() => {
@@ -114,6 +126,26 @@ export default function XpLeagueTab() {
       .then((d) => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
   }, [scope]);
+
+  // Once-per-week season notice: check whether THIS week's cycleStart was
+  // already dismissed. A new cycleStart (new week) means the check misses
+  // and the notice shows again exactly once.
+  useEffect(() => {
+    if (!data?.cycleStart) return;
+    try {
+      const dismissedWeek = localStorage.getItem("ccb_season_notice_dismissed");
+      setSeasonDismissed(dismissedWeek === data.cycleStart);
+    } catch {
+      setSeasonDismissed(false);
+    }
+  }, [data?.cycleStart]);
+
+  const dismissSeasonNotice = () => {
+    setSeasonDismissed(true);
+    try {
+      if (data?.cycleStart) localStorage.setItem("ccb_season_notice_dismissed", data.cycleStart);
+    } catch {}
+  };
 
   const countdown = useCountdown(data?.cycleEnd);
   const isMonth = scope === "month";
@@ -209,8 +241,9 @@ export default function XpLeagueTab() {
       {/* Weekly | Monthly leaderboard switch */}
       <ScopeToggle scope={scope} setScope={setScope} />
 
-      {/* Season banner */}
-      {data.seasonStart && (
+      {/* Season banner — shown once per week (owner decision 2026-09-15),
+         dismissible; reappears automatically when a new week starts. */}
+      {data.seasonStart && !seasonDismissed && (
         <div className="card p-4 border-ccb-primary/30">
           <div className="flex items-start gap-3">
             <Zap className="w-5 h-5 text-ccb-primary shrink-0 mt-0.5" />
@@ -222,6 +255,13 @@ export default function XpLeagueTab() {
                 loss costs XP too. All-time XP never resets.
               </p>
             </div>
+            <button
+              onClick={dismissSeasonNotice}
+              aria-label="Dismiss"
+              className="shrink-0 text-ccb-muted hover:text-ccb-text -mt-1 -mr-1 p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
@@ -242,6 +282,32 @@ export default function XpLeagueTab() {
           </div>
         </div>
       </div>
+
+      {/* XP boost banner (owner decision 2026-09-15) */}
+      {!isMonth && (() => {
+        const refMult = data.xpBoost?.multiplier ?? 1;
+        const memberMult = data.memberBoost ? 1.5 : 1;
+        const mult = Math.max(refMult, memberMult);
+        if (mult > 1) {
+          const isRef = refMult >= memberMult && !!data.xpBoost;
+          return (
+            <div className="rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-2.5 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                {mult}x XP active{isRef && data.xpBoost?.until ? ` — until ${new Date(data.xpBoost.until).toLocaleDateString()}` : " — member perk"}
+              </p>
+            </div>
+          );
+        }
+        return (
+          <a href="/affiliate" className="rounded-xl border border-ccb-border bg-ccb-muted/5 px-4 py-2.5 flex items-center gap-2 hover:bg-ccb-muted/10 transition-colors">
+            <Share2 className="w-4 h-4 text-ccb-primary shrink-0" />
+            <p className="text-xs text-ccb-muted">
+              Share your link — <span className="font-semibold text-ccb-foreground">1 activated referral = 1.25x XP for a week</span>, 5 = 1.5x, 10 = 2x
+            </p>
+          </a>
+        );
+      })()}
 
       {/* Rewards strip */}
       {rewards.length > 0 && (

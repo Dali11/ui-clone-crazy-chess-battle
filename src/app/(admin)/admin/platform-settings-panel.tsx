@@ -42,7 +42,7 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
     { key: "owner_usernames", label: "Owner / test account whitelist", type: "text", group: "control", help: "Comma-separated usernames that integrity scans never flag (your own accounts + test accounts — they legitimately share phones and play each other while testing). Case-insensitive" },
   ],
   affiliate: [
-    { key: "enabled", label: "Affiliate commissions enabled", type: "toggle", group: "control", help: "ON = membership purchases pay the buyer's referrer 25% (MK2,500 per MK10,000 sale) to their wallet. Referral tracking works while OFF; only payouts pause" },
+    { key: "enabled", label: "Affiliate commissions enabled", type: "toggle", group: "control", help: "ON = membership purchases pay the buyer's referrer 25% of the charged amount ($2.50 per $10 sale) to their wallet. Referral tracking works while OFF; only payouts pause" },
   ],
   direct_ads: [
     { key: "enabled", label: "Self-serve direct ads enabled", type: "toggle", group: "control", help: "ON = /advertise sells flat weekly campaigns from wallet balance; paid campaigns take priority over the ad network in every slot" },
@@ -50,7 +50,7 @@ const SECTION_FIELDS: Record<string, SettingField[]> = {
   ],
   membership: [
     { key: "enabled", label: "Membership purchases enabled", type: "toggle", group: "control", help: "Master switch — OFF hides the buy form and blocks the purchase API" },
-    { key: "price_mwk", label: "Price", type: "number", unit: "MWK", group: "control", help: "Charged per period via Malawi mobile money (PayChangu). Revenue is swept weekly with fees" },
+    { key: "price_usd", label: "Price", type: "number", unit: "USD", group: "control", help: "Charged per period via Malawi mobile money (PayChangu), converted to MWK at the live rate at charge time. Revenue is swept weekly with fees" },
     { key: "period_days", label: "Period", type: "number", unit: "days", group: "control", help: "Days each purchase adds (renewals stack — no lost days)" },
   ],
   ads: [

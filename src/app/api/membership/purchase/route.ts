@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
+import { getExchangeRate } from "@/lib/geo/fx";
 
 /**
  * POST /api/membership/purchase  { phone, operatorRefId, email?, firstName?, lastName? }
@@ -40,7 +41,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Membership purchases are currently disabled" }, { status: 403 });
     }
 
-    const amount = Math.round(Number(cfg.price_mwk) || 10000);
+    // USD $10/month pricing (owner decision 2026-09-15): convert to MWK
+    // at the live rate for the PayChangu charge. Sanity-banded — if both
+    // the live fetch and the DB-cached inverse rate look wrong, refuse
+    // the purchase rather than charge the wrong amount.
+    const priceUsd = Number(cfg.price_usd) || 10;
+    let usdToMwk = await getExchangeRate("USD", "MWK");
+    if (!usdToMwk || usdToMwk === 1) {
+      const { data: dbRate } = await admin
+        .from("exchange_rates")
+        .select("rate")
+        .eq("base_currency", "MWK")
+        .eq("target_currency", "USD")
+        .single();
+      const inv = dbRate?.rate ? 1 / Number(dbRate.rate) : 0;
+      if (inv > 0) usdToMwk = inv;
+    }
+    if (usdToMwk < 500 || usdToMwk > 5000) {
+      return NextResponse.json({ error: "Pricing is temporarily unavailable — please try again in a moment." }, { status: 503 });
+    }
+    const amount = Math.round(priceUsd * usdToMwk);
     if (amount < 100) return NextResponse.json({ error: "Invalid membership price configured" }, { status: 500 });
 
     const chargeId = `ccb_mem_${Date.now()}_${user.id.slice(0, 8)}`;

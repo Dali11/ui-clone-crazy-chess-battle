@@ -29,6 +29,26 @@ export async function GET(req: NextRequest) {
       .eq("user_id", user.id)
       .maybeSingle();
 
+    // XP boost state (owner decision 2026-09-15): referral boost from the
+    // league row, member 1.5x from the profile, and the rolling count of
+    // referrals activated this week for the "X more to next tier" nudge.
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("membership_until")
+      .eq("id", user.id)
+      .single();
+    const { count: activeReferrals } = await admin
+      .from("referrals")
+      .select("id", { count: "exact", head: true })
+      .eq("referrer_id", user.id)
+      .gt("activated_at", new Date(Date.now() - 7 * 86_400_000).toISOString());
+    const boostUntil = member?.xp_boost_until ?? null;
+    const boostActive = !!boostUntil && new Date(boostUntil).getTime() > Date.now();
+    const xpBoost = boostActive
+      ? { multiplier: member?.xp_boost_multiplier ?? 1, until: boostUntil }
+      : null;
+    const memberBoostActive = !!profile?.membership_until && new Date(profile.membership_until).getTime() > Date.now();
+
     // Not seeded yet — player has never finished a PvP game.
     if (!member) {
       return NextResponse.json({
@@ -206,6 +226,10 @@ export async function GET(req: NextRequest) {
         : (rewardsOn ? allTierRewards(cfg) : {}),
       tiers: LEAGUE_TIERS,
       rewardsCurrency: scope === "month" ? "MWK" : rewardsCurrencyOf(cfg),
+      // XP boost surface (owner decision 2026-09-15)
+      xpBoost,
+      memberBoost: memberBoostActive,
+      activeReferrals: activeReferrals ?? 0,
     });
   } catch (err) {
     console.error("league xp standings error:", err);
