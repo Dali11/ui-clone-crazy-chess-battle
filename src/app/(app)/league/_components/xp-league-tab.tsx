@@ -241,11 +241,6 @@ export default function XpLeagueTab() {
               {isMonth ? "Monthly championship" : "Weekly rewards"} — top {promote} in the {data.tier?.name ?? "league"}
             </h3>
           </div>
-          {currency.currencyCode !== "MWK" && (
-            <p className="text-[10px] text-ccb-muted -mt-1 mb-2">
-              Shown in your currency at today&apos;s exchange rate · paid to your wallet in Malawi Kwacha
-            </p>
-          )}
           <div className="grid grid-cols-5 gap-2">
             {rewards.map((r, i) => (
               <div key={i} className={`rounded-lg py-2 px-1 text-center ${i === 0 ? "bg-ccb-primary/15" : "bg-ccb-muted/5"}`}>
