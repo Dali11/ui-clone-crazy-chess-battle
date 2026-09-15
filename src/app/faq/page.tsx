@@ -8,7 +8,7 @@ import { pageMetadata } from "@/lib/seo/metadata";
 
 export const metadata = pageMetadata({
   title: "FAQ — How Crazy Chess Battles Works",
-  description: "Get answers to common questions about Crazy Chess Battles: how tournaments work, prize pools, membership, ratings, game rules, and more.",
+  description: "Get answers to common questions about Crazy Chess Battles: how tournaments work, weekly XP leagues, membership, ratings, game rules, and more.",
   path: "/faq",
 });
 
@@ -18,7 +18,7 @@ const FAQ_SECTIONS = [
     questions: [
       {
         q: "Is Crazy Chess Battles free to play?",
-        a: "Yes! You can play unlimited casual games and join free tournaments without ever depositing money. Paid tournaments are optional — you only spend money when you choose to enter one.",
+        a: "Yes! You can play unlimited casual games and join free tournaments forever. Club membership ($10 a month) is optional and unlocks the ad-free experience plus the weekly XP league rewards.",
       },
       {
         q: "Do I need a Chess.com account?",
@@ -47,11 +47,11 @@ const FAQ_SECTIONS = [
       },
       {
         q: "Is my money safe on CCB?",
-        a: "Your wallet balance is held securely in the platform. Entry fees for tournaments are locked when you join and refunded automatically if a tournament is cancelled or doesn't meet minimum players.",
+        a: "Your account balance is held securely by the platform. Tournament entries are recorded when you join and released automatically if a tournament is cancelled or doesn't meet minimum players.",
       },
       {
         q: "What fees does CCB charge?",
-        a: "CCB takes a 10% platform fee on paid tournament entry fees. The remaining 90% is split between the tournament creator (40% by default) and the prize pool (50% by default). There are no deposit or withdrawal fees.",
+        a: "The platform is funded by a simple $10 monthly membership — that's what keeps the weekly XP leagues, tournaments and community rewards running. There are no deposit or withdrawal fees.",
       },
     ],
   },
@@ -60,23 +60,23 @@ const FAQ_SECTIONS = [
     questions: [
       {
         q: "How do tournaments work?",
-        a: "CCB uses the Swiss tournament format. You play a set number of rounds, and in each round you're paired with someone at a similar score. After all rounds, players are ranked by total score. The top players split the prize pool.",
+        a: "CCB uses the Swiss tournament format. You play a set number of rounds, and in each round you're paired with someone at a similar score. After all rounds, players are ranked by total score. Your final ranking earns you titles, trophies and club rewards.",
       },
       {
         q: "What happens if a tournament doesn't get enough players?",
-        a: "If a tournament doesn't meet its minimum player count by the start time, it's automatically cancelled and all entry fees are refunded to participants' wallets instantly.",
+        a: "If a tournament doesn't meet its minimum player count by the start time, it's automatically cancelled and everyone is notified instantly.",
       },
       {
         q: "Can I create my own tournaments?",
-        a: "Yes! Once you meet the eligibility requirements, you can create both free and paid tournaments. You'll earn a 40% profit share of entry fees (after the 10% platform cut). Set your own entry fee, player limits, time controls, and schedule.",
+        a: "Yes! Once you meet the eligibility requirements, you can create your own tournaments and host them for the community. Set your own format, player limits, time controls, and schedule.",
       },
       {
         q: "What are the eligibility requirements to create tournaments?",
-        a: "Free tournaments: your account must be at least 3 days old and you must have played 10+ games. Paid tournaments: you need a verified Chess.com account, at least 1 prior mobile money deposit, a 7+ day old account, and 20+ games played.",
+        a: "Free tournaments: your account must be at least 3 days old and you must have played 10+ games. Larger events: you need a verified Chess.com account, a 7+ day old account, and 20+ games played.",
       },
       {
-        q: "How are prizes distributed?",
-        a: "Prizes are distributed automatically when the tournament ends. The standard split is: 1st place 40%, 2nd place 20%, 3rd place 18%, 4th place 12%, 5th place 10%. Winnings are credited to your wallet instantly.",
+        q: "How do league rewards work?",
+        a: "Every game earns you League XP (Win 3, Draw 1, Loss 0) toward the weekly XP league table. When the week ends, top finishers receive club rewards credited to their account automatically. Your membership of $10 a month funds the reward pools.",
       },
     ],
   },
@@ -97,7 +97,7 @@ const FAQ_SECTIONS = [
       },
       {
         q: "Can I play with friends?",
-        a: "Yes! Use the 'Challenge' feature to generate a link. Send it to your friend via WhatsApp, SMS, or any messenger. They click the link and the game starts. Choose ranked or casual, with or without stakes.",
+        a: "Yes! Use the 'Challenge' feature to generate a link. Send it to your friend via WhatsApp, SMS, or any messenger. They click the link and the game starts. Choose ranked or casual.",
       },
     ],
   },

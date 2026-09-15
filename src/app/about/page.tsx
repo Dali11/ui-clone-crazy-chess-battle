@@ -95,12 +95,12 @@ export default function AboutPage() {
               So that I could find people like me who were willing to join a battle, and compete in a tournament.
             </p>
             <p>
-              Today, Crazy Chess Battles is more than just battles — it&apos;s a full competitive ecosystem with Swiss qualifiers, a Premier League, season rankings, and real cash prizes. We&apos;re building the future of competitive chess, one match at a time.
+              Today, Crazy Chess Battles is more than just battles — it&apos;s a full competitive ecosystem with weekly XP leagues, tournaments, season rankings and a growing chess community. We&apos;re building the future of competitive chess in Africa, one match at a time.
             </p>
 
             <p>
-              Crazy Chess Battles features both free and paid tournaments, which means, instead of just playing
-              for free, players can earn money by doing what they love.
+              Crazy Chess Battles brings players together in weekly XP leagues, tournaments and community events —
+              so instead of playing alone, you compete, improve and climb with people who love the same game.
             </p>
 
             <p className="text-lg font-semibold text-ccb-text">Chess.</p>
@@ -176,7 +176,7 @@ export default function AboutPage() {
               <Shield className="w-6 h-6 text-ccb-success mb-3" />
               <h3 className="font-semibold mb-2 text-sm">Transparent economics</h3>
               <p className="text-xs sm:text-sm text-ccb-muted">
-                10% platform fee, 40% to tournament creators, 50% to the prize pool. Every cent is accounted for.
+                A simple $10 monthly membership funds the weekly XP leagues, tournaments and community rewards. Every cent is accounted for.
               </p>
             </div>
             <div className="card">

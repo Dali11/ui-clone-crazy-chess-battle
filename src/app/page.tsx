@@ -17,8 +17,8 @@ export const dynamic = "force-dynamic";
 import { pageMetadata } from "@/lib/seo/metadata";
 
 export const metadata = pageMetadata({
-  title: "Crazy Chess Battles — Play Competitive Chess Online & Win Prizes",
-  description: "Compete in live chess tournaments, ranked battles, and leagues. Play blitz, bullet, and rapid chess against players worldwide. Climb the league standings and win real prizes.",
+  title: "Crazy Chess Battles — Weekly XP Leagues, Tournaments & Chess Community",
+  description: "Compete in weekly XP leagues and live chess tournaments with a community of players. Play blitz, bullet, and rapid chess online. Club membership is just $10 a month.",
   path: "/",
 });
 
@@ -80,7 +80,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
             Do you think you got it in you?
           </h1>
           <p className="text-base sm:text-lg text-ccb-muted mb-8 sm:mb-10 max-w-2xl mx-auto px-2">
-            Challenge fellow players into Crazy Chess Battles, either as a free play duel, staked battle, or join our flagship tournaments and win real cash rewards.
+            Play chess, climb the weekly XP leagues, and compete in tournaments with a community that loves the game as much as you do.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
             <Link href={signupUrl} className="btn-primary text-base px-8 py-3 w-full sm:w-auto">
@@ -98,11 +98,11 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
             </div>
             <div className="flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5 text-ccb-success" />
-              <span>Real cash prizes</span>
+              <span>Weekly XP leagues</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5 text-ccb-success" />
-              <span>Staked battles</span>
+              <span>Tournaments &amp; community</span>
             </div>
           </div>
         </div>
@@ -113,7 +113,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-xl sm:text-3xl font-bold mb-4">You already play chess online. So why are we here?</h2>
           <p className="text-sm sm:text-base text-ccb-muted mb-8 max-w-2xl mx-auto leading-relaxed">
-            On other platforms, you grind for rating points that live on a screen. On Crazy Chess Battles, your skill puts real money in your pocket. Stake your games, enter cash tournaments, and climb a league where every win actually means something.
+            On other platforms, you grind for rating points that live on a screen. On Crazy Chess Battles, every game earns XP, every week brings a fresh league table to climb, and every tournament takes you closer to the title — in a community that tracks every move.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-left max-w-2xl mx-auto">
             <div className="flex items-start gap-3">
@@ -121,8 +121,8 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                 <Zap className="w-4 h-4 text-ccb-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-sm">Staked Battles</h3>
-                <p className="text-xs sm:text-sm text-ccb-muted">Wager and win real cash on your games.</p>
+                <h3 className="font-semibold text-sm">Weekly XP Leagues</h3>
+                <p className="text-xs sm:text-sm text-ccb-muted">Every game earns XP — Win 3, Draw 1 — and a fresh league table starts every week.</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -130,8 +130,8 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                 <Trophy className="w-4 h-4 text-ccb-accent" />
               </div>
               <div>
-                <h3 className="font-semibold text-sm">Cash Prize Tournaments</h3>
-                <p className="text-xs sm:text-sm text-ccb-muted">Entry fees fuel the pot. Winners get paid.</p>
+                <h3 className="font-semibold text-sm">Tournaments</h3>
+                <p className="text-xs sm:text-sm text-ccb-muted">Swiss and knockout events for every level — compete for titles, trophies and club rewards.</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -218,7 +218,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           </div>
           <h2 className="text-xl sm:text-3xl font-bold mb-4">Join the Club, Kill the Ads</h2>
           <p className="text-sm sm:text-base text-ccb-muted mb-8 max-w-2xl mx-auto">
-            One flat price — {formatMembershipPrice(convertedMembershipPrice, membershipDisplaySymbol)} — for a completely ad-free experience. Your membership keeps the cash rewards flowing for every player.
+            One flat membership — just $10 a month ({formatMembershipPrice(convertedMembershipPrice, membershipDisplaySymbol)} in your local currency) — for a completely ad-free experience. Your membership powers the weekly XP leagues, tournaments and community events.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-left max-w-2xl mx-auto mb-8">
@@ -227,8 +227,8 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                 <Trophy className="w-4 h-4 text-ccb-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-sm">You Fund the Cash Rewards</h3>
-                <p className="text-xs sm:text-sm text-ccb-muted">Weekly league payouts and battle pots stay real money because members cover the platform.</p>
+                <h3 className="font-semibold text-sm">You Power the Club</h3>
+                <p className="text-xs sm:text-sm text-ccb-muted">Your $10 membership funds the weekly XP league rewards, tournaments and community events for everyone.</p>
               </div>
             </div>
             <div className="flex items-start gap-3">

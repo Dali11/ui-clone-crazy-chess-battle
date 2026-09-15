@@ -67,7 +67,7 @@ export default function HowItWorksPage() {
                 {[
                   "Pick a unique username — this is how opponents see you",
                   "Choose your skill level or link Chess.com for auto-rating",
-                  "Get a referral link — earn MK500 cash when friends activate",
+                  "Get a referral link — earn club perks when friends activate",
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm text-ccb-muted">
                     <Check className="w-4 h-4 text-ccb-success shrink-0" />
@@ -90,12 +90,12 @@ export default function HowItWorksPage() {
             <div className="space-y-4">
               <div>
                 <div className="text-ccb-muted text-xs font-mono mb-1">Step 02</div>
-                <h2 className="text-lg sm:text-xl font-bold">Fund your wallet (optional)</h2>
+                <h2 className="text-lg sm:text-xl font-bold">Join the Club (optional)</h2>
               </div>
               <p className="text-sm text-ccb-muted">
-                Want to enter paid tournaments? Deposit money into your CCB wallet using mobile money.
-                Go to your Wallet page, enter your phone number and the amount, and authorize the payment
-                on your phone. Your balance updates instantly.
+                Club membership is just $10 a month. Pay with mobile money — go to your Membership page,
+                enter your phone number, and authorize the payment on your phone. Your membership activates
+                instantly and keeps the leagues, tournaments and rewards running for the whole community.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="card !p-3 flex items-center gap-3">
@@ -146,12 +146,12 @@ export default function HowItWorksPage() {
                 <div className="card">
                   <Swords className="w-5 h-5 text-ccb-success mb-2" />
                   <h3 className="font-semibold text-sm mb-1">Challenge a Friend</h3>
-                  <p className="text-xs text-ccb-muted">Generate a link and send it. Play ranked or casual, with or without stakes.</p>
+                  <p className="text-xs text-ccb-muted">Generate a link and send it. Play ranked or casual — the choice is yours.</p>
                 </div>
                 <div className="card">
                   <Trophy className="w-5 h-5 text-ccb-accent mb-2" />
                   <h3 className="font-semibold text-sm mb-1">Join a Tournament</h3>
-                  <p className="text-xs text-ccb-muted">Enter free or paid Swiss tournaments. Win games, climb the bracket, claim your prize.</p>
+                  <p className="text-xs text-ccb-muted">Enter Swiss tournaments. Win games, climb the bracket, claim the title.</p>
                 </div>
                 <div className="card">
                   <Disc3 className="w-5 h-5 text-ccb-accent mb-2" />
@@ -161,7 +161,7 @@ export default function HowItWorksPage() {
                 <div className="card">
                   <Gamepad2 className="w-5 h-5 text-ccb-primary mb-2" />
                   <h3 className="font-semibold text-sm mb-1">Play vs Computer</h3>
-                  <p className="text-xs text-ccb-muted">Practice chess or draughts against the AI. No stakes, no rating impact — just sharpen your skills.</p>
+                  <p className="text-xs text-ccb-muted">Practice chess or draughts against the AI. No rating impact — just sharpen your skills.</p>
                 </div>
               </div>
             </div>
@@ -179,11 +179,11 @@ export default function HowItWorksPage() {
             <div className="space-y-4">
               <div>
                 <div className="text-ccb-muted text-xs font-mono mb-1">Step 04</div>
-                <h2 className="text-lg sm:text-xl font-bold">Win, get paid, withdraw</h2>
+                <h2 className="text-lg sm:text-xl font-bold">Win, earn rewards, withdraw</h2>
               </div>
               <p className="text-sm text-ccb-muted">
-                When a tournament ends, prizes are distributed automatically to winners&apos; wallets based on final ranking.
-                The top players split the prize pool — typically 40% to 1st, 20% to 2nd, 18% to 3rd, and so on.
+                When a tournament ends, club rewards are credited automatically to top finishers&apos; wallets based on final ranking.
+                Members earn XP in every game, and the weekly league table decides who tops the week.
               </p>
               <p className="text-sm text-ccb-muted">
                 Your wallet balance can be withdrawn to your mobile money account at any time. No waiting periods,
@@ -191,7 +191,7 @@ export default function HowItWorksPage() {
               </p>
               <div className="flex items-center gap-2 text-sm text-ccb-success">
                 <Check className="w-4 h-4" />
-                <span>Instant payout to TNM Mpamba or Airtel Money</span>
+                <span>Secure withdrawals via TNM Mpamba or Airtel Money</span>
               </div>
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function HowItWorksPage() {
               <div className="text-ccb-muted text-xs font-mono mb-2">Stage 03</div>
               <Crown className="w-7 h-7 text-ccb-success mx-auto mb-3" />
               <h3 className="font-semibold text-sm mb-2">Season Champion</h3>
-              <p className="text-xs text-ccb-muted">Accumulate season points across all competitions. Top players fight for the championship title and prizes.</p>
+              <p className="text-xs text-ccb-muted">Accumulate season points across all competitions. Top players fight for the championship title.</p>
             </div>
           </div>
         </div>
@@ -242,14 +242,14 @@ export default function HowItWorksPage() {
                 <h2 className="text-lg sm:text-xl font-bold">Host your own tournaments</h2>
               </div>
               <p className="text-sm text-ccb-muted">
-                Once you&apos;re eligible, you can create tournaments and earn a 40% profit share of the entry fees
-                (after the 10% platform cut). Set your own entry fee, min/max players, time controls, and schedule.
+                Once you&apos;re eligible, you can host tournaments for the community. Set your own format,
+                min/max players, time controls, and schedule.
               </p>
               <div className="space-y-2">
                 <div className="text-sm font-medium">Eligibility requirements:</div>
                 {[
                   "Free tournaments: Account 3+ days old, 10+ games played",
-                  "Paid tournaments: Chess.com verified, 1+ deposit, 7+ day account, 20+ games played",
+                  "Hosting larger events: Chess.com verified, 7+ day account, 20+ games played",
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm text-ccb-muted">
                     <ChevronRight className="w-4 h-4 text-ccb-primary shrink-0" />

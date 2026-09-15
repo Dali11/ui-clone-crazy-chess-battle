@@ -8,31 +8,31 @@ import {
 import { pageMetadata } from "@/lib/seo/metadata";
 
 export const metadata = pageMetadata({
-  title: "How Battles Work — Staked Chess Matches Explained",
-  description: "The complete guide to Crazy Chess Battles: how stakes lock in escrow, the 2-minute join window, payouts, armageddon draw deciders, no-show rules, and how battles earn Elo and League XP.",
+  title: "How Battles Work — Head-to-Head Chess Duels Explained",
+  description: "The complete guide to Crazy Chess Battles: head-to-head battles, the 2-minute join window, Armageddon draw deciders, no-show rules, and how battles earn Elo and weekly League XP.",
   path: "/how-battles-work",
 });
 
 const SECTIONS = [
   {
     icon: Wallet,
-    title: "Stake & Lock",
-    body: "Both players lock the same stake from their wallets before the game starts. Your stake always displays in your own currency — the amounts match exactly, no matter where each player is.",
+    title: "Fair & Square",
+    body: "Battles are always evenly matched — you face a player at your level, with the time control shown up front. No surprises, no hidden terms, no matter where each player is.",
   },
   {
     icon: Swords,
     title: "Find Your Opponent",
-    body: "Two ways to battle: Quick Match pairs you with a waiting opponent instantly, or send a Challenge link to a friend or group. Unaccepted challenges auto-refund your stake.",
+    body: "Two ways to battle: Quick Match pairs you with a waiting opponent instantly, or send a Challenge link to a friend or group. Unaccepted challenges simply expire — nothing is ever lost.",
   },
   {
     icon: Clock,
     title: "The Join Window",
-    body: "When the game is created, the clock stays frozen for up to 2 minutes while both players get to the board. The game starts the moment you're both there — your stake can never burn on a game you didn't know had started.",
+    body: "When the game is created, the clock stays frozen for up to 2 minutes while both players get to the board. The game starts the moment you're both there — you never sit down to a game you didn't know had started.",
   },
   {
     icon: Trophy,
-    title: "Winner Takes the Pot",
-    body: "Both stakes form the pot. The winner takes it minus a small 5% platform fee, and the payout lands in your wallet automatically the second the game ends.",
+    title: "Claim the Win",
+    body: "The result is recorded the second the game ends — your Elo and weekly League XP update automatically, win or draw settled on the board, not in a dispute.",
   },
   {
     icon: Zap,
@@ -52,7 +52,7 @@ const SECTIONS = [
   {
     icon: Scale,
     title: "Draws Get Settled Fair",
-    body: "A drawn battle triggers an Armageddon decider — white gets more time, but a draw counts for black. Three draws in a row and both stakes are refunded. And per FIDE rule 6.9, a timeout against insufficient mating material is a draw, not a win — no cheap victories on a bare king.",
+    body: "A drawn battle triggers an Armageddon decider — white gets more time, but a draw counts for black. Three draws in a row and the battle is simply called even. And per FIDE rule 6.9, a timeout against insufficient mating material is a draw, not a win — no cheap victories on a bare king.",
   },
   {
     icon: TrendingUp,
@@ -85,7 +85,7 @@ export default function HowBattlesWorkPage() {
             How <span className="text-ccb-primary">Battles</span> work
           </h1>
           <p className="text-sm sm:text-lg text-ccb-muted">
-            Everything about staked matches on Crazy Chess Battles — from locking your stake to getting paid. Stake what you can afford. Play hard.
+            Everything about head-to-head battles on Crazy Chess Battles — from finding an opponent to claiming the win. Play hard.
           </p>
         </div>
       </section>
@@ -113,7 +113,7 @@ export default function HowBattlesWorkPage() {
         <div className="max-w-xl mx-auto">
           <h2 className="text-xl sm:text-2xl font-bold mb-3">Ready to battle?</h2>
           <p className="text-sm text-ccb-muted mb-6">
-            Lock your stake, find an opponent, and play for the pot.
+            Find an opponent, take your seat, and play.
           </p>
           <Link
             href="/battles"
