@@ -67,11 +67,11 @@ export default async function AffiliatePage() {
       .eq("status", "success"));
   const totalCommissionEarned = commissionDeposits.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
 
-  // Get membership pricing from platform settings (admin-configurable)
+  // Membership is a single $10/month USD-priced plan (owner decision
+  // 2026-09-15) — no yearly tier. Read price_usd from platform settings
+  // (admin-configurable) instead of the old MWK monthly/yearly fields.
   const mConfig = await getPlatformConfig(admin, "membership");
-  const membershipPrice = mConfig.monthly_price || mConfig.price_mwk || 10000; // MWK
-  const membershipCurrency = mConfig.currency || "MWK";
-  const yearlyPrice = mConfig.yearly_price || membershipPrice * 10; // 10 months (2 free)
+  const membershipPriceUsd = mConfig.price_usd ?? 10;
   const commissionRate = 0.25;
   const affConfig = await getPlatformConfig(admin, "affiliate");
   const affiliateEnabled = !!affConfig.enabled;
@@ -86,9 +86,7 @@ export default async function AffiliatePage() {
       baseUrl={baseUrl}
       walletBalance={profile?.wallet_balance || 0}
       totalCommissionEarned={totalCommissionEarned}
-      membershipPrice={membershipPrice}
-      yearlyPrice={yearlyPrice}
-      membershipCurrency={membershipCurrency}
+      membershipPriceUsd={membershipPriceUsd}
       commissionRate={commissionRate}
       referrals={referrals.map((r: any) => ({
         id: r.id,
