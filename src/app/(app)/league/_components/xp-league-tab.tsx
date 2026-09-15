@@ -41,18 +41,13 @@ interface StandingsResponse {
   allTimeXp?: number;
 }
 
-/** Local-currency reward tile: primary = player's currency, secondary = MWK. */
+/**
+ * Reward tile: shown entirely in the player's own currency.
+ * (Owner decision 2026-09-15: no MWK equivalent underneath for
+ * non-Malawian players — they just see their local figure.)
+ */
 function RewardAmount({ mwk, currency }: { mwk: number; currency: ReturnType<typeof useCurrency> }) {
-  const mwkLabel = `MK ${Math.floor(mwk).toLocaleString("en-US")}`;
-  if (currency.currencyCode === "MWK") {
-    return <div className="text-xs font-bold mt-0.5">{mwkLabel}</div>;
-  }
-  return (
-    <div className="mt-0.5">
-      <div className="text-xs font-bold">{currency.formatRewardMoney(mwk)}</div>
-      <div className="text-[9px] text-ccb-muted/80 leading-tight">{mwkLabel}</div>
-    </div>
-  );
+  return <div className="text-xs font-bold mt-0.5">{currency.formatRewardMoney(mwk)}</div>;
 }
 
 function useCountdown(targetIso?: string) {
