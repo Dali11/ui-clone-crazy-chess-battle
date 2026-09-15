@@ -55,3 +55,31 @@ export function getCurrencySymbol(currencyCode: string): string {
     return currencyCode;
   }
 }
+
+/**
+ * Get the MWK -> currencyCode rate from the exchange_rates table, falling
+ * back to the live FX API when no row exists. Returns 0 when unavailable
+ * (callers must reject the transaction rather than guess a rate).
+ * Server-side only: takes the admin Supabase client.
+ */
+export async function getMwkToLocalRate(
+  admin: { from: (table: string) => any },
+  currencyCode: string
+): Promise<number> {
+  if (!currencyCode || currencyCode === "MWK") return 1;
+  try {
+    const { data } = await admin
+      .from("exchange_rates")
+      .select("rate")
+      .eq("base_currency", "MWK")
+      .eq("target_currency", currencyCode)
+      .single();
+    const rate = Number(data?.rate || 0);
+    if (rate > 0) return rate;
+  } catch {}
+  // Live fallback. Every real MWK->X rate is < 1 (MWK is a weak currency),
+  // so a live result of >= 1 means the API failed and returned its
+  // safe-default of 1 — treat that as "unavailable", never as a real rate.
+  const live = await getExchangeRate("MWK", currencyCode);
+  return live > 0 && live < 1 ? live : 0;
+}

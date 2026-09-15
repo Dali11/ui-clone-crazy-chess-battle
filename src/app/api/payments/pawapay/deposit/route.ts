@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { initiateDeposit } from "@/lib/payments/pawapay";
 import { isAllowedDepositPhone } from "@/lib/deposit-phones";
+import { getMwkToLocalRate } from "@/lib/geo/fx";
 import { randomUUID } from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -13,9 +14,22 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { amount, phoneNumber, provider, currency, country } = await req.json();
-
     // ─── Load platform config ──────────────────────────────────────────
     const admin = createAdminClient();
+
+    const localAmount = Number(amount);
+    const currencyCode = String(currency || "MWK").toUpperCase();
+
+    // ─── FX: wallets are MWK-denominated — convert the local deposit amount
+    let amountMwk = localAmount;
+    let fxRate: number | null = null; // 1 MWK -> local currency
+    if (currencyCode !== "MWK") {
+      fxRate = await getMwkToLocalRate(admin, currencyCode);
+      if (!fxRate) {
+        return NextResponse.json({ error: "Currency conversion unavailable — try again shortly." }, { status: 503 });
+      }
+      amountMwk = Math.round(localAmount / fxRate);
+    }
     const dConfig = await getPlatformConfig(admin, "deposits");
 
     if (!dConfig.enabled) {
@@ -23,7 +37,10 @@ export async function POST(req: NextRequest) {
     }
 
     const minAmount = dConfig.min_amount || 1000;
-    if (!amount || amount < minAmount) {
+    if (!localAmount || localAmount <= 0) {
+      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+    }
+    if (amountMwk < minAmount) {
       return NextResponse.json(
         { error: `Minimum deposit is ${minAmount.toLocaleString()}` },
         { status: 400 }
@@ -31,7 +48,7 @@ export async function POST(req: NextRequest) {
     }
 
     const maxAmount = dConfig.max_amount || 10_000_000;
-    if (amount > maxAmount) {
+    if (amountMwk > maxAmount) {
       return NextResponse.json(
         { error: `Maximum deposit is ${maxAmount.toLocaleString()}` },
         { status: 400 }
@@ -59,14 +76,14 @@ export async function POST(req: NextRequest) {
 
     // Determine if this deposit needs manual approval
     const approvalThreshold = dConfig.require_approval_above || 0;
-    const requiresApproval = approvalThreshold > 0 && amount > approvalThreshold;
+    const requiresApproval = approvalThreshold > 0 && amountMwk > approvalThreshold;
 
     // Create deposit record
     const { data: deposit, error: depositError } = await admin
       .from("deposits")
       .insert({
         user_id: user.id,
-        amount: amount,
+        amount: amountMwk,
         method: "pawapay",
         payment_provider: "pawapay",
         status: "pending",
@@ -75,6 +92,9 @@ export async function POST(req: NextRequest) {
         operator: provider,
         pawapay_ref: depositId,
         country: country || null,
+        currency: currencyCode,
+        amount_local: fxRate ? localAmount : null,
+        fx_rate: fxRate,
       })
       .select("id")
       .single();
@@ -87,8 +107,8 @@ export async function POST(req: NextRequest) {
     try {
       const response = await initiateDeposit({
         depositId,
-        amount: String(amount),
-        currency: currency || "MWK",
+        amount: String(localAmount),
+        currency: currencyCode,
         phoneNumber,
         provider,
       });

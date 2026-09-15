@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { moneySymbol } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
+import { getMwkToLocalRate } from "@/lib/geo/fx";
 
 export async function POST(req: NextRequest) {
   try {
@@ -130,6 +131,7 @@ export async function POST(req: NextRequest) {
       .update({
         payment_provider: provider,
         country: country || null,
+        currency: currency || "MWK",
       })
       .eq("id", withdrawalId);
 
@@ -168,6 +170,15 @@ export async function POST(req: NextRequest) {
         const amountMWK = (netAmount || withdrawal.amount);
         let payoutSucceeded = false;
         const payoutProvider = withdrawal.payment_provider || "paychangu";
+        // PawaPay pays out in the player's LOCAL currency — convert the
+        // MWK net amount (wallet-denominated) before disbursement.
+        const payoutCurrency = String(withdrawal.currency || "MWK").toUpperCase();
+        let payoutAmountLocal = amountMWK;
+        if (payoutProvider === "pawapay" && payoutCurrency !== "MWK") {
+          const rate = await getMwkToLocalRate(admin, payoutCurrency);
+          if (!rate) throw new Error("Currency conversion unavailable");
+          payoutAmountLocal = Math.round(amountMWK * rate);
+        }
 
         if (payoutProvider === "pawapay") {
           try {
@@ -176,8 +187,8 @@ export async function POST(req: NextRequest) {
             const payoutId = randomUUID();
             const payoutResponse = await initiatePayout({
               payoutId,
-              amount: String(amountMWK),
-              currency: withdrawal.currency || "MWK",
+              amount: String(payoutAmountLocal),
+              currency: payoutCurrency,
               phoneNumber: withdrawal.phone,
               provider: withdrawal.operator_ref_id,
             });
@@ -194,7 +205,7 @@ export async function POST(req: NextRequest) {
                   user_id: withdrawal.user_id,
                   type: "withdrawal_approved",
                   title: "Your withdrawal has been processed",
-                  body: `${amountMWK.toLocaleString()} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
+                  body: `${payoutAmountLocal.toLocaleString()}${payoutCurrency !== "MWK" ? ` ${payoutCurrency}` : ""} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
                   data: { amount: amountMWK, phone: withdrawal.phone, operator: withdrawal.operator_name, auto: true, fees: totalFees, provider: "pawapay" },
                   read: false,
                 });

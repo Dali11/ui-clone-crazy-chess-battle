@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { initiatePayout } from "@/lib/payments/pawapay";
 import { randomUUID } from "crypto";
+import { getMwkToLocalRate } from "@/lib/geo/fx";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -48,11 +49,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // ── PawaPay payout ─────────────────────────────────────────────────
       const payoutId = randomUUID();
 
+      // PawaPay pays out in the player's LOCAL currency — convert the
+      // MWK net amount (wallet-denominated) before disbursement.
+      const payoutCurrency = String(withdrawal.currency || "MWK").toUpperCase();
+      let payoutAmountLocal = netAmount;
+      if (payoutCurrency !== "MWK") {
+        const rate = await getMwkToLocalRate(admin, payoutCurrency);
+        if (rate) payoutAmountLocal = Math.round(netAmount * rate);
+      }
+
       try {
         const response = await initiatePayout({
           payoutId,
-          amount: String(netAmount),
-          currency: withdrawal.currency || "MWK",
+          amount: String(payoutAmountLocal),
+          currency: payoutCurrency,
           phoneNumber: withdrawal.phone,
           provider: withdrawal.operator_ref_id,
         });
