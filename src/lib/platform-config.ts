@@ -20,14 +20,6 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     refresh_interval_seconds: 30,
   },
   // Push notifications (WhatsApp-style). Master switch + per-type throttle gaps.
-  // Zambia gateway (Ontech) — amounts in ZMW ("K").
-  payments_zm: {
-    enabled: true,
-    min_deposit_zmw: 5,
-    max_deposit_zmw: 5000,
-    min_withdrawal_zmw: 10,
-    max_withdrawal_zmw: 5000,
-  },
   push: {
     enabled: true,
     dm_gap_min: 0,       // DMs always notify (per sender:recipient pair)

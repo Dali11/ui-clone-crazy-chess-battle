@@ -63,18 +63,6 @@ interface WalletClientProps {
 
 const QUICK_AMOUNTS_MWK = [500, 1000, 2000, 5000, 10000, 25000];
 const QUICK_AMOUNTS_INTL = [100, 500, 1000, 2000, 5000, 10000];
-// ZM fallback (used only until /api/payments/ontech/config responds) — the
-// real chips are built from the admin-configured min in buildZmQuickAmounts.
-const QUICK_AMOUNTS_ZM_FALLBACK = [5, 20, 50, 100, 200, 500];
-
-/** Scale a set of quick-amount chips off the admin-configured min, capped at max. */
-function buildZmQuickAmounts(min: number, max: number): number[] {
-  const steps = [1, 4, 10, 20, 40, 100].map((m) => min * m);
-  const amounts = Array.from(new Set(steps.filter((a) => a <= max)));
-  if (amounts.length === 0) amounts.push(min);
-  return amounts;
-}
-
 export default function WalletClient({ balance, email, deposits, phone: savedPhone, depositPhones = [], country }: WalletClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -102,32 +90,13 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [pawapayProviders, setPawapayProviders] = useState<PawaPayProvider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [pawapayLoading, setPawapayLoading] = useState(false);
-  // Zambia (Ontech) state
-  const [zmMethod, setZmMethod] = useState<"mobile" | "bank">("mobile");
-  const [zmBanks, setZmBanks] = useState<{ code: string; name: string }[]>([]);
-  const [zmBankCode, setZmBankCode] = useState("");
-  const [zmAccountNumber, setZmAccountNumber] = useState("");
-  const [zmRecipientName, setZmRecipientName] = useState("");
-  const [pendingOntechId, setPendingOntechId] = useState<string | null>(null);
-  // Admin-configured ZM limits (Platform Settings → payments_zm) — never hardcode
-  // these client-side; fall back to the same defaults the API uses until loaded.
-  const [zmConfig, setZmConfig] = useState<{ minDepositZmw: number; maxDepositZmw: number; minWithdrawalZmw: number; maxWithdrawalZmw: number } | null>(null);
 
   // Live currency via shared hook — converts MWK to user's local currency
   const { formatMoney: fmtCurrency, currencySymbol: sym, currencyCode: currencyCode, rate: fxRate } = useCurrency(country);
   const isMalawi = !country || country === "MW";
-  const isZambia = country === "ZM";
-  const usePawaPay = !isMalawi && !isZambia;
+  const usePawaPay = !isMalawi; // everyone outside Malawi deposits/withdraws via PawaPay
 
-  const zmMinDeposit = zmConfig?.minDepositZmw ?? 5;
-  const zmMaxDeposit = zmConfig?.maxDepositZmw ?? 5000;
-  const zmMinWithdrawal = zmConfig?.minWithdrawalZmw ?? 10;
-  const zmMaxWithdrawal = zmConfig?.maxWithdrawalZmw ?? 5000;
-  const quickAmounts = isMalawi
-    ? QUICK_AMOUNTS_MWK
-    : isZambia
-    ? (zmConfig ? buildZmQuickAmounts(zmMinDeposit, zmMaxDeposit) : QUICK_AMOUNTS_ZM_FALLBACK)
-    : QUICK_AMOUNTS_INTL;
+  const quickAmounts = isMalawi ? QUICK_AMOUNTS_MWK : QUICK_AMOUNTS_INTL;
   const formatAmt = (amount: number) => fmtCurrency(amount || 0);
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -260,167 +229,6 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
     return () => { clearInterval(interval); clearTimeout(timeout); };
   }, [pendingChargeId, router]);
 
-  // ─── Fetch ZM banks + admin-configured deposit/withdraw limits (Ontech) ──
-  useEffect(() => {
-    if (!isZambia) return;
-    fetch("/api/payments/ontech/banks")
-      .then((r) => r.json())
-      .then((d) => { if (d.banks) setZmBanks(d.banks); })
-      .catch(() => {});
-    fetch("/api/payments/ontech/config")
-      .then((r) => r.json())
-      .then((d) => {
-        if (typeof d.minDepositZmw === "number") {
-          setZmConfig({
-            minDepositZmw: d.minDepositZmw,
-            maxDepositZmw: d.maxDepositZmw,
-            minWithdrawalZmw: d.minWithdrawalZmw,
-            maxWithdrawalZmw: d.maxWithdrawalZmw,
-          });
-        }
-      })
-      .catch(() => {});
-  }, [isZambia]);
-
-  // ─── Ontech deposit (Zambia) ─────────────────────────────────────────
-  const handleOntechDeposit = async () => {
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      if (depositAmount < zmMinDeposit) {
-        setError(`Minimum deposit is K${zmMinDeposit.toLocaleString()}`);
-        setLoading(false);
-        return;
-      }
-      if (depositAmount > zmMaxDeposit) {
-        setError(`Maximum deposit is K${zmMaxDeposit.toLocaleString()}`);
-        setLoading(false);
-        return;
-      }
-      if (!depositPhone || depositPhone.replace(/\D/g, "").length < 9) {
-        setError("Select one of your saved deposit numbers in Settings first.");
-        setLoading(false);
-        return;
-      }
-      const res = await fetch("/api/payments/ontech/deposit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: depositAmount, phone: depositPhone }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || "Deposit failed. Please try again.");
-      setPendingOntechId(data.chargeId);
-      setSuccess("Check your phone to authorize the Airtel/MTN/Zamtel payment. Waiting for confirmation...");
-    } catch (err: any) {
-      setError(err.message && err.message.length < 200 ? err.message : "Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Poll Ontech deposit status
-  useEffect(() => {
-    if (!pendingOntechId) return;
-    setPolling(true);
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/payments/ontech/deposit/status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chargeId: pendingOntechId }),
-        });
-        const data = await res.json();
-        if (data.status === "success") {
-          setSuccess(`K${data.amountZmw ?? ""} added to your wallet!`);
-          setPolling(false);
-          setPendingOntechId(null);
-          clearInterval(interval);
-          setWalletBal((prev) => prev + (data.amount || 0));
-          router.refresh();
-        } else if (data.status === "failed") {
-          setError("Payment failed or timed out. Please try again.");
-          setPolling(false);
-          setPendingOntechId(null);
-          clearInterval(interval);
-        }
-      } catch {}
-    }, 5000);
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      setPolling(false);
-      if (pendingOntechId) {
-        setError("Payment verification timed out. If you completed the payment, your balance will update shortly.");
-        setPendingOntechId(null);
-      }
-    }, 180000);
-    return () => { clearInterval(interval); clearTimeout(timeout); };
-  }, [pendingOntechId, router]);
-
-  // ─── ZM withdrawal (Ontech) ────────────────────────────────────────────
-  const handleZmWithdraw = async () => {
-    setWithdrawLoading(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      if (!withdrawAmount || withdrawAmount <= 0) {
-        setError("Enter an amount to withdraw");
-        setWithdrawLoading(false);
-        return;
-      }
-      if (withdrawAmount < zmMinWithdrawal) {
-        setError(`Minimum withdrawal is K${zmMinWithdrawal.toLocaleString()}`);
-        setWithdrawLoading(false);
-        return;
-      }
-      if (withdrawAmount > zmMaxWithdrawal) {
-        setError(`Maximum withdrawal is K${zmMaxWithdrawal.toLocaleString()}`);
-        setWithdrawLoading(false);
-        return;
-      }
-      const body: Record<string, any> = {
-        amount: withdrawAmount,
-        payment_provider: "ontech",
-        country: "ZM",
-        method: zmMethod,
-      };
-      if (zmMethod === "mobile") {
-        if (!withdrawPhone || withdrawPhone.replace(/\D/g, "").length < 9) {
-          setError("Enter a valid Zambian mobile number (e.g. 0971234567)");
-          setWithdrawLoading(false);
-          return;
-        }
-        body.phone = withdrawPhone;
-      } else {
-        if (!zmBankCode || !zmAccountNumber || !zmRecipientName) {
-          setError("Bank, account number and account name are required");
-          setWithdrawLoading(false);
-          return;
-        }
-        body.bankCode = zmBankCode;
-        body.accountNumber = zmAccountNumber;
-        body.recipientName = zmRecipientName;
-      }
-      const res = await fetch("/api/withdrawals/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || "Withdrawal failed. Please try again.");
-      // data.amountMwk = MWK debited
-      setWalletBal((prev) => prev - (data.amountMwk || 0));
-      setSuccess(`Withdrawal request for K${data.amountZmw ?? withdrawAmount} submitted. You'll receive it after admin approval.`);
-      router.refresh();
-      fetch("/api/withdrawals/list").then((r) => r.json()).then((d) => { if (d.withdrawals) setWithdrawals(d.withdrawals); });
-    } catch (err: any) {
-      setError(err.message && err.message.length < 200 ? err.message : "Something went wrong. Please try again.");
-    } finally {
-      setWithdrawLoading(false);
-    }
-  };
-
-
   const handlePawaPayDeposit = async () => {
     setLoading(true);
     setError(null);
@@ -510,10 +318,10 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
     }
   };
 
-  const handleDeposit = isZambia ? handleOntechDeposit : usePawaPay ? handlePawaPayDeposit : handlePayChanguDeposit;
+  const handleDeposit = usePawaPay ? handlePawaPayDeposit : handlePayChanguDeposit;
 
   // ─── Withdraw ─────────────────────────────────────────────────────────
-  const handleWithdraw = isZambia ? handleZmWithdraw : async () => {
+  const handleWithdraw = async () => {
     setWithdrawLoading(true);
     setError(null);
     setSuccess(null);
@@ -670,14 +478,9 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
             <input
               type="number"
               value={depositAmount}
-              onChange={(e) => setDepositAmount(Math.max(isZambia ? zmMinDeposit : 100, parseInt(e.target.value) || 0))}
+              onChange={(e) => setDepositAmount(Math.max(100, parseInt(e.target.value) || 0))}
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
             />
-            {isZambia && (
-              <p className="text-xs text-ccb-muted mt-1.5">
-                Min K{zmMinDeposit.toLocaleString()} · Max K{zmMaxDeposit.toLocaleString()}
-              </p>
-            )}
             <div className="flex gap-2 mt-2 flex-wrap">
               {quickAmounts.map((amt) => (
                 <button
@@ -729,11 +532,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
 
           <div>
             <label className="text-sm font-medium text-ccb-muted mb-2 block">
-              {isMalawi
-                ? "Mobile Money Number (Airtel Money or Mpamba)"
-                : isZambia
-                ? "Mobile Money Number (Airtel / MTN / Zamtel)"
-                : "Mobile Money Number"}
+              {isMalawi ? "Mobile Money Number (Airtel Money or Mpamba)" : "Mobile Money Number"}
             </label>
             {depositPhones.length === 0 ? (
               <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-600">
@@ -765,11 +564,6 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                   </button>
                 ))}
               </div>
-            )}
-            {isZambia && depositPhones.length > 0 && (
-              <p className="text-xs text-ccb-muted mt-1.5">
-                You&apos;ll receive a payment prompt on your phone to authorize the deposit.
-              </p>
             )}
           </div>
 
@@ -803,10 +597,8 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
             />
             <div className="flex gap-2 mt-2 flex-wrap">
               {(() => {
-                // Zambia withdraws in ZMW (Ontech config); everyone else in MWK
-                // (withdrawConfig). Never mix the two currencies' min/max.
-                const minW = isZambia ? zmMinWithdrawal : withdrawConfig ? withdrawConfig.min_amount : 10000;
-                const maxW = isZambia ? zmMaxWithdrawal : withdrawConfig ? withdrawConfig.max_amount : 500000;
+                const minW = withdrawConfig ? withdrawConfig.min_amount : 10000;
+                const maxW = withdrawConfig ? withdrawConfig.max_amount : 500000;
                 const amounts = [minW, minW * 2, minW * 5, Math.min(minW * 10, maxW), Math.min(minW * 20, maxW)];
                 const unique = [...new Set(amounts)].filter(a => a <= maxW);
                 return unique.map((amt) => (
@@ -823,38 +615,11 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               })()}
             </div>
             <p className="text-xs text-ccb-muted mt-2">
-              {isZambia
-                ? `Available: ${formatAmt(walletBal)} · Min: K${zmMinWithdrawal.toLocaleString()} · Max: K${zmMaxWithdrawal.toLocaleString()}`
-                : `Available: ${formatAmt(walletBal)} · Min: ${formatAmt(withdrawConfig ? withdrawConfig.min_amount : 10000)}`}
+              {`Available: ${formatAmt(walletBal)} · Min: ${formatAmt(withdrawConfig ? withdrawConfig.min_amount : 10000)}`}
             </p>
           </div>
 
-          {/* Zambia: method toggle (Mobile Money / Bank) */}
-          {isZambia && (
-            <div>
-              <label className="text-sm font-medium text-ccb-muted mb-2 block">Withdraw To</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setZmMethod("mobile")}
-                  className={`px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
-                    zmMethod === "mobile" ? "border-ccb-primary bg-ccb-primary/10 text-ccb-text" : "border-ccb-border bg-ccb-surface text-ccb-muted"
-                  }`}
-                >
-                  Mobile Money
-                </button>
-                <button
-                  onClick={() => setZmMethod("bank")}
-                  className={`px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
-                    zmMethod === "bank" ? "border-ccb-primary bg-ccb-primary/10 text-ccb-text" : "border-ccb-border bg-ccb-surface text-ccb-muted"
-                  }`}
-                >
-                  Bank Account
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* PawaPay provider selector for withdrawals (non-ZM) */}
+          {/* PawaPay provider selector for withdrawals (non-Malawi) */}
           {usePawaPay && (
             <div>
               <label className="text-sm font-medium text-ccb-muted mb-2 block">Withdraw To</label>
@@ -874,64 +639,17 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
             </div>
           )}
 
-          {/* ZM bank fields */}
-          {isZambia && zmMethod === "bank" && (
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-ccb-muted mb-2 block">Bank</label>
-                <select
-                  value={zmBankCode}
-                  onChange={(e) => setZmBankCode(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-sm"
-                >
-                  <option value="">Select bank…</option>
-                  {zmBanks.map((b) => (
-                    <option key={b.code} value={b.code}>{b.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-ccb-muted mb-2 block">Account Number</label>
-                <input
-                  type="text"
-                  value={zmAccountNumber}
-                  onChange={(e) => setZmAccountNumber(e.target.value)}
-                  placeholder="Account number"
-                  className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-ccb-muted mb-2 block">Account Name</label>
-                <input
-                  type="text"
-                  value={zmRecipientName}
-                  onChange={(e) => setZmRecipientName(e.target.value)}
-                  placeholder="Name on the account"
-                  className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border"
-                />
-              </div>
-            </div>
-          )}
-
           <div>
             <label className="text-sm font-medium text-ccb-muted mb-2 block">
-              {isZambia && zmMethod === "bank"
-                ? " "
-                : isMalawi
-                ? "Mobile Money Number (Airtel Money or Mpamba)"
-                : isZambia
-                ? "Mobile Money Number (Airtel / MTN / Zamtel)"
-                : "Mobile Money Number"}
+              {isMalawi ? "Mobile Money Number (Airtel Money or Mpamba)" : "Mobile Money Number"}
             </label>
-            {(!isZambia || zmMethod === "mobile") && (
-              <input
-                type="tel"
-                value={withdrawPhone}
-                onChange={(e) => setWithdrawPhone(e.target.value)}
-                placeholder={isMalawi ? "0991234567" : isZambia ? "0971234567" : "e.g. +260971234567"}
-                className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border"
-              />
-            )}
+            <input
+              type="tel"
+              value={withdrawPhone}
+              onChange={(e) => setWithdrawPhone(e.target.value)}
+              placeholder={isMalawi ? "0991234567" : "e.g. +260971234567"}
+              className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border"
+            />
           </div>
 
           {/* Fee breakdown */}

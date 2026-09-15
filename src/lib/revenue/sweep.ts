@@ -98,9 +98,7 @@ export async function computeWindowRevenue(
       .lt("created_at", window.endISO)
   ]);
 
-  // Withdrawal fees: MWK-denominated rows only — Ontech ZM rows store ZMW fees
   const withdrawalFees = (withdrawalsRes.data || [])
-    .filter((w) => w.payment_provider !== "ontech")
     .reduce((sum, w) => sum + Math.max(0, w.fee || 0), 0);
   const battleFees = (battlesRes.data || []).reduce(
     (sum, b) => sum + battleFee(b.stake, b.winner_payout),

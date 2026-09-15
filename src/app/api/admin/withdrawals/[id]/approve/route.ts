@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { initiatePayout } from "@/lib/payments/pawapay";
-import { ontechDisburse, zmCarrier } from "@/lib/payments/ontech";
 import { randomUUID } from "crypto";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -45,45 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // ── Determine payout provider ───────────────────────────────────────
     const provider = withdrawal.payment_provider || "paychangu";
 
-    if (provider === "ontech") {
-      // ── Ontech payout (Zambia): mobile money or bank, amount in ZMW ──
-      // For ontech rows: amount = MWK (wallet), amount_local/fee/net_amount = ZMW.
-      try {
-        const payoutZmw = withdrawal.net_amount ?? withdrawal.amount_local ?? null;
-        if (!payoutZmw || payoutZmw <= 0) {
-          throw new Error("Missing ZMW payout amount");
-        }
-        const bankCode = withdrawal.bank_code || (withdrawal.phone ? zmCarrier(withdrawal.phone) : null);
-        if (!bankCode) throw new Error("Missing payout destination");
-
-        const res = await ontechDisburse({
-          recipientName: withdrawal.recipient_name || "CCB player",
-          recipientAccount: withdrawal.account_number || withdrawal.phone,
-          bankCode,
-          amount: payoutZmw,
-          narration: "CCB wallet withdrawal",
-          reference: chargeId,
-        });
-
-        if (res.success && (res.status === "completed" || res.status === "pending")) {
-          payoutSucceeded = true;
-          await admin
-            .from("withdrawals")
-            .update({
-              status: "completed",
-              charge_id: chargeId,
-              ontech_ref: res.disbursementId,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", id);
-        } else {
-          console.error("Ontech payout failed:", res.message);
-        }
-      } catch (payoutErr: any) {
-        console.error("Ontech payout error:", payoutErr);
-      }
-
-    } else if (provider === "pawapay") {
+    if (provider === "pawapay") {
       // ── PawaPay payout ─────────────────────────────────────────────────
       const payoutId = randomUUID();
 
@@ -181,12 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Notify the user
     try {
-      // Ontech (ZM) rows: amount is MWK (wallet) but fee/net/amount_local are ZMW —
-      // show the player their own currency, not a mix.
-      const isZmRow = provider === "ontech" && withdrawal.currency === "ZMW";
-      const nBody = isZmRow
-        ? `Your withdrawal of K${withdrawal.amount_local} (fee: K${fee}, payout: K${netAmount}) has been processed to ${withdrawal.phone} via ${withdrawal.operator_name}.`
-        : `Your withdrawal of ${grossAmount.toLocaleString()} (fee: ${fee.toLocaleString()}, payout: ${netAmount.toLocaleString()}) has been processed to ${withdrawal.phone} via ${withdrawal.operator_name}.`;
+      const nBody = `Your withdrawal of ${grossAmount.toLocaleString()} (fee: ${fee.toLocaleString()}, payout: ${netAmount.toLocaleString()}) has been processed to ${withdrawal.phone} via ${withdrawal.operator_name}.`;
       await admin.from("notifications").insert({
         user_id: withdrawal.user_id,
         type: "withdrawal_approved",

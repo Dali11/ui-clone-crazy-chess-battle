@@ -4,151 +4,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { moneySymbol } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
-import { normalizeZmPhone, zmCarrier, zmCarrierName, zmwToMwk, isOntechConfigured } from "@/lib/payments/ontech";
-
-/**
- * Zambia withdrawal request (Ontech). Body: amount in ZMW plus either
- *   { method: "mobile", phone } or { method: "bank", bankCode, accountNumber, recipientName }.
- * Wallet is debited in MWK at the live rate; fees/net are stored in ZMW
- * (fee + net_amount columns hold LOCAL currency for provider='ontech' rows);
- * payout executes on admin approval via the ontech disburse branch.
- */
-async function requestZmWithdrawal(
-  _req: NextRequest,
-  userId: string,
-  args: {
-    amount: number;
-    phone?: string;
-    zmMethod?: string;
-    bankCode?: string;
-    accountNumber?: string;
-    recipientName?: string;
-  }
-): Promise<NextResponse> {
-  const admin = createAdminClient();
-
-  const zmConfig = await getPlatformConfig(admin, "payments_zm");
-  if (!zmConfig.enabled) {
-    return NextResponse.json({ error: "Withdrawals are currently unavailable in Zambia" }, { status: 403 });
-  }
-  if (!isOntechConfigured()) {
-    return NextResponse.json({ error: "Payment gateway not configured" }, { status: 503 });
-  }
-
-  const amountZmw = Number(args.amount);
-  if (!amountZmw || amountZmw <= 0) {
-    return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
-  }
-  if (amountZmw < (zmConfig.min_withdrawal_zmw || 10)) {
-    return NextResponse.json({ error: `Minimum withdrawal is K${zmConfig.min_withdrawal_zmw || 10}` }, { status: 400 });
-  }
-  if (amountZmw > (zmConfig.max_withdrawal_zmw || 5000)) {
-    return NextResponse.json({ error: `Maximum withdrawal is K${zmConfig.max_withdrawal_zmw || 5000}` }, { status: 400 });
-  }
-
-  // Method validation → bank_code / recipient / operator fields
-  let bankCode: string;
-  let accountNumber: string;
-  let recipientName: string;
-  let operatorName: string;
-  if (args.zmMethod === "bank") {
-    if (!args.bankCode || !args.accountNumber || !args.recipientName) {
-      return NextResponse.json({ error: "Bank, account number and account name are required" }, { status: 400 });
-    }
-    bankCode = String(args.bankCode).toUpperCase();
-    accountNumber = String(args.accountNumber).replace(/\s+/g, "");
-    recipientName = String(args.recipientName).trim();
-    operatorName = "Bank transfer";
-  } else {
-    const zmPhone = normalizeZmPhone(args.phone || "");
-    const carrier = zmPhone ? zmCarrier(zmPhone) : null;
-    if (!zmPhone || !carrier) {
-      return NextResponse.json({ error: "Enter a valid Zambian mobile number (e.g. 0971234567)" }, { status: 400 });
-    }
-    bankCode = carrier;
-    accountNumber = zmPhone;
-    const { data: profileRow } = await admin.from("profiles").select("display_name, username").eq("id", userId).single();
-    recipientName = String(args.recipientName || profileRow?.display_name || profileRow?.username || "CCB player").trim();
-    operatorName = zmCarrierName(carrier);
-  }
-
-  // Existing pending withdrawal (same rule as MW)
-  const { data: existingPending } = await admin.from("withdrawals")
-    .select("id").eq("user_id", userId).eq("status", "pending").limit(1);
-  if (existingPending && existingPending.length > 0) {
-    return NextResponse.json({ error: "You already have a pending withdrawal. Wait for it to be processed before requesting another." }, { status: 400 });
-  }
-
-  // Live FX: convert ZMW → MWK (wallet debits MWK)
-  const { data: rateRow } = await admin.from("exchange_rates")
-    .select("rate").eq("base_currency", "MWK").eq("target_currency", "ZMW").single();
-  const rate = Number(rateRow?.rate || 0);
-  if (!rate || rate <= 0) {
-    return NextResponse.json({ error: "Currency conversion unavailable — try again shortly" }, { status: 503 });
-  }
-  const amountMwk = zmwToMwk(amountZmw, rate);
-
-  // Daily limit (MWK-denominated global cap still applies)
-  const wConfig = await getPlatformConfig(admin, "withdrawals");
-  const dailyLimit = wConfig.daily_limit || 0;
-  if (dailyLimit > 0) {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const { data: todayWithdrawals } = await admin.from("withdrawals")
-      .select("amount").eq("user_id", userId).gte("created_at", today.toISOString())
-      .in("status", ["pending", "approved", "completed"]);
-    const todayTotal = (todayWithdrawals || []).reduce((sum, w) => sum + w.amount, 0);
-    if (todayTotal + amountMwk > dailyLimit) {
-      return NextResponse.json({ error: "Daily withdrawal limit reached" }, { status: 400 });
-    }
-  }
-
-  // Fees in ZMW (processing % only — the fixed fee is MWK-denominated)
-  const pct = Number(wConfig.processing_fee_pct || 0);
-  const feeZmw = Math.round(amountZmw * (pct / 100));
-  const netZmw = Math.max(0, Math.round(amountZmw - feeZmw));
-
-  // Atomic debit + insert (throws 'Insufficient balance')
-  let withdrawalId: string;
-  try {
-    const { data: id, error } = await admin.rpc("request_withdrawal", {
-      p_user_id: userId,
-      p_amount: amountMwk,
-      p_phone: accountNumber,
-      p_operator_ref_id: bankCode,
-      p_operator_name: operatorName,
-    });
-    if (error || !id) throw new Error(error?.message || "Withdrawal failed");
-    withdrawalId = id;
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Insufficient balance" }, { status: 400 });
-  }
-
-  await admin.from("withdrawals").update({
-    payment_provider: "ontech",
-    country: "ZM",
-    currency: "ZMW",
-    amount_local: amountZmw,
-    fx_rate: rate,
-    bank_code: bankCode,
-    account_number: accountNumber,
-    recipient_name: recipientName,
-    fee: feeZmw || 0,
-    net_amount: netZmw,
-  }).eq("id", withdrawalId);
-
-  try {
-    await admin.from("notifications").insert({
-      user_id: userId,
-      type: "withdrawal_requested",
-      title: "Withdrawal requested",
-      body: `Your K${amountZmw} withdrawal request is being reviewed.`,
-      data: { withdrawal_id: withdrawalId, currency: "ZMW", amount_local: amountZmw },
-      read: false,
-    });
-  } catch {}
-
-  return NextResponse.json({ withdrawalId, status: "pending", amountZmw, amountMwk });
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -156,8 +11,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { amount, phone, operatorRefId, operatorName, payment_provider, currency, country,
-            method: zmMethod, bankCode, accountNumber, recipientName } = await req.json();
+    const { amount, phone, operatorRefId, operatorName, payment_provider, currency, country } = await req.json();
 
     // ─── Load platform config ──────────────────────────────────────────
     const admin = createAdminClient();
@@ -186,12 +40,6 @@ export async function POST(req: NextRequest) {
     // Check if withdrawals are enabled
     if (!wConfig.enabled) {
       return NextResponse.json({ error: "Withdrawals are currently disabled" }, { status: 403 });
-    }
-
-    // ─── ZAMBIA (Ontech): amount in ZMW, payout mobile money or bank ────
-    const isZm = _profile?.country === "ZM" || payment_provider === "ontech" || country === "ZM";
-    if (isZm) {
-      return await requestZmWithdrawal(req, user.id, { amount, phone, zmMethod, bankCode, accountNumber, recipientName });
     }
 
     // Enforce minimum amount

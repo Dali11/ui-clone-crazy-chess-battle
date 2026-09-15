@@ -34,8 +34,7 @@ export async function GET() {
         .from("withdrawals")
         .select("fee")
         .eq("status", "completed")
-        .gt("fee", 0)
-        .neq("payment_provider", "ontech"),
+        .gt("fee", 0),
       admin
         .from("deposits")
         .select("amount")
