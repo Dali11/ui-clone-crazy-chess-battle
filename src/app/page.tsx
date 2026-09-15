@@ -7,9 +7,7 @@ import {
 import AppBanner from "@/components/layout/app-banner";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { detectCountry, detectCountryCode, formatMembershipPrice, type MarketConfig } from "@/lib/geo/country-detect";
-import { currencyForCountry } from "@/lib/geo/currency-map";
-import { getExchangeRate, getCurrencySymbol } from "@/lib/geo/fx";
+import { detectCountry, type MarketConfig } from "@/lib/geo/country-detect";
 import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
@@ -32,13 +30,6 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
   });
   const market = await detectCountry(req as any);
 
-  // Convert the membership price to the visitor's local currency using a
-  // live exchange rate, instead of always showing it in Malawi Kwacha.
-  const visitorCountryCode = await detectCountryCode(req as any);
-  const visitorCurrency = currencyForCountry(visitorCountryCode);
-  const fxRate = await getExchangeRate(market.currency, visitorCurrency);
-  const convertedMembershipPrice = Math.round(market.membershipPrice * fxRate);
-  const membershipDisplaySymbol = getCurrencySymbol(visitorCurrency);
   
   // Build signup URL with country + optional ref
   const signupParams = new URLSearchParams();
@@ -175,7 +166,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           </div>
           <h2 className="text-xl sm:text-3xl font-bold mb-4">Join the Club, Kill the Ads</h2>
           <p className="text-sm sm:text-base text-ccb-muted mb-8 max-w-2xl mx-auto">
-            One flat membership — just $10 a month ({formatMembershipPrice(convertedMembershipPrice, membershipDisplaySymbol)} in your local currency) — for a completely ad-free experience. Your membership powers the weekly XP leagues, tournaments and community events.
+            One flat membership — just $10 a month — for a completely ad-free experience. Your membership powers the weekly XP leagues, tournaments and community events.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-left max-w-2xl mx-auto mb-8">
