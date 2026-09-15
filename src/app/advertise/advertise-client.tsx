@@ -97,22 +97,26 @@ export default function AdvertiseClient({
         </div>
       ) : (
         <>
-          {/* Tabs */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-ccb-border bg-ccb-surface p-1">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${
-                  tab === t.key
-                    ? "bg-ccb-primary text-white"
-                    : "text-ccb-muted hover:text-ccb-text"
-                }`}
-              >
-                <t.icon className="w-3.5 h-3.5" />
-                <span className="truncate">{t.label}</span>
-              </button>
-            ))}
+          {/* Tabs — horizontally scrollable so it never overflows/pushes
+              the page width on narrow screens (3 tabs don't all fit at
+              once on small phones). */}
+          <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto scrollbar-none">
+            <div className="flex items-center gap-1.5 rounded-xl border border-ccb-border bg-ccb-surface p-1 w-max min-w-full sm:min-w-0">
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`shrink-0 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors ${
+                    tab === t.key
+                      ? "bg-ccb-primary text-white"
+                      : "text-ccb-muted hover:text-ccb-text"
+                  }`}
+                >
+                  <t.icon className="w-3.5 h-3.5" />
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {error && <p className="text-sm text-red-500">{error}</p>}

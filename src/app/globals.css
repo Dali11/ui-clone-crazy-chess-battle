@@ -60,6 +60,16 @@
   background: #3a3a4a;
 }
 
+/* Hide the scrollbar on horizontally-scrollable strips (e.g. the
+   advertise tab bar) while keeping touch/wheel scroll working. */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* Animations */
 @keyframes pulse-glow {
   0%, 100% {
