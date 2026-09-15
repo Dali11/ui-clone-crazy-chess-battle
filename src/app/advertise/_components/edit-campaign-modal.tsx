@@ -119,7 +119,7 @@ export default function EditCampaignModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[110] bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <div
@@ -291,7 +291,7 @@ export default function EditCampaignModal({
 
         {error && <p className="text-sm text-red-500">{error}</p>}
 
-        <div className="flex items-center gap-2 pt-1">
+        <div className="sticky bottom-0 -mx-4 -mb-4 mt-1 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] bg-ccb-bg border-t border-ccb-border flex items-center gap-2">
           <button
             onClick={onClose}
             className="rounded-lg border border-ccb-border px-4 py-2.5 text-sm font-semibold text-ccb-muted hover:text-ccb-text"
