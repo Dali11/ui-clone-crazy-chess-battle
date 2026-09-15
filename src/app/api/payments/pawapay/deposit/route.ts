@@ -5,6 +5,7 @@ import { getPlatformConfig } from "@/lib/platform-config";
 import { initiateDeposit } from "@/lib/payments/pawapay";
 import { isAllowedDepositPhone } from "@/lib/deposit-phones";
 import { getMwkToLocalRate } from "@/lib/geo/fx";
+import { toPawaPayMsisdn } from "@/lib/geo/iso3";
 import { randomUUID } from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -105,11 +106,15 @@ export async function POST(req: NextRequest) {
 
     // Initiate deposit with PawaPay
     try {
+      // Normalize to PawaPay's required MSISDN format (digits only, country
+      // dialing code, no leading 0 / "+") — fixes INVALID_PAYER_FORMAT
+      // rejections when players type their number in local format.
+      const msisdn = toPawaPayMsisdn(phoneNumber, country);
       const response = await initiateDeposit({
         depositId,
         amount: String(localAmount),
         currency: currencyCode,
-        phoneNumber,
+        phoneNumber: msisdn,
         provider,
       });
 

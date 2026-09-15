@@ -31,3 +31,26 @@ export function toAlpha3(countryCode: string | null | undefined): string {
   if (c.length === 3) return c; // already alpha-3
   return ALPHA2_TO_ALPHA3[c] || c;
 }
+
+// ISO 3166-1 alpha-2 -> international dialing code (no "+"). Covers
+// PawaPay's live countries plus common others. Used to normalize a
+// player-entered local number (e.g. "0727620855") into the MSISDN format
+// PawaPay's API requires (e.g. "254727620855" — digits only, no leading
+// 0, no "+", no separators).
+export const ALPHA2_TO_DIALING_CODE: Record<string, string> = {
+  BJ: "229", CI: "225", CM: "237", CD: "243", CG: "242", GA: "241",
+  KE: "254", MZ: "258", MW: "265", RW: "250", SN: "221", SL: "232",
+  UG: "256", ZM: "260", TZ: "255", ZW: "263", NA: "264", NG: "234",
+  GH: "233", ET: "251", ZA: "27", MG: "261", ML: "223",
+};
+
+/** Normalize a player-entered phone number into PawaPay's MSISDN format:
+ *  digits only, country dialing code prefix, no leading 0, no "+". */
+export function toPawaPayMsisdn(rawPhone: string, countryCode: string | null | undefined): string {
+  let digits = (rawPhone || "").replace(/\D/g, "");
+  const dial = ALPHA2_TO_DIALING_CODE[(countryCode || "").toUpperCase()];
+  if (!dial) return digits; // unknown country — pass through, let PawaPay validate
+  if (digits.startsWith(dial)) return digits;
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  return dial + digits;
+}

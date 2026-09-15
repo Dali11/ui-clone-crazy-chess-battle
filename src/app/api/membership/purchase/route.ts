@@ -5,6 +5,7 @@ import { getPlatformConfig } from "@/lib/platform-config";
 import { getExchangeRate, getMwkToLocalRate } from "@/lib/geo/fx";
 import { currencyCodeForCountry } from "@/lib/geo/format";
 import { initiateDeposit } from "@/lib/payments/pawapay";
+import { toPawaPayMsisdn } from "@/lib/geo/iso3";
 import { isAllowedDepositPhone } from "@/lib/deposit-phones";
 import { randomUUID } from "crypto";
 
@@ -120,12 +121,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Failed to create purchase record" }, { status: 500 });
       }
 
+      const msisdn = toPawaPayMsisdn(phoneNumber, profile?.country);
       try {
         const response = await initiateDeposit({
           depositId,
           amount: String(localAmount),
           currency: currencyCode,
-          phoneNumber,
+          phoneNumber: msisdn,
           provider,
         });
 
