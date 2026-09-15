@@ -58,7 +58,8 @@ export default async function WalletPage() {
       balance={profile?.wallet_balance || 0}
       email={user.email || ""}
       deposits={deposits}
-      phone={null}
+      phone={profile?.phone || null}
+      depositPhones={Array.isArray(profile?.deposit_phone_numbers) ? profile.deposit_phone_numbers : []}
       country={profile?.country || null}
     />
   );

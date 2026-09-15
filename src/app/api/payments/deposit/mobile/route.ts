@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
+import { isAllowedDepositPhone } from "@/lib/deposit-phones";
 import { moneySymbol } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
 
@@ -18,8 +19,8 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient();
     const dConfig = await getPlatformConfig(admin, "deposits");
 
-    // Get user's currency symbol
-    const { data: _profile } = await admin.from("profiles").select("country").eq("id", user.id).single();
+    // Get user's currency symbol + saved deposit phone numbers
+    const { data: _profile } = await admin.from("profiles").select("country, deposit_phone_numbers").eq("id", user.id).single();
     const sym = moneySymbol(_profile?.country);
 
     // Check if deposits are enabled
@@ -43,6 +44,16 @@ export async function POST(req: NextRequest) {
 
     if (!phone || !operatorRefId) {
       return NextResponse.json({ error: "Phone number and operator required" }, { status: 400 });
+    }
+
+    // Deposits can only go through a number the player already saved and
+    // locked in Settings (anti OTP-spam) — never an arbitrary free-text number.
+    const savedDepositPhones = (_profile?.deposit_phone_numbers as string[] | null) || [];
+    if (savedDepositPhones.length === 0) {
+      return NextResponse.json({ error: "Add a deposit phone number in Settings before depositing." }, { status: 400 });
+    }
+    if (!isAllowedDepositPhone(savedDepositPhones, phone)) {
+      return NextResponse.json({ error: "You can only deposit using one of your saved phone numbers. Manage them in Settings." }, { status: 400 });
     }
 
     const chargeId = `ccb_${Date.now()}_${user.id.slice(0, 8)}`;

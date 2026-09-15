@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { initiateDeposit } from "@/lib/payments/pawapay";
+import { isAllowedDepositPhone } from "@/lib/deposit-phones";
 import { randomUUID } from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -39,6 +40,17 @@ export async function POST(req: NextRequest) {
 
     if (!phoneNumber || !provider) {
       return NextResponse.json({ error: "Phone number and provider required" }, { status: 400 });
+    }
+
+    // Deposits can only go through a number the player already saved and
+    // locked in Settings (anti OTP-spam) — never an arbitrary free-text number.
+    const { data: depProfile } = await admin.from("profiles").select("deposit_phone_numbers").eq("id", user.id).single();
+    const savedDepositPhones = (depProfile?.deposit_phone_numbers as string[] | null) || [];
+    if (savedDepositPhones.length === 0) {
+      return NextResponse.json({ error: "Add a deposit phone number in Settings before depositing." }, { status: 400 });
+    }
+    if (!isAllowedDepositPhone(savedDepositPhones, phoneNumber)) {
+      return NextResponse.json({ error: "You can only deposit using one of your saved phone numbers. Manage them in Settings." }, { status: 400 });
     }
 
     // Generate a unique depositId for PawaPay

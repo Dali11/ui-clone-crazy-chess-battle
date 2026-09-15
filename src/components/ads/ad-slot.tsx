@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Ban, Crown } from "lucide-react";
 import { decideAd, loadState, saveState, type AdFrequencyCaps } from "@/lib/ads/frequency";
 
 /**
@@ -150,6 +152,29 @@ async function isMemberSuppressed(): Promise<boolean> {
   }
 }
 
+/* ---------- House ad: "Remove all Ads" (Club membership upsell) ----------
+ * Whenever a slot ends up empty (no paid direct campaign + no network
+ * unit configured), non-members see our own creative instead of dead
+ * space. Cooled down per player so it never nags. */
+
+const HOUSE_AD_KEY = "ccb-house-ad-last";
+const HOUSE_AD_GAP_MS = 45 * 60 * 1000;
+
+function houseAdAllowed(): boolean {
+  try {
+    const last = Number(localStorage.getItem(HOUSE_AD_KEY) || 0);
+    return Date.now() - last > HOUSE_AD_GAP_MS;
+  } catch {
+    return true;
+  }
+}
+
+function markHouseAdShown() {
+  try {
+    localStorage.setItem(HOUSE_AD_KEY, String(Date.now()));
+  } catch {}
+}
+
 export default function AdSlot({
   placement,
   className = "",
@@ -159,6 +184,7 @@ export default function AdSlot({
 }) {
   const [script, setScript] = useState<string | null>(null);
   const [direct, setDirect] = useState<DirectCreative | null>(null);
+  const [house, setHouse] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const injected = useRef(false);
 
@@ -168,10 +194,12 @@ export default function AdSlot({
     let cancelled = false;
     loadAdsConfig().then(async (cfg) => {
       if (cancelled) return;
-      // Members are ad-free for BOTH direct ads and the network.
+      // Members are ad-free for BOTH direct ads and the network —
+      // and never see the house upsell either (they already joined).
       if (await isMemberSuppressed()) {
         setScript(null);
         setDirect(null);
+        setHouse(false);
         return;
       }
       // Frequency router FIRST — direct ads obey the same caps; a mount
@@ -212,6 +240,11 @@ export default function AdSlot({
       const p = cfg?.placements?.[placement];
       if (!cfg?.enabled || !p?.enabled || !p.script) {
         setScript(null);
+        // Empty slot: our own "Remove all Ads" creative for non-members.
+        if (houseAdAllowed()) {
+          markHouseAdShown();
+          setHouse(true);
+        }
         return;
       }
       setScript(p.script);
@@ -285,7 +318,10 @@ export default function AdSlot({
     };
     return (
       <div className={`w-full ${className}`} data-ad-placement={placement}>
-        <p className="text-[10px] uppercase tracking-widest text-ccb-muted/60 mb-0.5 text-center">Sponsored</p>
+        <div className="flex items-center justify-between mb-0.5 px-0.5">
+          <p className="text-[10px] uppercase tracking-widest text-ccb-muted/60">Sponsored</p>
+          <Link href="/membership" className="text-[10px] text-ccb-muted/60 hover:text-ccb-primary transition-colors">Remove ads →</Link>
+        </div>
         <a
           href={direct.target_url}
           target="_blank"
@@ -313,11 +349,44 @@ export default function AdSlot({
     );
   }
 
-  if (!script) return null;
+  if (!script && !house) return null;
+
+  // House creative: our own ad about removing ads → membership card.
+  if (!script && house) {
+    return (
+      <div className={`w-full ${className}`} data-ad-placement={placement}>
+        <div className="flex items-center justify-between mb-0.5 px-0.5">
+          <p className="text-[10px] uppercase tracking-widest text-ccb-muted/60">Sponsored</p>
+          <p className="text-[10px] text-ccb-muted/60">Remove ads →</p>
+        </div>
+        <Link
+          href="/membership"
+          className="block w-full rounded-lg border border-ccb-primary/30 bg-gradient-to-br from-ccb-primary/10 to-ccb-accent/10 hover:border-ccb-primary/60 transition-colors"
+        >
+          <div className="px-3 py-2.5 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-ccb-primary/15">
+              <Ban className="w-4 h-4 text-ccb-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-ccb-text">Remove all Ads</p>
+              <p className="text-[11px] text-ccb-muted truncate">Join the Club — zero ads, 50% bonus XP &amp; priority support.</p>
+            </div>
+            <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-ccb-primary">
+              <Crown className="w-3.5 h-3.5" />
+              Join
+            </span>
+          </div>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className={`w-full ${className}`} data-ad-placement={placement}>
-      <p className="text-[10px] uppercase tracking-widest text-ccb-muted/60 mb-0.5 text-center">Sponsored</p>
+      <div className="flex items-center justify-between mb-0.5 px-0.5">
+        <p className="text-[10px] uppercase tracking-widest text-ccb-muted/60">Sponsored</p>
+        <Link href="/membership" className="text-[10px] text-ccb-muted/60 hover:text-ccb-primary transition-colors">Remove ads →</Link>
+      </div>
       <div ref={containerRef} className="w-full overflow-hidden rounded-lg" />
     </div>
   );

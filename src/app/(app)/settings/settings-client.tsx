@@ -21,6 +21,7 @@ interface Profile {
   avatar_url: string | null;
   phone: string | null;
   phone_number: string | null;
+  deposit_phone_numbers: string[] | null;
   gender: string | null;
   country: string | null;
   chesscom_username: string | null;
@@ -260,6 +261,11 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
   const [displayName, setDisplayName] = useState(profile?.display_name || "");
   const [bio, setBio] = useState(profile?.bio || "");
   const [phone, setPhone] = useState(profile?.phone || profile?.phone_number || "");
+  const [depositPhones, setDepositPhones] = useState<string[]>(profile?.deposit_phone_numbers || []);
+  const [newDepositPhone, setNewDepositPhone] = useState("");
+  const [depositPhoneErr, setDepositPhoneErr] = useState<string | null>(null);
+  const [depositPhoneMsg, setDepositPhoneMsg] = useState<string | null>(null);
+  const [depositPhoneSaving, setDepositPhoneSaving] = useState(false);
   const [gender, setGender] = useState(profile?.gender || "");
   const [country, setCountry] = useState(profile?.country || "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url || null);
@@ -371,6 +377,33 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
     finally { setAvatarUploading(false); if (e.target) e.target.value = ""; }
   };
 
+  // Deposit phone numbers: max 3, used for deposits/mobile payments only.
+  // First save is free; after that the DB trigger locks the list — only
+  // support (service_role) can change it. Anti OTP-spam (PawaPay/Gordon).
+  const addDepositPhone = async () => {
+    const num = newDepositPhone.trim();
+    setDepositPhoneErr(null); setDepositPhoneMsg(null);
+    if (!/^\+?[0-9]{7,15}$/.test(num)) { setDepositPhoneErr("Enter a valid mobile number (digits only, e.g. 0991234567)"); return; }
+    if (depositPhones.length >= 3) { setDepositPhoneErr("You already have 3 deposit numbers. Contact support to change one."); return; }
+    const last9 = (n: string) => n.replace(/\D/g, "").slice(-9);
+    if (depositPhones.some((p) => last9(p) === last9(num))) { setDepositPhoneErr("That number is already in your list."); return; }
+    const next = [...depositPhones, num];
+    setDepositPhoneSaving(true);
+    const { error } = await supabase.from("profiles").update({ deposit_phone_numbers: next }).eq("id", userId);
+    setDepositPhoneSaving(false);
+    if (error) {
+      setDepositPhoneErr(
+        error.message.toLowerCase().includes("locked")
+          ? "Your deposit numbers are locked. Contact support to change them."
+          : error.message
+      );
+      return;
+    }
+    setDepositPhones(next);
+    setNewDepositPhone("");
+    setDepositPhoneMsg("Saved.");
+  };
+
   const handleSaveProfile = async () => {
     setSaving(true); setError(null);
     const updates: Record<string, any> = { display_name: displayName, bio, phone, country };
@@ -469,7 +502,29 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
               {profile?.gender && <p className="text-xs text-ccb-muted mt-2 flex items-center gap-1.5"><Lock className="w-3 h-3" /> Gender is locked. Contact an admin to change.</p>}
             </div>
             <div><label className="text-sm font-medium block mb-1.5">Bio</label><textarea value={bio} onChange={(e) => setBio(e.target.value)} className="input min-h-[80px] resize-none" placeholder="Tell players about yourself" maxLength={200} /></div>
-            <div><label className="text-sm font-medium block mb-1.5">Phone (for withdrawals)</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="input" placeholder="+265 991 23 45 67" /></div>
+            <div><label className="text-sm font-medium block mb-1.5">Phone (for withdrawals)</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="input" placeholder="+265 991 23 45 67" /><p className="text-xs text-ccb-muted mt-1">Withdrawals can go to any number — this is just a convenience default.</p></div>
+            <div>
+              <label className="text-sm font-medium block mb-1.5">Deposit phone numbers</label>
+              <p className="text-xs text-ccb-muted mb-2">Deposits and mobile payments can only use these numbers. Maximum 3. Once saved, the list is locked — contact support to change it.</p>
+              {depositPhones.length > 0 && (
+                <div className="space-y-1.5 mb-2">
+                  {depositPhones.map((dp) => (
+                    <div key={dp} className="flex items-center justify-between px-3 py-2 rounded-xl bg-ccb-surface border border-ccb-border text-sm">
+                      <span>{dp}</span>
+                      <span className="flex items-center gap-1 text-xs text-ccb-muted"><Lock className="w-3 h-3" /> Locked</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {depositPhones.length < 3 && (
+                <div className="flex gap-2">
+                  <input type="tel" value={newDepositPhone} onChange={(e) => { setNewDepositPhone(e.target.value); setDepositPhoneErr(null); setDepositPhoneMsg(null); }} className="input flex-1" placeholder="e.g. 0991234567" disabled={depositPhoneSaving} />
+                  <button type="button" onClick={addDepositPhone} disabled={depositPhoneSaving || !newDepositPhone.trim()} className="shrink-0 px-4 py-2.5 rounded-xl bg-ccb-primary text-white text-sm font-semibold hover:bg-ccb-primary/90 disabled:opacity-50 transition-colors">{depositPhoneSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add"}</button>
+                </div>
+              )}
+              {depositPhoneErr && <p className="text-xs text-red-500 mt-1.5">{depositPhoneErr}</p>}
+              {depositPhoneMsg && <p className="text-xs text-ccb-success mt-1.5">{depositPhoneMsg}</p>}
+            </div>
             <SaveButton onSave={handleSaveProfile} saving={saving} saved={saved} error={error} />
           </SectionCard>
           <SectionCard title="Account">

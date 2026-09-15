@@ -5,9 +5,10 @@ import { useCurrency } from "@/hooks/use-currency";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Wallet, Check, Loader2, ArrowDown, ArrowUp, ArrowDownLeft, ArrowUpRight,
-  Clock, RefreshCw, History,
+  Clock, RefreshCw, History, Lock,
 } from "lucide-react";
 
 interface Deposit {
@@ -56,6 +57,7 @@ interface WalletClientProps {
   email: string;
   deposits: Deposit[];
   phone?: string | null;
+  depositPhones?: string[];
   country?: string | null;
 }
 
@@ -73,14 +75,17 @@ function buildZmQuickAmounts(min: number, max: number): number[] {
   return amounts;
 }
 
-export default function WalletClient({ balance, email, deposits, phone: savedPhone, country }: WalletClientProps) {
+export default function WalletClient({ balance, email, deposits, phone: savedPhone, depositPhones = [], country }: WalletClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<"deposit" | "withdraw" | "history">("deposit");
   const [depositAmount, setDepositAmount] = useState(1000);
   const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number; processing_fee_pct: number; currency_symbol?: string } | null>(null);
-  const [phone, setPhone] = useState(savedPhone || "");
+  // Deposits must use one of the player's up-to-3 saved, support-locked numbers
+  // (anti OTP-spam). Withdrawals stay free-text — can go to any number.
+  const [depositPhone, setDepositPhone] = useState(depositPhones[0] || "");
+  const [withdrawPhone, setWithdrawPhone] = useState(savedPhone || "");
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -293,15 +298,15 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         setLoading(false);
         return;
       }
-      if (!phone || phone.replace(/\D/g, "").length < 9) {
-        setError("Enter a valid Zambian mobile number (e.g. 0971234567)");
+      if (!depositPhone || depositPhone.replace(/\D/g, "").length < 9) {
+        setError("Select one of your saved deposit numbers in Settings first.");
         setLoading(false);
         return;
       }
       const res = await fetch("/api/payments/ontech/deposit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: depositAmount, phone }),
+        body: JSON.stringify({ amount: depositAmount, phone: depositPhone }),
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "Deposit failed. Please try again.");
@@ -380,12 +385,12 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         method: zmMethod,
       };
       if (zmMethod === "mobile") {
-        if (!phone || phone.replace(/\D/g, "").length < 9) {
+        if (!withdrawPhone || withdrawPhone.replace(/\D/g, "").length < 9) {
           setError("Enter a valid Zambian mobile number (e.g. 0971234567)");
           setWithdrawLoading(false);
           return;
         }
-        body.phone = phone;
+        body.phone = withdrawPhone;
       } else {
         if (!zmBankCode || !zmAccountNumber || !zmRecipientName) {
           setError("Bank, account number and account name are required");
@@ -422,8 +427,8 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
     setSuccess(null);
 
     try {
-      if (!phone || phone.length < 8) {
-        setError("Enter a valid mobile money number");
+      if (!depositPhone || depositPhone.length < 8) {
+        setError("Select one of your saved deposit numbers in Settings first.");
         setLoading(false);
         return;
       }
@@ -434,7 +439,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
       }
 
       // Normalize phone with country code if needed
-      let normalizedPhone = phone.replace(/\s/g, "");
+      let normalizedPhone = depositPhone.replace(/\s/g, "");
       if (!normalizedPhone.startsWith("+") && !normalizedPhone.startsWith("00")) {
         // Don't prepend country code — PawaPay predict-provider handles it
       }
@@ -473,8 +478,8 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
     setSuccess(null);
 
     try {
-      if (!phone || phone.length < 9) {
-        setError("Enter a valid Mobile Money number (Airtel or Mpamba, e.g., 0991234567)");
+      if (!depositPhone || depositPhone.length < 9) {
+        setError("Select one of your saved deposit numbers in Settings first.");
         setLoading(false);
         return;
       }
@@ -484,8 +489,8 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: depositAmount,
-          phone,
-          operatorRefId: detectOperator(phone),
+          phone: depositPhone,
+          operatorRefId: detectOperator(depositPhone),
           email,
         }),
       });
@@ -514,7 +519,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
     setSuccess(null);
 
     try {
-      if (!phone || phone.length < 8) {
+      if (!withdrawPhone || withdrawPhone.length < 8) {
         setError("Enter a valid mobile money number");
         setWithdrawLoading(false);
         return;
@@ -539,7 +544,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
 
       const body: Record<string, any> = {
         amount: withdrawAmount,
-        phone,
+        phone: withdrawPhone,
         currency: currencyCode,
         country: country || undefined,
       };
@@ -549,7 +554,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         body.operatorRefId = selectedProvider;
         body.operatorName = pawapayProviders.find(p => p.provider === selectedProvider)?.displayName || selectedProvider;
       } else {
-        const operatorRefId = detectOperator(phone);
+        const operatorRefId = detectOperator(withdrawPhone);
         body.operatorRefId = operatorRefId;
         body.operatorName = operatorRefId === "27494cb5-ba9e-437f-a114-4e7a7686bcca" ? "TNM Mpamba" : "Airtel Money";
         body.payment_provider = "paychangu";
@@ -730,14 +735,38 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 ? "Mobile Money Number (Airtel / MTN / Zamtel)"
                 : "Mobile Money Number"}
             </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder={isMalawi ? "0991234567" : isZambia ? "0971234567" : "e.g. +260971234567"}
-              className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border"
-            />
-            {isZambia && (
+            {depositPhones.length === 0 ? (
+              <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-600">
+                <span className="flex items-center gap-1.5 font-medium"><Lock className="w-3.5 h-3.5" /> No deposit number on file</span>
+                <p className="mt-1 text-yellow-600/90">
+                  Add a phone number in{" "}
+                  <Link href="/settings" className="underline underline-offset-2">Settings</Link>{" "}
+                  before you can deposit. Once saved it can&apos;t be changed without contacting support (max 3, to prevent OTP abuse).
+                </p>
+              </div>
+            ) : depositPhones.length === 1 ? (
+              <div className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border flex items-center justify-between">
+                <span className="font-medium">{depositPhones[0]}</span>
+                <span className="text-xs text-ccb-muted flex items-center gap-1"><Lock className="w-3 h-3" /> Locked</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2">
+                {depositPhones.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setDepositPhone(p)}
+                    className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                      depositPhone === p ? "border-ccb-primary bg-ccb-primary/10 text-ccb-text" : "border-ccb-border bg-ccb-surface text-ccb-muted"
+                    }`}
+                  >
+                    {p}
+                    {depositPhone === p && <Check className="w-4 h-4" />}
+                  </button>
+                ))}
+              </div>
+            )}
+            {isZambia && depositPhones.length > 0 && (
               <p className="text-xs text-ccb-muted mt-1.5">
                 You&apos;ll receive a payment prompt on your phone to authorize the deposit.
               </p>
@@ -746,7 +775,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
 
           <button
             onClick={handleDeposit}
-            disabled={loading || polling || (usePawaPay && !selectedProvider) || (isZambia && !phone)}
+            disabled={loading || polling || (usePawaPay && !selectedProvider) || !depositPhone}
             className="w-full py-3.5 rounded-xl bg-ccb-primary text-white font-semibold flex items-center justify-center gap-2 hover:bg-ccb-primary/90 disabled:opacity-50"
           >
             {loading || polling ? (
@@ -897,8 +926,8 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
             {(!isZambia || zmMethod === "mobile") && (
               <input
                 type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                value={withdrawPhone}
+                onChange={(e) => setWithdrawPhone(e.target.value)}
                 placeholder={isMalawi ? "0991234567" : isZambia ? "0971234567" : "e.g. +260971234567"}
                 className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border"
               />

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { ontechCollect, normalizeZmPhone, zmCarrier, zmCarrierName, zmwToMwk, isOntechConfigured } from "@/lib/payments/ontech";
+import { isAllowedDepositPhone } from "@/lib/deposit-phones";
 
 /**
  * Zambia deposit via Ontech (Airtel Money / MTN MoMo / Zamtel Kwacha).
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient();
     const { data: profile } = await admin.from("profiles")
-      .select("country, display_name, username, phone")
+      .select("country, display_name, username, phone, deposit_phone_numbers")
       .eq("id", user.id).single();
     if (profile?.country !== "ZM") {
       return NextResponse.json({ error: "Ontech deposits are for Zambia-based players only" }, { status: 403 });
@@ -43,7 +44,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Maximum deposit is K${zmConfig.max_deposit_zmw || 5000}` }, { status: 400 });
     }
 
-    const zmPhone = normalizeZmPhone(phoneArg || profile?.phone || "");
+    // Deposits can only go through a number the player already saved and
+    // locked in Settings (anti OTP-spam) — never an arbitrary free-text number.
+    const savedDepositPhones = (profile?.deposit_phone_numbers as string[] | null) || [];
+    if (savedDepositPhones.length === 0) {
+      return NextResponse.json({ error: "Add a deposit phone number in Settings before depositing." }, { status: 400 });
+    }
+    const candidatePhone = phoneArg || savedDepositPhones[0] || "";
+    if (!isAllowedDepositPhone(savedDepositPhones, candidatePhone)) {
+      return NextResponse.json({ error: "You can only deposit using one of your saved phone numbers. Manage them in Settings." }, { status: 400 });
+    }
+
+    const zmPhone = normalizeZmPhone(candidatePhone);
     if (!zmPhone) {
       return NextResponse.json({ error: "Enter a valid Zambian mobile number (e.g. 0971234567)" }, { status: 400 });
     }

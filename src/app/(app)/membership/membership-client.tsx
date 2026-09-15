@@ -10,7 +10,7 @@
 // (the cash is platform revenue, swept weekly to the owner).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Ban, Check, CheckCircle2, Crown, Loader2, ShieldCheck, Zap } from "lucide-react";
+import { Ban, Check, CheckCircle2, Crown, LifeBuoy, Loader2, ShieldCheck, Zap } from "lucide-react";
 import { detectOperator } from "@/lib/operator";
 
 interface Status {
@@ -192,6 +192,13 @@ export default function MembershipClient() {
               <div>
                 <p className="text-sm font-semibold">1.5x league XP, always on</p>
                 <p className="text-xs text-ccb-muted">Earn league XP half again as fast for as long as your membership runs — climb the weekly tables sooner.</p>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <LifeBuoy className="w-5 h-5 text-ccb-primary shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold">Priority support</p>
+                <p className="text-xs text-ccb-muted">Your tickets and questions jump to the front of the queue.</p>
               </div>
             </li>
             <li className="flex items-start gap-3">
