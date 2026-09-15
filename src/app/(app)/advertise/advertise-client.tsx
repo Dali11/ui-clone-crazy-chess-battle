@@ -134,7 +134,7 @@ export default function AdvertiseClient({
               onOrdered={onOrdered}
             />
           )}
-          {tab === "campaigns" && <CampaignsTab campaigns={campaigns} loading={false} />}
+          {tab === "campaigns" && <CampaignsTab campaigns={campaigns} loading={false} onRefresh={refresh} />}
         </>
       )}
     </div>
