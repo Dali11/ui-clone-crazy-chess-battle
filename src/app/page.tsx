@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import {
-  Trophy, Swords, TrendingUp, Zap, Crown, ArrowRight, Check, Download,
+  Trophy,  TrendingUp, Zap, Crown, ArrowRight, Check, Download,
   Shield, Disc3, GraduationCap, Headphones, Ban,
 } from "lucide-react";
 import AppBanner from "@/components/layout/app-banner";
@@ -152,49 +152,6 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                 <p className="text-xs sm:text-sm text-ccb-muted">Every game counts toward your season standing.</p>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Competitive Pipeline */}
-      <section className="border-t border-ccb-border py-12 sm:py-20 px-4">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-xl sm:text-3xl font-bold text-center mb-2">Your Path to Champion</h2>
-          <p className="text-sm text-ccb-muted text-center mb-10 sm:mb-12">Three stages from first game to championship title</p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-            <div className="text-center">
-              <div className="w-14 h-14 rounded-2xl bg-ccb-accent/10 flex items-center justify-center mx-auto mb-4">
-                <Swords className="w-7 h-7 text-ccb-accent" />
-              </div>
-              <div className="text-ccb-muted text-sm font-mono mb-2">Stage 01</div>
-              <h3 className="font-semibold mb-2">Qualify</h3>
-              <p className="text-sm text-ccb-muted">Compete in qualifier tournaments. Win matches, climb the bracket, and earn your qualification spot.</p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-14 h-14 rounded-2xl bg-ccb-primary/10 flex items-center justify-center mx-auto mb-4">
-                <Trophy className="w-7 h-7 text-ccb-primary" />
-              </div>
-              <div className="text-ccb-muted text-sm font-mono mb-2">Stage 02</div>
-              <h3 className="font-semibold mb-2">Compete</h3>
-              <p className="text-sm text-ccb-muted">Enter the Premier League. Play weekly fixtures against other qualified players. Earn points with every win.</p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-14 h-14 rounded-2xl bg-ccb-success/10 flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="w-7 h-7 text-ccb-success" />
-              </div>
-              <div className="text-ccb-muted text-sm font-mono mb-2">Stage 03</div>
-              <h3 className="font-semibold mb-2">Climb</h3>
-              <p className="text-sm text-ccb-muted">Climb the standings, accumulate season points, and fight for the championship title. Top players earn glory and the championship title.</p>
-            </div>
-          </div>
-
-          <div className="text-center mt-10">
-            <Link href={signupUrl} className="btn-primary inline-flex items-center gap-2">
-              Start Your Journey <ArrowRight className="w-4 h-4" />
-            </Link>
           </div>
         </div>
       </section>

@@ -198,37 +198,6 @@ export default function HowItWorksPage() {
         </div>
       </section>
 
-      {/* Competitive Pipeline */}
-      <section className="border-t border-ccb-border px-4 py-12 sm:py-16">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-8 sm:mb-10">
-            <Crown className="w-8 h-8 text-ccb-primary mx-auto mb-3" />
-            <h2 className="text-lg sm:text-2xl font-bold mb-2">The Competitive Pipeline</h2>
-            <p className="text-sm text-ccb-muted">From your first casual game to season champion — here&apos;s the path</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-            <div className="card text-center">
-              <div className="text-ccb-muted text-xs font-mono mb-2">Stage 01</div>
-              <Swords className="w-7 h-7 text-ccb-accent mx-auto mb-3" />
-              <h3 className="font-semibold text-sm mb-2">Swiss Qualifiers</h3>
-              <p className="text-xs text-ccb-muted">Compete in Swiss tournaments with Buchholz tiebreakers. Top finishers earn qualification spots for the Premier League.</p>
-            </div>
-            <div className="card text-center">
-              <div className="text-ccb-muted text-xs font-mono mb-2">Stage 02</div>
-              <Trophy className="w-7 h-7 text-ccb-primary mx-auto mb-3" />
-              <h3 className="font-semibold text-sm mb-2">Premier League</h3>
-              <p className="text-xs text-ccb-muted">Round-robin league with football-style scoring — 3 points for a win, 1 for a draw. Climb the table across weekly fixtures.</p>
-            </div>
-            <div className="card text-center">
-              <div className="text-ccb-muted text-xs font-mono mb-2">Stage 03</div>
-              <Crown className="w-7 h-7 text-ccb-success mx-auto mb-3" />
-              <h3 className="font-semibold text-sm mb-2">Season Champion</h3>
-              <p className="text-xs text-ccb-muted">Accumulate season points across all competitions. Top players fight for the championship title.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Create Tournaments */}
       <section className="border-t border-ccb-border px-4 py-12 sm:py-16 bg-ccb-surface/30">
         <div className="max-w-4xl mx-auto">
