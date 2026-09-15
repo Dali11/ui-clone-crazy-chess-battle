@@ -588,7 +588,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 {polling ? "Waiting for payment..." : "Processing..."}
               </>
             ) : (
-              <>Deposit {formatAmt(depositAmount)}</>
+              <>Deposit {formatWallet(depositAmount)}</>
             )}
           </button>
         </div>

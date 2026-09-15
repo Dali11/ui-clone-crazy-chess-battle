@@ -41,17 +41,22 @@ export async function POST(req: NextRequest) {
     if (!localAmount || localAmount <= 0) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
+    // Report limits in the player's OWN currency (what's in the field),
+    // not the raw MWK config number — a bare "1,000" reads as 1,000 ZMW
+    // when it's actually a MWK figure roughly 90x larger.
+    const minLocalDisplay = currencyCode === "MWK" ? minAmount : Math.round(minAmount * (fxRate || 1));
     if (amountMwk < minAmount) {
       return NextResponse.json(
-        { error: `Minimum deposit is ${minAmount.toLocaleString()}` },
+        { error: `Minimum deposit is ${minLocalDisplay.toLocaleString()} ${currencyCode}` },
         { status: 400 }
       );
     }
 
     const maxAmount = dConfig.max_amount || 10_000_000;
+    const maxLocalDisplay = currencyCode === "MWK" ? maxAmount : Math.round(maxAmount * (fxRate || 1));
     if (amountMwk > maxAmount) {
       return NextResponse.json(
-        { error: `Maximum deposit is ${maxAmount.toLocaleString()}` },
+        { error: `Maximum deposit is ${maxLocalDisplay.toLocaleString()} ${currencyCode}` },
         { status: 400 }
       );
     }
