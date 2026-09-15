@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       // Find the deposit by PawaPay depositId
       const { data: deposit } = await admin
         .from("deposits")
-        .select("id, user_id, amount, status, reference")
+        .select("id, user_id, amount, amount_local, currency, status, reference")
         .eq("pawapay_ref", body.depositId)
         .single();
 
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
             user_id: deposit.user_id,
             type: "deposit_success",
             title: "Deposit confirmed",
-            body: `Your deposit of ${deposit.amount.toLocaleString()} has been credited to your wallet.`,
+            body: `Your deposit of ${(deposit.amount_local ?? deposit.amount).toLocaleString()}${deposit.currency && deposit.currency !== "MWK" ? ` ${deposit.currency}` : ""} has been credited to your wallet.`,
             data: { amount: deposit.amount, method: "pawapay" },
             read: false,
           });

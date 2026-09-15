@@ -34,7 +34,7 @@ function isPathActive(pathname: string, href: string): boolean {
 
 export default function AppNav({ profile }: { profile: Profile | null }) {
   const pathname = usePathname();
-  const { formatMoney: fmtCurrency } = useCurrency();
+  const { formatWallet } = useCurrency();
   const isGameRoute = pathname.startsWith("/game/") || pathname.startsWith("/play/computer") || pathname.startsWith("/draughts/game/");
   const [menuOpen, setMenuOpen] = useState(false);
   const chatsUnread = useChatsUnread();
@@ -117,9 +117,8 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     });
   }
 
-  const formatBalance = (cents: number | null | undefined) => {
-    return fmtCurrency(cents ?? 0);
-  };
+  // Wallet balances are stored in the player's OWN currency (local wallets)
+  const formatBalance = (bal: number | null | undefined) => formatWallet(bal ?? 0);
 
   return (
     <>

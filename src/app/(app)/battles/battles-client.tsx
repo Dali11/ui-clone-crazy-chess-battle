@@ -80,7 +80,7 @@ export default function BattlesPage() {
   const [cancellingStuck, setCancellingStuck] = useState(false);
 
   // Live currency conversion — all money displayed to the user uses this
-  const { formatMoney: fmtCurrency, formatRewardMoney: fmtFee, convert: convertCurrency, toMWK, currencySymbol: _curSym, rate: fxRate, currencyCode: currencyCode, loaded: currencyLoaded } = useCurrency(userCountry);
+  const { formatMoney: fmtCurrency, formatRewardMoney: fmtFee, convert: convertCurrency, formatWallet, toMWK, currencySymbol: _curSym, rate: fxRate, currencyCode: currencyCode, loaded: currencyLoaded } = useCurrency(userCountry);
 
   // Currency state
   // Currency via shared hook — provides formatMoney(), convert(), rate, etc.
@@ -265,7 +265,7 @@ export default function BattlesPage() {
   const handleEnterBattle = async () => {
     setError(null);
 
-    if (balance < BATTLE_STAKE) {
+    if (balance < convertCurrency(BATTLE_STAKE)) {
       setError(`Insufficient balance. You need ${fmtCurrency(BATTLE_STAKE)}. Deposit funds first.`);
       return;
     }
@@ -316,8 +316,8 @@ export default function BattlesPage() {
 
     const stake = toMWK(stakeValue); // convert to MWK, the wallet's internal ledger unit
 
-    if (balance < stake) {
-      setStakeError(`Insufficient balance. You need ${_curSym} ${stakeValue.toLocaleString()}.`);
+    if (balance < convertCurrency(stake)) {
+      setStakeError(`Insufficient balance. You need ${fmtCurrency(stake)}.`);
       return;
     }
 
@@ -549,7 +549,7 @@ export default function BattlesPage() {
         {/* Balance + rating header */}
         <div className="pt-2 sm:pt-4">
           <div className="flex items-center gap-4 text-sm">
-            <span className="text-ccb-muted">Balance: <span className="font-semibold text-ccb-text">{fmtCurrency(balance)}</span></span>
+            <span className="text-ccb-muted">Balance: <span className="font-semibold text-ccb-text">{formatWallet(balance)}</span></span>
             <span className="text-ccb-muted">Rating: <span className="font-semibold text-ccb-text">{myRating}</span></span>
           </div>
         </div>
@@ -683,7 +683,7 @@ export default function BattlesPage() {
           <h1 className="text-2xl font-bold">Chess Battles</h1>
         </div>
         <div className="flex items-center gap-4 text-sm">
-          <span className="text-ccb-muted">Balance: <span className="font-semibold text-ccb-text">{fmtCurrency(balance)}</span></span>
+          <span className="text-ccb-muted">Balance: <span className="font-semibold text-ccb-text">{formatWallet(balance)}</span></span>
           <span className="text-ccb-muted">Rating: <span className="font-semibold text-ccb-text">{myRating}</span></span>
         </div>
       </div>
@@ -774,7 +774,7 @@ export default function BattlesPage() {
       </div>
 
       {/* Insufficient balance warning */}
-      {balance < BATTLE_STAKE && (
+      {balance < convertCurrency(BATTLE_STAKE) && (
         <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>Insufficient balance. You need {fmtCurrency(BATTLE_STAKE)}.
@@ -786,7 +786,7 @@ export default function BattlesPage() {
       {/* Big battle button */}
       <button
         onClick={handleEnterBattle}
-        disabled={balance < BATTLE_STAKE}
+        disabled={balance < convertCurrency(BATTLE_STAKE)}
         className="btn-primary w-full text-base py-4 disabled:opacity-50 disabled:cursor-not-allowed">
         <Swords className="w-5 h-5 mr-2" /> Find Battle · {fmtCurrency(BATTLE_STAKE)}
       </button>

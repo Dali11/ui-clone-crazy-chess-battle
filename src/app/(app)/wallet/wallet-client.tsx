@@ -92,7 +92,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [pawapayLoading, setPawapayLoading] = useState(false);
 
   // Live currency via shared hook — converts MWK to user's local currency
-  const { formatMoney: fmtCurrency, currencySymbol: sym, currencyCode: currencyCode, rate: fxRate } = useCurrency(country);
+  const { formatMoney: fmtCurrency, formatWallet, convert, currencySymbol: sym, currencyCode: currencyCode, rate: fxRate } = useCurrency(country);
   const isMalawi = !country || country === "MW";
   const usePawaPay = !isMalawi; // everyone outside Malawi deposits/withdraws via PawaPay
 
@@ -334,12 +334,13 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
       }
       const minAmt = withdrawConfig ? withdrawConfig.min_amount : 10000;
       const maxAmt = withdrawConfig ? withdrawConfig.max_amount : 500000;
-      if (withdrawAmount < minAmt) {
+      // withdrawAmount is in the player's wallet currency; min/max are MWK config
+      if (withdrawAmount < convert(minAmt)) {
         setError(`Minimum withdrawal is ${formatAmt(minAmt)}`);
         setWithdrawLoading(false);
         return;
       }
-      if (withdrawAmount > maxAmt) {
+      if (withdrawAmount > convert(maxAmt)) {
         setError(`Maximum withdrawal is ${formatAmt(maxAmt)}`);
         setWithdrawLoading(false);
         return;
@@ -417,7 +418,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               <RefreshCw className="w-4 h-4" />
             </button>
           </div>
-          <p className="text-3xl font-bold">{formatAmt(walletBal)}</p>
+          <p className="text-3xl font-bold">{formatWallet(walletBal)}</p>
           {!isMalawi && (
             <p className="text-xs text-ccb-muted mt-1">Currency: {currencyCode}</p>
           )}
@@ -615,7 +616,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               })()}
             </div>
             <p className="text-xs text-ccb-muted mt-2">
-              {`Available: ${formatAmt(walletBal)} · Min: ${formatAmt(withdrawConfig ? withdrawConfig.min_amount : 10000)}`}
+              {`Available: ${formatWallet(walletBal)} · Min: ${formatAmt(withdrawConfig ? withdrawConfig.min_amount : 10000)}`}
             </p>
           </div>
 

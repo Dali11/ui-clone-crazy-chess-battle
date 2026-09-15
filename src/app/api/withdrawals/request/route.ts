@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
-import { moneySymbol } from "@/lib/geo/format";
+import { moneySymbol, currencyCodeForCountry } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
 import { getMwkToLocalRate } from "@/lib/geo/fx";
 
@@ -38,6 +38,17 @@ export async function POST(req: NextRequest) {
     const { data: _profile } = await admin.from("profiles").select("country").eq("id", user.id).single();
     const sym = moneySymbol(_profile?.country);
 
+    // ─── Local-currency wallet ──────────────────────────────────────
+    // The amount the player typed (and every fee/net figure stored on
+    // the withdrawal) is in THEIR wallet currency. Config limits stay
+    // MWK and are converted here for validation.
+    const walletCurrency = currencyCodeForCountry(_profile?.country);
+    const mwkRate = walletCurrency === "MWK" ? 1 : await getMwkToLocalRate(admin, walletCurrency);
+    if (walletCurrency !== "MWK" && !mwkRate) {
+      return NextResponse.json({ error: "Currency conversion unavailable — try again shortly." }, { status: 503 });
+    }
+    const toLocal = (mk: number) => Math.round(mk * mwkRate);
+
     // Check if withdrawals are enabled
     if (!wConfig.enabled) {
       return NextResponse.json({ error: "Withdrawals are currently disabled" }, { status: 403 });
@@ -45,14 +56,16 @@ export async function POST(req: NextRequest) {
 
     // Enforce minimum amount
     const minAmount = wConfig.min_amount || 10_000;
-    if (!amount || amount < minAmount) {
+    const minLocal = toLocal(minAmount);
+    if (!amount || amount < minLocal) {
       const minDisplay = minAmount.toLocaleString();
       return NextResponse.json({ error: `Minimum withdrawal is ${await formatMoneyConverted(minAmount, _profile?.country)}` }, { status: 400 });
     }
 
     // Enforce maximum amount
     const maxAmount = wConfig.max_amount || 500_000;
-    if (amount > maxAmount) {
+    const maxLocal = toLocal(maxAmount);
+    if (amount > maxLocal) {
       const maxDisplay = maxAmount.toLocaleString();
       return NextResponse.json({ error: `Maximum withdrawal is ${await formatMoneyConverted(maxAmount, _profile?.country)}` }, { status: 400 });
     }
@@ -69,9 +82,10 @@ export async function POST(req: NextRequest) {
         .gte("created_at", today.toISOString())
         .in("status", ["pending", "approved", "completed"]);
 
+      const limitLocal = toLocal(dailyLimit);
       const todayTotal = (todayWithdrawals || []).reduce((sum, w) => sum + w.amount, 0);
-      if (todayTotal + amount > dailyLimit) {
-        const remaining = Math.max(0, dailyLimit - todayTotal).toLocaleString();
+      if (todayTotal + amount > limitLocal) {
+        const remaining = Math.max(0, limitLocal - todayTotal).toLocaleString();
         return NextResponse.json({ error: `Daily withdrawal limit reached. Remaining: ${remaining}` }, { status: 400 });
       }
     }
@@ -107,7 +121,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Apply withdrawal fee + processing fee
-    const withdrawalFee = wConfig.withdrawal_fee || 0;
+    const withdrawalFee = toLocal(wConfig.withdrawal_fee || 0);
     const processingFeePct = wConfig.processing_fee_pct || 0;
     const processingFee = Math.floor(amount * (processingFeePct / 100));
     const totalFees = withdrawalFee + processingFee;
@@ -170,15 +184,9 @@ export async function POST(req: NextRequest) {
         const amountMWK = (netAmount || withdrawal.amount);
         let payoutSucceeded = false;
         const payoutProvider = withdrawal.payment_provider || "paychangu";
-        // PawaPay pays out in the player's LOCAL currency — convert the
-        // MWK net amount (wallet-denominated) before disbursement.
+        // Wallet amounts are ALREADY in the player's local currency —
+        // pay out exactly the net that was debited. No conversion.
         const payoutCurrency = String(withdrawal.currency || "MWK").toUpperCase();
-        let payoutAmountLocal = amountMWK;
-        if (payoutProvider === "pawapay" && payoutCurrency !== "MWK") {
-          const rate = await getMwkToLocalRate(admin, payoutCurrency);
-          if (!rate) throw new Error("Currency conversion unavailable");
-          payoutAmountLocal = Math.round(amountMWK * rate);
-        }
 
         if (payoutProvider === "pawapay") {
           try {
@@ -187,7 +195,7 @@ export async function POST(req: NextRequest) {
             const payoutId = randomUUID();
             const payoutResponse = await initiatePayout({
               payoutId,
-              amount: String(payoutAmountLocal),
+              amount: String(amountMWK),
               currency: payoutCurrency,
               phoneNumber: withdrawal.phone,
               provider: withdrawal.operator_ref_id,
@@ -205,7 +213,7 @@ export async function POST(req: NextRequest) {
                   user_id: withdrawal.user_id,
                   type: "withdrawal_approved",
                   title: "Your withdrawal has been processed",
-                  body: `${payoutAmountLocal.toLocaleString()}${payoutCurrency !== "MWK" ? ` ${payoutCurrency}` : ""} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
+                  body: `${amountMWK.toLocaleString()}${payoutCurrency !== "MWK" ? ` ${payoutCurrency}` : ""} has been sent to ${withdrawal.phone} via ${withdrawal.operator_name}.`,
                   data: { amount: amountMWK, phone: withdrawal.phone, operator: withdrawal.operator_name, auto: true, fees: totalFees, provider: "pawapay" },
                   read: false,
                 });

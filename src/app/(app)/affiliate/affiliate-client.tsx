@@ -58,7 +58,7 @@ export default function AffiliateClient({
 }: AffiliateClientProps) {
   const [copied, setCopied] = useState(false);
   const [copyLink, setCopyLink] = useState(false);
-  const { formatMoney: fmtCurrency } = useCurrency();
+  const { formatWallet, formatMoney: fmtCurrency } = useCurrency();
 
   const referralLink = `${baseUrl}/signup?ref=${refCode}`;
   const commissionPct = Math.round(commissionRate * 100);
@@ -317,7 +317,7 @@ export default function AffiliateClient({
       <div className="bg-ccb-surface border border-ccb-border rounded-xl p-4 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Current Wallet Balance</p>
-          <p className="text-lg font-bold mt-0.5">{fmtCurrency(walletBalance)}</p>
+          <p className="text-lg font-bold mt-0.5">{formatWallet(walletBalance)}</p>
         </div>
         <a href="/wallet" className="text-xs font-bold text-ccb-primary hover:underline flex items-center gap-1">
           View Wallet <ChevronRight className="w-3.5 h-3.5" />

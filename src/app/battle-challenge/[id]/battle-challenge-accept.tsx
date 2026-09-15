@@ -45,10 +45,11 @@ export default function BattleChallengeAccept({
   const supabase = useMemo(() => createClient(), []);
   const [balance, setBalance] = useState(initialBalance);
   const [loading, setLoading] = useState(false);
-  const { formatMoney: fmtCurrency, formatRewardMoney: fmtFee, currencySymbol: _sym } = useCurrency();
+  const { formatMoney: fmtCurrency, formatRewardMoney: fmtFee, formatWallet, convert, currencySymbol: _sym } = useCurrency();
   const [error, setError] = useState<string | null>(null);
 
-  const shortfall = Math.max(0, stake - balance);
+  // stake is MWK (platform price); balance is the player's own currency
+  const shortfall = Math.max(0, convert(stake) - balance);
   const canAfford = shortfall === 0;
 
   const pot = stake * 2;
@@ -243,7 +244,7 @@ export default function BattleChallengeAccept({
 
         <div className="flex items-center justify-between text-sm px-1">
           <span className="text-ccb-muted">Your balance</span>
-          <span className={`font-semibold ${canAfford ? "text-ccb-text" : "text-red-400"}`}>{fmtCurrency(balance)}</span>
+          <span className={`font-semibold ${canAfford ? "text-ccb-text" : "text-red-400"}`}>{formatWallet(balance)}</span>
         </div>
 
         {error && (

@@ -19,6 +19,9 @@ export interface UseCurrencyReturn extends CurrencyState {
    * (nearest 5/1/0.25 by magnitude) — league payout displays only. */
   formatRewardMoney: (amountMWK: number) => string;
   convert: (amountMWK: number) => number;
+  /** Format a WALLET amount — already in the user's own currency
+   *  (local-currency wallets). Raw number + symbol, NO conversion. */
+  formatWallet: (amountLocal: number) => string;
   convertFormatted: (amountMWK: number) => string;
   /** Inverse of convert(): local-currency amount -> MWK-equivalent (the
    *  internal ledger unit every wallet/stake/deposit is stored in). Use
@@ -129,6 +132,14 @@ export function useCurrency(initialCountryCode?: string | null): UseCurrencyRetu
     [state.currencyCode, state.rate, state.loaded],
   );
 
+  const formatWallet = useCallback(
+    (amountLocal: number) => {
+      const value = Math.floor(amountLocal ?? 0);
+      return `${state.currencySymbol} ${value.toLocaleString("en-US")}`;
+    },
+    [state.currencySymbol],
+  );
+
   const convertFormatted = useCallback(
     (amountMWK: number) => convert(amountMWK).toLocaleString("en-US"),
     [convert],
@@ -146,5 +157,5 @@ export function useCurrency(initialCountryCode?: string | null): UseCurrencyRetu
     [state.currencyCode, state.rate, state.loaded],
   );
 
-  return { ...state, formatMoney, formatRewardMoney, convert, convertFormatted, toMWK };
+  return { ...state, formatMoney, formatRewardMoney, formatWallet, convert, convertFormatted, toMWK };
 }

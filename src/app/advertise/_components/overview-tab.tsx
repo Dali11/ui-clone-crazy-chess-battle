@@ -27,7 +27,7 @@ export default function OverviewTab({
   pricePerWeekMwk: number;
   onStart: () => void;
 }) {
-  const { formatMoney } = useCurrency();
+  const { formatWallet, formatMoney } = useCurrency();
   const tiers = adTiers(pricePerWeekMwk || 5000);
 
   const liveCount = campaigns.filter((c) => c.status === "active").length;
@@ -62,7 +62,7 @@ export default function OverviewTab({
           <p className="text-[11px] text-ccb-muted flex items-center gap-1">
             <Wallet className="w-3 h-3" /> Wallet balance
           </p>
-          <p className="text-lg font-bold text-ccb-text">{formatMoney(walletBalance)}</p>
+          <p className="text-lg font-bold text-ccb-text">{formatWallet(walletBalance)}</p>
         </div>
       </div>
 

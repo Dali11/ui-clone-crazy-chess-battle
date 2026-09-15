@@ -22,7 +22,7 @@ export default function OrderTab({
   pricePerWeekMwk: number;
   onOrdered: () => void;
 }) {
-  const { formatMoney } = useCurrency();
+  const { convert, formatMoney } = useCurrency();
   const tiers = adTiers(pricePerWeekMwk || 5000);
   const [step, setStep] = useState(0);
 
@@ -43,7 +43,8 @@ export default function OrderTab({
   const [error, setError] = useState<string | null>(null);
 
   const price = tiers.find((t) => t.weeks === weeks)?.priceMwk || 0;
-  const insufficient = walletBalance < price;
+  // walletBalance is in the player's currency; price is MWK — convert to compare
+  const insufficient = walletBalance < convert(price);
 
   const stepValid =
     step === 0

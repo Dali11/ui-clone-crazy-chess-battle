@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getMwkToLocalRate } from "@/lib/geo/fx";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { detectOperator, AIRTEL_OPERATOR_ID, TNM_OPERATOR_ID } from "@/lib/operator";
 
@@ -83,7 +84,7 @@ export async function computeWindowRevenue(
       .lt("completed_at", window.endISO),
     admin
       .from("withdrawals")
-      .select("fee, payment_provider")
+      .select("fee, payment_provider, currency")
       .eq("status", "completed")
       .gt("fee", 0)
       .gte("processed_at", window.startISO)
@@ -98,8 +99,20 @@ export async function computeWindowRevenue(
       .lt("created_at", window.endISO)
   ]);
 
-  const withdrawalFees = (withdrawalsRes.data || [])
-    .reduce((sum, w) => sum + Math.max(0, w.fee || 0), 0);
+  // Withdrawal fees are stored in each player's OWN wallet currency
+  // (local-currency wallets) — normalize to MWK before summing.
+  const feeRateCache = new Map<string, number>();
+  const feeCurrencies = [...new Set((withdrawalsRes.data || []).map(w => (w.currency || "MWK").toUpperCase()))].filter(c => c !== "MWK");
+  for (const cur of feeCurrencies) {
+    feeRateCache.set(cur, await getMwkToLocalRate(admin, cur));
+  }
+  const withdrawalFees = (withdrawalsRes.data || []).reduce((sum, w) => {
+    const fee = Math.max(0, w.fee || 0);
+    const cur = (w.currency || "MWK").toUpperCase();
+    if (fee === 0 || cur === "MWK") return sum + fee;
+    const rate = feeRateCache.get(cur) || 0;
+    return sum + (rate > 0 ? Math.round(fee / rate) : 0);
+  }, 0);
   const battleFees = (battlesRes.data || []).reduce(
     (sum, b) => sum + battleFee(b.stake, b.winner_payout),
     0
