@@ -164,7 +164,9 @@ BEGIN
 
     -- Service role (support/admin panel) can always override and does not
     -- consume the player's one free change.
-    IF auth.role() <> 'service_role' THEN
+    -- COALESCE: auth.role() is NULL outside a JWT session (e.g. direct SQL);
+    -- NULL <> 'service_role' would evaluate to NULL and silently skip this.
+    IF COALESCE(auth.role(), '') <> 'service_role' THEN
       IF OLD.country_change_used THEN
         RAISE EXCEPTION 'COUNTRY_CHANGE_USED: country can only be changed once. Contact support if you need to change it again.';
       END IF;
