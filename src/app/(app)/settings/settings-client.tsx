@@ -282,11 +282,22 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [allowSpectators, setAllowSpectators] = useState(true);
   const [showRating, setShowRating] = useState(true);
-  const [idDocUploaded, setIdDocUploaded] = useState(false);
-  const [selfieUploaded, setSelfieUploaded] = useState(false);
-  const [verifSubmitting, setVerifSubmitting] = useState(false);
-  const [verifStatus, setVerifStatus] = useState<string | null>(null);
+  const [kycDocType, setKycDocType] = useState("national_id");
+  const [kycDocNumber, setKycDocNumber] = useState("");
+  const [kycDocFile, setKycDocFile] = useState<File | null>(null);
+  const [kycSelfieFile, setKycSelfieFile] = useState<File | null>(null);
+  const [kycSubmitting, setKycSubmitting] = useState(false);
+  const [kycError, setKycError] = useState<string | null>(null);
+  const [kycLatest, setKycLatest] = useState<any>(null);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+
+  // Real KYC status from the server (PawaPay compliance upgrade 2026-09-15)
+  useEffect(() => {
+    fetch("/api/kyc/status", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => { if (d && !d.error) { setIdentityVerified(!!d.verified); setKycLatest(d.latest || null); } })
+      .catch(() => {});
+  }, []);
   const [newPassword, setNewPassword] = useState("");
   const [passwordUpdating, setPasswordUpdating] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -497,29 +508,95 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
             <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl mb-4 text-xs font-medium ${identityVerified ? "bg-ccb-success/10 text-ccb-success border border-ccb-success/30" : "bg-ccb-surface text-ccb-muted border border-ccb-border"}`}>
               {identityVerified ? <><CheckCircle className="w-4 h-4" /> Verified</> : <><AlertCircle className="w-4 h-4" /> Not verified</>}
             </div>
-            <p className="text-sm text-ccb-muted mb-4">Verify your identity to unlock competitive tournaments. Documents are reviewed by admins and kept confidential.</p>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2"><div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${idDocUploaded ? "bg-ccb-success text-white" : "bg-ccb-surface border border-ccb-border text-ccb-muted"}`}>{idDocUploaded ? "✓" : "1"}</div><p className="text-sm font-medium">Government ID</p></div>
-              <p className="text-xs text-ccb-muted pl-9">National ID, passport, or driver's license</p>
-              <div className="pl-9"><label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-ccb-border bg-ccb-surface/50 cursor-pointer hover:border-ccb-primary/30 text-xs text-ccb-muted hover:text-ccb-text transition-colors"><Upload className="w-3.5 h-3.5" />{idDocUploaded ? "ID uploaded — replace" : "Upload ID"}<input type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) setIdDocUploaded(true); }} /></label></div>
-            </div>
-            <div className="space-y-2 pt-2">
-              <div className="flex items-center gap-2"><div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${selfieUploaded ? "bg-ccb-success text-white" : "bg-ccb-surface border border-ccb-border text-ccb-muted"}`}>{selfieUploaded ? "✓" : "2"}</div><p className="text-sm font-medium">Selfie Verification</p></div>
-              <p className="text-xs text-ccb-muted pl-9">A clear selfie holding your ID</p>
-              <div className="pl-9"><label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-ccb-border bg-ccb-surface/50 cursor-pointer hover:border-ccb-primary/30 text-xs text-ccb-muted hover:text-ccb-text transition-colors"><Camera className="w-3.5 h-3.5" />{selfieUploaded ? "Selfie uploaded — replace" : "Upload selfie"}<input type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) setSelfieUploaded(true); }} /></label></div>
-            </div>
-            <div className="pt-2">
-              <button onClick={() => { if (idDocUploaded && selfieUploaded) { setVerifSubmitting(true); setTimeout(() => { setVerifSubmitting(false); setVerifStatus("submitted"); }, 1500); } }} disabled={!idDocUploaded || !selfieUploaded || verifSubmitting || !!verifStatus} className="btn-primary w-full">
-                {verifSubmitting ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Submitting...</> : verifStatus === "submitted" ? <><CheckCircle className="w-4 h-4 mr-1" /> Submitted</> : <><Shield className="w-4 h-4 mr-1" /> Submit</>}
-              </button>
-              {verifStatus === "submitted" && <p className="text-xs text-ccb-muted text-center mt-3">An admin will review your documents. You'll be notified when complete.</p>}
-            </div>
-            {profile?.identity_verified_at && <div className="flex items-center gap-2 pt-2 text-xs text-ccb-muted"><Clock className="w-3.5 h-3.5" />Verified on {new Date(profile.identity_verified_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>}
+            <p className="text-sm text-ccb-muted mb-4">Verify your identity with a government document to unlock competitive tournaments and full wallet features. Documents are reviewed by admins and kept confidential.</p>
+
+            {identityVerified ? (
+              <div className="rounded-xl bg-ccb-success/5 border border-ccb-success/30 p-4 space-y-2">
+                <p className="text-sm font-semibold text-ccb-success">Your identity is verified ✓</p>
+                {profile?.identity_verified_at && <p className="text-xs text-ccb-muted">Verified on {new Date(profile.identity_verified_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>}
+                <p className="text-xs text-ccb-muted">Competitive tournaments and wallet features are fully unlocked.</p>
+              </div>
+            ) : kycLatest && kycLatest.status === "pending" ? (
+              <div className="rounded-xl bg-amber-500/5 border border-amber-500/30 p-4 space-y-2">
+                <p className="text-sm font-semibold text-amber-500">Under review</p>
+                <p className="text-xs text-ccb-muted">Your {kycLatest.doc_type === "national_id" ? "national ID" : kycLatest.doc_type === "passport" ? "passport" : "driver's licence"} (••••{String(kycLatest.doc_number || "").slice(-4)}) was submitted {kycLatest.created_at ? new Date(kycLatest.created_at).toLocaleDateString() : ""} and is being reviewed by an admin. You'll get a notification when it's done.</p>
+              </div>
+            ) : (
+              <>
+                {kycLatest && kycLatest.status === "rejected" && (
+                  <div className="rounded-xl bg-destructive/5 border border-destructive/30 p-4 mb-4 space-y-1">
+                    <p className="text-sm font-semibold text-destructive">Your last submission was rejected</p>
+                    <p className="text-xs text-ccb-muted">{kycLatest.rejection_reason || "Please resubmit with clearer images."}</p>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium mb-1.5">Document type</label>
+                      <select value={kycDocType} onChange={(e) => setKycDocType(e.target.value)} className="w-full px-3 py-2.5 rounded-xl bg-ccb-surface border border-ccb-border text-sm">
+                        <option value="national_id">National ID</option>
+                        <option value="passport">Passport</option>
+                        <option value="drivers_license">Driver&apos;s Licence</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1.5">Document number</label>
+                      <input value={kycDocNumber} onChange={(e) => setKycDocNumber(e.target.value)} placeholder="e.g. ID number" className="w-full px-3 py-2.5 rounded-xl bg-ccb-surface border border-ccb-border text-sm" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2"><div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${kycDocFile ? "bg-ccb-success text-white" : "bg-ccb-surface border border-ccb-border text-ccb-muted"}`}>{kycDocFile ? "✓" : "1"}</div><p className="text-sm font-medium">Government ID</p></div>
+                    <p className="text-xs text-ccb-muted pl-9">A clear photo of the front of your document</p>
+                    <div className="pl-9"><label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-ccb-border bg-ccb-surface/50 cursor-pointer hover:border-ccb-primary/30 text-xs text-ccb-muted hover:text-ccb-text transition-colors"><Upload className="w-3.5 h-3.5" />{kycDocFile ? kycDocFile.name : "Upload ID"}<input type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) { setKycDocFile(e.target.files[0]); setKycError(null); } }} /></label></div>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center gap-2"><div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${kycSelfieFile ? "bg-ccb-success text-white" : "bg-ccb-surface border border-ccb-border text-ccb-muted"}`}>{kycSelfieFile ? "✓" : "2"}</div><p className="text-sm font-medium">Selfie Verification</p></div>
+                    <p className="text-xs text-ccb-muted pl-9">A clear selfie holding your ID</p>
+                    <div className="pl-9"><label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-ccb-border bg-ccb-surface/50 cursor-pointer hover:border-ccb-primary/30 text-xs text-ccb-muted hover:text-ccb-text transition-colors"><Camera className="w-3.5 h-3.5" />{kycSelfieFile ? kycSelfieFile.name : "Upload selfie"}<input type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) { setKycSelfieFile(e.target.files[0]); setKycError(null); } }} /></label></div>
+                  </div>
+
+                  {kycError && <p className="text-xs text-destructive">{kycError}</p>}
+
+                  <button
+                    onClick={async () => {
+                      setKycError(null);
+                      if (!kycDocNumber.trim()) { setKycError("Enter your document number."); return; }
+                      if (!kycDocFile || !kycSelfieFile) { setKycError("Upload both your ID document and a selfie."); return; }
+                      setKycSubmitting(true);
+                      try {
+                        const fd = new FormData();
+                        fd.append("docType", kycDocType);
+                        fd.append("docNumber", kycDocNumber.trim());
+                        fd.append("docFile", kycDocFile);
+                        fd.append("selfieFile", kycSelfieFile);
+                        const res = await fetch("/api/kyc/submit", { method: "POST", body: fd });
+                        const d = await res.json();
+                        if (!res.ok) throw new Error(d.error || "Submission failed");
+                        const st = await fetch("/api/kyc/status", { cache: "no-store" }).then((r) => r.json());
+                        setKycLatest(st.latest || null);
+                      } catch (err: any) {
+                        setKycError(err.message || "Submission failed. Try again.");
+                      } finally {
+                        setKycSubmitting(false);
+                      }
+                    }}
+                    disabled={kycSubmitting}
+                    className="btn-primary w-full"
+                  >
+                    {kycSubmitting ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Submitting...</> : <><Shield className="w-4 h-4 mr-1" /> Submit for review</>}
+                  </button>
+                  <p className="text-xs text-ccb-muted text-center">An admin will review your documents. You&apos;ll be notified when complete.</p>
+                </div>
+              </>
+            )}
           </SectionCard>
         </div>
       )}
 
-      {activeTab === "preferences" && (
+            {activeTab === "preferences" && (
         <div className="space-y-4">
           <SectionCard title="Game Preferences">
             <div><label className="text-sm font-medium block mb-1.5">Default Time Control</label><select value={defaultTimeControl} onChange={(e) => setDefaultTimeControl(e.target.value)} className="input cursor-pointer"><option value="15+10">15+10 (Rapid)</option><option value="10+5">10+5 (Rapid)</option><option value="5+3">5+3 (Blitz)</option><option value="3+2">3+2 (Blitz)</option><option value="1+0">1+0 (Bullet)</option></select></div>

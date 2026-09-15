@@ -9,7 +9,7 @@ import {
   ShieldCheck, UserRound, XCircle, ShieldAlert,
   Menu, LogOut, Crown, Play,
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
-  Settings, FileText, SlidersHorizontal, Database, ChevronDown,
+  Settings, FileText, SlidersHorizontal, Database, ChevronDown, FileCheck,
 } from "lucide-react";
 import PlatformSettingsPanel from "./platform-settings-panel";
 import CommunityRoomsCard from "./components/community-rooms-card";
@@ -77,6 +77,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [verificationPlayers, setVerificationPlayers] = useState<any[]>([]);
   const [verificationLoading, setVerificationLoading] = useState(false);
+  const [kycSubmissions, setKycSubmissions] = useState<any[]>([]);
+  const [kycLoading, setKycLoading] = useState(false);
   const [verificationFilter, setVerificationFilter] = useState<"pending" | "verified" | "all">("pending");
   // Finance config
   const [financeConfigSaving, setFinanceConfigSaving] = useState(false);
@@ -248,6 +250,39 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     if (tab === "verification") fetchVerificationPlayers();
   }, [verificationFilter]);
 
+  const fetchKycSubmissions = useCallback(async () => {
+    setKycLoading(true);
+    try {
+      const res = await fetch("/api/admin/kyc?filter=pending");
+      const d = await res.json();
+      if (res.ok) setKycSubmissions(d.submissions || []);
+    } catch {} finally { setKycLoading(false); }
+  }, []);
+
+  const reviewKyc = async (id: string, decision: "approve" | "reject") => {
+    let reason: string | undefined;
+    if (decision === "reject") {
+      reason = prompt("Reason for rejection (shown to the player):") || "Document didn't match your profile details";
+    }
+    setActionLoading(id);
+    try {
+      const res = await fetch("/api/admin/kyc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionId: id, decision, reason }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Review failed");
+      setKycSubmissions((prev) => prev.filter((k) => k.id !== id));
+      await fetchVerificationPlayers();
+      showToast(decision === "approve" ? "Identity approved" : "Submission rejected");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -260,7 +295,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       if (tab === "battles") await fetchBattleStats();
       
       if (tab === "integrity") await fetchIntegrity();
-      if (tab === "verification") await fetchVerificationPlayers();
+      if (tab === "verification") { await fetchVerificationPlayers(); await fetchKycSubmissions(); }
       setLoading(false);
     };
     load();
@@ -1450,6 +1485,44 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           {tab === "verification" && (
             <div className="space-y-4">
               <PlatformSettingsPanel section="verification" />
+              <div className="card p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <FileCheck className="w-4 h-4 text-ccb-primary" />
+                    <h3 className="text-sm font-bold">Document verification queue</h3>
+                    {kycSubmissions.length > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500">{kycSubmissions.length} pending</span>}
+                  </div>
+                  <button onClick={fetchKycSubmissions} className="text-xs text-ccb-muted hover:text-ccb-text">Refresh</button>
+                </div>
+                {kycLoading ? (
+                  <div className="py-6 text-center"><Loader2 className="w-5 h-5 mx-auto text-ccb-muted animate-spin" /></div>
+                ) : kycSubmissions.length === 0 ? (
+                  <p className="text-xs text-ccb-muted py-2">No ID documents awaiting review.</p>
+                ) : (
+                  kycSubmissions.map((k) => (
+                    <div key={k.id} className="rounded-xl border border-ccb-border p-3 mb-3 space-y-2">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <p className="text-sm font-bold">{k.player?.display_name || k.player?.username || "Player"}</p>
+                          <p className="text-xs text-ccb-muted">{k.player?.email}{k.player?.phone ? ` · ${k.player.phone}` : ""}</p>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-surface text-ccb-muted">
+                          {k.doc_type === "national_id" ? "National ID" : k.doc_type === "passport" ? "Passport" : "Driver's Licence"} · ••••{String(k.doc_number || "").slice(-4)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {k.docUrl && <a href={k.docUrl} target="_blank" rel="noreferrer" className="text-xs text-ccb-primary underline">View document</a>}
+                        {k.selfieUrl && <a href={k.selfieUrl} target="_blank" rel="noreferrer" className="text-xs text-ccb-primary underline">View selfie</a>}
+                        <span className="text-xs text-ccb-muted">submitted {new Date(k.created_at).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ActionButton onClick={() => reviewKyc(k.id, "approve")} loading={actionLoading === k.id} variant="success">Approve</ActionButton>
+                        <ActionButton onClick={() => reviewKyc(k.id, "reject")} loading={actionLoading === k.id} variant="danger">Reject</ActionButton>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 {(["pending", "verified", "all"] as const).map((f) => (
                   <button
