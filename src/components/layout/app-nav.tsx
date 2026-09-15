@@ -52,15 +52,14 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     return () => { document.body.style.overflow = ""; };
   }, [menuOpen]);
 
-  // Bottom nav: Play · Battles · Live · Tournaments · Leagues
+  // Bottom nav: Play · Battles · Academy · Tournaments · Leagues
   // (Chats moved to a floating bubble — bottom-right, above this nav)
   const bottomNav = [
     { href: "/play", label: "Play", icon: Swords },
     { href: "/battles", label: "Battles", icon: Coins },
-    { href: "/live", label: "Live", icon: Radio },
+    { href: "/academy", label: "Academy", icon: GraduationCap },
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/league", label: "Leagues", icon: Crown },
-    { href: "/academy", label: "Academy", icon: GraduationCap },
   ];
 
   // Desktop nav — primary actions
@@ -290,7 +289,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         </div>
       )}
 
-      {/* === MOBILE BOTTOM NAV: Play · Battles · Leagues · Tournaments · Live === */}
+      {/* === MOBILE BOTTOM NAV: Play · Battles · Academy · Tournaments · Leagues === */}
       {!isGameRoute && (
         <nav
           className="fixed bottom-0 left-0 right-0 z-[100] border-t border-gray-200 bg-white sm:hidden"
