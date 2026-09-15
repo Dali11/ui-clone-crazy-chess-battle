@@ -80,7 +80,7 @@ export default function BattlesPage() {
   const [cancellingStuck, setCancellingStuck] = useState(false);
 
   // Live currency conversion — all money displayed to the user uses this
-  const { formatMoney: fmtCurrency, convert: convertCurrency, toMWK, currencySymbol: _curSym, rate: fxRate, currencyCode: currencyCode, loaded: currencyLoaded } = useCurrency(userCountry);
+  const { formatMoney: fmtCurrency, formatRewardMoney: fmtFee, convert: convertCurrency, toMWK, currencySymbol: _curSym, rate: fxRate, currencyCode: currencyCode, loaded: currencyLoaded } = useCurrency(userCountry);
 
   // Currency state
   // Currency via shared hook — provides formatMoney(), convert(), rate, etc.
@@ -362,7 +362,10 @@ export default function BattlesPage() {
   };
 
   const feePct = config?.platform_fee_pct ?? 10;
-  const payout = BATTLE_STAKE * 2 - Math.round(BATTLE_STAKE * 2 * (feePct / 100));
+  // Owner decision 2026-09-15: mirror the server's calcPayout floor — a
+  // non-zero fee rate never rounds down to 0 MWK, even on small stakes.
+  const feeAmount = feePct > 0 ? Math.max(1, Math.round(BATTLE_STAKE * 2 * (feePct / 100))) : 0;
+  const payout = BATTLE_STAKE * 2 - feeAmount;
 
   // Disabled state
   if (!config?.enabled && config !== null) {
@@ -759,7 +762,7 @@ export default function BattlesPage() {
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-ccb-muted">Platform fee ({feePct}%)</span>
-            <span className="font-semibold text-red-400">−{fmtCurrency(Math.round(BATTLE_STAKE * 2 * (feePct / 100)))}</span>
+            <span className="font-semibold text-red-400">−{fmtFee(feeAmount)}</span>
           </div>
           <div className="flex items-center justify-between text-sm pt-2 border-t border-ccb-border">
             <span className="text-ccb-muted">Winner receives</span>

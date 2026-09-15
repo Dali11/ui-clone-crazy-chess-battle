@@ -42,6 +42,39 @@ describe("Battle Helpers — payout calculation", () => {
     expect(result.fee).toBe(47);
     expect(result.payout).toBe(619);
   });
+
+  // Owner decision 2026-09-15: with a non-zero rate, the platform's take
+  // can never round down to 0 — floor at 1 MWK. An explicit 0% rate
+  // still yields exactly 0 (deliberate admin promo, not a rounding bug).
+  describe("fee floor — platform take never rounds to 0 (owner decision 2026-09-15)", () => {
+    it("tiny stake with a real fee rate floors at 1 MWK instead of rounding to 0", () => {
+      // pot=4, 10% of 4 = 0.4 -> would round to 0 without the floor
+      const result = calcPayout(2, 10);
+      expect(result.fee).toBe(1);
+      expect(result.payout).toBe(3);
+    });
+    it("very low fee rate on a small pot still floors at 1 MWK", () => {
+      // pot=10, 1% of 10 = 0.1 -> would round to 0 without the floor
+      const result = calcPayout(5, 1);
+      expect(result.fee).toBe(1);
+      expect(result.payout).toBe(9);
+    });
+    it("explicit 0% fee rate stays exactly 0 (deliberate promo, not a rounding artifact)", () => {
+      const result = calcPayout(2, 0);
+      expect(result.fee).toBe(0);
+      expect(result.payout).toBe(4);
+    });
+    it("zero stake never charges a fee", () => {
+      const result = calcPayout(0, 10);
+      expect(result.fee).toBe(0);
+      expect(result.payout).toBe(0);
+    });
+    it("normal-size stakes are unaffected by the floor (already well above 1 MWK)", () => {
+      const result = calcPayout(500, 10);
+      expect(result.fee).toBe(100);
+      expect(result.payout).toBe(900);
+    });
+  });
 });
 
 describe("Battle Helpers — default config", () => {

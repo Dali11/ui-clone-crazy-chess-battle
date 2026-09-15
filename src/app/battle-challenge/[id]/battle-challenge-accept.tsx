@@ -45,14 +45,18 @@ export default function BattleChallengeAccept({
   const supabase = useMemo(() => createClient(), []);
   const [balance, setBalance] = useState(initialBalance);
   const [loading, setLoading] = useState(false);
-  const { formatMoney: fmtCurrency, currencySymbol: _sym } = useCurrency();
+  const { formatMoney: fmtCurrency, formatRewardMoney: fmtFee, currencySymbol: _sym } = useCurrency();
   const [error, setError] = useState<string | null>(null);
 
   const shortfall = Math.max(0, stake - balance);
   const canAfford = shortfall === 0;
 
   const pot = stake * 2;
-  const fee = Math.round(pot * (feePct / 100));
+  // Owner decision 2026-09-15: mirror the server's calcPayout floor so the
+  // preview never shows a fee lower than what's actually charged, and
+  // display it with decimals (formatRewardMoney) so a real fee converted
+  // to a small local-currency figure never visually rounds away to "0".
+  const fee = feePct > 0 ? Math.max(1, Math.round(pot * (feePct / 100))) : 0;
   const payout = pot - fee;
 
   // Deposit widget state
@@ -229,7 +233,7 @@ export default function BattleChallengeAccept({
           </div>
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-ccb-muted">Platform fee ({feePct}%)</span>
-            <span className="font-semibold text-red-400">−{fmtCurrency(fee)}</span>
+            <span className="font-semibold text-red-400">−{fmtFee(fee)}</span>
           </div>
           <div className="flex items-center justify-between text-sm pt-2 border-t border-ccb-border">
             <span className="text-ccb-muted">Winner receives</span>

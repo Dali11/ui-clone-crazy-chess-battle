@@ -35,9 +35,16 @@ export function formatMKK(amount: number): string {
   return `MK ${Math.floor(amount).toLocaleString("en-US")}`;
 }
 
+/**
+ * Owner decision 2026-09-15: with a non-zero fee rate configured, the
+ * platform's take can never round down to zero on a real battle —
+ * percentage math on tiny stakes can round to 0 MWK, silently skipping
+ * revenue. Floor at 1 MWK whenever feePct > 0. An explicit 0% fee (e.g.
+ * a promo) is a deliberate admin choice and stays exactly 0.
+ */
 export function calcPayout(stake: number, feePct: number): { pot: number; fee: number; payout: number } {
   const pot = stake * 2;
-  const fee = Math.round(pot * (feePct / 100));
+  const fee = feePct > 0 && pot > 0 ? Math.max(1, Math.round(pot * (feePct / 100))) : 0;
   const payout = pot - fee;
   return { pot, fee, payout };
 }

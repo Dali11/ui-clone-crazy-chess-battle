@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DEFAULT_CONFIG } from "@/lib/battles/battle-helpers";
+import { DEFAULT_CONFIG, calcPayout } from "@/lib/battles/battle-helpers";
 
 /**
  * Try to find a match for the player in the queue.
@@ -84,9 +84,9 @@ async function attemptMatch(
     }
     if (!claimed) continue; // another player matched this opponent first
 
-    const pot = stake * 2;
-    const fee = Math.round(pot * (config.platform_fee_pct / 100));
-    const payout = pot - fee;
+    // Shared calcPayout guarantees the platform fee is never 0 (owner
+    // decision 2026-09-15) — no duplicate rounding logic to drift out of sync.
+    const { pot, fee, payout } = calcPayout(stake, config.platform_fee_pct);
 
     const { data: battle, error: battleErr } = await admin
       .from("battles")
