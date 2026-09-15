@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { moneySymbol } from "@/lib/geo/format";
+import { moneySymbol, formatMoney } from "@/lib/geo/format";
+import { mwkToLocal } from "@/lib/wallet/mwk-to-local";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
 import { runArenaMatchmakingWave } from "@/lib/tournament/arena";
 
@@ -113,10 +114,15 @@ export async function POST(
     if (entryFee > 0 && !paidEntryFee) {
       // First-time payment — debit wallet
       const currentBalance = profile.wallet_balance ?? 0;
-      if (currentBalance < entryFee) {
+      // BUG FIX 2026-09-16: entryFee is MWK, currentBalance is already the
+      // player's LOCAL wallet currency — comparing/formatting them as if
+      // both were MWK rejected valid balances and double-converted the
+      // "you have" figure in the error message.
+      const localEntryFee = await mwkToLocal(user.id, entryFee, admin);
+      if (currentBalance < localEntryFee) {
         return NextResponse.json(
           {
-            error: `Insufficient wallet balance. Entry fee is ${await formatMoneyConverted(entryFee, _userProfile?.country)}. You have ${await formatMoneyConverted(currentBalance, _userProfile?.country)}. Please deposit funds first.`,
+            error: `Insufficient wallet balance. Entry fee is ${await formatMoneyConverted(entryFee, _userProfile?.country)}. You have ${formatMoney(currentBalance, _userProfile?.country)}. Please deposit funds first.`,
           },
           { status: 402 }
         );

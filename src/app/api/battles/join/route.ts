@@ -5,6 +5,7 @@ import { DEFAULT_CONFIG } from "@/lib/battles/battle-helpers";
 import { tryMatch } from "@/lib/battles/matchmaker";
 import { moneySymbol } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
+import { mwkToLocal } from "@/lib/wallet/mwk-to-local";
 
 const TIME_CONTROLS: Record<string, { minutes: number; increment: number }> = {
   bullet:    { minutes: 1,  increment: 0 },
@@ -137,7 +138,10 @@ export async function POST(req: NextRequest) {
     if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
     const balance = profile.wallet_balance ?? 0;
-    if (balance < stake) {
+    // BUG FIX 2026-09-16: convert MWK stake to the player's local wallet
+    // currency before comparing — see mwk-to-local.ts.
+    const localStake = await mwkToLocal(user.id, stake, admin);
+    if (balance < localStake) {
       return NextResponse.json(
         { error: `Insufficient balance. You need at least ${await formatMoneyConverted(stake, _profile?.country)}.` },
         { status: 402 }

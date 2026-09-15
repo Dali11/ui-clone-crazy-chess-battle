@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { moneySymbol } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
+import { mwkToLocal } from "@/lib/wallet/mwk-to-local";
 
 /**
  * POST /api/game/rematch
@@ -85,7 +86,9 @@ export async function POST(req: NextRequest) {
           .single();
 
         const balance = requesterProfile?.wallet_balance ?? 0;
-        if (balance < stake) {
+        // BUG FIX 2026-09-16: convert MWK stake to local currency before comparing.
+        const localStake = await mwkToLocal(user.id, stake, admin);
+        if (balance < localStake) {
           return NextResponse.json({
             error: `Insufficient balance for a staked rematch. You need ${await formatMoneyConverted(stake, _profile?.country)}.`,
             insufficientFunds: true,

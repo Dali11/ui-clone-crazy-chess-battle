@@ -6,6 +6,7 @@ import { sendPushToUsers } from "@/lib/push/send";
 import { DEFAULT_CONFIG, calcPayout } from "@/lib/battles/battle-helpers";
 import { moneySymbol } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
+import { mwkToLocal } from "@/lib/wallet/mwk-to-local";
 
 export async function POST(req: NextRequest) {
   try {
@@ -90,7 +91,9 @@ export async function POST(req: NextRequest) {
     if (!acceptorProfile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
     const balance = acceptorProfile.wallet_balance ?? 0;
-    if (balance < challenge.stake) {
+    // BUG FIX 2026-09-16: convert MWK stake to local currency before comparing.
+    const localStake = await mwkToLocal(user.id, challenge.stake, admin);
+    if (balance < localStake) {
       return NextResponse.json(
         {
           error: `Insufficient balance. You need ${await formatMoneyConverted(challenge.stake, _profile?.country)}.`,

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_CONFIG, calcPayout } from "@/lib/battles/battle-helpers";
 import { moneySymbol } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
+import { mwkToLocal } from "@/lib/wallet/mwk-to-local";
 
 /**
  * POST /api/game/rematch/accept
@@ -69,7 +70,9 @@ export async function POST(req: NextRequest) {
         .single();
 
       const acceptorBalance = acceptorProfile?.wallet_balance ?? 0;
-      if (acceptorBalance < stake) {
+      // BUG FIX 2026-09-16: convert MWK stake to the acceptor's own local currency.
+      const localStakeAcceptor = await mwkToLocal(user.id, stake, admin);
+      if (acceptorBalance < localStakeAcceptor) {
         return NextResponse.json({
           error: `Insufficient balance for a staked rematch. You need ${await formatMoneyConverted(stake, _profile?.country)}.`,
           insufficientFunds: true,
@@ -86,7 +89,10 @@ export async function POST(req: NextRequest) {
         .single();
 
       const requesterBalance = requesterProfile?.wallet_balance ?? 0;
-      if (requesterBalance < stake) {
+      // BUG FIX 2026-09-16: requester may be in a different country/currency
+      // than the acceptor — convert using the requester's own rate.
+      const localStakeRequester = await mwkToLocal(offer.requester_id, stake, admin);
+      if (requesterBalance < localStakeRequester) {
         return NextResponse.json({
           error: "Your opponent no longer has enough balance for this staked rematch.",
         }, { status: 402 });

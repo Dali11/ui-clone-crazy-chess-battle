@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
 import { getPlatformConfig } from "@/lib/platform-config";
+import { mwkToLocal } from "@/lib/wallet/mwk-to-local";
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,7 +60,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to load profile" }, { status: 500 });
     }
 
-    if ((profile?.wallet_balance || 0) < stake) {
+    // BUG FIX 2026-09-16: wallet_balance is the player's LOCAL currency
+    // (KES, ZMW, ...); `stake` is MWK (the internal ledger unit the client
+    // converts to before sending). Comparing them directly rejected valid
+    // balances for every non-Malawi player. Convert stake to local first.
+    const localStake = await mwkToLocal(user.id, stake, admin);
+    if ((profile?.wallet_balance || 0) < localStake) {
       return NextResponse.json({ error: "Insufficient wallet balance" }, { status: 400 });
     }
 
