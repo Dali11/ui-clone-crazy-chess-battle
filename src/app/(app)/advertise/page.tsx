@@ -21,5 +21,11 @@ export default async function AdvertisePage() {
     redirect("/login?redirect=/advertise");
   }
 
-  return <AdvertiseClient />;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("wallet_balance")
+    .eq("id", user.id)
+    .single();
+
+  return <AdvertiseClient walletBalance={profile?.wallet_balance || 0} />;
 }

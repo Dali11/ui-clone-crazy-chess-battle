@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import {
   Home, Swords, User, Wallet, Shield, Coins, Gift,
   Crown, Disc3, Menu, X, Trophy, Radio, Clock, Play, Settings, MessageCircle,
+  GraduationCap,
 } from "lucide-react";
 import NotificationBell from "./notification-bell";
 import { useCurrency } from "@/hooks/use-currency";
@@ -59,6 +60,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/live", label: "Live", icon: Radio },
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/league", label: "Leagues", icon: Crown },
+    { href: "/academy", label: "Academy", icon: GraduationCap },
   ];
 
   // Desktop nav — primary actions
@@ -100,7 +102,8 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         { href: "/settings", label: "Settings & Profile", icon: Settings },
         { href: "/wallet", label: "Wallet", icon: Wallet },
         { href: "/affiliate", label: "Affiliate", icon: Gift },
-        { href: "/membership", label: "Club Membership", icon: Crown },
+        { href: "/academy", label: "Chess Academy", icon: GraduationCap },
+      { href: "/membership", label: "Club Membership", icon: Crown },
         { href: "/history", label: "Game History", icon: Clock },
       ],
     },

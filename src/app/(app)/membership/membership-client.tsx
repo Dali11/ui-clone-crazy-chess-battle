@@ -10,7 +10,7 @@
 // (the cash is platform revenue, swept weekly to the owner).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Ban, Check, CheckCircle2, Crown, LifeBuoy, Loader2, ShieldCheck, Zap } from "lucide-react";
+import { Ban, Check, CheckCircle2, Crown, GraduationCap, LifeBuoy, Loader2, ShieldCheck, Zap } from "lucide-react";
 import { detectOperator } from "@/lib/operator";
 
 interface Status {
@@ -140,7 +140,7 @@ export default function MembershipClient() {
         </div>
         <h1 className="text-xl sm:text-2xl font-bold mb-2">Membership</h1>
         <p className="text-sm text-ccb-muted">
-          $10 a month. Zero ads. 1.5x league XP. Every cent keeps the leagues, tournaments and community running.
+          $10 a month. Zero ads. 1.5x league XP. Full Chess Academy. Every cent keeps the leagues, tournaments and community running.
         </p>
       </div>
 
@@ -192,6 +192,13 @@ export default function MembershipClient() {
               <div>
                 <p className="text-sm font-semibold">1.5x league XP, always on</p>
                 <p className="text-xs text-ccb-muted">Earn league XP half again as fast for as long as your membership runs — climb the weekly tables sooner.</p>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <GraduationCap className="w-5 h-5 text-ccb-primary shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold">Full Chess Academy access</p>
+                <p className="text-xs text-ccb-muted">The complete training curriculum — foundations, tactics and winning technique — with your progress tracked lesson by lesson.</p>
               </div>
             </li>
             <li className="flex items-start gap-3">
