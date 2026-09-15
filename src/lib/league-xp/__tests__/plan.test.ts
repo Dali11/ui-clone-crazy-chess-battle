@@ -371,3 +371,49 @@ describe("calendar week keys (CAT, date-anchored)", () => {
     expect(closing2).toBe(currentWeekStart(now2));
   });
 });
+
+describe("planWeeklySettlement — USD-denominated rewards (owner decision 2026-09-15)", () => {
+  const usdCfg = {
+    ...baseCfg,
+    rewards_currency: "USD" as const,
+    // Live ladder: Premier $25, Championship $20, Bronze $15, Amateur $10, Open $5.
+    rewards_t5: [10, 6, 4, 3, 2],
+    rewards_t4: [8, 5, 3, 2.5, 1.5],
+    rewards_t3: [6, 4, 2.5, 1.5, 1],
+    rewards_t2: [4, 2.5, 1.5, 1, 1],
+    rewards_t1: [2, 1.25, 0.75, 0.5, 0.5],
+  } as LeagueXpConfig;
+
+  it("converts USD amounts to whole MWK at the settle-time rate", () => {
+    const members = [m(5, 50), m(5, 40), m(5, 30), m(5, 20), m(5, 10)];
+    const plan = planWeeklySettlement({ members, cfg: usdCfg, closingWeek: CLOSING, newWeek: NEW, usdToMwk: 1745.2 });
+    expect(plan.payOn).toBe(true);
+    // $10 at 1745.2 = 17452 exactly; $6 = 10471.2 -> 10471
+    expect(plan.payouts[0].rewardMwk).toBe(17452);
+    expect(plan.payouts[1].rewardMwk).toBe(10471);
+  });
+
+  it("prefers rewards_tN over the legacy rewards_tN_mwk arrays", () => {
+    const members = [m(5, 50), m(5, 40), m(5, 30), m(5, 20), m(5, 10)];
+    const plan = planWeeklySettlement({ members, cfg: usdCfg, closingWeek: CLOSING, newWeek: NEW, usdToMwk: 1745.2 });
+    // If the legacy 15000-MWK array had won, rank 1 would be 15000, not 17452.
+    expect(plan.payouts[0].rewardMwk).not.toBe(15000);
+    expect(plan.payouts.filter((p) => p.rewardMwk === 15000)).toHaveLength(0);
+  });
+
+  it("refuses to pay with a missing or absurd USD->MWK rate (no mis-credits)", () => {
+    const members = [m(5, 50), m(5, 40), m(5, 30), m(5, 20), m(5, 10)];
+    for (const bad of [0, 1, 400, 9999]) {
+      const plan = planWeeklySettlement({ members, cfg: usdCfg, closingWeek: CLOSING, newWeek: NEW, usdToMwk: bad });
+      expect(plan.payOn).toBe(false);
+      expect(plan.unpaidReason).toContain("USD->MWK");
+    }
+  });
+
+  it("still pays exact MWK when rewards_currency is absent (legacy configs)", () => {
+    const members = [m(1, 50), m(1, 40), m(1, 30), m(1, 20), m(1, 10)];
+    const plan = planWeeklySettlement({ members, cfg: baseCfg, closingWeek: CLOSING, newWeek: NEW });
+    expect(plan.payOn).toBe(true);
+    expect(plan.payouts[0].rewardMwk).toBe(2000);
+  });
+});

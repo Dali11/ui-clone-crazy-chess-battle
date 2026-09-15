@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Loader2, Zap, Trophy } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
+import { formatUsd } from "@/lib/geo/format";
 import AdSlot from "@/components/ads/ad-slot";
 
 interface TopPlayer {
@@ -26,11 +27,20 @@ interface LeagueSummary {
 
 interface OverviewResponse {
   week: string;
+  rewardsCurrency?: "MWK" | "USD";
   leagues: LeagueSummary[];
 }
 
 /** One league card: roster, rewards, and this week's top 5. */
-function LeagueCard({ league, currency }: { league: LeagueSummary; currency: ReturnType<typeof useCurrency> }) {
+function LeagueCard({
+  league,
+  currency,
+  usdRewards,
+}: {
+  league: LeagueSummary;
+  currency: ReturnType<typeof useCurrency>;
+  usdRewards: boolean;
+}) {
   const weeklyTotal = league.rewards.reduce((s, r) => s + r, 0);
   return (
     <div className="card p-5">
@@ -42,7 +52,7 @@ function LeagueCard({ league, currency }: { league: LeagueSummary; currency: Ret
         </div>
         <div className="text-right shrink-0">
           <p className="text-[10px] text-ccb-muted">Weekly pot</p>
-          <p className="text-sm font-bold text-ccb-primary tabular-nums">{currency.formatRewardMoney(weeklyTotal)}</p>
+          <p className="text-sm font-bold text-ccb-primary tabular-nums">{usdRewards ? formatUsd(weeklyTotal) : currency.formatRewardMoney(weeklyTotal)}</p>
         </div>
       </div>
 
@@ -64,7 +74,7 @@ function LeagueCard({ league, currency }: { league: LeagueSummary; currency: Ret
                 <p className="text-[10px] text-ccb-muted">{p.xp.toLocaleString()} XP</p>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-xs font-bold tabular-nums">{currency.formatRewardMoney(league.rewards[i] ?? 0)}</p>
+                <p className="text-xs font-bold tabular-nums">{usdRewards ? formatUsd(league.rewards[i] ?? 0) : currency.formatRewardMoney(league.rewards[i] ?? 0)}</p>
                 <p className="text-[9px] text-ccb-muted/70">{currency.formatRewardMoney(league.monthlyRewards[i] ?? 0)} monthly</p>
               </div>
             </div>
@@ -120,7 +130,7 @@ export default function LeagueOverviewTab() {
 
       {[...data.leagues].sort((a, b) => b.tier - a.tier).map((lg, i) => (
         <React.Fragment key={lg.tier}>
-          <LeagueCard league={lg} currency={currency} />
+          <LeagueCard league={lg} currency={currency} usdRewards={data.rewardsCurrency === "USD"} />
           {/* Mid-feed inline ad: between the 2nd and 3rd league card
              (e.g. Premier / Knights done, Bronze / Amateur / Open below).
              Separate placement from the bottom "leagues" ad — smaller

@@ -77,6 +77,10 @@ export function planWeeklySettlement(args: {
   cfg: LeagueXpConfig;
   closingWeek: string;
   newWeek: string;
+  /** USD -> MWK rate, used only when cfg.rewards_currency === "USD".
+   * Validated against a sanity band (500-5000) before paying — a failed
+   * FX fetch (rate 1 / 0) refuses to settle rather than mis-credit. */
+  usdToMwk?: number;
 }): WeeklySettlePlan {
   const { members, cfg, closingWeek, newWeek } = args;
 
@@ -92,23 +96,36 @@ export function planWeeklySettlement(args: {
   //     began mid-week, plays for free; the first paid close is the
   //     settle AFTER the week starting on payouts_start).
   const beforeStart = !!cfg.payouts_start && closingWeek < cfg.payouts_start;
+  // USD-denominated rewards need a valid live rate to credit MWK wallets.
+  const usdMode = cfg.rewards_currency === "USD";
+  const usdToMwk = args.usdToMwk ?? 0;
+  const rateOk = !usdMode || (usdToMwk >= 500 && usdToMwk <= 5000);
   const payOn =
     cfg.rewards_enabled &&
     cfg.weekly_payouts_enabled !== false &&
-    !beforeStart;
+    !beforeStart &&
+    rateOk;
   const unpaidReason = !cfg.rewards_enabled
     ? "rewards_enabled is off"
     : cfg.weekly_payouts_enabled === false
       ? "weekly payouts paused by admin"
       : beforeStart
         ? `week starts before payouts_start (${cfg.payouts_start})`
-        : null;
+        : usdMode && !rateOk
+          ? `USD rewards but invalid USD->MWK rate (${usdToMwk})`
+          : null;
 
   const promoted = cfg.promote_count;
   const demoted = cfg.demote_count;
   const movesOn = cfg.tier_moves_enabled === true;
   const cap = cfg.tier_cap > 0 ? cfg.tier_cap : Infinity;
-  const rewardsFor = (tier: number) => (payOn ? rewardsForTier(cfg, tier) : [0, 0, 0, 0, 0]);
+  // Rewards in the credit currency (always MWK): convert USD arrays at
+  // the live rate when the ladder is dollar-denominated.
+  const rewardsFor = (tier: number) => {
+    if (!payOn) return [0, 0, 0, 0, 0];
+    const arr = rewardsForTier(cfg, tier);
+    return usdMode ? arr.map((v: number) => Math.round(v * usdToMwk)) : arr;
+  };
 
   const finalTier = new Map<string, number>();
   const movedUsers = new Set<string>();

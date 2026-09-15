@@ -55,6 +55,19 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     reward_3_mwk: 250,
     reward_4_mwk: 125,
     reward_5_mwk: 50,
+    // Denomination of weekly rewards (owner decision 2026-09-15): USD.
+    // rewards_tN arrays hold USD amounts; the settle converts to MWK at
+    // the live rate and credits wallets in MWK.
+    rewards_currency: "USD",
+    // Per-league weekly payouts, USD. rewards_tN = [1st, 2nd, 3rd, 4th, 5th]
+    // for tier N. Weekly totals: Premier $25, Championship $20, Bronze
+    // $15, Amateur $10, Open $5 — $75/week max exposure.
+    rewards_t1: [2, 1.25, 0.75, 0.5, 0.5],
+    rewards_t2: [4, 2.5, 1.5, 1, 1],
+    rewards_t3: [6, 4, 2.5, 1.5, 1],
+    rewards_t4: [8, 5, 3, 2.5, 1.5],
+    rewards_t5: [10, 6, 4, 3, 2],
+    // Legacy MWK arrays kept only as fallback (rewards_tN takes precedence).
     // Per-league weekly payouts, MWK. rewards_tN_mwk = [1st, 2nd, 3rd, ...]
     // for tier N. Higher leagues pay more — climb for bigger rewards.
     rewards_t1_mwk: [1000, 500, 250, 125, 50],

@@ -89,3 +89,17 @@ export function rewardFractionDigits(converted: number): number {
   const rounded = roundRewardAmount(converted);
   return rounded < 5 ? 2 : 0;
 }
+
+/**
+ * Format a USD-denominated reward amount ($10, $6, $2.50, $0.75) —
+ * dollars are the prize currency (owner decision 2026-09-15), shown as
+ * written to every player regardless of their own display currency.
+ */
+export function formatUsd(amount: number): string {
+  return new Intl.NumberFormat("en", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(amount ?? 0);
+}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getLeagueXpConfig, currentWeekStart, LEAGUE_TIERS, rewardsForTier, monthlyRewardsForTier } from "@/lib/league-xp";
+import { getLeagueXpConfig, currentWeekStart, LEAGUE_TIERS, rewardsForTier, monthlyRewardsForTier, rewardsCurrency } from "@/lib/league-xp";
 
 export const dynamic = "force-dynamic";
 
@@ -53,5 +53,5 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ week, leagues });
+  return NextResponse.json({ week, leagues, rewardsCurrency: rewardsCurrency(cfg) });
 }

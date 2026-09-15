@@ -102,6 +102,25 @@ async function runWeeklySettle(
     .order("updated_at", { ascending: true });
   if (error) return { error: error.message };
 
+  // ── USD->MWK rate for dollar-denominated rewards ─────────────────────
+  // Best-effort live fetch, falling back to the DB-cached inverse rate.
+  // planWeeklySettlement sanity-checks the value (500-5000 band) and
+  // refuses to pay rather than mis-credit if both sources are stale.
+  let usdToMwk = 0;
+  if (cfg.rewards_currency === "USD") {
+    usdToMwk = await getExchangeRate("USD", "MWK");
+    if (!usdToMwk || usdToMwk === 1) {
+      const { data: dbRate } = await admin
+        .from("exchange_rates")
+        .select("rate")
+        .eq("base_currency", "MWK")
+        .eq("target_currency", "USD")
+        .single();
+      const inv = dbRate?.rate ? 1 / Number(dbRate.rate) : 0;
+      if (inv > 0) usdToMwk = inv;
+    }
+  }
+
   // ── Decision layer: the pure, unit-tested plan ───────────────────────
   // planWeeklySettlement is the single source of truth for ranking, the
   // payout gate (rewards_enabled + admin kill-switch + the payouts_start
@@ -119,6 +138,7 @@ async function runWeeklySettle(
     cfg,
     closingWeek,
     newWeek,
+    usdToMwk,
   });
   if (!plan.payOn && plan.unpaidReason) {
     console.log(`[league] payouts OFF for ${closingWeek}: ${plan.unpaidReason}`);

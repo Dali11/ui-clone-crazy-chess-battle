@@ -76,6 +76,14 @@ export interface LeagueXpConfig {
    * the week starting on payouts_start (2026-09-15 → pays 2026-09-22).
    */
   payouts_start?: string | null;
+  /**
+   * Denomination of the WEEKLY tier reward arrays (owner decision
+   * 2026-09-15): "USD" — rewards_tN arrays hold USD amounts, converted
+   * to MWK at settle time at the live rate and credited to wallets in
+   * MWK. Absent/"MWK" — arrays are MWK amounts as before. Monthly
+   * championship arrays remain MWK-denominated for now (feature off).
+   */
+  rewards_currency?: "MWK" | "USD";
   reward_1_mwk: number;
   reward_2_mwk: number;
   reward_3_mwk: number;
@@ -110,12 +118,22 @@ export function rewardsArray(c: LeagueXpConfig): number[] {
  * Falls back to the legacy flat rewards when the tier's array is missing
  * or malformed, so old configs keep working.
  */
+/**
+ * Weekly payout array for a tier, denominated in cfg.rewards_currency
+ * (default MWK). Prefers the currency-agnostic `rewards_tN` key, falls
+ * back to the legacy `rewards_tN_mwk` arrays.
+ */
 export function rewardsForTier(c: LeagueXpConfig, tier: number): number[] {
-  const tierRewards = (c as any)[`rewards_t${tier}_mwk`];
+  const tierRewards = (c as any)[`rewards_t${tier}`] ?? (c as any)[`rewards_t${tier}_mwk`];
   if (Array.isArray(tierRewards) && tierRewards.length > 0 && tierRewards.every((v: unknown) => typeof v === "number" && v >= 0)) {
     return tierRewards as number[];
   }
   return rewardsArray(c);
+}
+
+/** Currency the weekly reward arrays are denominated in ("MWK" | "USD"). */
+export function rewardsCurrency(c: LeagueXpConfig): "MWK" | "USD" {
+  return c.rewards_currency === "USD" ? "USD" : "MWK";
 }
 
 /** All tiers' payout arrays — for UI display (per-league rewards preview). */

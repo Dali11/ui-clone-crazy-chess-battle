@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, Swords, TrendingUp, ChevronDown, Zap, Gift, ArrowDownCircle, Trophy, Info } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
+import { formatUsd } from "@/lib/geo/format";
 import { countryFlag } from "@/lib/geo/flags";
 import AdSlot from "@/components/ads/ad-slot";
 
@@ -34,7 +35,9 @@ interface StandingsResponse {
   standings?: Standing[];
   xpRules?: { win: number; draw: number; loss: number; upsetBonus: number; dailyCap: number };
   rewards?: number[];
-  /** Payout (MWK) for every league tier — keys are tier numbers. */
+  /** Denomination of weekly reward arrays: "USD" (current ladder) or "MWK". */
+  rewardsCurrency?: "MWK" | "USD";
+  /** Payout (weekly rewards' currency) for every league tier — keys are tier numbers. */
   tierRewards?: Record<number, number[]>;
   tiers?: { tier: number; name: string; emoji: string }[];
   seasonStart?: string | null;
@@ -42,12 +45,20 @@ interface StandingsResponse {
 }
 
 /**
- * Reward tile: shown entirely in the player's own currency.
- * (Owner decision 2026-09-15: no MWK equivalent underneath for
- * non-Malawian players — they just see their local figure.)
+ * Reward tile (owner decisions 2026-09-15): dollar-denominated ladders
+ * show the USD prize as written to every player ("win $10"); MWK
+ * ladders show the player's own local currency figure only.
  */
-function RewardAmount({ mwk, currency }: { mwk: number; currency: ReturnType<typeof useCurrency> }) {
-  return <div className="text-xs font-bold mt-0.5">{currency.formatRewardMoney(mwk)}</div>;
+function RewardAmount({
+  amount,
+  currency,
+  usd,
+}: { amount: number; currency: ReturnType<typeof useCurrency>; usd: boolean }) {
+  return (
+    <div className="text-xs font-bold mt-0.5">
+      {usd ? formatUsd(amount) : currency.formatRewardMoney(amount)}
+    </div>
+  );
 }
 
 function useCountdown(targetIso?: string) {
@@ -171,7 +182,7 @@ export default function XpLeagueTab() {
                   {payout > 0 && (
                     <div className="text-right shrink-0">
                       <div className="text-[9px] text-ccb-muted font-semibold uppercase tracking-wide">1st wins</div>
-                      <div className="text-[11px] font-bold text-ccb-primary">{currency.currencyCode === "MWK" ? `MK ${payout.toLocaleString()}` : currency.formatRewardMoney(payout)}</div>
+                      <div className="text-[11px] font-bold text-ccb-primary">{data.rewardsCurrency === "USD" ? formatUsd(payout) : currency.currencyCode === "MWK" ? `MK ${payout.toLocaleString()}` : currency.formatRewardMoney(payout)}</div>
                     </div>
                   )}
                   {i < (data.tiers?.length ?? 5) - 1 && <TrendingUp className="w-3.5 h-3.5 text-ccb-muted/50" />}
@@ -245,7 +256,7 @@ export default function XpLeagueTab() {
             {rewards.map((r, i) => (
               <div key={i} className={`rounded-lg py-2 px-1 text-center ${i === 0 ? "bg-ccb-primary/15" : "bg-ccb-muted/5"}`}>
                 <div className="text-[10px] text-ccb-muted font-semibold">#{i + 1}</div>
-                <RewardAmount mwk={r} currency={currency} />
+                <RewardAmount amount={r} currency={currency} usd={!isMonth && data.rewardsCurrency === "USD"} />
               </div>
             ))}
           </div>

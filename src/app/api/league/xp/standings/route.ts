@@ -1,3 +1,4 @@
+import { rewardsCurrency as rewardsCurrencyOf } from "@/lib/league-xp";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -204,6 +205,7 @@ export async function GET(req: NextRequest) {
         ? (monthlyOn ? allMonthlyTierRewards(cfg) : {})
         : (rewardsOn ? allTierRewards(cfg) : {}),
       tiers: LEAGUE_TIERS,
+      rewardsCurrency: scope === "month" ? "MWK" : rewardsCurrencyOf(cfg),
     });
   } catch (err) {
     console.error("league xp standings error:", err);
