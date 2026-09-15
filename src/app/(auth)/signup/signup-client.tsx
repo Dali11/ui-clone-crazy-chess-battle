@@ -77,9 +77,21 @@ export default function SignupPage() {
   const redirectPath = searchParams.get("redirect") || "/dashboard";
   const actionParam = searchParams.get("action");
 
+  // Geo-detect the player's country so registration is NOT asking them to
+  // pick — it comes pre-filled with their location and they can optionally
+  // change it. Locked after account creation (one change allowed later in
+  // Settings).
+  const [geoDone, setGeoDone] = useState(false);
+
   useEffect(() => {
     const c = searchParams.get("country");
-    if (c) setCountry(c.toUpperCase());
+    if (c) { setCountry(c.toUpperCase()); setGeoDone(true); return; }
+    // No explicit choice — use IP geo-detection (Vercel header, free)
+    fetch("/api/currency")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.countryCode) setCountry(data.countryCode.toUpperCase()); })
+      .catch(() => {})
+      .finally(() => setGeoDone(true));
     const ref = searchParams.get("ref");
     if (ref) {
       setRefCode(ref);
@@ -342,7 +354,8 @@ export default function SignupPage() {
               </div>
 
               <div>
-                <label htmlFor="country" className="text-sm font-medium block mb-1.5">Country</label>
+                <label htmlFor="country" className="text-sm font-medium block mb-1.5">Country <span className="text-ccb-muted font-normal">(auto-detected)</span></label>
+                <p className="text-xs text-ccb-muted mb-1.5">Locked to your location at signup — you can change it once later in Settings.</p>
                 <select
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}

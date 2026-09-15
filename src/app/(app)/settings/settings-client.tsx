@@ -24,6 +24,7 @@ interface Profile {
   deposit_phone_numbers: string[] | null;
   gender: string | null;
   country: string | null;
+  country_change_used: boolean | null;
   chesscom_username: string | null;
   chesscom_verified: boolean | null;
   identity_verified: boolean | null;
@@ -409,7 +410,18 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
     const updates: Record<string, any> = { display_name: displayName, bio, phone, country };
     if (gender && !profile?.gender) updates.gender = gender;
     const { error } = await supabase.from("profiles").update(updates).eq("id", userId);
-    if (error) setError(error.message); else { setSaved(true); setTimeout(() => setSaved(false), 2000); router.refresh(); }
+    if (error) {
+      const msg = error.message || "";
+      if (msg.includes("COUNTRY_CHANGE_USED")) {
+        setError("Country can only be changed once — contact support if you need to change it again.");
+      } else if (msg.includes("COUNTRY_CHANGE_BLOCKED")) {
+        setError("You have a withdrawal being processed — wait for it to complete before changing country.");
+      } else if (msg.includes("COUNTRY_CHANGE_FX")) {
+        setError("Currency conversion is temporarily unavailable — please try again shortly.");
+      } else {
+        setError(msg);
+      }
+    } else { setSaved(true); setTimeout(() => setSaved(false), 2000); router.refresh(); }
     setSaving(false);
   };
 
@@ -479,12 +491,22 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
               <label className="text-sm font-medium block mb-1.5">Country</label>
               <p className="text-xs text-ccb-muted mb-2">Used for division eligibility and regional competitions.</p>
               <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ccb-muted pointer-events-none" />
-                <select value={country} onChange={(e) => setCountry(e.target.value)} className="input pl-10 appearance-none cursor-pointer">
+                <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${profile?.country_change_used ? "text-ccb-muted/50" : "text-ccb-muted"}`} />
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  disabled={!!profile?.country_change_used}
+                  className={`input pl-10 appearance-none ${profile?.country_change_used ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                >
                   <option value="">Select your country</option>
                   {COUNTRIES.map((c) => <option key={c.code+c.name} value={c.code}>{c.flag} {c.name}</option>)}
                 </select>
               </div>
+              <p className="text-xs text-ccb-muted mt-1.5">
+                {profile?.country_change_used
+                  ? "Your country is locked — you've used your one change. Contact support if you need to change it again."
+                  : "You can change your country once — it locks permanently after that."}
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium block mb-2">Gender Identity</label>
