@@ -1,5 +1,7 @@
 "use client";
 
+import CreativeImage from "./creative-image";
+
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Ban, Crown } from "lucide-react";
@@ -330,12 +332,9 @@ export default function AdSlot({
           className="block w-full overflow-hidden rounded-lg border border-ccb-border bg-ccb-surface hover:border-ccb-primary/40 transition-colors"
         >
           {direct.image_url ? (
-            <div className="w-full flex justify-center bg-ccb-bg/60">
-              {/* Ratio-aware: contain (never crop) so square, 1.91:1, 16:9
-                  and wide banners all render intact instead of being
-                  sliced by a fixed-height crop. */}
-              <img src={direct.image_url} alt={direct.business_name} className="w-full max-h-28 object-contain" />
-            </div>
+            /* Ratio-aware: 16:9 creatives fill the slot, 1:1 squares render
+               centered — advertisers are told to align creatives as such. */
+            <CreativeImage src={direct.image_url} alt={direct.business_name} />
           ) : null}
           <div className="px-3 py-2 flex items-center gap-3">
             <div className="min-w-0 flex-1">

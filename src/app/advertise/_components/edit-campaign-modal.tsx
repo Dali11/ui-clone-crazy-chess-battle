@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, ImagePlus, X, Save } from "lucide-react";
+import CreativeImage from "@/components/ads/creative-image";
 import { AD_TARGET_COUNTRIES } from "@/lib/ads/direct-pricing";
 import { compressImage } from "@/components/chat/compress-image";
 import { createClient } from "@/lib/supabase/client";
@@ -173,7 +174,7 @@ export default function EditCampaignModal({
               ) : (
                 <ImagePlus className="w-4 h-4 text-ccb-muted" />
               )}
-              {uploadingImage ? "Uploading…" : "Upload a new image (JPG, PNG or WebP)"}
+              {uploadingImage ? "Uploading…" : "Upload a new image (JPG, PNG or WebP) — 16:9 or 1:1 square"}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -233,10 +234,7 @@ export default function EditCampaignModal({
             </p>
             <div className="w-full overflow-hidden rounded-lg border border-ccb-border bg-ccb-surface">
               {imageUrl ? (
-                <div className="w-full flex justify-center bg-ccb-bg/60">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={imageUrl} alt="Your banner" className="w-full max-h-28 object-contain" />
-                </div>
+                <CreativeImage src={imageUrl} alt="Your banner" />
               ) : (
                 <div className="w-full h-16 flex items-center justify-center bg-ccb-bg/60 text-[11px] text-ccb-muted">
                   Your banner image appears here
@@ -252,6 +250,13 @@ export default function EditCampaignModal({
                 <span className="shrink-0 text-[11px] font-bold text-ccb-primary">Visit →</span>
               </div>
             </div>
+            {imageUrl && imageDims && (imageDims.w / imageDims.h < 0.8 || imageDims.w / imageDims.h > 2.4) && (
+              <p className="mt-1 text-[11px] text-orange-400 text-center">
+                Heads up: your image is {ratioLabel(imageDims.w, imageDims.h)} — ads look best at
+                16:9 (e.g. 1200×675) or 1:1 square (e.g. 1080×1080) so it fits the slot without
+                cropping or bars.
+              </p>
+            )}
           </div>
         </div>
 

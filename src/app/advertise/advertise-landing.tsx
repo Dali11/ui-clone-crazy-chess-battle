@@ -95,6 +95,10 @@ export default function AdvertiseLanding({
           <p className="text-[10px] uppercase tracking-widest text-ccb-muted/60 mb-1 text-center">
             Your ad, as players see it
           </p>
+          <p className="text-[11px] text-ccb-muted text-center mb-3">
+            Creatives render as a 16:9 banner or a 1:1 square — align your image to either for a
+            perfect fit.
+          </p>
           <div className="w-full overflow-hidden rounded-lg border border-ccb-border bg-ccb-surface">
             <div className="w-full h-24 sm:h-28 flex items-center justify-center bg-gradient-to-br from-ccb-primary/20 via-ccb-primary/5 to-transparent">
               <p className="text-xs sm:text-sm font-semibold text-ccb-muted">
@@ -218,7 +222,7 @@ export default function AdvertiseLanding({
               {
                 n: 2,
                 title: "Build your campaign",
-                text: "Upload your banner, write your headline, set your destination link and pick your audience.",
+                text: "Upload your banner (16:9 or 1:1 square works best), write your headline, set your destination link and pick your audience.",
               },
               {
                 n: 3,
