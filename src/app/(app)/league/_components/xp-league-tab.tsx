@@ -49,7 +49,7 @@ function RewardAmount({ mwk, currency }: { mwk: number; currency: ReturnType<typ
   }
   return (
     <div className="mt-0.5">
-      <div className="text-xs font-bold">{currency.formatMoney(mwk)}</div>
+      <div className="text-xs font-bold">{currency.formatRewardMoney(mwk)}</div>
       <div className="text-[9px] text-ccb-muted/80 leading-tight">{mwkLabel}</div>
     </div>
   );
@@ -176,7 +176,7 @@ export default function XpLeagueTab() {
                   {payout > 0 && (
                     <div className="text-right shrink-0">
                       <div className="text-[9px] text-ccb-muted font-semibold uppercase tracking-wide">1st wins</div>
-                      <div className="text-[11px] font-bold text-ccb-primary">{currency.currencyCode === "MWK" ? `MK ${payout.toLocaleString()}` : currency.formatMoney(payout)}</div>
+                      <div className="text-[11px] font-bold text-ccb-primary">{currency.currencyCode === "MWK" ? `MK ${payout.toLocaleString()}` : currency.formatRewardMoney(payout)}</div>
                     </div>
                   )}
                   {i < (data.tiers?.length ?? 5) - 1 && <TrendingUp className="w-3.5 h-3.5 text-ccb-muted/50" />}

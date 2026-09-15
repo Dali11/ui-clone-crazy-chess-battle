@@ -42,7 +42,7 @@ function LeagueCard({ league, currency }: { league: LeagueSummary; currency: Ret
         </div>
         <div className="text-right shrink-0">
           <p className="text-[10px] text-ccb-muted">Weekly pot</p>
-          <p className="text-sm font-bold text-ccb-primary tabular-nums">{currency.convertFormatted(weeklyTotal)}</p>
+          <p className="text-sm font-bold text-ccb-primary tabular-nums">{currency.formatRewardMoney(weeklyTotal)}</p>
         </div>
       </div>
 
@@ -64,8 +64,8 @@ function LeagueCard({ league, currency }: { league: LeagueSummary; currency: Ret
                 <p className="text-[10px] text-ccb-muted">{p.xp.toLocaleString()} XP</p>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-xs font-bold tabular-nums">{currency.convertFormatted(league.rewards[i] ?? 0)}</p>
-                <p className="text-[9px] text-ccb-muted/70">{currency.convertFormatted(league.monthlyRewards[i] ?? 0)} monthly</p>
+                <p className="text-xs font-bold tabular-nums">{currency.formatRewardMoney(league.rewards[i] ?? 0)}</p>
+                <p className="text-[9px] text-ccb-muted/70">{currency.formatRewardMoney(league.monthlyRewards[i] ?? 0)} monthly</p>
               </div>
             </div>
           ))

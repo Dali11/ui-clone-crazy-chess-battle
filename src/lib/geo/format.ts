@@ -60,3 +60,32 @@ export function formatMoney(
 export function moneySymbol(countryCode: string | null | undefined): string {
   return currencySymbolForCountry(countryCode);
 }
+
+/**
+ * Reward-display rounding (owner decision 2026-09-15): converted league
+ * payout figures must read as clean, rounded-off numbers — and small
+ * prizes must never collapse to "0" under whole-unit rounding in strong
+ * currencies (500 MWK = $0.29 used to display as "$0").
+ *
+ * Tick scales with the amount's magnitude:
+ *   >= 20 -> nearest 5
+ *   >= 5  -> nearest 1
+ *   >= 1  -> nearest 0.25
+ *   <  1  -> cent-exact (already "rounded off" to the minor unit)
+ *
+ * Pure display logic: wallets, stakes and payouts always settle in MWK.
+ */
+export function roundRewardAmount(converted: number): number {
+  const v = converted ?? 0;
+  if (v <= 0) return 0;
+  if (v >= 20) return Math.round(v / 5) * 5;
+  if (v >= 5) return Math.round(v);
+  if (v >= 1) return Math.round(v * 4) / 4;
+  return v;
+}
+
+/** Fraction digits to render a rounded reward figure with. */
+export function rewardFractionDigits(converted: number): number {
+  const rounded = roundRewardAmount(converted);
+  return rounded < 5 ? 2 : 0;
+}

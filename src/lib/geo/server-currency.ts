@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { currencyForCountry } from "@/lib/geo/currency-map";
 import { getCurrencySymbol } from "@/lib/geo/fx";
+import { roundRewardAmount, rewardFractionDigits } from "@/lib/geo/format";
 
 /**
  * Server-side currency context for a given country code.
@@ -46,5 +47,24 @@ export async function getServerCurrency(countryCode: string | null | undefined) 
     }
   }
 
-  return { currencyCode: code, currencySymbol: symbol, rate, formatMoney };
+  function formatRewardMoney(amountMWK: number): string {
+    const value = Math.floor(amountMWK ?? 0);
+    if (code === "MWK" || rate === 1) {
+      return `${symbol} ${value.toLocaleString("en-US")}`;
+    }
+    const rounded = roundRewardAmount(value * rate);
+    const digits = rewardFractionDigits(value * rate);
+    try {
+      return new Intl.NumberFormat("en", {
+        style: "currency",
+        currency: code,
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+      }).format(rounded);
+    } catch {
+      return `${symbol} ${rounded.toLocaleString("en-US")}`;
+    }
+  }
+
+  return { currencyCode: code, currencySymbol: symbol, rate, formatMoney, formatRewardMoney };
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { moneySymbol } from "@/lib/geo/format";
+import { roundRewardAmount, rewardFractionDigits } from "@/lib/geo/format";
 import { COUNTRY_CURRENCY, DEFAULT_CURRENCY } from "@/lib/geo/currency-map";
 
 export interface CurrencyState {
@@ -14,6 +15,9 @@ export interface CurrencyState {
 
 export interface UseCurrencyReturn extends CurrencyState {
   formatMoney: (amountMWK: number) => string;
+  /** Like formatMoney, but rounds converted figures to clean reward ticks
+   * (nearest 5/1/0.25 by magnitude) — league payout displays only. */
+  formatRewardMoney: (amountMWK: number) => string;
   convert: (amountMWK: number) => number;
   convertFormatted: (amountMWK: number) => string;
   /** Inverse of convert(): local-currency amount -> MWK-equivalent (the
@@ -89,6 +93,32 @@ export function useCurrency(initialCountryCode?: string | null): UseCurrencyRetu
     [state.currencyCode, state.currencySymbol, state.rate, state.loaded],
   );
 
+  const formatRewardMoney = useCallback(
+    (amountMWK: number) => {
+      const value = Math.floor(amountMWK ?? 0);
+      if (state.currencyCode === "MWK") {
+        return `${state.currencySymbol} ${value.toLocaleString("en-US")}`;
+      }
+      // Same honesty gate as formatMoney: no fake conversion before the
+      // real rate has loaded.
+      if (!state.loaded || !state.rate || state.rate === 1) {
+        return `MK ${value.toLocaleString("en-US")}`;
+      }
+      const rounded = roundRewardAmount(value * state.rate);
+      try {
+        return new Intl.NumberFormat("en", {
+          style: "currency",
+          currency: state.currencyCode,
+          minimumFractionDigits: rewardFractionDigits(value * state.rate),
+          maximumFractionDigits: rewardFractionDigits(value * state.rate),
+        }).format(rounded);
+      } catch {
+        return `${state.currencySymbol} ${rounded.toLocaleString("en-US")}`;
+      }
+    },
+    [state.currencyCode, state.currencySymbol, state.rate, state.loaded],
+  );
+
   const convert = useCallback(
     (amountMWK: number) => {
       if (state.currencyCode === "MWK") return Math.floor(amountMWK ?? 0);
@@ -116,5 +146,5 @@ export function useCurrency(initialCountryCode?: string | null): UseCurrencyRetu
     [state.currencyCode, state.rate, state.loaded],
   );
 
-  return { ...state, formatMoney, convert, convertFormatted, toMWK };
+  return { ...state, formatMoney, formatRewardMoney, convert, convertFormatted, toMWK };
 }
