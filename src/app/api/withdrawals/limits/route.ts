@@ -13,6 +13,7 @@ export async function GET() {
 
     const admin = createAdminClient();
     const wConfig = await getPlatformConfig(admin, "withdrawals");
+    const dConfig = await getPlatformConfig(admin, "deposits");
 
     const { data: _profile } = await admin.from("profiles").select("country").eq("id", user.id).single();
     const sym = moneySymbol(_profile?.country);
@@ -24,6 +25,11 @@ export async function GET() {
       daily_limit: wConfig.daily_limit || 0,
       processing_fee_pct: wConfig.processing_fee_pct || 0,
       currency_symbol: sym,
+      // Deposit limits (MWK; the client converts to the player's currency —
+      // the minimum a player can deposit is the MWK minimum's equivalent)
+      deposit_enabled: dConfig.enabled !== false,
+      deposit_min_amount: dConfig.min_amount || 1000,
+      deposit_max_amount: dConfig.max_amount || 500_000,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

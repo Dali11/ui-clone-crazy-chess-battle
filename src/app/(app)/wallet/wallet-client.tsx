@@ -69,7 +69,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [tab, setTab] = useState<"deposit" | "withdraw" | "history">("deposit");
   const [depositAmount, setDepositAmount] = useState(1000);
   const [withdrawAmount, setWithdrawAmount] = useState(0);
-  const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number; processing_fee_pct: number; currency_symbol?: string } | null>(null);
+  const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number; processing_fee_pct: number; currency_symbol?: string; deposit_min_amount?: number; deposit_max_amount?: number } | null>(null);
   // Deposits must use one of the player's up-to-3 saved, support-locked numbers
   // (anti OTP-spam). Withdrawals stay free-text — can go to any number.
   const [depositPhone, setDepositPhone] = useState(depositPhones[0] || "");
@@ -92,11 +92,17 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [pawapayLoading, setPawapayLoading] = useState(false);
 
   // Live currency via shared hook — converts MWK to user's local currency
-  const { formatMoney: fmtCurrency, formatWallet, convert, currencySymbol: sym, currencyCode: currencyCode, rate: fxRate } = useCurrency(country);
+  const { formatMoney: fmtCurrency, formatWallet, convert, currencySymbol: sym, currencyCode: currencyCode, rate: fxRate, loaded: fxLoaded } = useCurrency(country);
   const isMalawi = !country || country === "MW";
   const usePawaPay = !isMalawi; // everyone outside Malawi deposits/withdraws via PawaPay
 
-  const quickAmounts = isMalawi ? QUICK_AMOUNTS_MWK : QUICK_AMOUNTS_INTL;
+  // Deposit minimum = the Malawi Kwacha config minimum, converted to the
+  // player's currency. (The server enforces the same rule; this keeps the
+  // form honest so players don't type amounts the API will reject.)
+  const depositMinMwk = withdrawConfig?.deposit_min_amount || 1000;
+  const depositMinLocal = isMalawi ? depositMinMwk : (fxLoaded && fxRate && fxRate !== 1 ? convert(depositMinMwk) : 1);
+  const baseQuickAmounts = isMalawi ? QUICK_AMOUNTS_MWK : QUICK_AMOUNTS_INTL;
+  const quickAmounts = baseQuickAmounts.filter((a) => a >= depositMinLocal);
   const formatAmt = (amount: number) => fmtCurrency(amount || 0);
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -479,7 +485,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
             <input
               type="number"
               value={depositAmount}
-              onChange={(e) => setDepositAmount(Math.max(100, parseInt(e.target.value) || 0))}
+              onChange={(e) => setDepositAmount(Math.max(depositMinLocal, parseInt(e.target.value) || 0))}
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
             />
             <div className="flex gap-2 mt-2 flex-wrap">
@@ -495,6 +501,9 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 </button>
               ))}
             </div>
+            <p className="text-xs text-ccb-muted mt-2">
+              Min deposit: {formatAmt(depositMinMwk)}{withdrawConfig?.deposit_max_amount ? ` · Max: ${formatAmt(withdrawConfig.deposit_max_amount)}` : ""}
+            </p>
           </div>
 
           {/* PawaPay provider selector (non-Malawi, non-Zambia) */}
