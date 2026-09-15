@@ -270,6 +270,37 @@ describe("planWeeklySettlement — fair-share rebalance", () => {
     for (const mem of members) finalCounts[movesByUser.get(mem.user_id) ?? mem.tier]++;
     expect(finalCounts).toEqual({ 1: 20, 2: 20, 3: 21, 4: 21, 5: 21 });
   });
+
+  it("falls back to best non-earners when earners run out (fair share guaranteed)", () => {
+    // 2026-09-15 regression: the week-2 close had only 59/205 Open
+    // players earning, so the earners-only wave died at Bronze and left
+    // Knights/Premier 22 under target. Same shape here: t1=40 (5 earned,
+    // 15 zero-XP active, 20 stale), t2=18, t3=18, t4=17, t5=10.
+    const members = [
+      ...Array.from({ length: 5 }, (_, i) => m(1, 20 - i)),
+      ...Array.from({ length: 15 }, (_, i) => m(1, 0)),
+      ...Array.from({ length: 20 }, (_, i) => m(1, 0, "2026-09-01")),
+      ...Array.from({ length: 18 }, (_, i) => m(2, 50 - i)),
+      ...Array.from({ length: 18 }, (_, i) => m(3, 50 - i)),
+      ...Array.from({ length: 17 }, (_, i) => m(4, 50 - i)),
+      ...Array.from({ length: 10 }, (_, i) => m(5, 50 - i)),
+    ];
+    const plan = planWeeklySettlement({ members, cfg: baseCfg, closingWeek: CLOSING, newWeek: NEW });
+    expect(plan.rebalanceDown).toHaveLength(0);
+    // Wave into t2: the 5 earners first, then the 15 zero-XP actives.
+    // Stale (never-played) members never ride.
+    const intoT2 = plan.rebalanceUp.filter((mv) => mv.toTier === 2).map((mv) => mv.userId);
+    expect(intoT2).toHaveLength(20);
+    const earned = new Set(members.filter((x) => x.week_start === CLOSING && x.xp > 0).map((x) => x.user_id));
+    expect(intoT2.filter((u) => earned.has(u))).toHaveLength(5);
+    const stale = new Set(members.filter((x) => x.week_start !== CLOSING).map((x) => x.user_id));
+    expect(intoT2.some((u) => stale.has(u))).toBe(false);
+    // Rosters land exactly on the fair-share targets.
+    const movesByUser = new Map(plan.rebalanceUp.map((mv) => [mv.userId, mv.toTier]));
+    const finalCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const mem of members) finalCounts[movesByUser.get(mem.user_id) ?? mem.tier]++;
+    expect(finalCounts).toEqual({ 1: 20, 2: 20, 3: 21, 4: 21, 5: 21 });
+  });
 });
 
 describe("planWeeklySettlement — contract details", () => {

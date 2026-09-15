@@ -33,7 +33,8 @@ export const maxDuration = 60;
  *      - FAIR-SHARE REBALANCE (owner policy 2026-09-11): after the
  *        standard moves, any roster drift from the even share (total / 5
  *        per league) is corrected in one wave — Open's surplus rides up
- *        (XP earners only), over-shared leagues shed their bottom. Only
+ *        (XP earners first, then a best-of-rest fallback — owner 2026-09-15;
+ *        over-shared leagues shed their bottom). Only
  *        fires at drift ≥ 5; cash rewards are unaffected.
  *    Idempotent guard: members already on the new week are skipped, so a
  *    re-run or overlap with live traffic can never double-pay.

@@ -191,7 +191,9 @@ export function planWeeklySettlement(args: {
   // After the standard moves: any roster drift from the even share
   // (total / 5, top leagues take the remainder) is corrected in one wave.
   // Over-shared leagues shed their bottom (inactive sink first); Open's
-  // surplus rides up (XP earners only). Only fires at drift ≥ 5.
+  // surplus rides up (XP earners first, then a best-of-rest fallback
+  // — owner decision 2026-09-15, so the share is always fair). Only
+  // fires at drift ≥ 5.
   const rebalanceUp: RebalanceMove[] = [];
   const rebalanceDown: RebalanceMove[] = [];
   {
@@ -238,15 +240,30 @@ export function planWeeklySettlement(args: {
     }
 
     // Bottom-up promotion: Open's surplus rides up the chain.
+    // FAIR-SHARE FALLBACK (owner decision 2026-09-15): XP earners ride
+    // first, but when they run out the wave CONTINUES with the best
+    // remaining players — highest closing-week XP first, never-played
+    // last — so the rebalance actually lands on the fair share even in
+    // thin-activity weeks. (The pre-fallback earners-only wave stranded
+    // Knights/Premier 22 under target at the week-2 close when only
+    // 59/205 Open players had earned.) Riders still climb exactly one
+    // tier per settle.
     let inflow = Math.max(0, counts[1] - targets[1]);
     if (inflow >= 5) {
       for (let t = 2; t <= 5 && inflow > 0; t++) {
         const room = Math.max(0, cap - counts[t]);
         if (room <= 0) break;
-        const eligible = pool(t - 1).filter((m) => m.earned);
-        const move = Math.min(inflow, eligible.length, room);
+        const candidates = pool(t - 1); // xp desc: earners, best-of-rest, stale last
+        const earners = candidates.filter((m) => m.earned);
+        const takeEarners = Math.min(inflow, earners.length, room);
+        const wave = earners.slice(0, takeEarners);
+        const fallbackNeed = Math.min(inflow - takeEarners, room - takeEarners);
+        if (fallbackNeed > 0) {
+          const rest = candidates.filter((m) => !m.earned);
+          wave.push(...rest.slice(0, fallbackNeed));
+        }
+        const move = wave.length;
         if (move <= 0) break;
-        const wave = eligible.slice(0, move);
         for (const m of wave) {
           rebalanceUp.push({ userId: m.user_id, fromTier: t - 1, toTier: t });
           m.tier = t;
