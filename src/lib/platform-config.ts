@@ -50,18 +50,18 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     tier_cap: 1000, // max players per league above Open (Open is uncapped)
     rewards_enabled: true,
     // Legacy flat rewards (pre per-tier config) — kept as fallback.
-    reward_1_mwk: 2000,
-    reward_2_mwk: 1000,
-    reward_3_mwk: 500,
-    reward_4_mwk: 250,
-    reward_5_mwk: 100,
+    reward_1_mwk: 1000,
+    reward_2_mwk: 500,
+    reward_3_mwk: 250,
+    reward_4_mwk: 125,
+    reward_5_mwk: 50,
     // Per-league weekly payouts, MWK. rewards_tN_mwk = [1st, 2nd, 3rd, ...]
     // for tier N. Higher leagues pay more — climb for bigger rewards.
-    rewards_t1_mwk: [2000, 1000, 500, 250, 100],
-    rewards_t2_mwk: [3000, 1500, 750, 400, 150],
-    rewards_t3_mwk: [5000, 2500, 1200, 600, 250],
-    rewards_t4_mwk: [8000, 4000, 2000, 1000, 400],
-    rewards_t5_mwk: [15000, 8000, 4000, 2000, 1000],
+    rewards_t1_mwk: [1000, 500, 250, 125, 50],
+    rewards_t2_mwk: [1500, 750, 375, 200, 75],
+    rewards_t3_mwk: [2500, 1250, 600, 300, 125],
+    rewards_t4_mwk: [4000, 2000, 1000, 500, 200],
+    rewards_t5_mwk: [7500, 4000, 2000, 1000, 500],
     // Monthly championship (calendar month, settled on the 1st)
     monthly_rewards_enabled: true,
     monthly_top_count: 5,
@@ -70,11 +70,11 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     // Season 1 started Fri 2026-09-11 00:00 CAT (owner policy). Monthly
     // championships never count XP earned before this date.
     season_start: "2026-09-11",
-    monthly_rewards_t1_mwk: [8000, 4000, 2000, 1000, 500],
-    monthly_rewards_t2_mwk: [12000, 6000, 3000, 1600, 600],
-    monthly_rewards_t3_mwk: [20000, 10000, 5000, 2400, 1000],
-    monthly_rewards_t4_mwk: [32000, 16000, 8000, 4000, 1600],
-    monthly_rewards_t5_mwk: [60000, 32000, 16000, 8000, 4000],
+    monthly_rewards_t1_mwk: [4000, 2000, 1000, 500, 250],
+    monthly_rewards_t2_mwk: [6000, 3000, 1500, 800, 300],
+    monthly_rewards_t3_mwk: [10000, 5000, 2500, 1200, 500],
+    monthly_rewards_t4_mwk: [16000, 8000, 4000, 2000, 800],
+    monthly_rewards_t5_mwk: [30000, 16000, 8000, 4000, 2000],
   },
   ads: {
     enabled: false, // global kill switch
