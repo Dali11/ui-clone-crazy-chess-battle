@@ -9,6 +9,11 @@ const config: Config = {
       colors: {
         ccb: {
           dark: "#0a0a0f",
+          // Alias for "dark" — several components (advertise forms,
+          // creative previews, friends page) reference bg-ccb-bg. It was
+          // never in this palette, so Tailwind silently dropped the
+          // class and those panels rendered fully transparent.
+          bg: "#0a0a0f",
           surface: "#16161f",
           card: "#1c1c28",
           border: "#2a2a3a",
@@ -22,6 +27,9 @@ const config: Config = {
           danger: "#ef4444",
           muted: "#9ca3af",
           text: "#ffffff",
+          // Aliases for "text" — same undefined-color bug as ccb-bg above.
+          fg: "#ffffff",
+          foreground: "#ffffff",
         },
       },
       fontFamily: {
