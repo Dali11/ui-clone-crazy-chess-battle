@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       // Find the deposit by PawaPay depositId
       const { data: deposit } = await admin
         .from("deposits")
-        .select("id, user_id, amount, amount_local, currency, status, reference")
+        .select("id, user_id, amount, amount_local, currency, status, reference, method")
         .eq("pawapay_ref", body.depositId)
         .single();
 
@@ -55,6 +55,55 @@ export async function POST(req: NextRequest) {
 
         if (!claimed || claimed.length === 0) {
           return NextResponse.json({ received: true, message: "Already processing" });
+        }
+
+        // Membership purchases don't credit the wallet — they extend
+        // membership. (Cash is platform revenue, swept weekly to the owner.)
+        if (deposit.method === "membership_purchase") {
+          const { extendMembership } = await import("@/lib/membership/membership");
+          const { data: mp } = await admin
+            .from("profiles")
+            .select("membership_until")
+            .eq("id", deposit.user_id)
+            .single();
+          const now = new Date().toISOString();
+          const { getPlatformConfig } = await import("@/lib/platform-config");
+          const memCfg = await getPlatformConfig(admin, "membership");
+          const periodDays = Number(memCfg.period_days) || 30;
+          const until = extendMembership(mp?.membership_until, now, periodDays);
+          await admin.from("profiles").update({ membership_until: until }).eq("id", deposit.user_id);
+
+          await admin
+            .from("deposits")
+            .update({ status: "success", updated_at: now })
+            .eq("id", deposit.id);
+
+          try {
+            await admin.from("notifications").insert({
+              user_id: deposit.user_id,
+              type: "membership_active",
+              title: "Membership active 🎉",
+              body: `You're a member until ${until.slice(0, 10)} — ads are off. Thanks for supporting Crazy Chess Battles!`,
+              data: { until, amount: deposit.amount },
+              read: false,
+            });
+          } catch {}
+
+          // Affiliate commission (same as the PayChangu rails): pays the
+          // referrer 25%, properly ledgered. Never blocks activation.
+          try {
+            const affCfg = await getPlatformConfig(admin, "affiliate");
+            if (affCfg.enabled) {
+              await admin.rpc("process_affiliate_commission", {
+                p_user_id: deposit.user_id,
+                p_amount: Math.round(deposit.amount),
+              });
+            }
+          } catch (affErr) {
+            console.error("affiliate commission failed:", affErr);
+          }
+
+          return NextResponse.json({ received: true });
         }
 
         // Normal deposit — credit wallet

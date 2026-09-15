@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { isMember, daysRemaining } from "@/lib/membership/membership";
-import { getExchangeRate } from "@/lib/geo/fx";
+import { getExchangeRate, getMwkToLocalRate } from "@/lib/geo/fx";
+import { currencyCodeForCountry } from "@/lib/geo/format";
 
 export const dynamic = "force-dynamic";
 
@@ -39,25 +40,41 @@ export async function GET() {
       country = profile?.country || null;
     }
 
-    // USD $10/month pricing (owner decision 2026-09-15) — show both the
-    // dollar price and the MWK figure the mobile-money rails will charge.
+    // USD $10/month pricing (owner decision 2026-09-15), converted to what
+    // the player's own rails will charge: MWK (PayChangu) for Malawi, the
+    // player's local currency (PawaPay) everywhere else.
+    const priceUsd = cfg.price_usd || 10;
     let priceMwk: number | null = null;
-    if (country === "MW" && cfg.enabled) {
-      const rate = await getExchangeRate("USD", "MWK");
-      if (rate >= 500 && rate <= 5000) priceMwk = Math.round((cfg.price_usd || 10) * rate);
+    let priceLocal: number | null = null;
+    let localCurrency: string | null = null;
+    if (cfg.enabled) {
+      let usdToMwk = await getExchangeRate("USD", "MWK");
+      if (usdToMwk >= 500 && usdToMwk <= 5000) {
+        const amountMwk = Math.round(priceUsd * usdToMwk);
+        if (country === "MW") {
+          priceMwk = amountMwk;
+        } else if (country) {
+          localCurrency = currencyCodeForCountry(country);
+          const mwkRate = await getMwkToLocalRate(admin, localCurrency);
+          if (mwkRate) priceLocal = Math.round(amountMwk * mwkRate);
+        }
+      }
     }
 
     return NextResponse.json({
       member,
       until,
       daysLeft,
+      country,
       enabled: !!cfg.enabled,
       currency: "USD",
-      priceUsd: cfg.price_usd || 10,
+      priceUsd: priceUsd,
       priceMwk,
+      priceLocal,
+      localCurrency,
       periodDays: cfg.period_days || 30,
-      // MW-only for now (PayChangu rails); ZM/other countries: coming soon
-      available: country === "MW",
+      // Available in every country: Malawi on PayChangu, worldwide on PawaPay
+      available: true,
     });
   } catch {
     return NextResponse.json({ member: false }, { status: 200 });

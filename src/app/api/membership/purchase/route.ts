@@ -2,16 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
-import { getExchangeRate } from "@/lib/geo/fx";
+import { getExchangeRate, getMwkToLocalRate } from "@/lib/geo/fx";
+import { currencyCodeForCountry } from "@/lib/geo/format";
+import { initiateDeposit } from "@/lib/payments/pawapay";
+import { isAllowedDepositPhone } from "@/lib/deposit-phones";
+import { randomUUID } from "crypto";
 
 /**
- * POST /api/membership/purchase  { phone, operatorRefId, email?, firstName?, lastName? }
+ * POST /api/membership/purchase
  *
- * Buys/extends membership via the SAME PayChangu mobile-money rails as
- * deposits: creates a deposits row with method='membership_purchase',
- * then initializes the charge. On payment success the verify/webhook
- * handlers extend profiles.membership_until (NOT the wallet — the cash
- * is platform revenue, swept weekly to the owner).
+ * Buys/extends membership for players in EVERY country:
+ *   - MW  -> PayChangu mobile-money rails (phone + operator -> PIN prompt)
+ *   - Intl-> PawaPay rails (provider + phone -> PIN prompt), charged in the
+ *           player's OWN currency at the live USD rate.
+ *
+ * Both create a deposits row with method='membership_purchase'. On payment
+ * success the verify/webhook handlers extend profiles.membership_until
+ * (NOT the wallet - the cash is platform revenue, swept weekly to the owner).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -19,31 +26,26 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { phone, operatorRefId, email, firstName, lastName } = await req.json();
-    if (!phone || !operatorRefId) {
-      return NextResponse.json({ error: "Phone number and operator required" }, { status: 400 });
-    }
+    const body = await req.json();
+    const { phone, operatorRefId, email, firstName, lastName,
+            // PawaPay (international) fields:
+            phoneNumber, provider } = body;
 
     const admin = createAdminClient();
 
-    // MW-only for now: the purchase rides PayChangu (Malawi mobile money)
     const { data: profile } = await admin
       .from("profiles")
-      .select("country, email, username")
+      .select("country, email, username, deposit_phone_numbers")
       .eq("id", user.id)
       .single();
-    if (profile?.country !== "MW") {
-      return NextResponse.json({ error: "Membership is coming soon to your country." }, { status: 403 });
-    }
 
     const cfg = await getPlatformConfig(admin, "membership");
     if (!cfg.enabled) {
       return NextResponse.json({ error: "Membership purchases are currently disabled" }, { status: 403 });
     }
 
-    // USD $10/month pricing (owner decision 2026-09-15): convert to MWK
-    // at the live rate for the PayChangu charge. Sanity-banded — if both
-    // the live fetch and the DB-cached inverse rate look wrong, refuse
+    // USD $10/month pricing (owner decision 2026-09-15). Sanity-banded - if
+    // both the live fetch and the DB-cached inverse rate look wrong, refuse
     // the purchase rather than charge the wrong amount.
     const priceUsd = Number(cfg.price_usd) || 10;
     let usdToMwk = await getExchangeRate("USD", "MWK");
@@ -58,10 +60,100 @@ export async function POST(req: NextRequest) {
       if (inv > 0) usdToMwk = inv;
     }
     if (usdToMwk < 500 || usdToMwk > 5000) {
-      return NextResponse.json({ error: "Pricing is temporarily unavailable — please try again in a moment." }, { status: 503 });
+      return NextResponse.json({ error: "Pricing is temporarily unavailable - please try again in a moment." }, { status: 503 });
     }
-    const amount = Math.round(priceUsd * usdToMwk);
-    if (amount < 100) return NextResponse.json({ error: "Invalid membership price configured" }, { status: 500 });
+    const amountMwk = Math.round(priceUsd * usdToMwk);
+    if (amountMwk < 100) return NextResponse.json({ error: "Invalid membership price configured" }, { status: 500 });
+
+    const isMalawi = !profile?.country || profile.country === "MW";
+
+    // -- INTERNATIONAL: PawaPay rails, charged in the player's currency --
+    if (!isMalawi) {
+      if (!phoneNumber || !provider) {
+        return NextResponse.json({ error: "Phone number and mobile money provider required" }, { status: 400 });
+      }
+
+      const currencyCode = currencyCodeForCountry(profile?.country);
+      const mwkRate = await getMwkToLocalRate(admin, currencyCode); // 1 MWK -> local
+      if (!mwkRate) {
+        return NextResponse.json({ error: "Pricing is temporarily unavailable - please try again in a moment." }, { status: 503 });
+      }
+      const localAmount = Math.round(amountMwk * mwkRate);
+      if (localAmount < 100) {
+        return NextResponse.json({ error: "Invalid membership price configured" }, { status: 500 });
+      }
+
+      // Anti-fraud: PawaPay charges only go to a locked deposit phone the
+      // player saved in Settings (same rule as wallet deposits).
+      const savedPhones = (profile?.deposit_phone_numbers as string[] | null) || [];
+      if (savedPhones.length === 0) {
+        return NextResponse.json({ error: "Add a deposit phone number in Settings first." }, { status: 400 });
+      }
+      if (!isAllowedDepositPhone(savedPhones, phoneNumber)) {
+        return NextResponse.json({ error: "Use one of your saved deposit phone numbers from Settings." }, { status: 400 });
+      }
+
+      const depositId = randomUUID();
+      const chargeId = `pwp_${depositId.slice(0, 13)}`;
+
+      const { data: deposit, error: depositError } = await admin
+        .from("deposits")
+        .insert({
+          user_id: user.id,
+          amount: amountMwk,
+          method: "membership_purchase",
+          payment_provider: "pawapay",
+          status: "pending",
+          charge_id: chargeId,
+          phone: phoneNumber,
+          operator: provider,
+          pawapay_ref: depositId,
+          country: profile?.country || null,
+          currency: currencyCode,
+          amount_local: localAmount,
+          fx_rate: mwkRate,
+        })
+        .select("id")
+        .single();
+
+      if (depositError || !deposit) {
+        return NextResponse.json({ error: "Failed to create purchase record" }, { status: 500 });
+      }
+
+      try {
+        const response = await initiateDeposit({
+          depositId,
+          amount: String(localAmount),
+          currency: currencyCode,
+          phoneNumber,
+          provider,
+        });
+
+        if (response.status === "ACCEPTED" || response.status === "COMPLETED") {
+          return NextResponse.json({
+            depositId: deposit.id,
+            chargeId,
+            status: "pending",
+            message: "Check your phone to authorize the payment",
+          });
+        } else {
+          await admin.from("deposits")
+            .update({ status: "failed", updated_at: new Date().toISOString() })
+            .eq("id", deposit.id);
+          return NextResponse.json({ error: "Payment was not accepted. Please try again." }, { status: 400 });
+        }
+      } catch {
+        await admin.from("deposits")
+          .update({ status: "failed", updated_at: new Date().toISOString() })
+          .eq("id", deposit.id);
+        return NextResponse.json({ error: "Unable to initiate payment. Please try again later." }, { status: 400 });
+      }
+    }
+
+    // -- MALAWI: PayChangu mobile-money rails (unchanged) -----------------
+    if (!phone || !operatorRefId) {
+      return NextResponse.json({ error: "Phone number and operator required" }, { status: 400 });
+    }
 
     const chargeId = `ccb_mem_${Date.now()}_${user.id.slice(0, 8)}`;
 
@@ -69,7 +161,7 @@ export async function POST(req: NextRequest) {
       .from("deposits")
       .insert({
         user_id: user.id,
-        amount,
+        amount: amountMwk,
         method: "membership_purchase",
         status: "pending",
         charge_id: chargeId,
@@ -92,7 +184,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         mobile: phone,
         mobile_money_operator_ref_id: operatorRefId,
-        amount,
+        amount: amountMwk,
         charge_id: chargeId,
         email: email || profile?.email || undefined,
         first_name: firstName || profile?.username || undefined,
@@ -121,7 +213,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       depositId: deposit.id,
       chargeId,
-      amount,
+      amount: amountMwk,
       status: data.status || "pending",
       message: data.message || "Check your phone to authorize the payment",
     });
