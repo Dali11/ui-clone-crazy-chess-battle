@@ -35,9 +35,14 @@ export async function POST(req: NextRequest) {
     if (!deposit) return NextResponse.json({ error: "Deposit not found" }, { status: 404 });
     if (deposit.user_id !== user.id) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-    // Already successfully processed — return immediately (idempotent)
+    // Already successfully processed — return immediately (idempotent).
+    // Must return amount_local (the player's own wallet currency), NOT the
+    // raw MWK ledger `amount` — this branch fires on every re-poll after
+    // success (wallet-client.tsx runs two polling effects that can both
+    // observe the same transition), and the client both displays this
+    // number in the toast and adds it to its optimistic balance.
     if (deposit.status === "success") {
-      return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount });
+      return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount_local ?? deposit.amount });
     }
 
     // Already being processed by another request — return pending
@@ -121,7 +126,7 @@ export async function POST(req: NextRequest) {
           console.error("affiliate commission failed:", affErr);
         }
 
-        return NextResponse.json({ status: "success", membership: true, until, depositId: deposit.id, amount: deposit.amount });
+        return NextResponse.json({ status: "success", membership: true, until, depositId: deposit.id, amount: deposit.amount_local ?? deposit.amount });
       }
 
       // Normal deposit — credit wallet (credit_wallet converts MWK equiv
@@ -181,7 +186,7 @@ export async function POST(req: NextRequest) {
 
       if (claimErr || !claimed || claimed.length === 0) {
         // Another request is already processing or has processed this deposit
-        return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount });
+        return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount_local ?? deposit.amount });
       }
 
       // Membership purchases don't credit the wallet — they extend membership.
@@ -234,7 +239,7 @@ export async function POST(req: NextRequest) {
           console.error("affiliate commission failed:", affErr);
         }
 
-        return NextResponse.json({ status: "success", membership: true, until, depositId: deposit.id, amount: deposit.amount });
+        return NextResponse.json({ status: "success", membership: true, until, depositId: deposit.id, amount: deposit.amount_local ?? deposit.amount });
       }
 
       // We won the race — safe to credit the wallet
@@ -263,7 +268,7 @@ export async function POST(req: NextRequest) {
         });
       } catch {}
 
-      return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount });
+      return NextResponse.json({ status: "success", depositId: deposit.id, amount: deposit.amount_local ?? deposit.amount });
     }
 
     if (remoteStatus === "failed" || remoteStatus === "cancelled") {

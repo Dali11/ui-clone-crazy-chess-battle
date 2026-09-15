@@ -82,6 +82,12 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [walletBal, setWalletBal] = useState(balance);
+  // Self-heal: whenever the server-rendered `balance` prop changes (e.g.
+  // after router.refresh() following a deposit), snap local state back to
+  // the true DB value. Without this, any optimistic-update bug (or a
+  // stray duplicate poll) leaves the displayed balance permanently wrong
+  // until a hard page reload, even though the backend is correct.
+  useEffect(() => { setWalletBal(balance); }, [balance]);
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [txnLoading, setTxnLoading] = useState(false);
