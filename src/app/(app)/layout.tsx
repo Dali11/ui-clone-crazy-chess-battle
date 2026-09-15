@@ -1,14 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import AppNav from "@/components/layout/app-nav";
-import ActiveBattleWatcher from "@/components/battles/active-battle-watcher";
-import ActiveTournamentWatcher from "@/components/layout/active-tournament-watcher";
-import TournamentPopup from "@/components/layout/tournament-popup";
-import ClubJoinPopup from "@/components/layout/club-join-popup";
-import OpenMatchBanner from "@/components/layout/open-match-banner";
-import ActiveGameRedirect from "@/components/layout/active-game-redirect";
-
+import AppShell from "@/components/layout/app-shell";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -30,18 +23,5 @@ export default async function AppLayout({
     .eq("id", user.id)
     .single();
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      <AppNav profile={profile} />
-      <ActiveBattleWatcher />
-      <ActiveTournamentWatcher />
-      <TournamentPopup />
-      <ClubJoinPopup />
-      <OpenMatchBanner />
-      <ActiveGameRedirect />
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        {children}
-      </main>
-    </div>
-  );
+  return <AppShell profile={profile}>{children}</AppShell>;
 }
