@@ -181,7 +181,9 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
           });
           const data = await res.json();
           if (data.status === "success") {
-            setSuccess(`${formatAmt(data.amount ?? 0)} added to your wallet!`);
+            // data.amount is ALREADY in the player's wallet currency
+            // (amount_local) — formatWallet shows it raw, no conversion.
+            setSuccess(`${formatWallet(data.amount ?? 0)} added to your wallet!`);
             setPolling(false);
             clearInterval(interval);
             setWalletBal((prev) => prev + data.amount);
@@ -214,7 +216,9 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         const data = await res.json();
 
         if (data.status === "success") {
-          setSuccess(`${formatAmt(data.amount ?? 0)} added to your wallet!`);
+          // data.amount is ALREADY in the player's wallet currency
+          // (amount_local) — formatWallet shows it raw, no conversion.
+          setSuccess(`${formatWallet(data.amount ?? 0)} added to your wallet!`);
           setPolling(false);
           setPendingChargeId(null);
           clearInterval(interval);
@@ -395,9 +399,10 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
 
       setWalletBal((prev) => prev - withdrawAmount);
       if (data.status === "completed" || data.auto) {
-        setSuccess(`${formatAmt(withdrawAmount)} withdrawal sent! Fees deducted — check your phone for the amount received.`);
+        // withdrawAmount is the player's own wallet currency — raw display
+        setSuccess(`${formatWallet(withdrawAmount)} withdrawal sent! Fees deducted — check your phone for the amount received.`);
       } else {
-        setSuccess(`Withdrawal request for ${formatAmt(withdrawAmount)} submitted. You'll receive it within 30 minutes after admin approval.`);
+        setSuccess(`Withdrawal request for ${formatWallet(withdrawAmount)} submitted. You'll receive it within 30 minutes after admin approval.`);
       }
       router.refresh();
 
@@ -728,17 +733,17 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               <div className="space-y-1.5 p-3.5 rounded-xl bg-ccb-surface border border-ccb-border">
                 <div className="flex justify-between text-sm">
                   <span className="text-ccb-muted">Withdrawal amount</span>
-                  <span className="font-medium">{formatAmt(withdrawAmount)}</span>
+                  <span className="font-medium">{formatWallet(withdrawAmount)}</span>
                 </div>
                 {pctFee > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-ccb-muted">Processing fee ({pctFee}%)</span>
-                    <span className="text-ccb-muted">−{formatAmt(processingFee)}</span>
+                    <span className="text-ccb-muted">−{formatWallet(processingFee)}</span>
                   </div>
                 )}
                 <div className="border-t border-ccb-border pt-1.5 flex justify-between text-sm font-semibold">
                   <span>You receive</span>
-                  <span className="text-ccb-primary">{formatAmt(netAmount)}</span>
+                  <span className="text-ccb-primary">{formatWallet(netAmount)}</span>
                 </div>
               </div>
             );
@@ -755,7 +760,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 Processing...
               </>
             ) : (
-              <>Withdraw {formatAmt(withdrawAmount)}</>
+              <>Withdraw {formatWallet(withdrawAmount)}</>
             )}
           </button>
 
@@ -766,9 +771,9 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 {withdrawals.slice(0, 5).map((w) => (
                   <div key={w.id} className="flex items-center justify-between p-3 rounded-lg bg-ccb-surface border border-ccb-border">
                     <div>
-                      <p className="text-sm font-medium">{formatAmt(w.amount)}</p>
+                      <p className="text-sm font-medium">{formatWallet(w.amount)}</p>
                       {w.fee != null && w.fee > 0 && w.net_amount != null && (
-                        <p className="text-xs text-ccb-muted">Fee: {formatAmt(w.fee)} · Net: {formatAmt(w.net_amount)}</p>
+                        <p className="text-xs text-ccb-muted">Fee: {formatWallet(w.fee)} · Net: {formatWallet(w.net_amount)}</p>
                       )}
                       <p className="text-xs text-ccb-muted">{w.operator_name} · {formatDate(w.created_at)}</p>
                     </div>
