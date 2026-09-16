@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { validateDraft, type CampaignDraft } from "@/lib/ads/direct-pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,55 @@ export async function GET() {
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ campaigns: data || [] });
+}
+
+/**
+ * POST /api/admin/ads — create a FREE (house/comped) ad campaign straight
+ * from the admin panel. No wallet debit, no ledger row, no affiliate
+ * commission (nothing was paid, so there is nothing to share or refund).
+ * Activates immediately by default; set activate_now=false to file it as
+ * pending_review like a player purchase.
+ */
+export async function POST(req: NextRequest) {
+  const { user, admin, status } = await requireAdmin();
+  if (!admin || !user) return NextResponse.json({ error: "Forbidden" }, { status });
+
+  let body: Partial<CampaignDraft> & { activate_now?: boolean };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+
+  const invalid = validateDraft(body);
+  if (invalid) return NextResponse.json({ error: invalid }, { status: 400 });
+
+  const activateNow = body.activate_now !== false;
+  const now = new Date();
+  const end = new Date(now.getTime() + body.weeks! * 7 * 24 * 60 * 60 * 1000);
+
+  const { data: campaign, error } = await admin
+    .from("ad_campaigns")
+    .insert({
+      advertiser_id: user.id, // admin's own account owns house ads
+      business_name: body.business_name!.trim(),
+      headline: body.headline!.trim(),
+      body: body.body?.trim() || null,
+      image_url: body.image_url?.trim() || null,
+      target_url: body.target_url!.trim(),
+      weeks: body.weeks!,
+      price_mwk: 0, // free — house/comped placement
+      target_country: body.target_country || null,
+      target_gender: body.target_gender || null,
+      status: activateNow ? "active" : "pending_review",
+      starts_at: activateNow ? now.toISOString() : null,
+      ends_at: activateNow ? end.toISOString() : null,
+    })
+    .select("id,status,ends_at")
+    .single();
+
+  if (error || !campaign) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ campaign }, { status: 201 });
 }
 
 /**

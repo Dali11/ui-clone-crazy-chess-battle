@@ -5,7 +5,8 @@
 // GET/PATCH /api/admin/ads.
 
 import { useCallback, useEffect, useState } from "react";
-import { Eye, Loader2, MousePointerClick, Pause, Play, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Eye, Loader2, MousePointerClick, Pause, Play, Plus, RotateCcw, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { AD_TARGET_COUNTRIES } from "@/lib/ads/direct-pricing";
 
 interface AdCampaign {
   id: string;
@@ -68,12 +69,149 @@ export default function DirectAdsPanel() {
     }
   };
 
+  // ── Free (house/comped) ad creation ──
+  const [showForm, setShowForm] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    business_name: "",
+    headline: "",
+    body: "",
+    image_url: "",
+    target_url: "",
+    weeks: 1,
+    target_country: "",
+    target_gender: "",
+    activate_now: true,
+  });
+
+  const setF = (k: keyof typeof form, v: string | number | boolean) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const createFreeAd = async () => {
+    setCreating(true);
+    setFormError(null);
+    try {
+      const payload = {
+        business_name: form.business_name,
+        headline: form.headline,
+        body: form.body || null,
+        image_url: form.image_url || null,
+        target_url: form.target_url,
+        weeks: form.weeks,
+        target_country: form.target_country || null,
+        target_gender: form.target_gender || null,
+        activate_now: form.activate_now,
+      };
+      const r = await fetch("/api/admin/ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        setFormError(d.error || "Failed to create campaign");
+        return;
+      }
+      setForm({ business_name: "", headline: "", body: "", image_url: "", target_url: "", weeks: 1, target_country: "", target_gender: "", activate_now: true });
+      setShowForm(false);
+      await load();
+    } catch {
+      setFormError("Network error creating campaign");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   if (loading) {
     return <div className="pt-4 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-ccb-muted" /></div>;
   }
 
+  const inputCls = "w-full rounded-md border border-ccb-border bg-ccb-bg px-3 py-2 text-sm text-ccb-text placeholder:text-ccb-muted/60 focus:outline-none focus:border-ccb-primary";
+  const labelCls = "block text-xs font-bold uppercase tracking-wide text-ccb-muted mb-1";
+
   return (
     <div className="pt-4 space-y-3">
+      {/* Create free ad */}
+      <div className="rounded-lg border border-ccb-primary/40 bg-ccb-primary/5 p-3">
+        <button
+          onClick={() => { setShowForm((s) => !s); setFormError(null); }}
+          className="flex items-center gap-1.5 text-sm font-bold text-ccb-primary"
+        >
+          {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+          {showForm ? "Cancel" : "Create free ad"}
+        </button>
+        <p className="text-xs text-ccb-muted mt-0.5">
+          House or comped placement — no charge, no wallet involved, goes live immediately.
+        </p>
+        {showForm && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className={labelCls}>Business name *</label>
+              <input className={inputCls} maxLength={60} value={form.business_name} onChange={(e) => setF("business_name", e.target.value)} placeholder="e.g. Chibondo Hardware" />
+            </div>
+            <div>
+              <label className={labelCls}>Headline *</label>
+              <input className={inputCls} maxLength={60} value={form.headline} onChange={(e) => setF("headline", e.target.value)} placeholder="e.g. 20% off chess boards" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Body (optional, max 120)</label>
+              <input className={inputCls} maxLength={120} value={form.body} onChange={(e) => setF("body", e.target.value)} placeholder="Supporting line shown under the headline" />
+            </div>
+            <div>
+              <label className={labelCls}>Destination link * (https)</label>
+              <input className={inputCls} value={form.target_url} onChange={(e) => setF("target_url", e.target.value)} placeholder="https://example.com" />
+            </div>
+            <div>
+              <label className={labelCls}>Banner image URL (optional, https)</label>
+              <input className={inputCls} value={form.image_url} onChange={(e) => setF("image_url", e.target.value)} placeholder="https://example.com/banner.jpg" />
+            </div>
+            <div>
+              <label className={labelCls}>Duration</label>
+              <select className={inputCls} value={form.weeks} onChange={(e) => setF("weeks", Number(e.target.value))}>
+                <option value={1}>1 week</option>
+                <option value={2}>2 weeks</option>
+                <option value={4}>4 weeks</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Target country</label>
+              <select className={inputCls} value={form.target_country} onChange={(e) => setF("target_country", e.target.value)}>
+                <option value="">All countries</option>
+                {AD_TARGET_COUNTRIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Target gender</label>
+              <select className={inputCls} value={form.target_gender} onChange={(e) => setF("target_gender", e.target.value)}>
+                <option value="">All players</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+            <div className="flex items-end gap-3">
+              <label className="flex items-center gap-2 text-sm text-ccb-text pb-2">
+                <input type="checkbox" checked={form.activate_now} onChange={(e) => setF("activate_now", e.target.checked)} className="w-4 h-4 accent-ccb-primary" />
+                Go live immediately
+              </label>
+            </div>
+            {formError && <p className="sm:col-span-2 text-sm text-red-500">{formError}</p>}
+            <div className="sm:col-span-2">
+              <button
+                onClick={createFreeAd}
+                disabled={creating || !form.business_name.trim() || !form.headline.trim() || !form.target_url.trim()}
+                className="flex items-center gap-1.5 rounded-md bg-ccb-primary hover:bg-ccb-primary/90 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+              >
+                {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                Create free campaign
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {error && <p className="text-sm text-red-500">{error}</p>}
       {campaigns.length === 0 && (
         <p className="text-sm text-ccb-muted py-2">No campaigns yet. Players buy them at /advertise.</p>
@@ -98,7 +236,9 @@ export default function DirectAdsPanel() {
                 : c.status === "rejected" ? "bg-red-500/15 text-red-500"
                 : "bg-ccb-muted/15 text-ccb-muted"
               }`}>{c.status.replace("_", " ")}</span>
-              <p className="text-xs text-ccb-muted mt-1">{c.weeks}w · {fmtMK(c.price_mwk)}</p>
+              <p className="text-xs text-ccb-muted mt-1">
+                {c.weeks}w · {c.price_mwk === 0 ? <span className="font-bold text-emerald-500">FREE</span> : fmtMK(c.price_mwk)}
+              </p>
             </div>
           </div>
 
@@ -146,7 +286,7 @@ export default function DirectAdsPanel() {
               <Play className="w-3.5 h-3.5" /> {c.status === "paused" ? "Resume" : "Activate"}
             </button>
           )}
-          {(c.status === "pending_review" || c.status === "rejected" || c.status === "paused") && (
+          {c.price_mwk > 0 && (c.status === "pending_review" || c.status === "rejected" || c.status === "paused") && (
             <button
               onClick={() => { if (confirm(`Refund ${fmtMK(c.price_mwk)} to the advertiser's wallet?`)) act(c.id, "refund"); }}
               disabled={busy === c.id + "refund"}
