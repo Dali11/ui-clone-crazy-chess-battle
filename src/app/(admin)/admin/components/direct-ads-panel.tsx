@@ -4,9 +4,11 @@
 // creative + stats; approve/reject/pause/resume/refund via
 // GET/PATCH /api/admin/ads.
 
-import { useCallback, useEffect, useState } from "react";
-import { Eye, Loader2, MousePointerClick, Pause, Play, Plus, RotateCcw, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Eye, ImagePlus, Loader2, MousePointerClick, Pause, Play, Plus, RotateCcw, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { AD_TARGET_COUNTRIES } from "@/lib/ads/direct-pricing";
+import { compressImage } from "@/components/chat/compress-image";
+import { createClient } from "@/lib/supabase/client";
 
 interface AdCampaign {
   id: string;
@@ -71,6 +73,7 @@ export default function DirectAdsPanel() {
 
   // ── Free (house/comped) ad creation ──
   const [showForm, setShowForm] = useState(false);
+  const setShowUrlInputReset = () => setShowImageUrlInput(false);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -87,6 +90,39 @@ export default function DirectAdsPanel() {
 
   const setF = (k: keyof typeof form, v: string | number | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  // ── Banner image upload (same bucket + pipeline as the player flow) ──
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [showImageUrlInput, setShowImageUrlInput] = useState(false);
+
+  const pickImage = async (file: File) => {
+    setFormError(null);
+    if (!file.type.startsWith("image/") || file.type === "image/gif") {
+      setFormError("Please pick a JPG, PNG or WebP image.");
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const { blob } = await compressImage(file);
+      const supabase = createClient();
+      const path = `admin/${crypto.randomUUID()}.jpg`;
+      const { error: upErr } = await supabase.storage
+        .from("ad-creatives")
+        .upload(path, blob, { contentType: "image/jpeg" });
+      if (upErr) throw new Error(upErr.message);
+      const { data: pub } = supabase.storage.from("ad-creatives").getPublicUrl(path);
+      setF("image_url", pub.publicUrl);
+      setShowImageUrlInput(false);
+    } catch (e: any) {
+      setFormError(e?.message?.includes("policy") || e?.message?.includes("row-level")
+        ? "Upload permission denied for this bucket."
+        : "Couldn't upload that image. Try a smaller file (under 8MB).");
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const createFreeAd = async () => {
     setCreating(true);
@@ -114,6 +150,7 @@ export default function DirectAdsPanel() {
         return;
       }
       setForm({ business_name: "", headline: "", body: "", image_url: "", target_url: "", weeks: 1, target_country: "", target_gender: "", activate_now: true });
+      setShowUrlInputReset();
       setShowForm(false);
       await load();
     } catch {
@@ -162,9 +199,61 @@ export default function DirectAdsPanel() {
               <label className={labelCls}>Destination link * (https)</label>
               <input className={inputCls} value={form.target_url} onChange={(e) => setF("target_url", e.target.value)} placeholder="https://example.com" />
             </div>
-            <div>
-              <label className={labelCls}>Banner image URL (optional, https)</label>
-              <input className={inputCls} value={form.image_url} onChange={(e) => setF("image_url", e.target.value)} placeholder="https://example.com/banner.jpg" />
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Banner image (optional)</label>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) pickImage(f); }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  className="flex items-center gap-1.5 rounded-md border border-ccb-border bg-ccb-bg px-3 py-2 text-xs font-bold text-ccb-text hover:border-ccb-primary disabled:opacity-50"
+                >
+                  {uploadingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+                  {uploadingImage ? "Uploading…" : "Upload image"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowImageUrlInput((s) => !s)}
+                  className="text-xs text-ccb-muted underline hover:text-ccb-text"
+                >
+                  {showImageUrlInput ? "Hide URL input" : "Paste a URL instead"}
+                </button>
+                {form.image_url && (
+                  <button
+                    type="button"
+                    onClick={() => setF("image_url", "")}
+                    className="text-xs text-ccb-muted underline hover:text-red-400"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {showImageUrlInput && (
+                <input
+                  className={`${inputCls} mt-2`}
+                  value={form.image_url}
+                  onChange={(e) => setF("image_url", e.target.value)}
+                  placeholder="https://example.com/banner.jpg"
+                />
+              )}
+              {form.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={form.image_url}
+                  alt="Banner preview"
+                  className="mt-2 h-20 w-auto rounded-md border border-ccb-border object-cover"
+                />
+              )}
+              <p className="mt-1 text-[11px] text-ccb-muted">
+                JPG, PNG or WebP — compressed automatically and stored in the ad-creatives bucket.
+              </p>
             </div>
             <div>
               <label className={labelCls}>Duration</label>
