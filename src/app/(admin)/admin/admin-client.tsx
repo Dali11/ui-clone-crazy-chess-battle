@@ -63,7 +63,17 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [userKpis, setUserKpis] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<UserInfo | null>(null);
   const [userDetailId, setUserDetailId] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; kind: "success" | "error" } | null>(null);
+  const [queuesUpdatedAt, setQueuesUpdatedAt] = useState<{ withdrawals?: number; deposits?: number }>({});
+  const [nowTick, setNowTick] = useState(Date.now());
+  const [confirmReq, setConfirmReq] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    danger: boolean;
+    loading: boolean;
+    onConfirm: () => void;
+  } | null>(null);
   const [editingTournament, setEditingTournament] = useState<Tournament | null>(null);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
   const [prizeEditTournament, setPrizeEditTournament] = useState<Tournament | null>(null);
@@ -90,9 +100,24 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   const [creditNotes, setCreditNotes] = useState<string>("");
   const [configEdit, setConfigEdit] = useState<Record<string, string>>({});
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+  /** Ask before destructive actions (ban, delete, admin grants, wallet edits). */
+  const askConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    opts?: { confirmLabel?: string; danger?: boolean }
+  ) => setConfirmReq({
+    title,
+    message,
+    confirmLabel: opts?.confirmLabel || "Confirm",
+    danger: opts?.danger ?? true,
+    loading: false,
+    onConfirm,
+  });
+
+  const showToast = (msg: string, kind: "success" | "error" = "success") => {
+    setToast({ msg, kind });
+    setTimeout(() => setToast(null), kind === "error" ? 5000 : 3000);
   };
 
   const fetchStats = useCallback(async () => {
@@ -105,6 +130,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     const res = await fetch(`/api/admin/withdrawals?status=${withdrawalFilter}`);
     const data = await res.json();
     setWithdrawals(data.withdrawals || []);
+    setQueuesUpdatedAt((prev) => ({ ...prev, withdrawals: Date.now() }));
   }, [withdrawalFilter]);
 
   const USER_PAGE_SIZE = 50;
@@ -134,6 +160,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     const res = await fetch(`/api/admin/deposits?status=${depositFilter}`);
     const data = await res.json();
     setDeposits(data.deposits || []);
+    setQueuesUpdatedAt((prev) => ({ ...prev, deposits: Date.now() }));
   }, [depositFilter]);
 
   const fetchTournaments = useCallback(async () => {
@@ -175,7 +202,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
         await fetchIntegrity();
         await fetchStats();
       } else {
-        alert(`Scan failed: ${data.error || "unknown error"}`);
+        showToast(String(`Scan failed: ${data.error || "unknown error"}`), "error");
       }
     } finally {
       setScanLoading(false);
@@ -193,12 +220,12 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const data = await res.json();
       if (res.ok) {
         if (data.released > 0) {
-          alert(`Flag ${action}ed — released ${data.released} held payout(s) to the player's wallet.`);
+          showToast(`Flag ${action}ed — released ${data.released} held payout(s) to the player's wallet.`);
         }
         await fetchIntegrity();
         await fetchStats();
       } else {
-        alert(`Action failed: ${data.error || "unknown error"}`);
+        showToast(String(`Action failed: ${data.error || "unknown error"}`), "error");
       }
     } finally {
       setIntegrityActionLoading(null);
@@ -242,7 +269,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       if (!res.ok) throw new Error(json.error || "Failed");
       showToast(json.message || "Done");
       await fetchVerificationPlayers();
-    } catch (err: any) { showToast(err.message); }
+    } catch (err: any) { showToast(err.message, "error"); }
     finally { setActionLoading(null); }
   };
 
@@ -277,11 +304,29 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchVerificationPlayers();
       showToast(decision === "approve" ? "Identity approved" : "Submission rejected");
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
   };
+
+  // PHASE 1 SAFETY: money queues never silently go stale — auto-refresh
+  // every 60s while their tab is open, plus stats so badges stay live.
+  useEffect(() => {
+    const ref = setInterval(() => {
+      fetchStats();
+      if (tab === "withdrawals") fetchWithdrawals();
+      if (tab === "deposits") fetchDeposits();
+    }, 60000);
+    return () => clearInterval(ref);
+  }, [tab, fetchStats, fetchWithdrawals, fetchDeposits]);
+
+  // Ticker for the "updated Xs ago" labels (only ticks on money tabs)
+  useEffect(() => {
+    if (tab !== "withdrawals" && tab !== "deposits") return;
+    const tick = setInterval(() => setNowTick(Date.now()), 5000);
+    return () => clearInterval(tick);
+  }, [tab]);
 
   useEffect(() => {
     const load = async () => {
@@ -311,7 +356,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchStats();
       showToast("Withdrawal approved");
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -332,7 +377,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchStats();
       showToast("Withdrawal rejected");
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -354,10 +399,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
         setWithdrawalConfig(data);
         showToast(enabled ? "Auto-approval enabled — withdrawals will process automatically" : "Manual approval enabled — withdrawals require admin review");
       } else {
-        showToast(data.error || "Failed to update setting");
+        showToast(data.error || "Failed to update setting", "error");
       }
     } catch {
-      showToast("Failed to update setting");
+      showToast("Failed to update setting", "error");
     } finally {
       setWithdrawalConfigSaving(false);
     }
@@ -378,10 +423,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
         showToast("Finance settings updated");
       } else {
         const data = await res.json();
-        showToast(data.error || "Failed to update settings");
+        showToast(data.error || "Failed to update settings", "error");
       }
     } catch {
-      showToast("Failed to update finance settings");
+      showToast("Failed to update finance settings", "error");
     }
     setFinanceConfigSaving(false);
   };
@@ -389,7 +434,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   // Reject withdrawal with reason
   const handleRejectWithReason = async (id: string) => {
     if (!rejectReason.trim()) {
-      showToast("Please provide a reason for rejection");
+      showToast("Please provide a reason for rejection", "error");
       return;
     }
     setActionLoading(id);
@@ -406,10 +451,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
         setRejectReason("");
       } else {
         const data = await res.json();
-        showToast(data.error || "Failed to reject");
+        showToast(data.error || "Failed to reject", "error");
       }
     } catch {
-      showToast("Failed to reject withdrawal");
+      showToast("Failed to reject withdrawal", "error");
     }
     setActionLoading(null);
   };
@@ -417,7 +462,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
   // Credit deposit with notes
   const handleCreditWithNotes = async (id: string) => {
     if (!creditNotes.trim()) {
-      showToast("Please add a note for the manual credit");
+      showToast("Please add a note for the manual credit", "error");
       return;
     }
     setActionLoading(`${id}_credit`);
@@ -434,10 +479,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
         setCreditNotes("");
       } else {
         const data = await res.json();
-        showToast(data.error || "Failed to credit deposit");
+        showToast(data.error || "Failed to credit deposit", "error");
       }
     } catch {
-      showToast("Failed to credit deposit");
+      showToast("Failed to credit deposit", "error");
     }
     setActionLoading(null);
   };
@@ -453,13 +498,13 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
         await fetchDeposits();
         await fetchStats();
       } else if (data.status === "failed") {
-        showToast(data.message || "Payment not completed");
+        showToast(data.message || "Payment not completed", "error");
         await fetchDeposits();
       } else {
-        showToast(`Status: ${data.status} - ${data.message || "Still pending"}`);
+        showToast(`Status: ${data.status} - ${data.message || "Still pending"}`, "error");
       }
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -480,7 +525,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchDeposits();
       await fetchStats();
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -501,7 +546,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchDeposits();
       await fetchStats();
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -525,16 +570,16 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       }
       showToast(`User ${action} successful`);
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
+      setConfirmReq(null);
     }
   };
 
 
   const handleDeleteUser = async (userId: string, username: string) => {
     const msg1 = "PERMANENTLY DELETE " + username + "?\n\nThis will remove ALL their data:\n- Profile, auth account, game history\n- Tournament participations\n- Battle records\n- Referrals, deposits, withdrawals\n\nThis CANNOT be undone. Are you absolutely sure?";
-    if (!confirm(msg1)) return;
     const msg2 = "Last chance \u2014 really delete " + username + "? This is irreversible.";
     if (!confirm(msg2)) return;
     setActionLoading(userId + "_delete");
@@ -549,14 +594,24 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchUsers();
       showToast(data.warning ? "User deleted (partial: " + data.warning + ")" : "User permanently deleted");
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
+      setConfirmReq(null);
     }
   };
 
-  const handleTournamentAction = async (tournamentId: string, action: string) => {
-    if (!confirm(`Are you sure you want to ${action} this tournament?`)) return;
+  const handleTournamentAction = async (tournamentId: string, action: string, skipConfirm = false) => {
+    const destructive = ["reject", "cancel", "force_finish", "delete"].includes(action);
+    if (!skipConfirm && destructive) {
+      askConfirm(
+        `${action.replace(/_/g, " ")} this tournament?`,
+        `This will ${action.replace(/_/g, " ")} the tournament — prize pools and player entries may be affected. Continue?`,
+        () => handleTournamentAction(tournamentId, action, true),
+        { confirmLabel: action.replace(/_/g, " ") }
+      );
+      return;
+    }
     setActionLoading(`${tournamentId}_${action}`);
     try {
       const res = await fetch("/api/admin/tournaments", {
@@ -569,9 +624,10 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchTournaments();
       showToast(`Tournament ${action} successful`);
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
+      setConfirmReq(null);
     }
   };
 
@@ -625,7 +681,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchTournaments();
       showToast("Tournament updated");
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -641,7 +697,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchTournaments();
       showToast("Tournament deleted");
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -660,7 +716,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchTournaments();
       showToast(`Duplicated as "${data.clone?.name}"`);
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -702,7 +758,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchTournaments();
       showToast("Prize distribution updated");
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -744,7 +800,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchTournaments();
       showToast(`Tournament "${data.tournament?.name || "New tournament"}" created`);
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -781,7 +837,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchTournaments();
       await fetchTournamentDetail(managingTournament);
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -817,7 +873,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       await fetchGames();
       showToast("Game aborted");
     } catch (err: any) {
-      alert(err.message);
+      showToast(String(err.message), "error");
     } finally {
       setActionLoading(null);
     }
@@ -867,7 +923,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       setBattleConfig(data);
       showToast("Battle config saved");
     } catch (e: any) {
-      alert(e.message);
+      showToast(String(e.message), "error");
     } finally {
       setBattleConfigSaving(false);
     }
@@ -900,8 +956,53 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     <div className="flex min-h-screen">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-4 right-4 z-[60] bg-ccb-success text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2">
-          <Check className="w-4 h-4" /> {toast}
+        <div
+          className={`fixed top-4 right-4 z-[70] px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 ${
+            toast.kind === "error" ? "bg-ccb-danger" : "bg-ccb-success"
+          } text-white`}
+        >
+          {toast.kind === "error" ? <X className="w-4 h-4 shrink-0" /> : <Check className="w-4 h-4 shrink-0" />}
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Confirmation dialog for destructive actions */}
+      {confirmReq && (
+        <div className="fixed inset-0 z-[65] bg-black/60 flex items-center justify-center p-4" onClick={() => !confirmReq.loading && setConfirmReq(null)}>
+          <div
+            className="card max-w-md w-full p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${confirmReq.danger ? "bg-ccb-danger/15 text-ccb-danger" : "bg-ccb-primary/15 text-ccb-primary"}`}>
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-bold text-sm">{confirmReq.title}</h3>
+                <p className="text-xs text-ccb-muted mt-1 whitespace-pre-line">{confirmReq.message}</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => !confirmReq.loading && setConfirmReq(null)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-ccb-surface border border-ccb-border text-ccb-muted hover:border-ccb-primary/40"
+                disabled={confirmReq.loading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmReq((r) => r ? { ...r, loading: true } : r);
+                  confirmReq.onConfirm();
+                }}
+                disabled={confirmReq.loading}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white flex items-center gap-1.5 ${confirmReq.danger ? "bg-ccb-danger" : "bg-ccb-primary"} disabled:opacity-60`}
+              >
+                {confirmReq.loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {confirmReq.confirmLabel}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1174,7 +1275,15 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         </ActionButton>
 
                         <ActionButton
-                          onClick={() => handleUserAction(u.id, u.is_banned ? "unban" : "ban")}
+                          onClick={() => {
+                            if (u.is_banned) { handleUserAction(u.id, "unban"); return; }
+                            askConfirm(
+                              "Ban this user?",
+                              `Suspend ${u.display_name || u.username}? They will be blocked from signing in until unbanned.`,
+                              () => handleUserAction(u.id, "ban"),
+                              { confirmLabel: "Ban user" }
+                            );
+                          }}
                           loading={actionLoading === `${u.id}_${u.is_banned ? "unban" : "ban"}`}
                           variant={u.is_banned ? "success" : "danger"}
                         >
@@ -1182,7 +1291,14 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         </ActionButton>
 
                         <ActionButton
-                          onClick={() => handleUserAction(u.id, "toggle_admin", !u.is_admin)}
+                          onClick={() => askConfirm(
+                            u.is_admin ? "Remove admin access?" : "Grant admin access?",
+                            u.is_admin
+                              ? `Remove admin privileges from ${u.display_name || u.username}? They lose access to this console immediately.`
+                              : `Grant FULL admin access to ${u.display_name || u.username}? They will control money, users and settings.`,
+                            () => handleUserAction(u.id, "toggle_admin", !u.is_admin),
+                            { confirmLabel: u.is_admin ? "Remove admin" : "Grant admin", danger: !u.is_admin }
+                          )}
                           loading={actionLoading === `${u.id}_toggle_admin`}
                           variant="primary"
                         >
@@ -1192,7 +1308,14 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         <ActionButton
                           onClick={() => {
                             const val = prompt("Adjust wallet (positive=credit, negative=debit, in MK):", "10");
-                            if (val !== null) handleUserAction(u.id, "adjust_wallet", parseInt(val));
+                            const amt = parseInt(val || "", 10);
+                            if (isNaN(amt)) return;
+                            askConfirm(
+                              "Apply wallet adjustment?",
+                              `${amt > 0 ? "Credit" : "Debit"} ${formatMWK(Math.abs(amt))} ${amt > 0 ? "to" : "from"} ${u.display_name || u.username}'s wallet?`,
+                              () => handleUserAction(u.id, "adjust_wallet", amt),
+                              { confirmLabel: amt > 0 ? "Credit wallet" : "Debit wallet", danger: amt < 0 }
+                            );
                           }}
                           loading={actionLoading === `${u.id}_adjust_wallet`}
                           variant="default"
@@ -1212,7 +1335,12 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                         </ActionButton>
 
                         <ActionButton
-                          onClick={() => handleDeleteUser(u.id, u.display_name || u.username)}
+                          onClick={() => askConfirm(
+                            "PERMANENTLY delete this user?",
+                            `This removes ALL data for ${u.display_name || u.username} — profile, auth account, games, tournaments, battles, referrals, deposits and withdrawals. This CANNOT be undone.`,
+                            () => handleDeleteUser(u.id, u.display_name || u.username),
+                            { confirmLabel: "Delete forever" }
+                          )}
                           loading={actionLoading === (u.id + "_delete")}
                           variant="danger"
                         >
@@ -1252,6 +1380,14 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
           )}
 
           {/* WITHDRAWALS */}
+          {tab === "withdrawals" && (
+            <div className="flex items-center gap-1.5 text-[11px] text-ccb-muted">
+              <Clock className="w-3.5 h-3.5" />
+              {queuesUpdatedAt.withdrawals
+                ? `Updated ${Math.max(0, Math.round((nowTick - queuesUpdatedAt.withdrawals) / 1000))}s ago · auto-refreshes every 60s`
+                : "Auto-refreshes every 60s"}
+            </div>
+          )}
           {tab === "withdrawals" && (
             <WithdrawalsPanel
               withdrawals={withdrawals}
@@ -1403,6 +1539,14 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
 
           {/* DEPOSITS */}
 
+          {tab === "deposits" && (
+            <div className="flex items-center gap-1.5 text-[11px] text-ccb-muted">
+              <Clock className="w-3.5 h-3.5" />
+              {queuesUpdatedAt.deposits
+                ? `Updated ${Math.max(0, Math.round((nowTick - queuesUpdatedAt.deposits) / 1000))}s ago · auto-refreshes every 60s`
+                : "Auto-refreshes every 60s"}
+            </div>
+          )}
           {tab === "deposits" && (
             <DepositsPanel
               deposits={deposits}
