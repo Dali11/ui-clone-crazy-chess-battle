@@ -21,7 +21,12 @@ export const dynamic = "force-dynamic";
  *   every provider callback received for its reference (payment history),
  *   and the player's related recent ledger rows.
  *
- * ?format=csv exports the filtered set. READ-ONLY.
+ * ?format=csv exports the filtered set.
+ *
+ * The list response includes a `queue` of pending/processing deposits
+ * (oldest first) which the UI renders with verify/credit/reject actions.
+ * Those actions POST to the same requireAdmin endpoints the legacy panel
+ * uses (/api/admin/deposits/[id]/verify|credit|reject).
  */
 
 export async function GET(req: NextRequest) {
@@ -175,7 +180,21 @@ export async function GET(req: NextRequest) {
       else if (s === "failed") failed += 1;
     }
 
+    // Pending deposits queue (oldest first) — surfaced for the
+    // Command Centre's manual verify / credit / reject actions.
+    const { data: pendingQueue } = await admin
+      .from("deposits")
+      .select(select)
+      .in("method", MONEY_IN)
+      .in("status", ["pending", "processing"])
+      .order("created_at", { ascending: true })
+      .limit(12);
+
     return NextResponse.json({
+      queue: (pendingQueue || []).map((r: any) => ({
+        ...r,
+        amountUsd: fx.usdFromMwk(Math.abs(Number(r.amount || 0))),
+      })),
       rows: (rows || []).map((r: any) => ({
         ...r,
         amountUsd: fx.usdFromMwk(Math.abs(Number(r.amount || 0))),

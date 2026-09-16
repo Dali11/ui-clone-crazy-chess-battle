@@ -65,6 +65,7 @@ interface DepositsKpis {
 }
 
 interface DepositsResponse {
+  queue: DepositRow[];
   rows: DepositRow[];
   page: number;
   limit: number;
@@ -549,6 +550,13 @@ export function DepositsView() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
 
+  // Manual action state machine for the pending queue (mirrors the
+  // withdrawals queue pattern): verify / credit / reject with reason.
+  const [rowActions, setRowActions] = useState<Record<string, QueueRowAction>>({});
+
+  const [refreshTick, setRefreshTick] = useState(0);
+  const refreshDeposits = () => setRefreshTick((t) => t + 1);
+
   useEffect(() => {
     let ignore = false;
     setLoading(true);
@@ -583,7 +591,8 @@ export function DepositsView() {
       });
 
     return () => { ignore = true; };
-  }, [country, from, to, status, network, player, min, max, page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [country, from, to, status, network, player, min, max, page, refreshTick]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -628,6 +637,79 @@ export function DepositsView() {
   };
 
   const kpis = data?.kpis;
+  const queue = data?.queue || [];
+
+  // ── Pending-deposit actions (same requireAdmin APIs the legacy panel uses) ──
+  const setAction = (id: string, action: QueueRowAction) =>
+    setRowActions((prev) => ({ ...prev, [id]: action }));
+
+  const handleVerifyClick = (id: string) => setAction(id, { mode: "approve_confirm" });
+  const handleCreditClick = (id: string) => setAction(id, { mode: "credit_confirm" });
+  const handleRejectClick = (id: string) => setAction(id, { mode: "reject_form", reason: "" });
+
+  const handleConfirmVerify = async (id: string) => {
+    setAction(id, { mode: "processing" });
+    try {
+      const res = await fetch(`/api/admin/deposits/${id}/verify`, { method: "POST" });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok || resData.status === "failed") {
+        setAction(id, { mode: "error", message: resData.message || resData.error || "Verification failed" });
+        refreshDeposits();
+        return;
+      }
+      if (resData.status !== "success") {
+        setAction(id, { mode: "error", message: resData.message || `Still ${resData.status}` });
+        refreshDeposits();
+        return;
+      }
+      setAction(id, { mode: "success", message: resData.message || "Deposit verified and credited" });
+      setTimeout(refreshDeposits, 1000);
+    } catch (err: any) {
+      setAction(id, { mode: "error", message: err?.message || "Unexpected error" });
+    }
+  };
+
+  const handleConfirmCredit = async (id: string) => {
+    setAction(id, { mode: "processing" });
+    try {
+      const res = await fetch(`/api/admin/deposits/${id}/credit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: "Manual credit via Command Centre" }),
+      });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAction(id, { mode: "error", message: resData.error || "Failed to credit" });
+        refreshDeposits();
+        return;
+      }
+      setAction(id, { mode: "success", message: "Deposit credited to wallet" });
+      setTimeout(refreshDeposits, 1000);
+    } catch (err: any) {
+      setAction(id, { mode: "error", message: err?.message || "Unexpected error" });
+    }
+  };
+
+  const handleConfirmReject = async (id: string, reason: string) => {
+    setAction(id, { mode: "processing" });
+    try {
+      const res = await fetch(`/api/admin/deposits/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: reason.trim() || "Rejected by admin" }),
+      });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAction(id, { mode: "error", message: resData.error || "Failed to reject" });
+        refreshDeposits();
+        return;
+      }
+      setAction(id, { mode: "success", message: "Deposit rejected" });
+      setTimeout(refreshDeposits, 1000);
+    } catch (err: any) {
+      setAction(id, { mode: "error", message: err?.message || "Unexpected error" });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -652,6 +734,164 @@ export function DepositsView() {
         <StatCard label="Pending" value={kpis?.pending ?? 0} />
         <StatCard label="Failed" value={kpis?.failed ?? 0} />
         <StatCard label="Success Rate" value={`${kpis?.successRate ?? 0}%`} />
+      </div>
+
+      {/* Pending Deposits Queue — manual verify / credit / reject */}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-amber-400">Pending Deposits Queue</h3>
+            <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-bold text-amber-300">
+              {queue.length}
+            </span>
+          </div>
+          <span className="text-[11px] text-ccb-muted">
+            Verify checks with the provider before crediting. Manual credit bypasses the provider check.
+          </span>
+        </div>
+
+        {queue.length === 0 ? (
+          <p className="text-xs text-ccb-muted">No pending deposits in queue.</p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {queue.map((q) => {
+              const action = rowActions[q.id] || { mode: "idle" };
+              return (
+                <div key={q.id} className="rounded-lg border border-ccb-border bg-ccb-card p-3 text-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-white">
+                      {q.profiles?.username || q.profiles?.display_name || q.user_id.slice(0, 8)}
+                    </span>
+                    <CountryBadge country={q.country} />
+                  </div>
+                  <div className="flex items-center justify-between font-mono">
+                    <span className="text-ccb-muted">
+                      {q.amount_local != null ? `${q.currency || ""} ${q.amount_local.toLocaleString()}` : `${Math.abs(q.amount).toLocaleString()} MWK`}
+                    </span>
+                    <span className="text-white font-medium">{formatUsd(q.amountUsd)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-ccb-muted">
+                    <span>Age: {timeAgo(q.created_at)}</span>
+                    <span>{q.payment_provider || q.method} · {q.status}</span>
+                  </div>
+
+                  <div className="pt-2 border-t border-ccb-border/40">
+                    {action.mode === "processing" && (
+                      <p className="text-[11px] font-medium text-amber-400 animate-pulse">Processing...</p>
+                    )}
+                    {action.mode === "success" && (
+                      <p className="text-[11px] font-medium text-emerald-400">✓ {action.message}</p>
+                    )}
+                    {action.mode === "error" && (
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-medium text-red-400">{action.message}</p>
+                        <button
+                          onClick={() => setAction(q.id, { mode: "idle" })}
+                          className="text-[11px] text-ccb-muted hover:text-white underline"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+
+                    {(action.mode === "idle" || action.mode === "approve_confirm" || action.mode === "credit_confirm") && (
+                      <div className="space-y-1.5">
+                        {(action.mode === "approve_confirm" || action.mode === "credit_confirm") && (
+                          <p className="text-[11px] font-medium text-violet-300">
+                            {action.mode === "credit_confirm" ? "Manually credit this deposit?" : "Check provider & credit if paid?"}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {(action.mode === "idle") && (
+                            <>
+                              <button
+                                onClick={() => handleVerifyClick(q.id)}
+                                className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-emerald-500 transition-colors"
+                              >
+                                Verify
+                              </button>
+                              <button
+                                onClick={() => handleCreditClick(q.id)}
+                                className="rounded-lg bg-ccb-surface border border-ccb-border px-2.5 py-1 text-[13px] font-semibold text-white hover:border-violet-500/60 transition-colors"
+                              >
+                                Credit
+                              </button>
+                              <button
+                                onClick={() => handleRejectClick(q.id)}
+                                className="rounded-lg px-2 py-1 text-[13px] font-medium text-red-400 hover:text-red-300 transition-colors"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {action.mode === "approve_confirm" && (
+                            <>
+                              <button
+                                onClick={() => handleConfirmVerify(q.id)}
+                                className="rounded-lg bg-violet-600 px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-violet-500 transition-colors"
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={() => setAction(q.id, { mode: "idle" })}
+                                className="text-[12px] text-ccb-muted hover:text-white underline"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          )}
+                          {action.mode === "credit_confirm" && (
+                            <>
+                              <button
+                                onClick={() => handleConfirmCredit(q.id)}
+                                className="rounded-lg bg-violet-600 px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-violet-500 transition-colors"
+                              >
+                                Confirm credit
+                              </button>
+                              <button
+                                onClick={() => setAction(q.id, { mode: "idle" })}
+                                className="text-[12px] text-ccb-muted hover:text-white underline"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {action.mode === "reject_form" && (
+                      <div className="space-y-1.5">
+                        <input
+                          type="text"
+                          value={action.reason}
+                          onChange={(e) => setAction(q.id, { mode: "reject_form", reason: e.target.value })}
+                          placeholder="Reason (shown to player)..."
+                          className="w-full rounded-lg border border-ccb-border bg-ccb-surface px-2 py-1 text-[12px] text-white placeholder-ccb-muted focus:border-violet-500 focus:outline-none"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleConfirmReject(q.id, action.reason)}
+                            disabled={action.reason.trim().length < 3}
+                            className="rounded-lg bg-red-600 px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-red-500 transition-colors disabled:opacity-40"
+                          >
+                            Confirm reject
+                          </button>
+                          <button
+                            onClick={() => setAction(q.id, { mode: "idle" })}
+                            className="text-[12px] text-ccb-muted hover:text-white underline"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -938,6 +1178,7 @@ export function DepositsView() {
 type QueueRowAction =
   | { mode: "idle" }
   | { mode: "approve_confirm" }
+  | { mode: "credit_confirm" }
   | { mode: "reject_form"; reason: string }
   | { mode: "processing" }
   | { mode: "success"; message: string }
