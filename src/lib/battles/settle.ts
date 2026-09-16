@@ -212,5 +212,29 @@ export async function settleBattle(
     .update({ status: "released", released_at: new Date().toISOString() })
     .eq("battle_id", battleId);
 
+
+  // AFFILIATE FEE SHARE (2026-09-16): the referrers of both players earn a
+  // configurable share (default 25%) of the rake this battle generated —
+  // but only if the referred player is KYC-verified. Each player
+  // effectively contributes half the fee. Non-fatal by design: a commission
+  // failure must never break a cash settlement.
+  try {
+    const totalFee = battle.stake * 2 - payout;
+    const halfFee = Math.floor(totalFee / 2);
+    if (halfFee > 0) {
+      const loserId = winnerId === battle.white_player_id
+        ? battle.black_player_id
+        : battle.white_player_id;
+      await admin.rpc("pay_affiliate_fee_share", {
+        p_user_id: winnerId, p_fee_amount: halfFee, p_source: "battle_fee",
+      });
+      await admin.rpc("pay_affiliate_fee_share", {
+        p_user_id: loserId, p_fee_amount: halfFee, p_source: "battle_fee",
+      });
+    }
+  } catch (affErr) {
+    console.error(`Affiliate fee share failed for battle ${battleId} (non-fatal):`, affErr);
+  }
+
   return { settled: true, winnerId, payout, result: result || "win" };
 }

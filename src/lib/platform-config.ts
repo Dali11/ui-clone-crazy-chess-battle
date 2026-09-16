@@ -227,6 +227,12 @@ export const DEFAULT_CONFIGS: Record<string, Record<string, any>> = {
     // OFF by default — flipping it on makes each MK10,000 sale pay the
     // referrer MK2,500 to their wallet (ledgered, withdrawable).
     enabled: false,
+    // Fee share (2026-09-16): referrers also earn a share of every
+    // platform FEE a referred player generates — battle rake and
+    // fixed-pool tournament entries. Only counts once the referred
+    // player is KYC-verified; can never exceed collected revenue.
+    fee_share_enabled: true,
+    fee_share_pct: 25,
   },
   direct_ads: {
     // Self-serve direct advertising: players buy flat weekly banner

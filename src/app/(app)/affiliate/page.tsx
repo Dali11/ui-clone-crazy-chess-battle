@@ -10,7 +10,7 @@ import { pageMetadata } from "@/lib/seo/metadata";
 
 export const metadata = pageMetadata({
   title: "Affiliate Program — Earn 25% Commission",
-  description: "Invite friends to Crazy Chess Battles and earn 25% commission on every membership fee they pay. Ongoing commissions, paid to your wallet.",
+  description: "Invite friends to Crazy Chess Battles and earn 25% of every battle fee, paid tournament entry, and membership fee they generate. Ongoing commissions, paid to your wallet.",
   path: "/affiliate",
   noIndex: true,
 });

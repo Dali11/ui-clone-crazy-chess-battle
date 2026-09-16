@@ -41,6 +41,7 @@ const ACTIVATION_LABELS: Record<string, string> = {
   wallet_topup: "Topped up wallet",
   "10_quick_matches": "Played 10 quick matches",
   membership_purchase: "Purchased membership",
+  fee_share: "Generating platform fees",
 };
 
 import { useCurrency } from "@/hooks/use-currency";
@@ -116,7 +117,7 @@ export default function AffiliateClient({
           <div className="flex-1">
             <h1 className="font-bold text-base sm:text-lg leading-tight">Affiliate Program</h1>
             <p className="text-xs text-ccb-muted mt-0.5">
-              Earn <span className="font-bold text-ccb-primary">{commissionPct}%</span> commission on every membership your referrals buy
+              Earn <span className="font-bold text-ccb-primary">{commissionPct}%</span> of every fee your referrals generate — battles, tournaments &amp; membership
             </p>
           </div>
         </div>
@@ -138,7 +139,7 @@ export default function AffiliateClient({
         {/* Ongoing badge */}
         <div className="flex items-center gap-1.5 mt-3 text-[11px] text-ccb-muted">
           <TrendingUp className="w-3.5 h-3.5 text-ccb-success" />
-          <span>Ongoing — you earn commission every time they renew. No limit.</span>
+          <span>Ongoing — every cash battle they play, every paid tournament they enter, every renewal. No limit.</span>
         </div>
       </div>
 
@@ -226,16 +227,16 @@ export default function AffiliateClient({
           <div className="flex items-start gap-2.5">
             <div className="w-6 h-6 rounded-full bg-ccb-primary/20 text-ccb-primary text-[11px] font-bold flex items-center justify-center shrink-0">2</div>
             <div>
-              <p className="text-sm font-medium">Friend signs up & buys membership</p>
-              <p className="text-xs text-ccb-muted mt-0.5">Your friend registers using your link and subscribes to CrazyChess Club.</p>
+              <p className="text-sm font-medium">Friend signs up &amp; verifies their ID</p>
+              <p className="text-xs text-ccb-muted mt-0.5">Your friend registers using your link and verifies their identity — that unlocks your earnings.</p>
             </div>
           </div>
           <div className="flex items-start gap-2.5">
             <div className="w-6 h-6 rounded-full bg-ccb-success/20 text-ccb-success text-[11px] font-bold flex items-center justify-center shrink-0">3</div>
             <div>
-              <p className="text-sm font-medium">You earn {commissionPct}% — every renewal</p>
+              <p className="text-sm font-medium">You earn {commissionPct}% of their fees — forever</p>
               <p className="text-xs text-ccb-muted mt-0.5">
-                {formatUsd(membershipPriceUsd * commissionRate)} per membership renewal. Credited to your wallet automatically.
+                Every cash battle they play and every paid tournament they enter pays you {commissionPct}% of the platform fee, plus {formatUsd(membershipPriceUsd * commissionRate)} per membership renewal. Credited automatically.
               </p>
             </div>
           </div>
@@ -285,7 +286,7 @@ export default function AffiliateClient({
                       ) : (
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3 text-ccb-muted" />
-                          Pending — waiting for membership purchase
+                          Pending — earnings unlock once they verify ID &amp; play
                         </span>
                       )}
                     </p>

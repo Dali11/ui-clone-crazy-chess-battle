@@ -173,6 +173,22 @@ export async function POST(
       });
 
       if (depositErr) console.error("Deposit audit log failed:", depositErr);
+
+      // AFFILIATE FEE SHARE (2026-09-16): on fixed-pool tournaments the
+      // entry fee is platform revenue, so the referrer earns a share
+      // (default 25%). Entry-fee pools fund the prize — player money, not
+      // revenue — so they are excluded. Non-fatal: must not block the join.
+      if (tournament.pool_source === "fixed") {
+        try {
+          await admin.rpc("pay_affiliate_fee_share", {
+            p_user_id: user.id,
+            p_fee_amount: entryFee,
+            p_source: "tournament_fee",
+          });
+        } catch (affErr) {
+          console.error("Affiliate fee share failed (non-fatal):", affErr);
+        }
+      }
     }
 
     // Join tournament
