@@ -689,7 +689,8 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
           {/* Fee breakdown */}
           {(() => {
             const pctFee = withdrawConfig?.processing_fee_pct || 0;
-            const processingFee = Math.floor(withdrawAmount * (pctFee / 100));
+            // Must mirror the server's fee calc (ceil — never floors to 0)
+            const processingFee = Math.ceil(withdrawAmount * (pctFee / 100));
             const totalFees = processingFee;
             const netAmount = Math.max(0, withdrawAmount - totalFees);
             if (totalFees === 0) return null;

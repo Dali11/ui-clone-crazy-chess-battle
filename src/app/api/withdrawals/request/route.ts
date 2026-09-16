@@ -124,7 +124,10 @@ export async function POST(req: NextRequest) {
     // Apply withdrawal fee + processing fee
     const withdrawalFee = toLocal(wConfig.withdrawal_fee || 0);
     const processingFeePct = wConfig.processing_fee_pct || 0;
-    const processingFee = Math.floor(amount * (processingFeePct / 100));
+    // Round UP: a fee must never silently default to 0 on small amounts
+    // (e.g. ZMW 11 at 5% floors to 0 — the player rides free). Ceil
+    // guarantees at least 1 unit whenever a percentage fee is set.
+    const processingFee = Math.ceil(amount * (processingFeePct / 100));
     const totalFees = withdrawalFee + processingFee;
     const netAmount = amount - totalFees;
 
@@ -154,16 +157,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    // Record fees (store on the withdrawal record for transparency)
-    if (totalFees > 0) {
-      await admin
-        .from("withdrawals")
-        .update({
-          fee: totalFees,
-          net_amount: netAmount,
-        })
-        .eq("id", withdrawalId);
-    }
+    // Record fee + net on the withdrawal record for transparency.
+    // ALWAYS write them — net_amount must reflect the real payout even
+    // when the fee is 0, so history never shows a bogus "you receive 0".
+    await admin
+      .from("withdrawals")
+      .update({
+        fee: totalFees,
+        net_amount: netAmount,
+      })
+      .eq("id", withdrawalId);
 
     // Check if auto-approve is enabled (from platform_settings, also synced to withdrawal_config)
     if (wConfig.auto_approve) {
