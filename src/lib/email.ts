@@ -149,6 +149,67 @@ function wrapContent(title: string, bodyHtml: string, previewText?: string): str
 
 // ─── Button Helper ────────────────────────────────────────────────
 
+// ─── Helper: describe a tournament's REAL format/prizing for emails ────
+// Fixes a bug where the new_tournament/tournament_reminder emails always
+// said "90% Prize Pool!" and "MK500 entry — 5-round Swiss, rapid 10+0"
+// no matter what the tournament actually was (see Sept 2026 report: a
+// knockout tournament's email claimed Swiss/rapid/MK500/90%).
+function describeTournament(data: Record<string, any>) {
+  const type = String(data.tournamentType || "swiss").toLowerCase();
+  const typeDisplay = type.charAt(0).toUpperCase() + type.slice(1);
+
+  const tc = String(data.timeControl || "blitz").toLowerCase();
+  const tcDisplay = tc.charAt(0).toUpperCase() + tc.slice(1);
+  const initialMinutes = data.initialMinutes ?? 5;
+  const incrementSeconds = data.incrementSeconds ?? 0;
+  const timeControlDisplay = `${tcDisplay} ${initialMinutes}+${incrementSeconds}`;
+
+  const roundsDisplay =
+    type === "arena"
+      ? `${data.durationMinutes || 60} min Arena`
+      : data.rounds
+      ? `${data.rounds}-round ${typeDisplay}`
+      : typeDisplay;
+
+  const entryFee = Number(data.entryFee || 0);
+  const poolSource = data.poolSource || "entry_fees";
+  const creatorProfitPercent = Number(data.creatorProfitPercent || 0);
+
+  let poolPercent = 100;
+  let poolLine: string;
+  let subjectPoolLabel: string;
+  const fixedPoolAmount = Number(data.currentPrizePool || 0);
+  if (poolSource === "fixed") {
+    poolLine = fixedPoolAmount > 0
+      ? `This tournament has a house-funded fixed prize pool of ${formatMWK(fixedPoolAmount)} — guaranteed no matter how many players show up.`
+      : "This tournament has a house-funded fixed prize pool — guaranteed no matter how many players show up.";
+    subjectPoolLabel = fixedPoolAmount > 0 ? `${formatMWK(fixedPoolAmount)} Fixed Pool!` : "Fixed Prize Pool!";
+  } else if (entryFee <= 0) {
+    poolLine = "It's free to join — no entry fee, just rating and bragging rights on the line.";
+    subjectPoolLabel = "Free Entry!";
+  } else {
+    poolPercent = Math.max(0, 100 - creatorProfitPercent);
+    poolLine = `${poolPercent}% of every ${formatMWK(entryFee)} entry fee goes straight into the prize pool — the more players join, the bigger the pot!`;
+    subjectPoolLabel = `${poolPercent}% Prize Pool!`;
+  }
+
+  // Format-specific hook — what actually makes THIS tournament's format
+  // distinct, so the email reads like it was written for this event and
+  // not a generic placeholder (the original bug: every email said "Swiss").
+  let formatHook: string;
+  if (type === "knockout") {
+    formatHook = "It's single-elimination knockout — lose once and you're out, so every game matters from round one.";
+  } else if (type === "arena") {
+    const mins = data.durationMinutes || 60;
+    formatHook = `It's a ${mins}-minute Arena — nonstop games against the field, best score when time runs out wins. Jump in any time before it ends.`;
+  } else {
+    const roundsText = data.rounds ? `${data.rounds}-round` : "multi-round";
+    formatHook = `It's a ${roundsText} Swiss — everyone plays every round, and the final standings come down to the wire.`;
+  }
+
+  return { typeDisplay, timeControlDisplay, roundsDisplay, poolLine, subjectPoolLabel, entryFee, formatHook, fixedPoolAmount };
+}
+
 function button(href: string, label: string): string {
   return `
   <table cellpadding="0" cellspacing="0" style="margin:24px auto;">
@@ -552,39 +613,51 @@ function renderTemplate(template: EmailTemplate, data: Record<string, any>): { s
     }
 
     case "new_tournament": {
+      const nt = describeTournament(data);
       return {
-        subject: `\ud83c\udfc6 New tournament: ${data.tournamentName || "Tournament"} \u2014 90% Prize Pool!`,
+        subject: `\ud83c\udfc6 New ${nt.typeDisplay} tournament: ${data.tournamentName || "Tournament"} \u2014 ${nt.subjectPoolLabel}`,
         title: "New Tournament",
         preview: `${data.tournamentName || "A new tournament"} is open for registration`,
         body: `
           <h2 style="margin:0 0 16px;font-size:20px;color:#ffffff;">\u2694\ufe0f ${data.tournamentName || "New Tournament"} is Live!</h2>
+          <p style="margin:0 0 8px;font-size:15px;color:#9ca3af;line-height:1.6;">
+            ${nt.formatHook}
+          </p>
           <p style="margin:0 0 16px;font-size:15px;color:#9ca3af;line-height:1.6;">
-            A new tournament just opened for registration. 90% of every entry fee goes straight into the prize pool \u2014 the more players join, the bigger the pot!
+            ${nt.poolLine}
           </p>
           ${infoBox("Tournament", data.tournamentName || "Tournament", "#7c3aed")}
           ${infoBox("Starts", data.startTime || formatCAT(data.startsAt), "#f59e0b")}
-          ${infoBox("Entry Fee", formatMWK(data.entryFee || 0), "#9ca3af")}
+          ${infoBox("Entry Fee", nt.entryFee > 0 ? formatMWK(nt.entryFee) : "Free", "#9ca3af")}
+          ${infoBox("Format", nt.roundsDisplay, "#9ca3af")}
+          ${infoBox("Time Control", nt.timeControlDisplay, "#9ca3af")}
           ${button(`${BASE_URL}/tournament/${data.tournamentId}`, "Join Now")}
-          <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">MK500 entry \u2014 5-round Swiss, rapid 10+0. Register before it fills up!</p>
+          <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Register before it fills up!</p>
         `,
       };
     }
 
     case "tournament_reminder": {
+      const tr = describeTournament(data);
       return {
-        subject: `\u23f0 ${data.tournamentName || "Tournament"} starts in 5 hours \u2014 join now!`,
+        subject: `\u23f0 ${tr.typeDisplay} tournament ${data.tournamentName || "Tournament"} starts in 5 hours \u2014 join now!`,
         title: "Tournament Starting Soon",
         preview: `${data.tournamentName || "Tournament"} starts in 5 hours \u2014 you haven\u2019t joined yet`,
         body: `
           <h2 style="margin:0 0 16px;font-size:20px;color:#ffffff;">\u23f0 ${data.tournamentName || "Tournament"} starts in 5 hours</h2>
+          <p style="margin:0 0 8px;font-size:15px;color:#9ca3af;line-height:1.6;">
+            ${tr.formatHook}
+          </p>
           <p style="margin:0 0 16px;font-size:15px;color:#9ca3af;line-height:1.6;">
-            A tournament is starting soon and you haven\u2019t joined yet. 90% of every entry fee goes straight into the prize pool \u2014 the more players, the bigger the pot!
+            You haven\u2019t joined yet. ${tr.poolLine}
           </p>
           ${infoBox("Tournament", data.tournamentName || "Tournament", "#7c3aed")}
           ${infoBox("Starts", data.startTime || formatCAT(data.startsAt), "#f59e0b")}
-          ${infoBox("Entry Fee", formatMWK(data.entryFee || 0), "#9ca3af")}
+          ${infoBox("Entry Fee", tr.entryFee > 0 ? formatMWK(tr.entryFee) : "Free", "#9ca3af")}
+          ${infoBox("Format", tr.roundsDisplay, "#9ca3af")}
+          ${infoBox("Time Control", tr.timeControlDisplay, "#9ca3af")}
           ${button(`${BASE_URL}/tournament/${data.tournamentId}`, "Join Now")}
-          <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">MK500 entry \u2014 5-round Swiss, rapid 10+0. Don\u2019t miss out!</p>
+          <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Don\u2019t miss out!</p>
         `,
       };
     }

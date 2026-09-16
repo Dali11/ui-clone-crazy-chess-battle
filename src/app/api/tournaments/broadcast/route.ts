@@ -26,7 +26,9 @@ export async function GET(req: NextRequest) {
 
   const { data: tournament, error } = await admin
     .from("tournaments")
-    .select("id, name, starts_at, entry_fee")
+    .select(
+      "id, name, starts_at, entry_fee, type, time_control, initial_minutes, increment_seconds, rounds, duration_minutes, pool_source, prize_pool, creator_profit_percent"
+    )
     .eq("id", tournamentId)
     .single();
 
@@ -59,7 +61,16 @@ export async function GET(req: NextRequest) {
             tournamentName: tournament.name,
             tournamentId: tournament.id,
             startsAt: tournament.starts_at,
-            entryFee: tournament.entry_fee || 500,
+            entryFee: tournament.entry_fee || 0,
+            currentPrizePool: tournament.prize_pool || 0,
+            tournamentType: tournament.type,
+            timeControl: tournament.time_control,
+            initialMinutes: tournament.initial_minutes,
+            incrementSeconds: tournament.increment_seconds,
+            rounds: tournament.rounds,
+            durationMinutes: tournament.duration_minutes,
+            poolSource: tournament.pool_source,
+            creatorProfitPercent: tournament.creator_profit_percent || 0,
           },
         })
       )

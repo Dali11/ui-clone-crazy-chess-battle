@@ -148,6 +148,14 @@ export async function POST(req: NextRequest) {
                   entryFee: Number(entryFee || 0),
                   playerCount: 0,
                   currentPrizePool: poolSource === "fixed" ? Number(prizePool || 0) : 0,
+                  tournamentType: dbType,
+                  timeControl: dbTimeControl,
+                  initialMinutes: Number(initialMinutes),
+                  incrementSeconds: Number(incrementSeconds || 0),
+                  rounds: rounds ? Number(rounds) : null,
+                  durationMinutes: durationMinutes ? Number(durationMinutes) : null,
+                  poolSource: poolSource === "fixed" ? "fixed" : "entry_fees",
+                  creatorProfitPercent: isPaid ? profitPercent : 0,
                 },
               })
             );

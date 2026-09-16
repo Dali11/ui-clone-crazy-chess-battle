@@ -31,7 +31,9 @@ export async function GET(req: NextRequest) {
     // each tournament only triggers one reminder, regardless of cron frequency.
     const { data: tournaments, error } = await admin
       .from("tournaments")
-      .select("id, name, starts_at, entry_fee, prize_pool")
+      .select(
+        "id, name, starts_at, entry_fee, prize_pool, type, time_control, initial_minutes, increment_seconds, rounds, duration_minutes, pool_source, creator_profit_percent"
+      )
       .eq("status", "upcoming")
       .lte("starts_at", fiveHoursFromNow.toISOString())
       .is("reminder_sent_at", null);
@@ -85,8 +87,16 @@ export async function GET(req: NextRequest) {
               tournamentName: tournament.name,
               tournamentId: tournament.id,
               startsAt: tournament.starts_at,
-              entryFee: tournament.entry_fee || 500,
+              entryFee: tournament.entry_fee || 0,
               currentPrizePool: tournament.prize_pool || 0,
+              tournamentType: tournament.type,
+              timeControl: tournament.time_control,
+              initialMinutes: tournament.initial_minutes,
+              incrementSeconds: tournament.increment_seconds,
+              rounds: tournament.rounds,
+              durationMinutes: tournament.duration_minutes,
+              poolSource: tournament.pool_source,
+              creatorProfitPercent: tournament.creator_profit_percent || 0,
             },
           })
         );

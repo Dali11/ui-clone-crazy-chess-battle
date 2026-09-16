@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   if (!tournamentId) {
     const { data: latest } = await admin
       .from("tournaments")
-      .select("id, name, starts_at, entry_fee, prize_pool, creator_profit_percent")
+      .select("id, name, starts_at, entry_fee, prize_pool, creator_profit_percent, type, time_control, initial_minutes, increment_seconds, rounds, duration_minutes, pool_source")
       .eq("status", "upcoming")
       .order("starts_at", { ascending: false })
       .limit(1)
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   } else {
     const { data: t } = await admin
       .from("tournaments")
-      .select("id, name, starts_at, entry_fee, prize_pool, creator_profit_percent")
+      .select("id, name, starts_at, entry_fee, prize_pool, creator_profit_percent, type, time_control, initial_minutes, increment_seconds, rounds, duration_minutes, pool_source")
       .eq("id", tournamentId)
       .single();
     tournament = t;
@@ -55,9 +55,17 @@ export async function GET(req: NextRequest) {
       tournamentName: tournament.name,
       tournamentId: tournament.id,
       startsAt: tournament.starts_at,
-      entryFee: tournament.entry_fee || 500,
+      entryFee: tournament.entry_fee || 0,
       playerCount: count || 0,
       currentPrizePool: tournament.prize_pool || 0,
+      tournamentType: tournament.type,
+      timeControl: tournament.time_control,
+      initialMinutes: tournament.initial_minutes,
+      incrementSeconds: tournament.increment_seconds,
+      rounds: tournament.rounds,
+      durationMinutes: tournament.duration_minutes,
+      poolSource: tournament.pool_source,
+      creatorProfitPercent: tournament.creator_profit_percent || 0,
     },
   });
 
