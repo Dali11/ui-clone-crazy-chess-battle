@@ -5,6 +5,7 @@ import { getPlatformConfig } from "@/lib/platform-config";
 import { moneySymbol, currencyCodeForCountry } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
 import { getMwkToLocalRate } from "@/lib/geo/fx";
+import { toPawaPayMsisdn } from "@/lib/geo/iso3";
 
 export async function POST(req: NextRequest) {
   try {
@@ -193,11 +194,15 @@ export async function POST(req: NextRequest) {
             const { initiatePayout } = await import("@/lib/payments/pawapay");
             const { randomUUID } = await import("crypto");
             const payoutId = randomUUID();
+            // PawaPay expects a bare-digit MSISDN (no leading "+") — the
+            // deposit flow already normalizes via toPawaPayMsisdn, but this
+            // payout call was sending the raw "+2547..." phone straight
+            // through, which PawaPay rejects every time.
             const payoutResponse = await initiatePayout({
               payoutId,
               amount: String(amountMWK),
               currency: payoutCurrency,
-              phoneNumber: withdrawal.phone,
+              phoneNumber: toPawaPayMsisdn(withdrawal.phone, withdrawal.country),
               provider: withdrawal.operator_ref_id,
             });
 

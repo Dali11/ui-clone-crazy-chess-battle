@@ -669,8 +669,16 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               {(() => {
                 const minW = withdrawConfig ? withdrawConfig.min_amount : 10000;
                 const maxW = withdrawConfig ? withdrawConfig.max_amount : 500000;
-                const amounts = [minW, minW * 2, minW * 5, Math.min(minW * 10, maxW), Math.min(minW * 20, maxW)];
-                const unique = [...new Set(amounts)].filter(a => a <= maxW);
+                // Config amounts are MWK — convert to the player's own
+                // wallet currency before using as button values. Previously
+                // these were set as raw MWK numbers directly onto
+                // withdrawAmount (which is local-currency), letting a KES
+                // player accidentally request a KES 1,000 withdrawal by
+                // tapping a button meant to mean ~KES 74.
+                const amountsMwk = [minW, minW * 2, minW * 5, Math.min(minW * 10, maxW), Math.min(minW * 20, maxW)];
+                const amounts = amountsMwk.map((a) => convert(a));
+                const maxLocal = convert(maxW);
+                const unique = [...new Set(amounts)].filter(a => a <= maxLocal);
                 return unique.map((amt) => (
                   <button
                     key={amt}
@@ -679,7 +687,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                       withdrawAmount === amt ? "bg-ccb-primary text-white" : "bg-ccb-surface text-ccb-muted border border-ccb-border"
                     }`}
                   >
-                    {amt.toLocaleString()}
+                    {formatWallet(amt)}
                   </button>
                 ));
               })()}
