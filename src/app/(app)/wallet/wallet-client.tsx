@@ -61,8 +61,6 @@ interface WalletClientProps {
   country?: string | null;
 }
 
-const QUICK_AMOUNTS_MWK = [500, 1000, 2000, 5000, 10000, 25000];
-const QUICK_AMOUNTS_INTL = [100, 500, 1000, 2000, 5000, 10000];
 export default function WalletClient({ balance, email, deposits, phone: savedPhone, depositPhones = [], country }: WalletClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -107,8 +105,6 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   // form honest so players don't type amounts the API will reject.)
   const depositMinMwk = withdrawConfig?.deposit_min_amount || 1000;
   const depositMinLocal = isMalawi ? depositMinMwk : (fxLoaded && fxRate && fxRate !== 1 ? convert(depositMinMwk) : 1);
-  const baseQuickAmounts = isMalawi ? QUICK_AMOUNTS_MWK : QUICK_AMOUNTS_INTL;
-  const quickAmounts = baseQuickAmounts.filter((a) => a >= depositMinLocal);
   const formatAmt = (amount: number) => fmtCurrency(amount || 0);
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -548,19 +544,6 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               onChange={(e) => setDepositAmount(Math.max(depositMinLocal, parseInt(e.target.value) || 0))}
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
             />
-            <div className="flex gap-2 mt-2 flex-wrap">
-              {quickAmounts.map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => setDepositAmount(amt)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    depositAmount === amt ? "bg-ccb-primary text-white" : "bg-ccb-surface text-ccb-muted border border-ccb-border"
-                  }`}
-                >
-                  {amt.toLocaleString()}
-                </button>
-              ))}
-            </div>
             <p className="text-xs text-ccb-muted mt-2">
               Min deposit: {formatAmt(depositMinMwk)}{withdrawConfig?.deposit_max_amount ? ` · Max: ${formatAmt(withdrawConfig.deposit_max_amount)}` : ""}
             </p>
@@ -665,33 +648,6 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               onChange={(e) => setWithdrawAmount(parseInt(e.target.value) || 0)}
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
             />
-            <div className="flex gap-2 mt-2 flex-wrap">
-              {(() => {
-                const minW = withdrawConfig ? withdrawConfig.min_amount : 10000;
-                const maxW = withdrawConfig ? withdrawConfig.max_amount : 500000;
-                // Config amounts are MWK — convert to the player's own
-                // wallet currency before using as button values. Previously
-                // these were set as raw MWK numbers directly onto
-                // withdrawAmount (which is local-currency), letting a KES
-                // player accidentally request a KES 1,000 withdrawal by
-                // tapping a button meant to mean ~KES 74.
-                const amountsMwk = [minW, minW * 2, minW * 5, Math.min(minW * 10, maxW), Math.min(minW * 20, maxW)];
-                const amounts = amountsMwk.map((a) => convert(a));
-                const maxLocal = convert(maxW);
-                const unique = [...new Set(amounts)].filter(a => a <= maxLocal);
-                return unique.map((amt) => (
-                  <button
-                    key={amt}
-                    onClick={() => setWithdrawAmount(amt)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      withdrawAmount === amt ? "bg-ccb-primary text-white" : "bg-ccb-surface text-ccb-muted border border-ccb-border"
-                    }`}
-                  >
-                    {formatWallet(amt)}
-                  </button>
-                ));
-              })()}
-            </div>
             <p className="text-xs text-ccb-muted mt-2">
               {`Available: ${formatWallet(walletBal)} · Min: ${formatAmt(withdrawConfig ? withdrawConfig.min_amount : 10000)}`}
             </p>
