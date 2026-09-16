@@ -1,0 +1,543 @@
+"use client";
+
+/**
+ * CrazyChess Admin Command Centre — Phase 1 shell.
+ *
+ * Read-only financial + operational overview in USD. Sidebar drives
+ * internal views over two API endpoints (overview + transactions feed).
+ * Phase 2/3 sections are listed but disabled. The legacy /admin panel is
+ * untouched and linked for the actual financial controls.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import type {
+  AttentionItem,
+  FeedRow,
+  MarketRow,
+  OverviewResponse,
+  RangePresetUi,
+  RevenueStream,
+  TransactionsResponse,
+} from "./types";
+import RevenueChart, { STREAM_COLORS } from "./chart";
+import {
+  AttentionStrip,
+  KpiCard,
+  MarketsTable,
+  MarketModal,
+  StreamTiles,
+  TransactionFeed,
+  TypeChips,
+  formatLocal,
+  formatUsd,
+} from "./sections";
+
+type View =
+  | "dashboard"
+  | "finance-overview"
+  | "finance-transactions"
+  | "finance-deposits"
+  | "finance-withdrawals"
+  | `rev-${RevenueStream}`
+  | "markets";
+
+const RANGE_CHIPS: Array<[RangePresetUi, string]> = [
+  ["today", "Today"],
+  ["7d", "7 Days"],
+  ["30d", "30 Days"],
+  ["90d", "90 Days"],
+  ["12m", "12 Months"],
+  ["custom", "Custom"],
+];
+
+const VIEW_META: Record<string, { title: string; sub: string; txType?: string }> = {
+  dashboard: { title: "Dashboard", sub: "Financial & operational pulse of CrazyChess" },
+  "finance-overview": { title: "Finance · Overview", sub: "Revenue performance across all streams" },
+  "finance-transactions": { title: "Finance · Transactions", sub: "Unified activity feed", txType: "all" },
+  "finance-deposits": { title: "Finance · Deposits", sub: "Money into the platform", txType: "deposit" },
+  "finance-withdrawals": { title: "Finance · Withdrawals", sub: "Payouts to players", txType: "withdrawal" },
+  "rev-battles": { title: "Revenue · Battles", sub: "Rake from settled battles", txType: "battle_fee" },
+  "rev-tournaments": { title: "Revenue · Tournaments", sub: "Platform profit on tournaments", txType: "tournament" },
+  "rev-memberships": { title: "Revenue · Memberships", sub: "Membership purchases", txType: "membership" },
+  "rev-ads": { title: "Revenue · Ads", sub: "Self-serve ad campaign spend", txType: "ad" },
+  "rev-withdrawal_fees": { title: "Revenue · Withdrawal Fees", sub: "Payout fees collected", txType: "withdrawal_fee" },
+  markets: { title: "Markets · Countries", sub: "Per-country performance — USD" },
+};
+
+const PHASE2_NAV = [
+  ["Reconciliation", "Phase 2"],
+  ["Player Management", "Phase 2"],
+  ["Financial Controls", "Phase 3"],
+] as const;
+
+export default function CommandCentreClient() {
+  const [view, setView] = useState<View>("dashboard");
+  const [range, setRange] = useState<RangePresetUi>("30d");
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
+
+  const [data, setData] = useState<OverviewResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const [txRows, setTxRows] = useState<FeedRow[]>([]);
+  const [txType, setTxType] = useState<string>("all");
+  const [txLoading, setTxLoading] = useState(false);
+  const [txCursor, setTxCursor] = useState<string | null>(null);
+
+  const [openMarket, setOpenMarket] = useState<MarketRow | null>(null);
+  const [activeStreams, setActiveStreams] = useState<string[]>([]);
+
+  const overviewAbort = useRef<AbortController | null>(null);
+
+  // ── Overview fetch ──────────────────────────────────────────────────
+  const fetchOverview = useCallback(async () => {
+    overviewAbort.current?.abort();
+    const ctl = new AbortController();
+    overviewAbort.current = ctl;
+    setError(null);
+    try {
+      const params = new URLSearchParams({ range });
+      if (range === "custom") {
+        if (customFrom) params.set("from", customFrom);
+        if (customTo) params.set("to", customTo);
+      }
+      const res = await fetch(`/api/admin/commandcentre/overview?${params}`, {
+        signal: ctl.signal,
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Overview failed (${res.status})`);
+      }
+      const json: OverviewResponse = await res.json();
+      setData(json);
+      setLastUpdated(new Date());
+    } catch (err: any) {
+      if (err?.name !== "AbortError") setError(err?.message || "Failed to load overview");
+    } finally {
+      if (!ctl.signal.aborted) setLoading(false);
+    }
+  }, [range, customFrom, customTo]);
+
+  // ── Transactions fetch ─────────────────────────────────────────────
+  const fetchTransactions = useCallback(
+    async (type: string, cursor?: string | null) => {
+      setTxLoading(true);
+      try {
+        const params = new URLSearchParams({ type, limit: "50" });
+        if (cursor) params.set("before", cursor);
+        const res = await fetch(`/api/admin/commandcentre/transactions?${params}`, {
+          cache: "no-store",
+        });
+        const json: TransactionsResponse = await res.json();
+        if (!res.ok) throw new Error((json as any).error || "Feed failed");
+        setTxRows((prev) => (cursor ? [...prev, ...json.rows] : json.rows));
+        setTxCursor(json.nextCursor);
+      } catch {
+        // keep previous rows on refresh failure
+      } finally {
+        setTxLoading(false);
+      }
+    },
+    []
+  );
+
+  // ── Effects: load + auto-refresh ────────────────────────────────────
+  useEffect(() => {
+    setLoading(true);
+    fetchOverview();
+  }, [fetchOverview]);
+
+  useEffect(() => {
+    const id = setInterval(fetchOverview, 90_000);
+    return () => clearInterval(id);
+  }, [fetchOverview]);
+
+  // The dashboard's mini feed, the finance feed views and the revenue
+  // stream pages all render transaction rows — everywhere else the feed
+  // isn't visible so we skip fetching it.
+  const feedType = view === "dashboard" ? "all" : VIEW_META[view]?.txType;
+  const effectiveType = view === "finance-transactions" ? txType : feedType;
+
+  useEffect(() => {
+    if (!feedType) return;
+    fetchTransactions(effectiveType!, null);
+  }, [feedType, effectiveType, fetchTransactions]);
+
+  useEffect(() => {
+    if (!feedType) return;
+    const id = setInterval(() => fetchTransactions(effectiveType!, null), 45_000);
+    return () => clearInterval(id);
+  }, [feedType, effectiveType, fetchTransactions]);
+
+  // ── Handlers ────────────────────────────────────────────────────────
+  const toggleStream = (s: string) =>
+    setActiveStreams((prev) =>
+      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+    );
+
+  const openStreamPage = (s: string) => setView(`rev-${s}` as View);
+
+  const onReview = (item: AttentionItem) => {
+    if (item.action === "withdrawals") {
+      window.open("/admin", "_blank"); // approvals live in the legacy panel (no duplicate controls)
+    } else if (item.action === "transactions") {
+      setView("finance-transactions");
+      setTxType("all");
+    } else {
+      window.open("/admin", "_blank");
+    }
+  };
+
+  const granularity = data?.period.granularity ?? "day";
+  const streamForView = view.startsWith("rev-") ? (view.slice(4) as RevenueStream) : null;
+
+  const streamKpi = useMemo(() => {
+    if (!streamForView || !data) return null;
+    const cur = data.revenue.streams[streamForView] ?? 0;
+    const prev = data.revenue.streamsPrev[streamForView] ?? 0;
+    const series = data.series.map((p) => ({
+      bucket: p.bucket,
+      value: p[streamForView],
+    }));
+    const best = series.reduce((m, p) => (p.value > (m?.value ?? -1) ? p : m), null as { bucket: string; value: number } | null);
+    return { cur, prev, pct: prev === 0 ? null : ((cur - prev) / prev) * 100, best, series };
+  }, [streamForView, data]);
+
+  const navItem = (v: View, label: string, opts?: { dot?: boolean }) => (
+    <button
+      key={v}
+      onClick={() => setView(v)}
+      className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] transition-colors ${
+        view === v
+          ? "bg-violet-600/20 font-semibold text-white"
+          : "text-ccb-muted hover:bg-ccb-surface hover:text-white"
+      }`}
+    >
+      {label}
+      {opts?.dot && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+    </button>
+  );
+
+  const navGroup = (label: string, children: React.ReactNode) => (
+    <div className="mb-4">
+      <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ccb-muted/70">
+        {label}
+      </p>
+      <div className="space-y-0.5">{children}</div>
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-screen">
+      {/* ── Sidebar ──────────────────────────────────────────────────── */}
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-ccb-border bg-ccb-surface/60 px-3 py-5 lg:flex">
+        <div className="mb-6 px-2">
+          <p className="text-sm font-bold tracking-tight text-white">
+            <span className="text-violet-400">♞</span> CrazyChess
+          </p>
+          <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-ccb-muted">
+            Command Centre
+          </p>
+        </div>
+
+        {navItem("dashboard", "Dashboard")}
+        {navGroup("Finance",
+          <>
+            {navItem("finance-overview", "Overview")}
+            {navItem("finance-transactions", "Transactions")}
+            {navItem("finance-deposits", "Deposits")}
+            {navItem("finance-withdrawals", "Withdrawals")}
+          </>
+        )}
+        {navGroup("Revenue",
+          <>
+            {navItem("rev-battles", "Battles")}
+            {navItem("rev-tournaments", "Tournaments")}
+            {navItem("rev-memberships", "Memberships")}
+            {navItem("rev-ads", "Ads")}
+            {navItem("rev-withdrawal_fees", "Withdrawal Fees")}
+          </>
+        )}
+        {navGroup("Markets", navItem("markets", "Countries"))}
+
+        <div className="mb-4 opacity-50">
+          <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ccb-muted/70">
+            Coming Soon
+          </p>
+          <div className="space-y-0.5">
+            {PHASE2_NAV.map(([label, phase]) => (
+              <div
+                key={label}
+                className="flex items-center justify-between rounded-lg px-3 py-1.5 text-[13px] text-ccb-muted"
+              >
+                <span>{label}</span>
+                <span className="rounded bg-ccb-card px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-ccb-muted">
+                  {phase}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-auto space-y-1 border-t border-ccb-border pt-3">
+          <Link
+            href="/admin"
+            className="block rounded-lg px-3 py-1.5 text-[13px] text-ccb-muted hover:bg-ccb-surface hover:text-white"
+          >
+            Legacy Admin Panel →
+          </Link>
+          <p className="px-3 pt-1 text-[10px] text-ccb-muted/60">
+            Reporting currency: USD · Phase 1 (read-only)
+          </p>
+        </div>
+      </aside>
+
+      {/* ── Main ─────────────────────────────────────────────────────── */}
+      <main className="min-w-0 flex-1 px-4 pb-16 pt-5 sm:px-6">
+        {/* Header */}
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-white">
+              {VIEW_META[view].title}
+            </h1>
+            <p className="mt-0.5 text-xs text-ccb-muted">{VIEW_META[view].sub}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {RANGE_CHIPS.map(([k, label]) => (
+              <button
+                key={k}
+                onClick={() => setRange(k)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  range === k
+                    ? "bg-violet-600 text-white"
+                    : "border border-ccb-border bg-ccb-surface text-ccb-muted hover:text-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            {range === "custom" && (
+              <span className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="rounded-md border border-ccb-border bg-ccb-card px-2 py-1 text-xs text-white"
+                />
+                <span className="text-xs text-ccb-muted">→</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="rounded-md border border-ccb-border bg-ccb-card px-2 py-1 text-xs text-white"
+                />
+              </span>
+            )}
+            <button
+              onClick={() => { fetchOverview(); }}
+              className="rounded-md border border-ccb-border bg-ccb-surface px-2.5 py-1 text-xs font-medium text-white hover:border-violet-500/60"
+              title="Refresh now"
+            >
+              ⟳
+            </button>
+          </div>
+        </div>
+
+        {data?.fx.mwkToUsdSource === "degraded" && (
+          <div className="mb-4 rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-2 text-xs text-amber-300">
+            FX degraded — some currencies could not be converted to USD
+            {data.fx.unavailableCurrencies.length > 0 &&
+              ` (${data.fx.unavailableCurrencies.join(", ")})`}.
+            Affected amounts show local values only.
+          </div>
+        )}
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-xs text-red-300">
+            {error}
+          </div>
+        )}
+
+        {loading && !data ? (
+          <div className="flex h-64 items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+          </div>
+        ) : !data ? (
+          <div className="rounded-xl border border-ccb-border bg-ccb-card p-8 text-center text-sm text-ccb-muted">
+            No data available.
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* ── Dashboard ───────────────────────────────────────── */}
+            {view === "dashboard" && (
+              <>
+                <AttentionStrip items={data.attention} onReview={onReview} />
+
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+                  <KpiCard label="Total Revenue" kpi={data.kpis.totalRevenue} highlight hint="Actual CrazyChess earnings — deposits excluded" />
+                  <KpiCard label="Transaction Volume" kpi={data.kpis.transactionVolume} hint="Deposits + completed withdrawals" />
+                  <KpiCard label="Total Deposits" kpi={data.kpis.deposits} hint="Money in (not revenue)" />
+                  <KpiCard label="Total Withdrawals" kpi={data.kpis.withdrawals} hint="Completed payouts" />
+                  <KpiCard label="Player Balances" kpi={data.kpis.playerBalances} hint="Live wallets, all currencies → USD" />
+                  <KpiCard label="Pending Withdrawals" kpi={data.kpis.pendingWithdrawals} />
+                </div>
+
+                <section className="rounded-xl border border-ccb-border bg-ccb-card p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">Revenue Overview</h3>
+                      <p className="text-[11px] text-ccb-muted">
+                        Total: <span className="font-semibold text-white">{formatUsd(data.revenue.total)}</span>
+                        {data.revenue.totalPrev > 0 && (
+                          <span className="ml-1.5">
+                            ({data.revenue.total >= data.revenue.totalPrev ? "▲" : "▼"}
+                            {" "}
+                            {Math.abs(((data.revenue.total - data.revenue.totalPrev) / data.revenue.totalPrev) * 100).toFixed(1)}% vs prev)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setView("finance-overview")}
+                      className="text-xs font-semibold text-violet-400 hover:text-violet-300"
+                    >
+                      Full revenue view →
+                    </button>
+                  </div>
+                  <StreamTiles data={data} activeStreams={activeStreams} onToggle={toggleStream} onOpenStream={openStreamPage} />
+                  <div className="mt-4">
+                    <RevenueChart series={data.series} streams={activeStreams} granularity={granularity} />
+                  </div>
+                </section>
+
+                <div className="grid gap-5 xl:grid-cols-2">
+                  <section className="rounded-xl border border-ccb-border bg-ccb-card">
+                    <div className="flex items-center justify-between border-b border-ccb-border px-4 py-3">
+                      <h3 className="text-sm font-semibold text-white">Transaction Activity</h3>
+                      <button onClick={() => setView("finance-transactions")} className="text-xs font-semibold text-violet-400 hover:text-violet-300">
+                        View all →
+                      </button>
+                    </div>
+                    <TransactionFeed rows={txRows.slice(0, 8)} onOpen={() => setView("finance-transactions")} dense />
+                  </section>
+
+                  <MarketsTable
+                    markets={data.markets}
+                    compact
+                    onOpenMarket={setOpenMarket}
+                    onViewAll={() => setView("markets")}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* ── Finance overview ─────────────────────────────────── */}
+            {view === "finance-overview" && (
+              <>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <KpiCard label="Total Revenue" kpi={data.kpis.totalRevenue} highlight />
+                  <KpiCard label="Deposits (gross)" kpi={data.kpis.deposits} hint="Not revenue" />
+                  <KpiCard label="Withdrawals (gross)" kpi={data.kpis.withdrawals} />
+                  <KpiCard label="Transaction Volume" kpi={data.kpis.transactionVolume} />
+                </div>
+                <section className="rounded-xl border border-ccb-border bg-ccb-card p-4">
+                  <h3 className="mb-3 text-sm font-semibold text-white">Revenue by Stream</h3>
+                  <StreamTiles data={data} activeStreams={activeStreams} onToggle={toggleStream} onOpenStream={openStreamPage} />
+                  <div className="mt-4">
+                    <RevenueChart series={data.series} streams={activeStreams} granularity={granularity} />
+                  </div>
+                  <p className="mt-3 text-[11px] text-ccb-muted">
+                    Deposits and transaction volume are <span className="font-semibold text-white">not</span> revenue —
+                    only battle rake, platform tournament profit, memberships, ad spend and withdrawal fees count.
+                  </p>
+                </section>
+              </>
+            )}
+
+            {/* ── Feed views ───────────────────────────────────────── */}
+            {(feedType != null) && (
+              <section className="rounded-xl border border-ccb-border bg-ccb-card">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ccb-border px-4 py-3">
+                  <h3 className="text-sm font-semibold text-white">
+                    {txLoading ? "Syncing…" : `${txRows.length} shown`}
+                  </h3>
+                  {(view === "finance-transactions") && (
+                    <TypeChips value={txType} onChange={setTxType} />
+                  )}
+                </div>
+                <TransactionFeed rows={txRows} onOpen={() => {}} />
+                {txCursor && (
+                  <div className="border-t border-ccb-border p-3 text-center">
+                    <button
+                      onClick={() => fetchTransactions(effectiveType!, txCursor)}
+                      className="rounded-md border border-ccb-border bg-ccb-surface px-4 py-1.5 text-xs font-semibold text-white hover:border-violet-500/60"
+                    >
+                      Load older
+                    </button>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* ── Stream detail ────────────────────────────────────── */}
+            {streamKpi && (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-violet-500/40 bg-gradient-to-br from-violet-500/10 to-transparent p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-ccb-muted">Revenue this period</p>
+                  <p className="mt-2 text-2xl font-semibold text-white">{formatUsd(streamKpi.cur)}</p>
+                  <p className={`mt-1 text-[11px] ${streamKpi.pct == null ? "text-ccb-muted" : streamKpi.pct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {streamKpi.pct == null ? "no baseline" : `${streamKpi.pct >= 0 ? "▲" : "▼"} ${Math.abs(streamKpi.pct).toFixed(1)}%`}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-ccb-border bg-ccb-card p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-ccb-muted">Previous period</p>
+                  <p className="mt-2 text-2xl font-semibold text-white">{formatUsd(streamKpi.prev)}</p>
+                  <p className="mt-1 text-[11px] text-ccb-muted">Equal-length window before this one</p>
+                </div>
+                <div className="rounded-xl border border-ccb-border bg-ccb-card p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-ccb-muted">Best {granularity === "month" ? "month" : "day"}</p>
+                  <p className="mt-2 text-2xl font-semibold text-white">{formatUsd(streamKpi.best?.value ?? 0)}</p>
+                  <p className="mt-1 text-[11px] text-ccb-muted">{streamKpi.best?.bucket ?? "—"}</p>
+                </div>
+                <section className="sm:col-span-3 rounded-xl border border-ccb-border bg-ccb-card p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full" style={{ background: STREAM_COLORS[streamForView!] }} />
+                    <h3 className="text-sm font-semibold text-white">Trend</h3>
+                  </div>
+                  <RevenueChart
+                    series={data.series}
+                    streams={[streamForView!]}
+                    granularity={granularity}
+                  />
+                </section>
+              </div>
+            )}
+
+            {/* ── Markets ──────────────────────────────────────────── */}
+            {view === "markets" && (
+              <>
+                <MarketsTable markets={data.markets} onOpenMarket={setOpenMarket} />
+                <p className="text-[11px] leading-relaxed text-ccb-muted">
+                  USD conversion uses each transaction&apos;s recorded FX rate; the table shows the
+                  union of the platform&apos;s signup markets and every country seen in live data.
+                  Original local-currency values are never modified.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        <p className="mt-8 text-[10px] text-ccb-muted/60">
+          {lastUpdated
+            ? `Updated ${lastUpdated.toLocaleTimeString()} · auto-refreshes every 90s · figures in USD`
+            : "…"}
+        </p>
+      </main>
+
+      {openMarket && <MarketModal market={openMarket} onClose={() => setOpenMarket(null)} />}
+    </div>
+  );
+}
