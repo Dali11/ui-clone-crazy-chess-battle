@@ -8,7 +8,7 @@ import Link from "next/link";
 import {
   User, LogOut, Save, ChevronRight, Trophy, Swords, Wallet, Camera,
   AlertCircle, CheckCircle, Lock, Shield, Bell, Eye,
-  Loader2, Upload, Clock, Smartphone, MapPin,
+  Loader2, Upload, Clock, Smartphone, MapPin, GraduationCap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCurrency } from "@/hooks/use-currency";
@@ -554,6 +554,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
               <Link href={profile?.username ? `/profile/${profile.username}` : "/dashboard"} className="flex items-center justify-between hover:bg-ccb-surface -mx-2 px-2 py-2 rounded-lg transition-colors"><div className="flex items-center gap-2.5"><Trophy className="w-4 h-4 text-ccb-accent" /><span className="text-sm">Public Profile</span></div><ChevronRight className="w-4 h-4 text-ccb-muted" /></Link>
               <Link href="/wallet" className="flex items-center justify-between hover:bg-ccb-surface -mx-2 px-2 py-2 rounded-lg transition-colors"><div className="flex items-center gap-2.5"><Wallet className="w-4 h-4 text-ccb-accent" /><span className="text-sm">Wallet · {walletBalance}</span></div><ChevronRight className="w-4 h-4 text-ccb-muted" /></Link>
               <Link href="/history" className="flex items-center justify-between hover:bg-ccb-surface -mx-2 px-2 py-2 rounded-lg transition-colors"><div className="flex items-center gap-2.5"><Swords className="w-4 h-4 text-ccb-text" /><span className="text-sm">Game History</span></div><ChevronRight className="w-4 h-4 text-ccb-muted" /></Link>
+              <Link href="/academy" className="flex items-center justify-between hover:bg-ccb-surface -mx-2 px-2 py-2 rounded-lg transition-colors"><div className="flex items-center gap-2.5"><GraduationCap className="w-4 h-4 text-ccb-accent" /><span className="text-sm">Chess Academy</span></div><ChevronRight className="w-4 h-4 text-ccb-muted" /></Link>
             </div>
           </SectionCard>
           <NotificationsSection />

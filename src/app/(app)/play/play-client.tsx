@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { AIDifficulty } from "@/lib/game/chess-ai";
 import {
   Zap, Clock, Swords, Bot, Link2, Copy, Check, X,
-  Users, Target, Sparkles, ChevronRight, Play,
+  Users, Target, Sparkles, ChevronRight, Play, Disc3,
 } from "lucide-react";
 
 const timeControls = [
@@ -340,7 +341,7 @@ export default function PlayPage() {
   // ===== Play vs Computer view =====
   if (view === "computer") {
     return (
-      <div className="max-w-2xl mx-auto space-y-6 pb-20 sm:pb-0 animate-slide-up">
+      <div className="max-w-2xl lg:max-w-4xl mx-auto space-y-6 pb-20 sm:pb-0 animate-slide-up">
         <button onClick={() => setView("main")} className="text-sm text-ccb-muted hover:text-ccb-text flex items-center gap-1">
           <ChevronRight className="w-4 h-4 rotate-180" /> Back
         </button>
@@ -404,7 +405,7 @@ export default function PlayPage() {
 
   // ===== MAIN VIEW — flat, no menu step =====
   return (
-    <div className="max-w-2xl mx-auto space-y-5 pb-20 sm:pb-0">
+    <div className="max-w-2xl lg:max-w-4xl mx-auto space-y-5 pb-20 sm:pb-0">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold">Play Chess</h1>
         <p className="text-sm text-ccb-muted mt-1">Pick your time control and find a game</p>
@@ -454,7 +455,7 @@ export default function PlayPage() {
       </div>
 
       {/* Secondary actions — no extra menu step */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <button
           onClick={handleCreateChallenge}
           disabled={creatingChallenge}
@@ -474,6 +475,13 @@ export default function PlayPage() {
           <Bot className="w-4 h-4 text-ccb-success" />
           Play Computer
         </button>
+        <Link
+          href="/draughts"
+          className="flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-primary/40 hover:bg-ccb-surface transition-colors"
+        >
+          <Disc3 className="w-4 h-4 text-ccb-primary" />
+          Play Draughts
+        </Link>
       </div>
 
       {/* Quick links */}

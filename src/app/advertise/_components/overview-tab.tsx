@@ -1,9 +1,9 @@
 "use client";
 
-import { Megaphone, Eye, ShieldCheck, Rocket, ArrowRight, Wallet, MapPin } from "lucide-react";
+import { Megaphone, ShieldCheck, Rocket, ArrowRight, Wallet, MapPin } from "lucide-react";
 import { adTiers } from "@/lib/ads/direct-pricing";
 import { useCurrency } from "@/hooks/use-currency";
-import { type AudienceStats, type Campaign, ctr } from "./shared";
+import { type Campaign, ctr } from "./shared";
 
 const PLACEMENTS = [
   "Home dashboard",
@@ -15,13 +15,11 @@ const PLACEMENTS = [
 ];
 
 export default function OverviewTab({
-  audience,
   campaigns,
   walletBalance,
   pricePerWeekMwk,
   onStart,
 }: {
-  audience: AudienceStats | null;
   campaigns: Campaign[];
   walletBalance: number;
   pricePerWeekMwk: number;
@@ -37,15 +35,7 @@ export default function OverviewTab({
   return (
     <div className="space-y-6">
       {/* Stat tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="rounded-xl border border-ccb-border bg-ccb-surface p-3">
-          <p className="text-[11px] text-ccb-muted flex items-center gap-1">
-            <Eye className="w-3 h-3" /> Players reached
-          </p>
-          <p className="text-lg font-bold text-ccb-text">
-            {audience ? audience.total.toLocaleString() : "—"}
-          </p>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <div className="rounded-xl border border-ccb-border bg-ccb-surface p-3">
           <p className="text-[11px] text-ccb-muted flex items-center gap-1">
             <Megaphone className="w-3 h-3" /> Your live ads

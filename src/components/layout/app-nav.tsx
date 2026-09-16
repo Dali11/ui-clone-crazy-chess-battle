@@ -5,9 +5,9 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
-  Home, Swords, User, Wallet, Shield, Coins, Gift,
-  Crown, Disc3, Menu, X, Trophy, Radio, Clock, Play, Settings, MessageCircle,
-  GraduationCap, Megaphone,
+  Home, Swords, User, Wallet, Shield, Coins,
+  Crown, Menu, X, Trophy, Radio, Settings, MessageCircle,
+  Megaphone,
 } from "lucide-react";
 import NotificationBell from "./notification-bell";
 import { useCurrency } from "@/hooks/use-currency";
@@ -32,6 +32,56 @@ function isPathActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(next);
 }
 
+// ─── Navigation model ─────────────────────────────────────────────────────
+// The menu is deliberately short: pages absorb their sub-features —
+//   · /play offers vs Player / vs Computer / Draughts
+//   · /wallet links Membership + Affiliate
+//   · /settings links Academy + Game History
+// The same groups drive the desktop sidebar (lg+) and the menu overlay.
+const navGroups = [
+  {
+    title: "Play",
+    items: [
+      { href: "/play", label: "Play", icon: Swords },
+      { href: "/battles", label: "Cash Battles", icon: Coins },
+    ],
+  },
+  {
+    title: "Compete",
+    items: [
+      { href: "/league", label: "Premium Leagues", icon: Crown },
+      { href: "/tournaments", label: "Tournaments", icon: Trophy },
+      { href: "/live", label: "Live Matches", icon: Radio },
+    ],
+  },
+  {
+    title: "Me",
+    items: [
+      { href: "/settings", label: "Settings & Profile", icon: Settings },
+      { href: "/wallet", label: "Wallet", icon: Wallet },
+      { href: "/chats", label: "Chats", icon: MessageCircle },
+      { href: "/friends", label: "Friends", icon: Users },
+      { href: "/advertise", label: "Advertise", icon: Megaphone },
+    ],
+  },
+];
+
+const adminGroup = {
+  title: "Admin",
+  items: [{ href: "/admin", label: "Admin Panel", icon: Shield }],
+};
+
+// Tablet top bar (sm–lg). On lg+ the persistent sidebar takes over.
+const tabletNav = [
+  { href: "/dashboard", label: "Home", icon: Home },
+  { href: "/play", label: "Play", icon: Swords },
+  { href: "/battles", label: "Battles", icon: Coins },
+  { href: "/league", label: "Leagues", icon: Crown },
+  { href: "/tournaments", label: "Tournaments", icon: Trophy },
+  { href: "/chats", label: "Chats", icon: MessageCircle },
+  { href: "/friends", label: "Friends", icon: Users },
+];
+
 export default function AppNav({ profile }: { profile: Profile | null }) {
   const pathname = usePathname();
   const { formatWallet } = useCurrency();
@@ -52,6 +102,8 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     return () => { document.body.style.overflow = ""; };
   }, [menuOpen]);
 
+  const groups = profile?.is_admin ? [...navGroups, adminGroup] : navGroups;
+
   // Bottom nav: Play · Battles · Advertise · Tournaments · Leagues
   // (Chats moved to a floating bubble — bottom-right, above this nav)
   const bottomNav = [
@@ -62,76 +114,91 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
     { href: "/league", label: "Leagues", icon: Crown },
   ];
 
-  // Desktop nav — primary actions
-  const desktopNav = [
-    { href: "/dashboard", label: "Home", icon: Home },
-    { href: "/play", label: "Play", icon: Swords },
-    { href: "/battles", label: "Battles", icon: Coins },
-    { href: "/history", label: "History", icon: Clock },
-    { href: "/league", label: "Leagues", icon: Crown },
-    { href: "/tournaments", label: "Tournaments", icon: Trophy },
-    { href: "/chats", label: "Chats", icon: MessageCircle },
-    { href: "/friends", label: "Friends", icon: Users },
-  ];
-
-  // Menu — categorized, ordered by relevance
-  const menuSections = [
-    {
-      title: "Play",
-      items: [
-        { href: "/play", label: "Quick Match", icon: Swords },
-        { href: "/play/computer", label: "Play Computer", icon: Play },
-        { href: "/draughts", label: "Draughts", icon: Disc3 },
-        { href: "/battles", label: "Cash Battles", icon: Coins },
-      ],
-    },
-    {
-      title: "Compete",
-      items: [
-        { href: "/league", label: "Premium Leagues", icon: Crown },
-        { href: "/tournaments", label: "Tournaments", icon: Trophy },
-        { href: "/live", label: "Live Matches", icon: Radio },
-        { href: "/chats", label: "Chats", icon: MessageCircle },
-        { href: "/friends", label: "Friends", icon: Users },
-      ],
-    },
-    {
-      title: "Account",
-      items: [
-        { href: "/settings", label: "Settings & Profile", icon: Settings },
-        { href: "/wallet", label: "Wallet", icon: Wallet },
-        { href: "/affiliate", label: "Affiliate", icon: Gift },
-        { href: "/academy", label: "Chess Academy", icon: GraduationCap },
-      { href: "/membership", label: "Club Membership", icon: Crown },
-        { href: "/history", label: "Game History", icon: Clock },
-      ],
-    },
-  ];
-
-  if (profile?.is_admin) {
-    menuSections.push({
-      title: "Admin",
-      items: [
-        { href: "/admin", label: "Admin Panel", icon: Shield },
-      ],
-    });
-  }
-
   // Wallet balances are stored in the player's OWN currency (local wallets)
   const formatBalance = (bal: number | null | undefined) => formatWallet(bal ?? 0);
 
+  const SidebarItem = ({ href, label, icon: Icon }: { href: string; label: string; icon: typeof Home }) => {
+    const active = isPathActive(pathname, href);
+    return (
+      <Link
+        href={href}
+        prefetch={true}
+        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+          active
+            ? "bg-ccb-primary/10 text-ccb-primary"
+            : "text-ccb-text hover:bg-ccb-accent/10"
+        }`}
+      >
+        <Icon className="w-[18px] h-[18px] shrink-0" />
+        <span className="truncate">{label}</span>
+      </Link>
+    );
+  };
+
   return (
     <>
-      {/* === DESKTOP NAV === */}
+      {/* === DESKTOP SIDEBAR (lg+) === */}
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-60 flex-col border-r border-ccb-border bg-ccb-surface">
+        <Link href="/dashboard" className="flex items-center gap-2.5 px-4 h-16 border-b border-ccb-border shrink-0">
+          <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-8 h-8 rounded-full" />
+          <span className="font-bold">CCB</span>
+        </Link>
+
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+          {groups.map((group) => (
+            <div key={group.title}>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted px-3 pb-1.5">
+                {group.title}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <SidebarItem key={item.href} href={item.href} label={item.label} icon={item.icon} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* User footer */}
+        <div className="border-t border-ccb-border p-3 space-y-1 shrink-0">
+          <Link
+            href="/wallet"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm hover:bg-ccb-accent/10 transition-colors"
+          >
+            <Wallet className="w-4 h-4 text-ccb-accent shrink-0" />
+            <span className="font-bold text-ccb-text truncate">{formatBalance(profile?.wallet_balance)}</span>
+          </Link>
+          <Link
+            href="/settings"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-ccb-muted hover:text-ccb-text hover:bg-ccb-accent/10 transition-colors"
+          >
+            <div className="w-8 h-8 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">
+              {profile?.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-4 h-4" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="font-medium text-ccb-text truncate">{profile?.username ?? "Player"}</p>
+              <p className="text-[11px] text-ccb-muted">Rating: {profile?.rating ?? "—"}</p>
+            </div>
+          </Link>
+        </div>
+      </aside>
+
+      {/* === TOP BAR (sm+) — links for tablets only; right cluster for all desktop === */}
       <nav className="hidden sm:block border-b border-ccb-border bg-ccb-surface sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-16">
           <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="flex items-center gap-2">
+            {/* Brand — tablets only (sidebar carries it on lg+) */}
+            <Link href="/dashboard" className="lg:hidden flex items-center gap-2">
               <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-8 h-8 rounded-full" />
               <span className="font-bold">CCB</span>
             </Link>
-            <div className="flex items-center gap-1">
-              {desktopNav.map((item) => {
+            <div className="lg:hidden flex items-center gap-1">
+              {tabletNav.map((item) => {
                 const Icon = item.icon;
                 const active = isPathActive(pathname, item.href);
                 return (
@@ -227,7 +294,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         </header>
       )}
 
-      {/* === FULL-SCREEN MENU OVERLAY === */}
+      {/* === FULL-SCREEN MENU OVERLAY (mobile + tablet "More") === */}
       {menuOpen && (
         <div className="fixed inset-0 z-[200] bg-ccb-dark flex flex-col">
           {/* Top bar — close button */}
@@ -260,8 +327,8 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
 
           {/* Scrollable menu sections */}
           <div className="flex-1 overflow-y-auto">
-            {menuSections.map((section, si) => (
-              <div key={si} className={si > 0 ? "border-t border-ccb-border" : ""}>
+            {groups.map((section, si) => (
+              <div key={section.title} className={si > 0 ? "border-t border-ccb-border" : ""}>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted px-4 pt-3 pb-1">
                   {section.title}
                 </p>

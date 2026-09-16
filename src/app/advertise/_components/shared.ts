@@ -60,29 +60,4 @@ export function ctr(clicks: number, impressions: number): string {
   return `${((clicks / impressions) * 100).toFixed(1)}%`;
 }
 
-export interface AudienceStats {
-  total: number;
-  countries: Record<string, { total: number; male: number; female: number }>;
-}
 
-/** Estimated reach for a country+gender pairing, as a human sentence. */
-export function reachSentence(
-  audience: AudienceStats,
-  targetCountry: string,
-  targetGender: string
-): string {
-  const all = audience.total;
-  if (!targetCountry && !targetGender) return `Reaches all ${all.toLocaleString()} players.`;
-  const c = targetCountry
-    ? audience.countries[targetCountry] || { total: 0, male: 0, female: 0 }
-    : null;
-  if (targetCountry && targetGender) {
-    const n = targetGender === "male" ? c!.male : c!.female;
-    return `Reaches ~${n.toLocaleString()} ${targetGender === "male" ? "men" : "women"} who play in ${COUNTRY_LABELS[targetCountry]} (players who haven't set their gender in Settings never see gender-targeted ads — consider leaving gender on "All" to reach the full country).`;
-  }
-  if (targetCountry)
-    return `Reaches ~${c!.total.toLocaleString()} players in ${COUNTRY_LABELS[targetCountry]} (of ${all.toLocaleString()} total).`;
-  const male = Object.values(audience.countries).reduce((a, x) => a + x.male, 0);
-  const female = Object.values(audience.countries).reduce((a, x) => a + x.female, 0);
-  return `Reaches ~${(targetGender === "male" ? male : female).toLocaleString()} players who have set their gender (of ${all.toLocaleString()} total).`;
-}

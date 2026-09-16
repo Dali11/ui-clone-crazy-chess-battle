@@ -28,7 +28,8 @@ export default function AppShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex flex-col">
+    // lg:pl-60 clears the fixed desktop sidebar rendered by AppNav
+    <div className="min-h-screen flex flex-col lg:pl-60">
       <AppNav profile={profile} />
       <ActiveBattleWatcher />
       <ActiveTournamentWatcher />
@@ -36,7 +37,7 @@ export default function AppShell({
       <ClubJoinPopup />
       <OpenMatchBanner />
       <ActiveGameRedirect />
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         {children}
       </main>
     </div>

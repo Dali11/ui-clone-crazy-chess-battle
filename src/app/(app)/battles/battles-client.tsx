@@ -397,7 +397,7 @@ export default function BattlesPage() {
 
   if (activeBattle) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-6 pb-28 sm:py-10 sm:pb-10">
+      <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 py-6 pb-28 sm:py-10 sm:pb-10">
         <div className="text-center py-8">
           <Swords className="w-10 h-10 text-ccb-primary mx-auto mb-3" />
           <h2 className="text-lg font-bold mb-1">You have an active battle</h2>
@@ -433,7 +433,7 @@ export default function BattlesPage() {
   // ===== Searching state =====
   if (state === "searching") {
     return (
-      <div className="max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[70vh] space-y-6 animate-slide-up px-4">
+      <div className="max-w-2xl lg:max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[70vh] space-y-6 animate-slide-up px-4">
         <div className="relative">
           <div className="w-28 h-28 rounded-full bg-ccb-primary/10 flex items-center justify-center animate-pulse-glow">
             <Coins className="w-14 h-14 text-ccb-primary" />
@@ -485,7 +485,7 @@ export default function BattlesPage() {
   // ===== Matched state =====
   if (state === "matched" && opponent) {
     return (
-      <div className="max-w-2xl mx-auto text-center py-8 animate-slide-up">
+      <div className="max-w-2xl lg:max-w-4xl mx-auto text-center py-8 animate-slide-up">
         <div className="mb-2 inline-block">
           <span className="px-4 py-1.5 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-medium">
             OPPONENT FOUND
@@ -545,7 +545,7 @@ export default function BattlesPage() {
   // ===== Challenge a Friend view =====
   if (view === "challenge") {
     return (
-      <div className="max-w-2xl mx-auto space-y-6 px-4 sm:px-0 pb-20 sm:pb-0 animate-slide-up">
+      <div className="max-w-2xl lg:max-w-4xl mx-auto space-y-6 px-4 sm:px-0 pb-20 sm:pb-0 animate-slide-up">
         {/* Balance + rating header */}
         <div className="pt-2 sm:pt-4">
           <div className="flex items-center gap-4 text-sm">
@@ -675,7 +675,7 @@ export default function BattlesPage() {
 
   // ===== MAIN VIEW — simplified, fixed stake + time control =====
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4 pb-28 sm:py-6 sm:pb-10 space-y-5">
+    <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 py-4 pb-28 sm:py-6 sm:pb-10 space-y-5">
       {/* Header with balance + rating */}
       <div>
         <div className="flex items-center gap-2 mb-2">

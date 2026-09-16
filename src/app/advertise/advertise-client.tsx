@@ -4,13 +4,13 @@
 //   Overview (how it works, reach, pricing) · New Campaign (3-step
 //   order wizard) · My Campaigns (stats, filters, management).
 //
-// Backend: GET /api/ads/config (pricing), GET/POST /api/ads/campaigns,
-// GET /api/ads/audience. Wallet balance is passed in from the server page.
+// Backend: GET /api/ads/config (pricing), GET/POST /api/ads/campaigns.
+// Wallet balance is passed in from the server page.
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Info, Megaphone, PlusCircle, BarChart3 } from "lucide-react";
-import { type AudienceStats, type Campaign } from "./_components/shared";
+import { type Campaign } from "./_components/shared";
 import OverviewTab from "./_components/overview-tab";
 import OrderTab from "./_components/order-tab";
 import CampaignsTab from "./_components/campaigns-tab";
@@ -27,18 +27,15 @@ export default function AdvertiseClient({
   const [enabled, setEnabled] = useState(false);
   const [pricePerWeekMwk, setPricePerWeekMwk] = useState(5000);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [audience, setAudience] = useState<AudienceStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [cfgR, mineR, audR] = await Promise.all([
+      const [cfgR, mineR] = await Promise.all([
         fetch("/api/ads/config", { cache: "no-store" }),
         fetch("/api/ads/campaigns", { cache: "no-store" }),
-        fetch("/api/ads/audience", { cache: "no-store" }),
       ]);
-      if (audR.ok) setAudience(await audR.json());
       const cfg = await cfgR.json();
       setEnabled(!!cfg.directAds?.enabled);
       setPricePerWeekMwk(Number(cfg.directAds?.pricePerWeekMwk) || 5000);
@@ -123,7 +120,6 @@ export default function AdvertiseClient({
 
           {tab === "overview" && (
             <OverviewTab
-              audience={audience}
               campaigns={campaigns}
               walletBalance={walletBalance}
               pricePerWeekMwk={pricePerWeekMwk}
@@ -132,7 +128,6 @@ export default function AdvertiseClient({
           )}
           {tab === "order" && (
             <OrderTab
-              audience={audience}
               walletBalance={walletBalance}
               pricePerWeekMwk={pricePerWeekMwk}
               onOrdered={onOrdered}

@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Wallet, Check, Loader2, ArrowDown, ArrowUp, ArrowDownLeft, ArrowUpRight,
-  Clock, RefreshCw, History, Lock,
+  Clock, RefreshCw, History, Lock, Crown, Gift, ChevronRight,
 } from "lucide-react";
 
 interface Deposit {
@@ -451,6 +451,49 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
           {error}
         </div>
       )}
+
+      {/* Quick Links: Membership & Affiliate */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Link
+          href="/membership"
+          className="rounded-xl border border-ccb-border bg-ccb-surface p-3.5 flex items-center justify-between hover:border-ccb-primary/50 transition-colors group"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-500 shrink-0">
+              <Crown className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-sm text-ccb-text group-hover:text-ccb-primary transition-colors truncate">
+                Club Membership
+              </div>
+              <div className="text-xs text-ccb-muted truncate">
+                Join the club for perks &amp; benefits
+              </div>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:text-ccb-text transition-colors shrink-0 ml-2" />
+        </Link>
+
+        <Link
+          href="/affiliate"
+          className="rounded-xl border border-ccb-border bg-ccb-surface p-3.5 flex items-center justify-between hover:border-ccb-primary/50 transition-colors group"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-lg bg-ccb-primary/10 text-ccb-primary shrink-0">
+              <Gift className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-sm text-ccb-text group-hover:text-ccb-primary transition-colors truncate">
+                Affiliate
+              </div>
+              <div className="text-xs text-ccb-muted truncate">
+                Earn from players you refer
+              </div>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:text-ccb-text transition-colors shrink-0 ml-2" />
+        </Link>
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-2 p-1 bg-ccb-surface rounded-xl">

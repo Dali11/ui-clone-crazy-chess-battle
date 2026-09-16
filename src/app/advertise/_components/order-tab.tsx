@@ -7,17 +7,15 @@ import { adTiers, AD_TARGET_COUNTRIES, type AdWeeks } from "@/lib/ads/direct-pri
 import { useCurrency } from "@/hooks/use-currency";
 import { compressImage } from "@/components/chat/compress-image";
 import { createClient } from "@/lib/supabase/client";
-import { type AudienceStats, COUNTRY_LABELS, reachSentence, ratioLabel } from "./shared";
+import { COUNTRY_LABELS, ratioLabel } from "./shared";
 
 const STEPS = ["Creative", "Audience", "Checkout"] as const;
 
 export default function OrderTab({
-  audience,
   walletBalance,
   pricePerWeekMwk,
   onOrdered,
 }: {
-  audience: AudienceStats | null;
   walletBalance: number;
   pricePerWeekMwk: number;
   onOrdered: () => void;
@@ -355,11 +353,10 @@ export default function OrderTab({
                 <option value="female">Women only</option>
               </select>
             </div>
-            {audience && (
-              <p className="text-[11px] text-ccb-muted leading-relaxed">
-                {reachSentence(audience, targetCountry, targetGender)}
-              </p>
-            )}
+            <p className="text-[11px] text-ccb-muted leading-relaxed">
+              Gender-targeted ads only reach players who have set their gender
+              in Settings — leave targeting on "All" for the widest reach.
+            </p>
           </div>
         </div>
       )}
