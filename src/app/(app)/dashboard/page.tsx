@@ -109,9 +109,9 @@ export default async function DashboardPage() {
     : `${walletSymbol} 0`;
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-24 sm:pb-6">
-      {/* Welcome */}
-      <div>
+    <div className="pb-24 sm:pb-6">
+      {/* Welcome — full width */}
+      <div className="mb-4 sm:mb-6">
         <h1 className="text-xl sm:text-2xl font-bold">
           {isNewUser ? "Welcome to Crazy Chess Battles" : `Welcome back, ${profile?.display_name || profile?.username || "Player"}`}
         </h1>
@@ -119,6 +119,11 @@ export default async function DashboardPage() {
           {isNewUser ? "Let\'s get you playing — here\'s where to start." : "Ready for a battle?"}
         </p>
       </div>
+
+      {/* Two-column desktop: main (2/3) + right rail (1/3). Mobile: single column */}
+      <div className="space-y-4 sm:space-y-6 lg:grid lg:grid-cols-3 lg:gap-6 lg:space-y-0 lg:items-start">
+        {/* Main column */}
+        <div className="space-y-4 sm:space-y-6 lg:col-span-2">
 
       {/* WhatsApp group invite — shows once daily until joined */}
       <WhatsAppBanner />
@@ -219,24 +224,9 @@ export default async function DashboardPage() {
         </div>
       </Link>
 
-      {/* Community Room — the WhatsApp group, now native */}
-      <Link href="/chats" className="block rounded-xl border border-ccb-border bg-ccb-card p-4 group active:scale-[0.98] transition-transform">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-ccb-primary/15 flex items-center justify-center shrink-0">
-              <MessageCircle className="w-5.5 h-5.5 text-ccb-primary" />
-            </div>
-            <div>
-              <h3 className="font-bold text-ccb-text">Chats</h3>
-              <p className="text-xs text-ccb-muted">Group chats & direct messages with fellow players</p>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:translate-x-1 transition-transform shrink-0" />
-        </div>
-      </Link>
 
       {/* Tournaments + Recent Games */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
         {/* Upcoming tournaments */}
         <div className="card p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3">
@@ -337,24 +327,41 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Wallet row */}
-      <div className="grid grid-cols-1 gap-2 sm:gap-3">
+        </div>
 
-        <Link href="/wallet" className="flex items-center justify-between rounded-xl bg-ccb-surface border border-ccb-border px-4 py-3 group">
-          <div className="flex items-center gap-2.5">
-            <Wallet className="w-4 h-4 text-ccb-accent" />
-            <div>
-              <span className="text-xs text-ccb-muted block">Wallet</span>
-              <span className="text-sm font-bold">{walletBalance}</span>
+        {/* Right rail */}
+        <div className="space-y-4 sm:space-y-6">
+          {/* Community Room — the WhatsApp group, now native */}
+          <Link href="/chats" className="block rounded-xl border border-ccb-border bg-ccb-card p-4 group active:scale-[0.98] transition-transform">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-ccb-primary/15 flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-5.5 h-5.5 text-ccb-primary" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-ccb-text">Chats</h3>
+                  <p className="text-xs text-ccb-muted">Group chats & direct messages with fellow players</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:translate-x-1 transition-transform shrink-0" />
             </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:translate-x-1 transition-transform" />
-        </Link>
-      </div>
+          </Link>
+          {/* Wallet quick link */}
+          <Link href="/wallet" className="flex items-center justify-between rounded-xl bg-ccb-surface border border-ccb-border px-4 py-3 group">
+            <div className="flex items-center gap-2.5">
+              <Wallet className="w-4 h-4 text-ccb-accent" />
+              <div>
+                <span className="text-xs text-ccb-muted block">Wallet</span>
+                <span className="text-sm font-bold">{walletBalance}</span>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:translate-x-1 transition-transform" />
+          </Link>
 
-      {/* Lobby ad — admin-managed (Ads > Lobby). Renders nothing when off.
-          Bottom row: sits under all content so it never pushes the UI. */}
-      <AdSlot placement="lobby" className="pt-2" />
+          {/* Lobby ad — admin-managed (Ads > Lobby). Renders nothing when off. */}
+          <AdSlot placement="lobby" className="pt-2" />
+        </div>
+      </div>
     </div>
   );
 }

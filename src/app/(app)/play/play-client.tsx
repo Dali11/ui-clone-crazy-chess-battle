@@ -403,96 +403,106 @@ export default function PlayPage() {
     );
   }
 
-  // ===== MAIN VIEW — flat, no menu step =====
+  // ===== MAIN VIEW — two-column on desktop: matchmaking hero + ways-to-play rail =====
   return (
-    <div className="max-w-2xl lg:max-w-4xl mx-auto space-y-5 pb-20 sm:pb-0">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold">Play Chess</h1>
-        <p className="text-sm text-ccb-muted mt-1">Pick your time control and find a game</p>
+    <div className="max-w-2xl lg:max-w-5xl mx-auto lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8 pb-20 sm:pb-0">
+      {/* Left column — matchmaking (the hero action) */}
+      <div className="space-y-5">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold">Play Chess</h1>
+          <p className="text-sm text-ccb-muted mt-1">Pick your time control and find a game</p>
+        </div>
+
+        {/* Time Control — immediately visible */}
+        <TimeControlPicker selectedTC={selectedTC} setSelectedTC={setSelectedTC} />
+
+        {/* Ranked toggle — inline */}
+        <RatedToggle rated={rated} setRated={setRated} />
+
+        {/* Big play button */}
+        <button onClick={handleQuickMatch} className="btn-primary w-full text-base py-4 text-lg">
+          <Swords className="w-5 h-5 mr-2" /> Find Match
+        </button>
+
+        <p className="text-xs text-ccb-muted text-center">
+          No opponent found in 60s? You&rsquo;ll get the option to play the computer.
+        </p>
+
+        {/* Divider — mobile only (desktop splits into the side rail) */}
+        <div className="relative pt-2 lg:hidden">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-ccb-border" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-ccb-dark px-3 text-xs text-ccb-muted">or</span>
+          </div>
+        </div>
       </div>
 
-      {/* Time Control — immediately visible */}
-      <TimeControlPicker selectedTC={selectedTC} setSelectedTC={setSelectedTC} />
+      {/* Right column — other ways to play (sticky rail on desktop) */}
+      <div className="space-y-3 mt-0 lg:sticky lg:top-20 lg:self-start lg:mt-0">
+        <p className="hidden lg:block text-xs font-bold uppercase tracking-wider text-ccb-muted">
+          Other ways to play
+        </p>
 
-      {/* Ranked toggle — inline */}
-      <RatedToggle rated={rated} setRated={setRated} />
-
-      {/* Big play button */}
-      <button onClick={handleQuickMatch} className="btn-primary w-full text-base py-4 text-lg">
-        <Swords className="w-5 h-5 mr-2" /> Find Match
-      </button>
-
-      <p className="text-xs text-ccb-muted text-center">
-        No opponent found in 60s? You'll get the option to play the computer.
-      </p>
-
-      {/* Divider */}
-      <div className="relative pt-2">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-ccb-border" />
+        {/* Challenge link expiry picker */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-ccb-muted">Link expires in:</span>
+          {[10, 30, 60].map((mins) => (
+            <button
+              key={mins}
+              onClick={() => setChallengeExpiry(mins)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                challengeExpiry === mins
+                  ? "bg-ccb-primary text-ccb-primary-foreground"
+                  : "bg-ccb-surface text-ccb-muted border border-ccb-border hover:border-ccb-primary/40"
+              }`}
+            >
+              {mins < 60 ? `${mins}m` : `${mins / 60}h`}
+            </button>
+          ))}
         </div>
-        <div className="relative flex justify-center">
-          <span className="bg-ccb-dark px-3 text-xs text-ccb-muted">or</span>
-        </div>
-      </div>
 
-      {/* Challenge link expiry picker */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-ccb-muted">Link expires in:</span>
-        {[10, 30, 60].map((mins) => (
+        {/* Secondary actions — no extra menu step */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button
-            key={mins}
-            onClick={() => setChallengeExpiry(mins)}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-              challengeExpiry === mins
-                ? "bg-ccb-primary text-ccb-primary-foreground"
-                : "bg-ccb-surface text-ccb-muted border border-ccb-border hover:border-ccb-primary/40"
-            }`}
+            onClick={handleCreateChallenge}
+            disabled={creatingChallenge}
+            className="flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-accent/40 hover:bg-ccb-surface transition-colors disabled:opacity-50"
           >
-            {mins < 60 ? `${mins}m` : `${mins / 60}h`}
+            {creatingChallenge ? (
+              <span className="w-4 h-4 border-2 border-ccb-accent border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Link2 className="w-4 h-4 text-ccb-accent" />
+            )}
+            {creatingChallenge ? "Creating..." : "Challenge a Friend"}
           </button>
-        ))}
-      </div>
+          <button
+            onClick={() => setView("computer")}
+            className="flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-success/50 hover:bg-ccb-surface transition-colors"
+          >
+            <Bot className="w-4 h-4 text-ccb-success" />
+            Play Computer
+          </button>
+          <Link
+            href="/draughts"
+            className="flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-primary/40 hover:bg-ccb-surface transition-colors"
+          >
+            <Disc3 className="w-4 h-4 text-ccb-primary" />
+            Play Draughts
+          </Link>
+        </div>
 
-      {/* Secondary actions — no extra menu step */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <button
-          onClick={handleCreateChallenge}
-          disabled={creatingChallenge}
-          className="flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-accent/40 hover:bg-ccb-surface transition-colors disabled:opacity-50"
-        >
-          {creatingChallenge ? (
-            <span className="w-4 h-4 border-2 border-ccb-accent border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Link2 className="w-4 h-4 text-ccb-accent" />
-          )}
-          {creatingChallenge ? "Creating..." : "Challenge a Friend"}
-        </button>
-        <button
-          onClick={() => setView("computer")}
-          className="flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-success/50 hover:bg-ccb-surface transition-colors"
-        >
-          <Bot className="w-4 h-4 text-ccb-success" />
-          Play Computer
-        </button>
-        <Link
-          href="/draughts"
-          className="flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-card px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-primary/40 hover:bg-ccb-surface transition-colors"
-        >
-          <Disc3 className="w-4 h-4 text-ccb-primary" />
-          Play Draughts
-        </Link>
-      </div>
-
-      {/* Quick links */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-1">
-        <button
-          onClick={() => router.push("/battles")}
-          className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-surface px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-accent/40 transition-colors"
-        >
-          <Target className="w-4 h-4 text-ccb-accent" />
-          Staked Battles
-        </button>
+        {/* Quick links */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-1">
+          <button
+            onClick={() => router.push("/battles")}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-ccb-border bg-ccb-surface px-4 py-3 text-sm font-medium text-ccb-text hover:border-ccb-accent/40 transition-colors"
+          >
+            <Target className="w-4 h-4 text-ccb-accent" />
+            Staked Battles
+          </button>
+        </div>
       </div>
     </div>
   );
