@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * GET /api/admin/ledger — unified money-movement ledger over `deposits`.
  *
  * The deposits table is the platform's single source of truth for wallet
- * activity: payment inflows (mobile_money, card, pawapay, ontech_mm),
+ * activity: payment inflows (mobile_money, card, bank_transfer, pawapay),
  * battle escrow/payouts/refunds, tournament entries/payouts, membership
  * purchases, ad purchases, affiliate commissions, failure refunds and
  * the weekly revenue sweep. This endpoint surfaces ALL of it with
@@ -23,7 +23,6 @@ const METHOD_CATEGORIES: Record<string, string> = {
   card: "money_in",
   bank_transfer: "money_in",
   pawapay: "money_in",
-  ontech_mm: "money_in",
   // Battle lifecycle
   battle_escrow: "battle",
   battle_challenge_escrow: "battle",

@@ -44,7 +44,7 @@ export function battleFee(stake: number | null, winnerPayout: number | null): nu
   return Math.max(0, pot - payout);
 }
 
-/** Sum revenue from raw rows (battles + completed non-Ontech withdrawals + memberships). */
+/** Sum revenue from raw rows (battles + completed withdrawals + memberships). */
 export function computeRevenueFromRows(
   battles: { stake: number | null; winner_payout: number | null }[],
   withdrawals: { fee: number | null }[],
