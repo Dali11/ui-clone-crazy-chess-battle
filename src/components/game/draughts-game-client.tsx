@@ -575,7 +575,7 @@ export default function DraughtsGameClient({
     materialAdvantage?: number;
     pieceCount?: number;
   }) => (
-    <div className={`flex items-center justify-between max-w-[600px] mx-auto w-full px-3 py-2 rounded-lg transition-colors ${data.isActive ? "bg-ccb-primary/8" : ""}`}>
+    <div className={`flex items-center justify-between max-w-[680px] mx-auto w-full px-3 py-2 rounded-lg transition-colors ${data.isActive ? "bg-ccb-primary/8" : ""}`}>
       <div className="flex items-center gap-2.5 min-w-0">
         <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border-2 overflow-hidden transition-colors ${data.isActive ? "border-ccb-primary bg-ccb-primary/15" : "border-ccb-border bg-ccb-surface"}`}>
           {data.avatar ? (
@@ -652,9 +652,9 @@ export default function DraughtsGameClient({
 
   return (
     <>
-      <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
+      <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 lg:-mx-8 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
         {/* Board column */}
-        <div className="relative flex flex-col h-full w-full lg:w-[600px] lg:max-w-[600px] lg:h-auto lg:shrink-0 lg:my-auto">
+        <div className="relative flex flex-col h-full w-full lg:w-[680px] lg:max-w-[680px] lg:h-auto lg:shrink-0 lg:my-auto">
           {/* Mobile top bar */}
           <div className="lg:hidden shrink-0 flex items-center justify-between px-3 pt-[max(0.875rem,env(safe-area-inset-top))] pb-2 h-auto min-h-12 border-b border-ccb-border">
             <Link href="/draughts" className="p-1.5 -ml-1.5 text-ccb-muted hover:text-ccb-primary">
@@ -675,14 +675,14 @@ export default function DraughtsGameClient({
 
           {/* Connecting indicator */}
           {!channelRef.current && (
-            <div className="shrink-0 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted px-4 py-1.5 text-xs text-center max-w-[600px] mx-auto w-full mt-1">
+            <div className="shrink-0 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted px-4 py-1.5 text-xs text-center max-w-[680px] mx-auto w-full mt-1">
               Connecting...
             </div>
           )}
 
           {/* Error banner */}
           {error && (
-            <div className="w-full shrink-0 max-w-[600px] mx-auto px-3 py-1.5">
+            <div className="w-full shrink-0 max-w-[680px] mx-auto px-3 py-1.5">
               <div className="px-4 py-2 rounded-lg bg-red-500/15 text-red-400 text-sm text-center">
                 {error}
               </div>
@@ -719,7 +719,7 @@ export default function DraughtsGameClient({
 
           {/* Draw offer banner — received from opponent */}
           {drawOffer === "offer" && !isSpectator && !gameEnded && (
-            <div className="max-w-[600px] mx-auto w-full px-3 py-2">
+            <div className="max-w-[680px] mx-auto w-full px-3 py-2">
               <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-ccb-primary/10 border border-ccb-primary/30">
                 <span className="text-sm flex items-center gap-1.5">
                   <Handshake className="w-4 h-4 text-ccb-primary" /> Opponent offers a draw
@@ -734,7 +734,7 @@ export default function DraughtsGameClient({
 
           {/* Draw offer banner — we sent it, waiting for opponent */}
           {drawOffer === "pending" && !isSpectator && !gameEnded && (
-            <div className="max-w-[600px] mx-auto w-full px-3 py-2">
+            <div className="max-w-[680px] mx-auto w-full px-3 py-2">
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-ccb-muted/10 border border-ccb-border">
                 <div className="w-4 h-4 border-2 border-ccb-muted border-t-transparent rounded-full animate-spin" />
                 <span className="text-sm text-ccb-muted">Waiting for opponent to respond…</span>
@@ -745,7 +745,7 @@ export default function DraughtsGameClient({
 
           {/* Turn indicator */}
           {!gameEnded && (
-            <div className="max-w-[600px] mx-auto w-full px-3 py-1">
+            <div className="max-w-[680px] mx-auto w-full px-3 py-1">
               <div className={`px-4 py-1.5 rounded-lg text-sm font-medium text-center ${
                 myTurn ? "bg-ccb-primary/10 text-ccb-primary" : "bg-ccb-surface text-ccb-muted"
               }`}>
@@ -760,7 +760,7 @@ export default function DraughtsGameClient({
 
           {/* Live position indicator when reviewing past moves */}
           {!isLiveView && moveHistory.length > 0 && (
-            <div className="max-w-[600px] mx-auto w-full px-3">
+            <div className="max-w-[680px] mx-auto w-full px-3">
               <button
                 onClick={() => setViewPly(moveHistory.length)}
                 className="w-full text-center text-xs text-ccb-primary hover:underline py-1"
@@ -772,7 +772,7 @@ export default function DraughtsGameClient({
 
           {/* Desktop resign controls */}
           {!isSpectator && !gameEnded && (
-            <div className="hidden lg:flex items-center justify-center gap-3 max-w-[600px] mx-auto mt-2 shrink-0">
+            <div className="hidden lg:flex items-center justify-center gap-3 max-w-[680px] mx-auto mt-2 shrink-0">
               {showResignConfirm ? (
                 <>
                   <span className="text-sm text-ccb-muted">Resign?</span>

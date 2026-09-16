@@ -103,7 +103,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
   // 0.94: board gets ~3% breathing room per side on phones/tablets so
   // squares stay slightly smaller than full-width (was edge-to-edge ~55-56px
   // on mobile). Snapped to a multiple of 8 by the hook, so still seam-free.
-  const { containerRef: boardContainerRef, size: boardSize } = useBoardSize(600, 220, 8, 0.94);
+  const { containerRef: boardContainerRef, size: boardSize } = useBoardSize(680, 220, 8, 0.94);
 
   useLockBodyScroll();
 
@@ -835,9 +835,9 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
 
   return (
     <>
-      <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-6">
+      <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 lg:-mx-8 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-6">
         {/* ===== Board column ===== */}
-        <div className="relative flex flex-col h-full w-full lg:w-[600px] lg:max-w-[600px] lg:shrink-0 lg:my-auto">
+        <div className="relative flex flex-col h-full w-full lg:w-[680px] lg:max-w-[680px] lg:shrink-0 lg:my-auto">
           {/* Mobile-only slim top bar */}
           <div className="lg:hidden shrink-0 flex items-center justify-between px-3 h-11 border-b border-ccb-border">
             <Link href="/play" className="p-1.5 -ml-1.5 text-ccb-muted hover:text-ccb-primary">
@@ -853,7 +853,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
           </div>
 
           {/* Horizontal move scroller — chess.com style, at the very top */}
-          <div className="max-w-[600px] mx-auto w-full px-2 py-1">
+          <div className="max-w-[680px] mx-auto w-full px-2 py-1">
             {moveHistory.length >= 2 && (
               <div className="mb-1">
                 <OpeningBadge moves={moveHistory} />
@@ -865,7 +865,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
           </div>
 
           {/* Opponent bar */}
-          <div className={`shrink-0 flex items-center justify-between max-w-[600px] mx-auto w-full px-2 py-1.5 rounded-lg transition-colors ${opponentData.isActive ? "bg-ccb-primary/8" : ""}`}>
+          <div className={`shrink-0 flex items-center justify-between max-w-[680px] mx-auto w-full px-2 py-1.5 rounded-lg transition-colors ${opponentData.isActive ? "bg-ccb-primary/8" : ""}`}>
             <div className="flex items-center gap-2.5 min-w-0">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors ${opponentData.isActive ? "border-ccb-primary bg-ccb-primary/15" : "border-ccb-border bg-ccb-surface"}`}>
                 <Bot className="w-4 h-4 text-ccb-muted" />
@@ -893,7 +893,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
           </div>
 
           {/* Player bar */}
-          <div className={`shrink-0 flex items-center justify-between max-w-[600px] mx-auto w-full px-2 py-1.5 rounded-lg transition-colors ${playerData.isActive ? "bg-ccb-primary/8" : ""}`}>
+          <div className={`shrink-0 flex items-center justify-between max-w-[680px] mx-auto w-full px-2 py-1.5 rounded-lg transition-colors ${playerData.isActive ? "bg-ccb-primary/8" : ""}`}>
             <div className="flex items-center gap-2.5 min-w-0">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors ${playerData.isActive ? "border-ccb-primary bg-ccb-primary/15" : "border-ccb-border bg-ccb-surface"}`}>
                 <span className="text-lg">{playerData.symbol}</span>
@@ -915,7 +915,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
 
           {/* Live position indicator when reviewing past moves */}
           {!isLiveView && moveHistory.length > 0 && (
-            <div className="max-w-[600px] mx-auto w-full px-2">
+            <div className="max-w-[680px] mx-auto w-full px-2">
               <button
                 onClick={() => setViewPly(moveHistory.length)}
                 className="w-full text-center text-xs text-ccb-primary hover:underline py-1"
@@ -927,7 +927,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
 
           {/* Desktop-only resign control */}
           {!gameEnded && (
-            <div className="hidden lg:flex items-center justify-center gap-3 max-w-[600px] mx-auto mt-2 shrink-0">
+            <div className="hidden lg:flex items-center justify-center gap-3 max-w-[680px] mx-auto mt-2 shrink-0">
               {showResignConfirm ? (
                 <>
                   <span className="text-sm text-ccb-muted">Resign?</span>

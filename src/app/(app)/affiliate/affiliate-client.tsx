@@ -97,7 +97,7 @@ export default function AffiliateClient({
   const pendingRefs = totalRefs - activatedRefs;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 max-w-2xl mx-auto space-y-4 pb-8">
+    <div className="px-4 sm:px-6 lg:px-8 max-w-2xl lg:max-w-5xl mx-auto space-y-4 pb-8">
       {/* Paused notice — tracking still works, payouts wait for the switch */}
       {!affiliateEnabled && (
         <div className="rounded-xl border border-ccb-accent/30 bg-ccb-accent/10 p-4 text-center">

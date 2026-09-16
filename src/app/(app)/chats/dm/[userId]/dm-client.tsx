@@ -38,7 +38,7 @@ export default function DmChatClient({ partnerId }: { partnerId: string }) {
   }, [partnerId]);
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl lg:max-w-5xl mx-auto">
       {partner ? (
         <ChatView
           mode="dm"

@@ -26,7 +26,7 @@ interface PlayerBarProps extends PlayerBarData {
 
 function PlayerBarBase({ name, userId, avatar, country, rating, ratingChange, captured, advantage, clock, isActive, symbol, gameEnded, onPreview }: PlayerBarProps) {
   return (
-    <div className={`flex items-center justify-between max-w-[600px] mx-auto w-full px-2 py-2 rounded-lg transition-colors ${isActive ? "bg-ccb-primary/8" : ""}`}>
+    <div className={`flex items-center justify-between max-w-[680px] mx-auto w-full px-2 py-2 rounded-lg transition-colors ${isActive ? "bg-ccb-primary/8" : ""}`}>
       <div className="flex items-center gap-2.5 min-w-0">
         {/* Avatar circle — chess.com style */}
         <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors ${isActive ? "border-ccb-primary bg-ccb-primary/15" : "border-ccb-border bg-ccb-surface"}`}>

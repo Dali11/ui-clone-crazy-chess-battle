@@ -341,7 +341,7 @@ export default function PlayPage() {
   // ===== Play vs Computer view =====
   if (view === "computer") {
     return (
-      <div className="max-w-2xl lg:max-w-4xl mx-auto space-y-6 pb-20 sm:pb-0 animate-slide-up">
+      <div className="max-w-2xl lg:max-w-5xl mx-auto space-y-6 pb-20 sm:pb-0 animate-slide-up">
         <button onClick={() => setView("main")} className="text-sm text-ccb-muted hover:text-ccb-text flex items-center gap-1">
           <ChevronRight className="w-4 h-4 rotate-180" /> Back
         </button>

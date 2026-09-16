@@ -53,7 +53,7 @@ export default function LessonClient({
   };
 
   return (
-    <article className="max-w-2xl mx-auto">
+    <article className="max-w-2xl lg:max-w-4xl mx-auto">
       {/* Breadcrumb */}
       <Link
         href="/academy"

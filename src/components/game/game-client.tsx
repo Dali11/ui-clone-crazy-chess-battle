@@ -117,7 +117,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   // 0.94: board gets ~3% breathing room per side on phones/tablets so
   // squares stay slightly smaller than full-width (was edge-to-edge ~55-56px
   // on mobile). Snapped to a multiple of 8 by the hook, so still seam-free.
-  const { containerRef: boardContainerRef, size: boardSize } = useBoardSize(600, 220, 8, 0.94);
+  const { containerRef: boardContainerRef, size: boardSize } = useBoardSize(680, 220, 8, 0.94);
 
   const TERMINAL_STATUSES = ["checkmate", "stalemate", "draw", "resign", "timeout", "abort"];
   const gameEnded = TERMINAL_STATUSES.includes(game.status);
@@ -455,7 +455,11 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     if (gameEnded || game.turn !== player) {
       return formatClock(player === "white" ? game.white_clock_ms : game.black_clock_ms);
     }
-    const elapsed = Date.now() - new Date(game.last_move_at).getTime();
+    // Clamp at 0: a NEGATIVE elapsed (opponent's device clock runs ahead of
+    // ours — last_move_at came from their broadcast) would otherwise ADD
+    // time to the clock. Server-authoritative values from /api/game/state
+    // polling re-sync last_move_at within a second or two.
+    const elapsed = Math.max(0, Date.now() - new Date(game.last_move_at).getTime());
     void clockTick;
     const baseMs = player === "white" ? game.white_clock_ms : game.black_clock_ms;
     return formatClock(Math.max(0, baseMs - elapsed));
@@ -1099,7 +1103,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   // ============ SHARED BOARD COLUMN ============
   const boardColumn = (topPlayer: any, bottomPlayer: any, showControls: boolean) => (
-    <div className="relative flex flex-col h-full w-full lg:w-[600px] lg:max-w-[600px] lg:shrink-0 lg:my-auto">
+    <div className="relative flex flex-col h-full w-full lg:w-[680px] lg:max-w-[680px] lg:shrink-0 lg:my-auto">
       {/* Mobile top bar */}
       <div className="lg:hidden shrink-0 flex items-center justify-between px-3 pt-[max(0.875rem,env(safe-area-inset-top))] pb-2 h-auto min-h-12 border-b border-ccb-border">
         <Link href="/play" className="p-1.5 -ml-1.5 text-ccb-muted hover:text-ccb-primary">
@@ -1133,7 +1137,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       </div>
 
       {/* Moves + opening area — fixed height slot, nothing enters/leaves flow */}
-      <div className="relative max-w-[600px] mx-auto w-full px-2 py-1 h-[62px]">
+      <div className="relative max-w-[680px] mx-auto w-full px-2 py-1 h-[62px]">
         {/* Move scroller — pinned to bottom of the fixed-height slot */}
         <div className="absolute bottom-1 inset-x-2 rounded-lg bg-ccb-surface/50 border border-ccb-border/50 px-2 py-1.5">
           <MoveScroller moves={moveHistory} currentPly={viewPly} onPlyChange={setViewPly} />
@@ -1227,7 +1231,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       )}
 
       {/* Desktop resign/draw controls — fixed height slot, content may disappear without shifting */}
-      <div className="hidden lg:flex items-center justify-center gap-3 max-w-[600px] mx-auto mt-2 h-11 shrink-0">
+      <div className="hidden lg:flex items-center justify-center gap-3 max-w-[680px] mx-auto mt-2 h-11 shrink-0">
         {showControls && !gameEnded && (
           <>
             {showResignConfirm ? (
@@ -1486,7 +1490,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
     return (
       <>
-        <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
+        <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 lg:-mx-8 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
           {boardColumn(topPlayer, bottomPlayer, false)}
           {renderDesktopSidebar()}
         </div>
@@ -1558,7 +1562,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   return (
     <>
-      <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
+      <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 lg:-mx-8 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
         {boardColumn(playerData, myData, true)}
         {renderDesktopSidebar()}
       </div>

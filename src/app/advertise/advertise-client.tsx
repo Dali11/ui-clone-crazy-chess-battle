@@ -78,7 +78,7 @@ export default function AdvertiseClient({
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 pb-24 sm:pb-6 space-y-4">
+    <div className="max-w-2xl lg:max-w-5xl mx-auto px-4 py-6 pb-24 sm:pb-6 space-y-4">
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold text-ccb-text">Advertise on Crazy Chess Battles</h1>

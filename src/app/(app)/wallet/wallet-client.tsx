@@ -413,6 +413,25 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
 
   return (
     <div className="space-y-4 pb-20 sm:pb-0">
+      {/* Success message */}
+      {success && (
+        <div className="rounded-lg bg-ccb-success/10 border border-ccb-success/30 text-ccb-success px-4 py-3 text-sm flex items-center gap-2">
+          <Check className="w-4 h-4 shrink-0" />
+          {success}
+        </div>
+      )}
+
+      {/* Error message */}
+      {error && (
+        <div className="rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 px-4 py-3 text-sm">
+          {error}
+        </div>
+      )}
+
+      {/* Desktop two-column fill: Balance+Quick Links on the left, Deposit /
+          Withdraw / History on the right — single column stack on mobile. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr,3fr] lg:gap-6 lg:items-start">
+        <div className="space-y-4">
       {/* Balance Card */}
       <div className="card relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-ccb-primary/5 rounded-full -translate-y-16 translate-x-16" />
@@ -436,21 +455,6 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
           )}
         </div>
       </div>
-
-      {/* Success message */}
-      {success && (
-        <div className="rounded-lg bg-ccb-success/10 border border-ccb-success/30 text-ccb-success px-4 py-3 text-sm flex items-center gap-2">
-          <Check className="w-4 h-4 shrink-0" />
-          {success}
-        </div>
-      )}
-
-      {/* Error message */}
-      {error && (
-        <div className="rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 px-4 py-3 text-sm">
-          {error}
-        </div>
-      )}
 
       {/* Quick Links: Membership & Affiliate */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -495,6 +499,8 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         </Link>
       </div>
 
+        </div>
+        <div className="space-y-4">
       {/* Tabs */}
       <div className="flex gap-2 p-1 bg-ccb-surface rounded-xl">
         <button
@@ -854,6 +860,8 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
           )}
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

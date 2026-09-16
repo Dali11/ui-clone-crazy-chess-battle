@@ -12,6 +12,7 @@ import {
 import NotificationBell from "./notification-bell";
 import { useCurrency } from "@/hooks/use-currency";
 import { useChatsUnread } from "@/hooks/use-chats-unread";
+import { isGameRoute as checkIsGameRoute } from "@/lib/is-game-route";
 import { Users } from "lucide-react";
 
 interface Profile {
@@ -85,7 +86,7 @@ const tabletNav = [
 export default function AppNav({ profile }: { profile: Profile | null }) {
   const pathname = usePathname();
   const { formatWallet } = useCurrency();
-  const isGameRoute = pathname.startsWith("/game/") || pathname.startsWith("/play/computer") || pathname.startsWith("/draughts/game/");
+  const isGameRoute = checkIsGameRoute(pathname);
   const [menuOpen, setMenuOpen] = useState(false);
   const chatsUnread = useChatsUnread();
 
@@ -137,7 +138,9 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
 
   return (
     <>
-      {/* === DESKTOP SIDEBAR (lg+) === */}
+      {/* === DESKTOP SIDEBAR (lg+) — hidden on game routes so the board
+          gets the full width, matching chess.com's two-column layout === */}
+      {!isGameRoute && (
       <aside className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-60 flex-col border-r border-ccb-border bg-ccb-surface">
         <Link href="/dashboard" className="flex items-center gap-2.5 px-4 h-16 border-b border-ccb-border shrink-0">
           <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-8 h-8 rounded-full" />
@@ -187,6 +190,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
           </Link>
         </div>
       </aside>
+      )}
 
       {/* === TOP BAR (sm+) — links for tablets only; right cluster for all desktop === */}
       <nav className="hidden sm:block border-b border-ccb-border bg-ccb-surface sticky top-0 z-50">

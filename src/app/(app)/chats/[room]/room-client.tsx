@@ -38,7 +38,7 @@ export default function RoomChatClient({ room }: { room: string }) {
   }, [room]);
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl lg:max-w-5xl mx-auto">
       <ChatView
         mode="group"
         room={room}

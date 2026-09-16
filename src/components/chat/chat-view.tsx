@@ -531,7 +531,7 @@ export default function ChatView({ mode, room, partnerId, headerTitle, headerSub
 
   // ── Render ────────────────────────────────────────────────────────
   return (
-    <div className="relative flex flex-col h-[calc(100vh-11rem)] min-h-[420px] max-w-3xl mx-auto -mt-2">
+    <div className="relative flex flex-col h-[calc(100vh-11rem)] min-h-[420px] max-w-3xl lg:max-w-5xl mx-auto -mt-2">
       {/* Header */}
       <div className="flex items-center gap-2.5 px-2.5 py-2.5 rounded-t-xl border border-ccb-border bg-ccb-card">
         <Link

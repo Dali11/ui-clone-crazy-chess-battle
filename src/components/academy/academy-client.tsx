@@ -9,7 +9,7 @@ import { GraduationCap, Lock, Sparkles } from "lucide-react";
  */
 export default function AcademyClient({ member }: { member: boolean }) {
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl lg:max-w-5xl mx-auto">
       {/* Header — unchanged */}
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 rounded-full border border-ccb-primary/30 bg-ccb-primary/10 px-4 py-1.5 mb-4">

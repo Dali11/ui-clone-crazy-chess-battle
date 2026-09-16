@@ -272,7 +272,7 @@ export default function DraughtsPage() {
   ];
 
   return (
-    <div className="max-w-2xl mx-auto pb-20 sm:pb-0">
+    <div className="max-w-2xl lg:max-w-5xl mx-auto pb-20 sm:pb-0">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3 min-w-0">

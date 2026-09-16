@@ -173,7 +173,7 @@ export default function FriendsClient() {
     <div className="min-h-screen bg-ccb-bg text-ccb-text pb-24">
       {/* header */}
       <div className="sticky top-0 z-20 bg-ccb-bg/90 backdrop-blur border-b border-ccb-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-2xl lg:max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Link href="/dashboard" aria-label="Back" className="p-1 -ml-1 text-ccb-muted hover:text-ccb-text">
             <ChevronLeft className="w-5 h-5" />
           </Link>
@@ -196,7 +196,7 @@ export default function FriendsClient() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4">
+      <div className="max-w-2xl lg:max-w-5xl mx-auto px-4">
         {/* add friend by username */}
         <div className="mt-4">
           <div className="relative">

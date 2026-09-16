@@ -120,7 +120,23 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
       const newMoveCount = data.move_count ?? 0;
       if (newMoveCount < lastAppliedMoveCount.current) return;
       if (newMoveCount === lastAppliedMoveCount.current) {
-        if (data.status === gameStatusRef.current) return;
+        if (data.status === gameStatusRef.current) {
+          // Clock fields are SERVER-authoritative. The move broadcast carries
+          // the opponent's device timestamp as lastMoveAt — if their clock
+          // runs behind ours, elapsed = now - lastMoveAt explodes past the
+          // remaining clock and OUR clock pins at 0:00 the moment it's our
+          // turn. Keep applying the server's clock values even when nothing
+          // else changed, so the skew self-corrects within one poll.
+          if (data.last_move_at || data.white_clock_ms != null || data.black_clock_ms != null) {
+            setGame((prev) => ({
+              ...prev,
+              white_clock_ms: data.white_clock_ms ?? prev.white_clock_ms,
+              black_clock_ms: data.black_clock_ms ?? prev.black_clock_ms,
+              last_move_at: data.last_move_at ?? prev.last_move_at,
+            }));
+          }
+          return;
+        }
       }
 
       lastAppliedMoveCount.current = newMoveCount;

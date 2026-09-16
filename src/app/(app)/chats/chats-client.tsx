@@ -168,7 +168,7 @@ export default function ChatsClient() {
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0);
 
   return (
-    <div className="max-w-3xl mx-auto -mt-2 space-y-4">
+    <div className="max-w-3xl lg:max-w-5xl mx-auto -mt-2 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
