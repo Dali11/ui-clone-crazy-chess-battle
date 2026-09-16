@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Check, X, Coins, Smartphone, Shield, Clock,
   TrendingUp, Wallet, AlertCircle, ChevronRight, Gamepad2,
-  Ban, Star, DollarSign, Search, Save, ScrollText, Swords,
+  Ban, Star, DollarSign, Search, Save, ScrollText, Swords, FileSpreadsheet,
   ShieldCheck, UserRound, XCircle, ShieldAlert,
   Menu, LogOut, Crown, Play,
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
@@ -21,6 +21,8 @@ import PlatformSettingsPanel from "./platform-settings-panel";
 import BattlesAdminPanel from "./components/battles-admin-panel";
 import ResultOverrideModal from "./components/result-override-modal";
 import OverviewPanel from "./components/overview-panel";
+import FinancePanel from "./components/finance-panel";
+import GameDetailModal from "./components/game-detail-modal";
 import TournamentsPanel from "./components/tournaments-panel";
 import WithdrawalsPanel from "./components/withdrawals-panel";
 import IntegrityPanel from "./components/integrity-panel";
@@ -77,6 +79,8 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
   const [withdrawalFilter, setWithdrawalFilter] = useState("pending");
   const [depositFilter, setDepositFilter] = useState("all");
   const [gamesFilter, setGamesFilter] = useState("all");
+  const [gamesEngine, setGamesEngine] = useState<"chess" | "draughts">("chess");
+  const [detailGame, setDetailGame] = useState<{ id: string; engine: "chess" | "draughts" } | null>(null);
   const [battleStats, setBattleStats] = useState<any>(null);
   const [battleConfig, setBattleConfig] = useState<any>(null);
   const [battleConfigSaving, setBattleConfigSaving] = useState(false);
@@ -222,9 +226,13 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
   }, [apiFetch]);
 
   const fetchGames = useCallback(async (force = false) => {
-    const data = await apiFetch(`games:${gamesFilter}`, `/api/admin/games?status=${gamesFilter}`, force);
+    const data = await apiFetch(
+      `games:${gamesEngine}:${gamesFilter}`,
+      `/api/admin/games?status=${gamesFilter}&engine=${gamesEngine}`,
+      force
+    );
     if (data) setGames(data.games || []);
-  }, [gamesFilter, apiFetch]);
+  }, [gamesFilter, gamesEngine, apiFetch]);
 
   const fetchLogs = useCallback(async (force = false) => {
     const data = await apiFetch("logs", "/api/admin/logs", force);
@@ -1012,6 +1020,7 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
 
   const tabs: { id: Tab; label: string; icon: any; badge?: number }[] = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "ledger", label: "Ledger", icon: FileSpreadsheet },
     { id: "users", label: "Users", icon: Users },
     { id: "withdrawals", label: "Withdrawals", icon: ArrowDownUp, badge: stats?.pendingWithdrawals },
     { id: "tournaments", label: "Tournaments", icon: Trophy, badge: stats?.pendingTournamentApprovals || undefined },
@@ -1116,7 +1125,7 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
         <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
           {[
             { label: null, items: ["overview"] },
-            { label: "Financial", items: ["deposits", "withdrawals", "battles"] },
+            { label: "Financial", items: ["ledger", "deposits", "withdrawals", "battles"] },
             { label: "Compete", items: ["tournaments", "games", "leagues"] },
             { label: "Community", items: ["users", "verification"] },
             { label: "System", items: ["logs", "settings"] },
@@ -1242,6 +1251,9 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
           )}
 
           {/* USERS */}
+          {tab === "ledger" && (
+            <FinancePanel formatMWK={formatMWK} formatDate={formatDate} />
+          )}
           {tab === "users" && (
             <div className="space-y-3">
               {/* KPIs */}
@@ -1549,6 +1561,20 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
             <div className="space-y-4">
               <PlatformSettingsPanel section="games" />
               <div className="flex gap-2">
+                {(["chess", "draughts"] as const).map((e) => (
+                  <button
+                    key={e}
+                    onClick={() => setGamesEngine(e)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold capitalize transition-all ${
+                      gamesEngine === e
+                        ? "bg-ccb-accent/10 text-ccb-accent border border-ccb-accent/30"
+                        : "text-ccb-muted hover:text-ccb-text border border-transparent"
+                    }`}
+                  >
+                    {e}
+                  </button>
+                ))}
+                <div className="w-px bg-ccb-border mx-1" />
                 {["all", "playing", "completed", "aborted", "draw"].map((f) => (
                   <button
                     key={f}
@@ -1593,8 +1619,14 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
                         </div>
                       </div>
                       {/* Action buttons */}
-                      {(g.status === "playing" || g.status === "completed" || g.status === "draw") && (
+                      {(
                         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-ccb-border">
+                          <button
+                            onClick={() => setDetailGame({ id: g.id, engine: g.engine || gamesEngine })}
+                            className="text-xs px-3 py-1.5 rounded-lg bg-ccb-surface text-ccb-text border border-ccb-border hover:border-ccb-primary/40 font-semibold"
+                          >
+                            Detail
+                          </button>
                           {g.status === "playing" && (
                             <button
                               onClick={() => handleGameAbort(g.id)}
@@ -1876,6 +1908,19 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
         onClose={() => setOverrideGame(null)}
         onConfirm={handleOverrideConfirm}
       />
+
+      {detailGame && (
+        <GameDetailModal
+          gameId={detailGame.id}
+          engine={detailGame.engine}
+          onClose={() => setDetailGame(null)}
+          formatMWK={formatMWK}
+          onResultOverride={(g) => {
+            setDetailGame(null);
+            setOverrideGame({ ...g, engine: detailGame.engine });
+          }}
+        />
+      )}
     </div>
   );
 }

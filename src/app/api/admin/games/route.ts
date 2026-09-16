@@ -17,13 +17,18 @@ export async function GET(req: NextRequest) {
 
     const url = new URL(req.url);
     const status = url.searchParams.get("status");
+    // AUDIT 2026-09-16: draughts games were invisible to the admin Games
+    // tab — the list only queried the chess `games` table. engine=draughts
+    // lists draughts_games instead (same shape: both tables share column
+    // names for the fields selected here).
+    const engine = url.searchParams.get("engine") === "draughts" ? "draughts" : "chess";
 
     let query = admin
-      .from("games")
+      .from(engine === "draughts" ? "draughts_games" : "games")
       .select(`
         id, status, time_control, rated, white_player_id, black_player_id,
         white_rating, black_rating, winner, created_at, ended_at,
-        move_count, pgn
+        move_count
       `)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -56,6 +61,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       games: games?.map(g => ({
         ...g,
+        engine,
         white_username: playerMap[g.white_player_id] || "?",
         black_username: playerMap[g.black_player_id] || "?",
         move_count: g.move_count || 0,

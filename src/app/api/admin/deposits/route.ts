@@ -6,7 +6,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // battle_escrow, battle_payout, battle_refund, tournament_entry,
 // tournament_payout, tournament_refund, tournament_creator_profit, platform_cut.
 // Those are ledger entries, not money entering the platform.
-const PAYMENT_METHODS = ["mobile_money", "card", "bank_transfer"];
+// AUDIT FIX 2026-09-16: pawapay and ontech_mm deposits were missing here,
+// so the admin Deposits queue could not see real PawaPay money-in at all.
+const PAYMENT_METHODS = ["mobile_money", "card", "bank_transfer", "pawapay", "ontech_mm"];
 
 export async function GET(req: NextRequest) {
   try {
