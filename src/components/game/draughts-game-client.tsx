@@ -13,6 +13,7 @@ import VictoryOverlay, { type GameOutcome } from "./victory-overlay";
 import GameChat from "./game-chat";
 import PlayerProfilePreview from "./player-profile-preview";
 import {
+  initialBoard,
   stringToBoard,
   getLegalMoves,
   getMovesForPiece,
@@ -32,6 +33,29 @@ import {
 // Map DB turn ('white'/'black') to engine Color ('w'/'b')
 function dbToEngine(s: string | null): Color {
   return s === "white" ? "w" : "b";
+}
+
+// Rebuild the board at an earlier ply by replaying the move history.
+// Used by the Back/Forward review controls — previously these buttons
+// changed nothing on screen; they only froze input, forcing players to
+// tap "Return to live position" manually after every accidental press.
+function boardAtPly(history: any[], ply: number): Board {
+  const b = initialBoard();
+  for (let i = 0; i < Math.min(ply, history.length); i++) {
+    const m = history[i];
+    if (!m?.from || !m?.to) continue;
+    let piece = b[m.from.row]?.[m.from.col];
+    if (!piece) continue;
+    b[m.from.row][m.from.col] = null;
+    for (const c of m.captures || []) {
+      if (b[c.row]?.[c.col] !== undefined) b[c.row][c.col] = null;
+    }
+    const dest = m.path?.length ? m.path[m.path.length - 1] : m.to;
+    if (piece === "w" && dest.row === 0) piece = "W";
+    else if (piece === "b" && dest.row === 7) piece = "B";
+    if (b[dest.row]) b[dest.row][dest.col] = piece;
+  }
+  return b;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -108,6 +132,29 @@ export default function DraughtsGameClient({
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Latest game snapshot for deduping realtime/poll updates outside render
+  const gameRef = useRef(game);
+  useEffect(() => {
+    gameRef.current = game;
+  }, [game]);
+
+  // Apply a fresh game snapshot from realtime or polling. Deduped against
+  // the latest state so repeat events don't churn the board.
+  const applyUpdate = useCallback((data: any) => {
+    const prev = gameRef.current;
+    if (data.move_count === prev.move_count && data.status === prev.status) return;
+    setBoard(stringToBoard(data.board_state));
+    setSelected(null);
+    setLegalMoves([]);
+    setError(null);
+    const mh = data.move_history;
+    if (Array.isArray(mh) && mh.length > 0) {
+      const last = mh[mh.length - 1];
+      if (last?.from && last?.to) setLastMove({ from: last.from, to: last.to });
+    }
+    setGame(data);
+  }, []);
+
   // Variant rules
   const variant: Variant = (game.variant as Variant) || "international";
 
@@ -132,14 +179,34 @@ export default function DraughtsGameClient({
     return raw;
   }, [game.move_history]);
 
-  // Keep viewPly at live position when new moves arrive
+  // Auto-return to the live position whenever the game moves on
+  // (chess.com behavior): a new move from either player snaps the view
+  // back to live, so you can never be left staring at a stale board.
   useEffect(() => {
-    if (viewPly === 0 || viewPly >= moveHistory.length) {
-      setViewPly(moveHistory.length);
-    }
+    setViewPly(moveHistory.length);
   }, [moveHistory.length]);
 
   const isLiveView = viewPly >= moveHistory.length;
+
+  // If it becomes your move while you're reviewing history, jump to live
+  // so the board is always interactive on your turn.
+  useEffect(() => {
+    if (myTurn && !isLiveView) setViewPly(moveHistory.length);
+  }, [myTurn, isLiveView, moveHistory.length]);
+
+  // Board shown on screen: live board, or the replayed position while
+  // reviewing earlier moves with the Back/Forward controls.
+  const reviewInfo = useMemo(() => {
+    if (isLiveView || moveHistory.length === 0) return null;
+    const ply = Math.max(0, Math.min(viewPly, moveHistory.length));
+    const last = ply > 0 ? moveHistory[ply - 1] : null;
+    return {
+      board: boardAtPly(moveHistory, ply),
+      lastMove: last?.from && last?.to ? { from: last.from, to: last.to } : null,
+    };
+  }, [isLiveView, moveHistory, viewPly]);
+  const displayBoard = reviewInfo ? reviewInfo.board : board;
+  const displayLastMove = reviewInfo ? reviewInfo.lastMove : lastMove;
 
   // Live clock calculation
   // Clock doesn't start until the first move is made — show full time before that
@@ -211,24 +278,7 @@ export default function DraughtsGameClient({
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "draughts_games", filter: `id=eq.${game.id}` },
         (payload: any) => {
-          setGame((prev: any) => {
-            if (payload.new.move_count === prev.move_count && payload.new.status === prev.status) {
-              return prev;
-            }
-            setBoard(stringToBoard(payload.new.board_state));
-            setSelected(null);
-            setLegalMoves([]);
-            setError(null);
-            // Update last move for highlight
-            const mh = payload.new.move_history;
-            if (Array.isArray(mh) && mh.length > 0) {
-              const last = mh[mh.length - 1];
-              if (last?.from && last?.to) {
-                setLastMove({ from: last.from, to: last.to });
-              }
-            }
-            return payload.new;
-          });
+          applyUpdate(payload.new);
         }
       )
       .subscribe();
@@ -256,27 +306,10 @@ export default function DraughtsGameClient({
       try {
         const res = await fetch(`/api/draughts/state?gameId=${game.id}`);
         if (res.ok) {
-          const data = await res.json();
-          setGame((prev: any) => {
-            if (data.move_count !== prev.move_count || data.status !== prev.status) {
-              setBoard(stringToBoard(data.board_state));
-              setSelected(null);
-              setLegalMoves([]);
-              setError(null);
-              const mh = data.move_history;
-              if (Array.isArray(mh) && mh.length > 0) {
-                const last = mh[mh.length - 1];
-                if (last?.from && last?.to) {
-                  setLastMove({ from: last.from, to: last.to });
-                }
-              }
-              return data;
-            }
-            return prev;
-          });
+          applyUpdate(await res.json());
         }
       } catch {}
-    }, 1500);
+    }, 3000);
 
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
@@ -516,17 +549,17 @@ export default function DraughtsGameClient({
   const draughtsBoardElement = useMemo(() => (
     <DraughtsBoard
       boardTheme={boardTheme}
-      board={board}
+      board={displayBoard}
       perspective={perspective}
-      selected={selected}
-      legalMoves={legalMoves}
-      mustContinueJump={mustContinueJump}
+      selected={isLiveView ? selected : null}
+      legalMoves={isLiveView ? legalMoves : []}
+      mustContinueJump={isLiveView ? mustContinueJump : null}
       onSquareClick={handleSquareClick}
-      lastMove={lastMove}
+      lastMove={displayLastMove}
       interactive={myTurn && !submitting && isLiveView}
     />
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [boardTheme, board, perspective, selected, legalMoves, mustContinueJump, handleSquareClick, lastMove, myTurn, submitting, isLiveView]);
+  ), [boardTheme, displayBoard, perspective, selected, legalMoves, mustContinueJump, handleSquareClick, displayLastMove, myTurn, submitting, isLiveView]);
 
   // Player bar renderer — chess.com style with avatar, name, rating, clock
   const renderPlayerBar = (data: {
