@@ -23,6 +23,28 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient();
 
+    // ── Phase 2 reconciliation source ──────────────────────────────────
+    // Record EVERY provider callback (append-only) BEFORE processing, so
+    // the reconciliation engine can compare CrazyChess records against
+    // the provider's view of the world. Failures here never block payment
+    // processing, but are surfaced in the logs.
+    if (body.depositId || body.payoutId) {
+      try {
+        await admin.from("provider_transactions").insert({
+          provider: "pawapay",
+          provider_ref: body.depositId || body.payoutId!,
+          direction: body.depositId ? "deposit" : "payout",
+          provider_status: body.status,
+          amount_local: body.amount != null ? Number(body.amount) : null,
+          currency: body.currency || null,
+          country: body.country || null,
+          raw_payload: body as unknown as Record<string, unknown>,
+        });
+      } catch (recErr: any) {
+        console.error("provider_transactions record failed:", recErr?.message);
+      }
+    }
+
     // ── Handle DEPOSIT callback ─────────────────────────────────────────
     if (body.depositId) {
       const internalStatus = mapPawaPayStatus(body.status);

@@ -1,12 +1,16 @@
 "use client";
 
 /**
- * CrazyChess Admin Command Centre — Phase 1 shell.
+ * CrazyChess Admin Command Centre — Phase 1 + Phase 2 shell.
  *
- * Read-only financial + operational overview in USD. Sidebar drives
- * internal views over two API endpoints (overview + transactions feed).
- * Phase 2/3 sections are listed but disabled. The legacy /admin panel is
- * untouched and linked for the actual financial controls.
+ * Phase 1: read-only financial + operational overview in USD, driven by
+ * the overview + transactions feed endpoints.
+ * Phase 2 (Finance & Reconciliation): transaction ledger, deposit and
+ * withdrawal management, reconciliation against the payment provider,
+ * player wallet ledgers, 14-market finance, settlements, downloadable
+ * reports and the financial audit log. Each Phase 2 view is a
+ * self-fetching section component (phase2-*.tsx).
+ * The legacy /admin panel is untouched and linked for approvals.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -32,13 +36,22 @@ import {
   formatLocal,
   formatUsd,
 } from "./sections";
+import { LedgerView, DepositsView, WithdrawalsView } from "./phase2-finance";
+import { ReconciliationView, PlayersView } from "./phase2-recon";
+import { MarketsView, SettlementsView, ReportsView, AuditView } from "./phase2-ops";
 
 type View =
   | "dashboard"
   | "finance-overview"
   | "finance-transactions"
-  | "finance-deposits"
-  | "finance-withdrawals"
+  | "ledger"
+  | "deposits"
+  | "withdrawals"
+  | "reconciliation"
+  | "players"
+  | "settlements"
+  | "reports"
+  | "audit"
   | `rev-${RevenueStream}`
   | "markets";
 
@@ -55,8 +68,14 @@ const VIEW_META: Record<string, { title: string; sub: string; txType?: string }>
   dashboard: { title: "Dashboard", sub: "Financial & operational pulse of CrazyChess" },
   "finance-overview": { title: "Finance · Overview", sub: "Revenue performance across all streams" },
   "finance-transactions": { title: "Finance · Transactions", sub: "Unified activity feed", txType: "all" },
-  "finance-deposits": { title: "Finance · Deposits", sub: "Money into the platform", txType: "deposit" },
-  "finance-withdrawals": { title: "Finance · Withdrawals", sub: "Payouts to players", txType: "withdrawal" },
+  ledger: { title: "Finance · Transaction Ledger", sub: "Every money movement — CrazyChess ↔ pawaPay reconciliation-ready" },
+  deposits: { title: "Deposits", sub: "Money into the platform, by market, network and player" },
+  withdrawals: { title: "Withdrawals", sub: "Payouts to players + the pending review queue" },
+  reconciliation: { title: "Reconciliation", sub: "Does the money recorded by CrazyChess match the money processed by pawaPay?" },
+  players: { title: "Players · Wallet Ledger", sub: "Per-player balances derived from the financial ledger" },
+  settlements: { title: "Settlements", sub: "Money between the payment infrastructure and CrazyChess accounts" },
+  reports: { title: "Financial Reports", sub: "Downloadable reports, consolidated in USD" },
+  audit: { title: "Financial Audit Log", sub: "Every financial admin action — immutable" },
   "rev-battles": { title: "Revenue · Battles", sub: "Rake from settled battles", txType: "battle_fee" },
   "rev-tournaments": { title: "Revenue · Tournaments", sub: "Platform profit on tournaments", txType: "tournament" },
   "rev-memberships": { title: "Revenue · Memberships", sub: "Membership purchases", txType: "membership" },
@@ -65,11 +84,10 @@ const VIEW_META: Record<string, { title: string; sub: string; txType?: string }>
   markets: { title: "Markets · Countries", sub: "Per-country performance — USD" },
 };
 
-const PHASE2_NAV = [
-  ["Reconciliation", "Phase 2"],
-  ["Player Management", "Phase 2"],
-  ["Financial Controls", "Phase 3"],
-] as const;
+/** Self-fetching Phase 2 section views (independent of the overview API). */
+const PHASE2_VIEWS = new Set<View>(["ledger", "deposits", "withdrawals", "reconciliation", "players", "settlements", "reports", "audit", "markets"]);
+
+const PHASE3_NAV = [["Financial Controls", "Phase 3"]] as const;
 
 export default function CommandCentreClient() {
   const [view, setView] = useState<View>("dashboard");
@@ -249,8 +267,22 @@ export default function CommandCentreClient() {
           <>
             {navItem("finance-overview", "Overview")}
             {navItem("finance-transactions", "Transactions")}
-            {navItem("finance-deposits", "Deposits")}
-            {navItem("finance-withdrawals", "Withdrawals")}
+            {navItem("ledger", "Ledger")}
+            {navItem("deposits", "Deposits")}
+            {navItem("withdrawals", "Withdrawals")}
+          </>
+        )}
+        {navGroup("Reconciliation",
+          <>
+            {navItem("reconciliation", "Reconciliation")}
+            {navItem("audit", "Audit Log")}
+          </>
+        )}
+        {navGroup("Players", navItem("players", "Wallet Ledger"))}
+        {navGroup("Operations",
+          <>
+            {navItem("settlements", "Settlements")}
+            {navItem("reports", "Reports")}
           </>
         )}
         {navGroup("Revenue",
@@ -262,14 +294,14 @@ export default function CommandCentreClient() {
             {navItem("rev-withdrawal_fees", "Withdrawal Fees")}
           </>
         )}
-        {navGroup("Markets", navItem("markets", "Countries"))}
+        {navGroup("Markets", navItem("markets", "Country Finance"))}
 
         <div className="mb-4 opacity-50">
           <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ccb-muted/70">
             Coming Soon
           </p>
           <div className="space-y-0.5">
-            {PHASE2_NAV.map(([label, phase]) => (
+            {PHASE3_NAV.map(([label, phase]) => (
               <div
                 key={label}
                 className="flex items-center justify-between rounded-lg px-3 py-1.5 text-[13px] text-ccb-muted"
@@ -291,7 +323,7 @@ export default function CommandCentreClient() {
             Legacy Admin Panel →
           </Link>
           <p className="px-3 pt-1 text-[10px] text-ccb-muted/60">
-            Reporting currency: USD · Phase 1 (read-only)
+            Reporting currency: USD · Phase 1 read-only + Phase 2 finance ops
           </p>
         </div>
       </aside>
@@ -306,7 +338,7 @@ export default function CommandCentreClient() {
             </h1>
             <p className="mt-0.5 text-xs text-ccb-muted">{VIEW_META[view].sub}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={`flex flex-wrap items-center gap-2 ${PHASE2_VIEWS.has(view) ? "hidden" : ""}`}>
             {RANGE_CHIPS.map(([k, label]) => (
               <button
                 key={k}
@@ -361,7 +393,19 @@ export default function CommandCentreClient() {
           </div>
         )}
 
-        {loading && !data ? (
+        {PHASE2_VIEWS.has(view) ? (
+          <div className="space-y-5">
+            {view === "ledger" && <LedgerView />}
+            {view === "deposits" && <DepositsView />}
+            {view === "withdrawals" && <WithdrawalsView />}
+            {view === "reconciliation" && <ReconciliationView />}
+            {view === "players" && <PlayersView />}
+            {view === "markets" && <MarketsView />}
+            {view === "settlements" && <SettlementsView />}
+            {view === "reports" && <ReportsView />}
+            {view === "audit" && <AuditView />}
+          </div>
+        ) : loading && !data ? (
           <div className="flex h-64 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
           </div>
