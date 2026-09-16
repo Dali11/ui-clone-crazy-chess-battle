@@ -124,10 +124,10 @@ export async function POST(req: NextRequest) {
     // Apply withdrawal fee + processing fee
     const withdrawalFee = toLocal(wConfig.withdrawal_fee || 0);
     const processingFeePct = wConfig.processing_fee_pct || 0;
-    // Round UP: a fee must never silently default to 0 on small amounts
-    // (e.g. ZMW 11 at 5% floors to 0 — the player rides free). Ceil
-    // guarantees at least 1 unit whenever a percentage fee is set.
-    const processingFee = Math.ceil(amount * (processingFeePct / 100));
+    // Exact percentage fee — no floor/ceil tricks. A 5% fee on ZMW 11 is
+    // 0.55, and decimals are allowed (fee/net_amount columns are
+    // numeric(14,2)). The fee can never silently default to 0.
+    const processingFee = Math.round(amount * (processingFeePct / 100) * 100) / 100;
     const totalFees = withdrawalFee + processingFee;
     const netAmount = amount - totalFees;
 

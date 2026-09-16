@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { initiatePayout } from "@/lib/payments/pawapay";
+import { toPawaPayMsisdn } from "@/lib/geo/iso3";
 import { randomUUID } from "crypto";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -57,7 +58,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           payoutId,
           amount: String(netAmount),
           currency: payoutCurrency,
-          phoneNumber: withdrawal.phone,
+          // PawaPay expects a bare-digit MSISDN — normalize like the
+          // request route does (raw "+2547…"/local numbers get rejected).
+          phoneNumber: toPawaPayMsisdn(withdrawal.phone, withdrawal.country),
           provider: withdrawal.operator_ref_id,
         });
 

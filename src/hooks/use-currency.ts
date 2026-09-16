@@ -134,8 +134,13 @@ export function useCurrency(initialCountryCode?: string | null): UseCurrencyRetu
 
   const formatWallet = useCallback(
     (amountLocal: number) => {
-      const value = Math.floor(amountLocal ?? 0);
-      return `${state.currencySymbol} ${value.toLocaleString("en-US")}`;
+      const value = Number(amountLocal ?? 0);
+      // Whole wallet amounts format as before; fractional amounts (e.g.
+      // an exact 5% withdrawal fee netting K10.45) keep their decimals.
+      const shown = Number.isInteger(value)
+        ? value.toLocaleString("en-US")
+        : value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return `${state.currencySymbol} ${shown}`;
     },
     [state.currencySymbol],
   );
