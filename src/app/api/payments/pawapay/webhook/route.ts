@@ -154,39 +154,46 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true, message: "Withdrawal not found" });
       }
 
-      if (withdrawal.status === "completed" || withdrawal.status === "rejected") {
+      // 'rejected' is terminal (already refunded) — duplicate callbacks
+      // are no-ops.
+      if (withdrawal.status === "rejected") {
         return NextResponse.json({ received: true, message: "Already processed" });
       }
 
       if (internalStatus === "success") {
-        // Mark withdrawal as completed
+        // Mark withdrawal as completed (idempotent — may already be marked)
         await admin
           .from("withdrawals")
           .update({ status: "completed", updated_at: new Date().toISOString() })
           .eq("id", withdrawal.id);
 
         try {
-          await admin.from("notifications").insert({
-            user_id: withdrawal.user_id,
-            type: "withdrawal_approved",
-            title: "Withdrawal completed",
-            body: `Your withdrawal of ${withdrawal.amount.toLocaleString()} has been sent to your mobile money wallet.`,
-            data: { amount: withdrawal.amount, method: "pawapay" },
-            read: false,
-          });
+          if (withdrawal.status !== "completed") {
+            await admin.from("notifications").insert({
+              user_id: withdrawal.user_id,
+              type: "withdrawal_approved",
+              title: "Withdrawal completed",
+              body: `Your withdrawal of ${withdrawal.amount.toLocaleString()} has been sent to your mobile money wallet.`,
+              data: { amount: withdrawal.amount, method: "pawapay" },
+              read: false,
+            });
+          }
         } catch {}
 
       } else if (internalStatus === "failed") {
-        // Payout failed — refund the wallet
-        await admin.rpc("refund_withdrawal", {
+        // Payout failed at the provider — refund the wallet. The
+        // withdrawal may be 'pending', but it may also be 'completed':
+        // that is only the optimistic marker set when the payout was
+        // INITIATED (PawaPay ACCEPTED). A terminal FAILED callback must
+        // refund from either state. refund_failed_payout is idempotent
+        // and writes the ledger row atomically.
+        const { error: refundErr } = await admin.rpc("refund_failed_payout", {
           p_withdrawal_id: withdrawal.id,
-          p_admin_id: null,
+          p_reason: `PawaPay payout ${body.status}`,
         });
-
-        await admin
-          .from("withdrawals")
-          .update({ status: "rejected", updated_at: new Date().toISOString() })
-          .eq("id", withdrawal.id);
+        if (refundErr) {
+          console.error(`MANUAL INTERVENTION: payout failure refund failed for withdrawal ${withdrawal.id}:`, refundErr.message);
+        }
 
         try {
           await admin.from("notifications").insert({
