@@ -117,7 +117,7 @@ export default function AffiliateClient({
           <div className="flex-1">
             <h1 className="font-bold text-base sm:text-lg leading-tight">Affiliate Program</h1>
             <p className="text-xs text-ccb-muted mt-0.5">
-              Earn <span className="font-bold text-ccb-primary">{commissionPct}%</span> of every fee your referrals generate — battles, tournaments &amp; membership
+              Earn <span className="font-bold text-ccb-primary">{commissionPct}%</span> of every fee your referrals generate — battles, tournaments &amp; membership. Plus up to {commissionPct}% of their ad spend.
             </p>
           </div>
         </div>
@@ -139,7 +139,7 @@ export default function AffiliateClient({
         {/* Ongoing badge */}
         <div className="flex items-center gap-1.5 mt-3 text-[11px] text-ccb-muted">
           <TrendingUp className="w-3.5 h-3.5 text-ccb-success" />
-          <span>Ongoing — every cash battle they play, every paid tournament they enter, every renewal. No limit.</span>
+          <span>Ongoing — every cash battle they play, every paid tournament they enter, every renewal, every ad campaign they buy. No limit.</span>
         </div>
       </div>
 
@@ -236,7 +236,7 @@ export default function AffiliateClient({
             <div>
               <p className="text-sm font-medium">You earn {commissionPct}% of their fees — forever</p>
               <p className="text-xs text-ccb-muted mt-0.5">
-                Every cash battle they play and every paid tournament they enter pays you {commissionPct}% of the platform fee, plus {formatUsd(membershipPriceUsd * commissionRate)} per membership renewal. Credited automatically.
+                Every cash battle they play and every paid tournament they enter pays you {commissionPct}% of the platform fee, plus {formatUsd(membershipPriceUsd * commissionRate)} per membership renewal. When they advertise on the platform you earn {commissionPct}% of their first ad campaign and 10% of every one after. Credited automatically.
               </p>
             </div>
           </div>

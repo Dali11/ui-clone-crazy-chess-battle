@@ -88,6 +88,12 @@ export async function PATCH(req: NextRequest) {
       reference: `ad_campaign_refund:${id}`,
       admin_notes: `Direct ad campaign refunded (MK${campaign.price_mwk})`,
     });
+
+    // Reverse the referrer's ad commission for this campaign (if any was
+    // paid) so the program never pays on money returned to the advertiser.
+    const { error: clawErr } = await admin.rpc("clawback_affiliate_ad_commission", { p_campaign_id: id });
+    if (clawErr) console.error(`MANUAL INTERVENTION: affiliate ad clawback failed for campaign ${id}:`, clawErr.message);
+
     return NextResponse.json({ ok: true });
   }
 

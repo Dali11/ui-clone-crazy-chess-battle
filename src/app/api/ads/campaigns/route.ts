@@ -102,6 +102,14 @@ export async function POST(req: Request) {
       : `Direct ad campaign purchase (${body.weeks}w @ MK${price} = ${buyerCurrency.currencySymbol}${localAmount.toLocaleString()} at ${buyerCurrency.rate.toFixed(4)} fx)`,
   }).then((r) => { if (r.error) console.error("[ads/campaigns] ledger insert failed:", r.error.message); });
 
+  // Affiliate ad commission: the buyer's referrer earns 25% on their
+  // first ad purchase ever, 10% on every subsequent one (KYC-gated).
+  // Failure must not fail the purchase — the platform keeps the money;
+  // the referrer simply goes unpaid and the error is surfaced loudly.
+  admin
+    .rpc("pay_affiliate_ad_commission", { p_user_id: user.id, p_ad_spend: price, p_campaign_id: campaign.id })
+    .then((r) => { if (r.error) console.error(`MANUAL REVIEW: ad commission RPC failed for campaign ${campaign.id}:`, r.error.message); });
+
   return NextResponse.json({
     campaign: {
       id: campaign.id,
