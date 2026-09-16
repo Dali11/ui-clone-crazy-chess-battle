@@ -413,7 +413,19 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
     const load = async () => {
       setLoading(true);
       await fetchStats();
-      if (tab === "withdrawals") { await fetchWithdrawals(); await fetchWithdrawalConfig(); }
+      if (tab === "withdrawals") {
+        await fetchWithdrawals(); await fetchWithdrawalConfig();
+        // Near-realtime payout reconciliation: poll PawaPay for any
+        // withdrawal whose provider outcome is unknown (no webhooks are
+        // configured), then refresh the list with what the sweep found.
+        try {
+          const res = await fetch("/api/cron/reconcile-payouts");
+          if (res.ok) {
+            const r = await res.json();
+            if (r.confirmed > 0 || r.refunded > 0) await fetchWithdrawals();
+          }
+        } catch {}
+      }
       if (tab === "deposits") await fetchDeposits();
       if (tab === "tournaments") await fetchTournaments();
       if (tab === "games") await fetchGames();
