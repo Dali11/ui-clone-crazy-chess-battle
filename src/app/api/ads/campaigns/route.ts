@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { validateDraft, adPriceForWeeks, type CampaignDraft } from "@/lib/ads/direct-pricing";
 import { getServerCurrency } from "@/lib/geo/server-currency";
+import { mwkToLocal } from "@/lib/wallet/mwk-to-local";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 
 export const dynamic = "force-dynamic";
 
@@ -52,9 +54,15 @@ export async function POST(req: Request) {
 
   // Wallet balance check (debit_wallet also enforces it, but a clean
   // pre-check gives a friendlier error than a raw RPC failure).
+  // wallet_balance is in the BUYER'S OWN currency; price is MWK — convert
+  // before comparing, same as battle/tournament routes (see mwk-to-local.ts).
   const { data: profile } = await admin.from("profiles").select("wallet_balance,country").eq("id", user.id).single();
-  if ((profile?.wallet_balance || 0) < price) {
-    return NextResponse.json({ error: `Insufficient wallet balance — need MK${price.toLocaleString()}. Top up your wallet first.` }, { status: 400 });
+  const localPrice = await mwkToLocal(user.id, price, admin);
+  if ((profile?.wallet_balance || 0) < localPrice) {
+    return NextResponse.json(
+      { error: `Insufficient wallet balance — need ${await formatMoneyConverted(price, profile?.country)}. Top up your wallet first.` },
+      { status: 400 }
+    );
   }
 
   // Every advertiser is quoted and charged in their own currency — the
