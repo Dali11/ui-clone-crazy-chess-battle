@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Check, X, Coins, Smartphone, Shield, Clock,
@@ -9,15 +9,15 @@ import {
   ShieldCheck, UserRound, XCircle, ShieldAlert,
   Menu, LogOut, Crown, Play,
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
-  Settings, FileText, SlidersHorizontal, Database, ChevronDown, FileCheck,
+  Settings, FileText, SlidersHorizontal, Database, ChevronDown, FileCheck, RefreshCw,
 } from "lucide-react";
-import PlatformSettingsPanel from "./platform-settings-panel";
 import CommunityRoomsCard from "./components/community-rooms-card";
 import LeaguesAdminPanel from "./components/leagues-admin-panel";
 import UserDetailModal from "./user-detail-modal";
 import { type Withdrawal, type Stats, type UserInfo, type Deposit, type Tournament, type GameInfo, type AdminLog, type Tab, localToUTC, utcToLocalInput } from "./types";
 import { ActionButton, ConfigInput } from "./components/shared";
 import PlatformSettingsHub from "./components/platform-settings-hub";
+import PlatformSettingsPanel from "./platform-settings-panel";
 import BattlesAdminPanel from "./components/battles-admin-panel";
 import ResultOverrideModal from "./components/result-override-modal";
 import OverviewPanel from "./components/overview-panel";
@@ -27,7 +27,34 @@ import IntegrityPanel from "./components/integrity-panel";
 import DepositsPanel from "./components/deposits-panel";
 
 
-export default function AdminDashboard({ adminName }: { adminName: string }) {
+/** PHASE 2 SPEED: per-tab skeletons instead of a lone centered spinner —
+ *  the console keeps its shape while a tab's first fetch lands. */
+function TabSkeleton({ tab }: { tab: string }) {
+  if (tab === "overview") {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 animate-pulse">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="card p-4 space-y-3">
+            <div className="h-3 w-1/2 rounded bg-ccb-muted/15" />
+            <div className="h-6 w-2/3 rounded bg-ccb-muted/15" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2 animate-pulse">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="card p-4 flex items-center justify-between">
+          <div className="h-4 w-1/3 rounded bg-ccb-muted/15" />
+          <div className="h-4 w-16 rounded bg-ccb-muted/15" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function AdminDashboard({ adminName, adminKyc }: { adminName: string; adminKyc: boolean }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [stats, setStats] = useState<Stats | null>(null);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -120,21 +147,44 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     setTimeout(() => setToast(null), kind === "error" ? 5000 : 3000);
   };
 
-  const fetchStats = useCallback(async () => {
-    const res = await fetch("/api/admin/stats");
-    const data = await res.json();
-    setStats(data);
+  // PHASE 2 SPEED: 30s per-resource cache + latest-wins aborts.
+  // Revisiting a tab within 30s is instant (no refetch, no skeleton),
+  // and a slow response from a previous visit can never overwrite
+  // newer data — the older request is aborted before it lands.
+  const fetchCacheRef = useRef<Record<string, number>>({});
+  const abortRef = useRef<Record<string, AbortController>>({});
+
+  const apiFetch = useCallback(async (key: string, url: string, force = false): Promise<any | null> => {
+    if (!force && Date.now() - (fetchCacheRef.current[key] || 0) < 30_000) return null;
+    abortRef.current[key]?.abort();
+    const ctrl = new AbortController();
+    abortRef.current[key] = ctrl;
+    try {
+      const res = await fetch(url, { signal: ctrl.signal });
+      const data = await res.json();
+      fetchCacheRef.current[key] = Date.now();
+      return data;
+    } catch (err: any) {
+      if (err?.name === "AbortError") return null; // superseded by a newer request
+      throw err;
+    }
   }, []);
 
-  const fetchWithdrawals = useCallback(async () => {
-    const res = await fetch(`/api/admin/withdrawals?status=${withdrawalFilter}`);
-    const data = await res.json();
-    setWithdrawals(data.withdrawals || []);
-    setQueuesUpdatedAt((prev) => ({ ...prev, withdrawals: Date.now() }));
-  }, [withdrawalFilter]);
+  const fetchStats = useCallback(async (force = false) => {
+    const data = await apiFetch("stats", "/api/admin/stats", force);
+    if (data) setStats(data);
+  }, [apiFetch]);
+
+  const fetchWithdrawals = useCallback(async (force = false) => {
+    const data = await apiFetch(`withdrawals:${withdrawalFilter}`, `/api/admin/withdrawals?status=${withdrawalFilter}`, force);
+    if (data) {
+      setWithdrawals(data.withdrawals || []);
+      setQueuesUpdatedAt((prev) => ({ ...prev, withdrawals: Date.now() }));
+    }
+  }, [withdrawalFilter, apiFetch]);
 
   const USER_PAGE_SIZE = 50;
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (force = false) => {
     const p = new URLSearchParams({
       page: String(userPage),
       page_size: String(USER_PAGE_SIZE),
@@ -142,12 +192,14 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       sort: userSort,
     });
     if (userSearch.trim()) p.set("search", userSearch.trim());
-    const res = await fetch(`/api/admin/users?${p.toString()}`);
-    const data = await res.json();
-    setUsers(data.users || []);
-    setUsersTotal(data.total ?? 0);
-    if (data.kpis) setUserKpis(data.kpis);
-  }, [userPage, userStatus, userSort, userSearch]);
+    const key = `users:${userPage}:${userStatus}:${userSort}:${userSearch.trim()}`;
+    const data = await apiFetch(key, `/api/admin/users?${p.toString()}`, force);
+    if (data) {
+      setUsers(data.users || []);
+      setUsersTotal(data.total ?? 0);
+      if (data.kpis) setUserKpis(data.kpis);
+    }
+  }, [userPage, userStatus, userSort, userSearch, apiFetch]);
 
   // Refetch (debounced) whenever the users tab is active and any filter changes
   useEffect(() => {
@@ -156,37 +208,35 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     return () => clearTimeout(t);
   }, [tab, fetchUsers]);
 
-  const fetchDeposits = useCallback(async () => {
-    const res = await fetch(`/api/admin/deposits?status=${depositFilter}`);
-    const data = await res.json();
-    setDeposits(data.deposits || []);
-    setQueuesUpdatedAt((prev) => ({ ...prev, deposits: Date.now() }));
-  }, [depositFilter]);
+  const fetchDeposits = useCallback(async (force = false) => {
+    const data = await apiFetch(`deposits:${depositFilter}`, `/api/admin/deposits?status=${depositFilter}`, force);
+    if (data) {
+      setDeposits(data.deposits || []);
+      setQueuesUpdatedAt((prev) => ({ ...prev, deposits: Date.now() }));
+    }
+  }, [depositFilter, apiFetch]);
 
-  const fetchTournaments = useCallback(async () => {
-    const res = await fetch("/api/admin/tournaments");
-    const data = await res.json();
-    setTournaments(data.tournaments || []);
-  }, []);
+  const fetchTournaments = useCallback(async (force = false) => {
+    const data = await apiFetch("tournaments", "/api/admin/tournaments", force);
+    if (data) setTournaments(data.tournaments || []);
+  }, [apiFetch]);
 
-  const fetchGames = useCallback(async () => {
-    const res = await fetch(`/api/admin/games?status=${gamesFilter}`);
-    const data = await res.json();
-    setGames(data.games || []);
-  }, [gamesFilter]);
+  const fetchGames = useCallback(async (force = false) => {
+    const data = await apiFetch(`games:${gamesFilter}`, `/api/admin/games?status=${gamesFilter}`, force);
+    if (data) setGames(data.games || []);
+  }, [gamesFilter, apiFetch]);
 
-  const fetchLogs = useCallback(async () => {
-    const res = await fetch("/api/admin/logs");
-    const data = await res.json();
-    setLogs(data.logs || []);
-  }, []);
+  const fetchLogs = useCallback(async (force = false) => {
+    const data = await apiFetch("logs", "/api/admin/logs", force);
+    if (data) setLogs(data.logs || []);
+  }, [apiFetch]);
 
-  const fetchIntegrity = useCallback(async () => {
+  const fetchIntegrity = useCallback(async (force = false) => {
+    if (!force && Date.now() - (fetchCacheRef.current["integrity"] || 0) < 30_000) return;
     setIntegrityLoading(true);
     try {
-      const res = await fetch("/api/admin/integrity/flags?status=all");
-      const data = await res.json();
-      setIntegrityFlags(data.flags || []);
+      const data = await apiFetch("integrity", "/api/admin/integrity/flags?status=all", force);
+      if (data) setIntegrityFlags(data.flags || []);
     } finally {
       setIntegrityLoading(false);
     }
@@ -199,8 +249,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const data = await res.json();
       if (res.ok) {
         setScanResult(data);
-        await fetchIntegrity();
-        await fetchStats();
+        await fetchIntegrity(true);
+        await fetchStats(true);
       } else {
         showToast(String(`Scan failed: ${data.error || "unknown error"}`), "error");
       }
@@ -222,8 +272,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
         if (data.released > 0) {
           showToast(`Flag ${action}ed — released ${data.released} held payout(s) to the player's wallet.`);
         }
-        await fetchIntegrity();
-        await fetchStats();
+        await fetchIntegrity(true);
+        await fetchStats(true);
       } else {
         showToast(String(`Action failed: ${data.error || "unknown error"}`), "error");
       }
@@ -238,21 +288,21 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     if (res.ok) setWithdrawalConfig(await res.json());
   }, []);
 
-  const fetchBattleStats = useCallback(async () => {
-    const [statsRes, configRes] = await Promise.all([
-      fetch("/api/battles/stats"),
-      fetch("/api/admin/battle-config"),
+  const fetchBattleStats = useCallback(async (force = false) => {
+    const [stats, config] = await Promise.all([
+      apiFetch("battleStats", "/api/battles/stats", force),
+      apiFetch("battleConfig", "/api/admin/battle-config", force),
     ]);
-    if (statsRes.ok) setBattleStats(await statsRes.json());
-    if (configRes.ok) setBattleConfig(await configRes.json());
-  }, []);
+    if (stats) setBattleStats(stats);
+    if (config) setBattleConfig(config);
+  }, [apiFetch]);
 
-  const fetchVerificationPlayers = useCallback(async () => {
+  const fetchVerificationPlayers = useCallback(async (force = false) => {
+    if (!force && Date.now() - (fetchCacheRef.current[`verification:${verificationFilter}`] || 0) < 30_000) return;
     setVerificationLoading(true);
     try {
-      const res = await fetch(`/api/admin/identity-verification?filter=${verificationFilter}`);
-      const json = await res.json();
-      setVerificationPlayers(json.players || []);
+      const json = await apiFetch(`verification:${verificationFilter}`, `/api/admin/identity-verification?filter=${verificationFilter}`, force);
+      if (json) setVerificationPlayers(json.players || []);
     } catch { setVerificationPlayers([]); }
     finally { setVerificationLoading(false); }
   }, [verificationFilter]);
@@ -268,23 +318,23 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed");
       showToast(json.message || "Done");
-      await fetchVerificationPlayers();
+      await fetchVerificationPlayers(true);
     } catch (err: any) { showToast(err.message, "error"); }
     finally { setActionLoading(null); }
   };
 
   useEffect(() => {
-    if (tab === "verification") fetchVerificationPlayers();
+    if (tab === "verification") fetchVerificationPlayers(true);
   }, [verificationFilter]);
 
-  const fetchKycSubmissions = useCallback(async () => {
+  const fetchKycSubmissions = useCallback(async (force = false) => {
+    if (!force && Date.now() - (fetchCacheRef.current["kyc"] || 0) < 30_000) return;
     setKycLoading(true);
     try {
-      const res = await fetch("/api/admin/kyc?filter=pending");
-      const d = await res.json();
-      if (res.ok) setKycSubmissions(d.submissions || []);
+      const d = await apiFetch("kyc", "/api/admin/kyc?filter=pending", force);
+      if (d) setKycSubmissions(d.submissions || []);
     } catch {} finally { setKycLoading(false); }
-  }, []);
+  }, [apiFetch]);
 
   const reviewKyc = async (id: string, decision: "approve" | "reject") => {
     let reason: string | undefined;
@@ -301,7 +351,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Review failed");
       setKycSubmissions((prev) => prev.filter((k) => k.id !== id));
-      await fetchVerificationPlayers();
+      await fetchVerificationPlayers(true);
       showToast(decision === "approve" ? "Identity approved" : "Submission rejected");
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -310,13 +360,36 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
     }
   };
 
+  // PHASE 2 SPEED: one-click hard refresh of whatever tab is open —
+  // bypasses the 30s cache and pulls everything fresh.
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshTab = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.allSettled([
+        fetchStats(true),
+        tab === "users" ? fetchUsers(true) : null,
+        tab === "withdrawals" ? fetchWithdrawals(true) : null,
+        tab === "deposits" ? fetchDeposits(true) : null,
+        tab === "tournaments" ? fetchTournaments(true) : null,
+        tab === "games" ? fetchGames(true) : null,
+        tab === "logs" ? fetchLogs(true) : null,
+        tab === "battles" ? fetchBattleStats(true) : null,
+        tab === "integrity" ? fetchIntegrity(true) : null,
+        tab === "verification" ? Promise.all([fetchVerificationPlayers(true), fetchKycSubmissions(true)]) : null,
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [tab, fetchStats, fetchUsers, fetchWithdrawals, fetchDeposits, fetchTournaments, fetchGames, fetchLogs, fetchBattleStats, fetchIntegrity, fetchVerificationPlayers, fetchKycSubmissions]);
+
   // PHASE 1 SAFETY: money queues never silently go stale — auto-refresh
   // every 60s while their tab is open, plus stats so badges stay live.
   useEffect(() => {
     const ref = setInterval(() => {
-      fetchStats();
-      if (tab === "withdrawals") fetchWithdrawals();
-      if (tab === "deposits") fetchDeposits();
+      fetchStats(true);
+      if (tab === "withdrawals") fetchWithdrawals(true);
+      if (tab === "deposits") fetchDeposits(true);
     }, 60000);
     return () => clearInterval(ref);
   }, [tab, fetchStats, fetchWithdrawals, fetchDeposits]);
@@ -353,7 +426,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to approve");
       setWithdrawals((prev) => prev.filter((w) => w.id !== id));
-      await fetchStats();
+      await fetchStats(true);
       showToast("Withdrawal approved");
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -374,7 +447,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to reject");
       setWithdrawals((prev) => prev.filter((w) => w.id !== id));
-      await fetchStats();
+      await fetchStats(true);
       showToast("Withdrawal rejected");
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -495,11 +568,11 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       if (!res.ok) throw new Error(data.error || "Verification failed");
       if (data.status === "success") {
         showToast(data.message || "Deposit verified and credited");
-        await fetchDeposits();
-        await fetchStats();
+        await fetchDeposits(true);
+        await fetchStats(true);
       } else if (data.status === "failed") {
         showToast(data.message || "Payment not completed", "error");
-        await fetchDeposits();
+        await fetchDeposits(true);
       } else {
         showToast(`Status: ${data.status} - ${data.message || "Still pending"}`, "error");
       }
@@ -522,8 +595,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to credit");
       showToast("Deposit credited to wallet");
-      await fetchDeposits();
-      await fetchStats();
+      await fetchDeposits(true);
+      await fetchStats(true);
     } catch (err: any) {
       showToast(String(err.message), "error");
     } finally {
@@ -543,8 +616,8 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to reject");
       showToast("Deposit rejected");
-      await fetchDeposits();
-      await fetchStats();
+      await fetchDeposits(true);
+      await fetchStats(true);
     } catch (err: any) {
       showToast(String(err.message), "error");
     } finally {
@@ -562,7 +635,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      await fetchUsers();
+      await fetchUsers(true);
       if (selectedUser?.id === userId) {
         // Update selected user
         const updated = users.find(u => u.id === userId);
@@ -591,7 +664,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      await fetchUsers();
+      await fetchUsers(true);
       showToast(data.warning ? "User deleted (partial: " + data.warning + ")" : "User permanently deleted");
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -621,7 +694,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      await fetchTournaments();
+      await fetchTournaments(true);
       showToast(`Tournament ${action} successful`);
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -678,7 +751,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       setEditingTournament(null);
-      await fetchTournaments();
+      await fetchTournaments(true);
       showToast("Tournament updated");
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -694,7 +767,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const res = await fetch(`/api/admin/tournaments?id=${tournamentId}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      await fetchTournaments();
+      await fetchTournaments(true);
       showToast("Tournament deleted");
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -713,7 +786,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      await fetchTournaments();
+      await fetchTournaments(true);
       showToast(`Duplicated as "${data.clone?.name}"`);
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -755,7 +828,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       setPrizeEditTournament(null);
-      await fetchTournaments();
+      await fetchTournaments(true);
       showToast("Prize distribution updated");
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -797,7 +870,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       if (!res.ok) throw new Error(data.error || "Failed to create tournament");
       setCreatingTournament(false);
       setCreateForm({});
-      await fetchTournaments();
+      await fetchTournaments(true);
       showToast(`Tournament "${data.tournament?.name || "New tournament"}" created`);
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -834,7 +907,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       showToast(`Tournament ${action.replace(/_/g, " ")} successful`);
-      await fetchTournaments();
+      await fetchTournaments(true);
       await fetchTournamentDetail(managingTournament);
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -870,7 +943,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      await fetchGames();
+      await fetchGames(true);
       showToast("Game aborted");
     } catch (err: any) {
       showToast(String(err.message), "error");
@@ -891,7 +964,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      await fetchGames();
+      await fetchGames(true);
       const suffix = data.tournamentRecorded ? " — tournament updated" : "";
       showToast(`Result set: ${winnerLabel}${suffix}`);
     } finally {
@@ -1095,7 +1168,13 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-medium truncate">{adminName}</p>
-              <p className="text-[10px] text-ccb-muted">Administrator</p>
+              <p className="text-[10px] text-ccb-muted flex items-center gap-1">
+                {adminKyc ? (
+                  <><ShieldCheck className="w-3 h-3 text-ccb-success" />KYC verified</>
+                ) : (
+                  <><AlertCircle className="w-3 h-3 text-ccb-accent" />KYC pending</>
+                )}
+              </p>
             </div>
           </div>
           <a
@@ -1141,26 +1220,30 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
 
         {/* Content area */}
         <div className="flex-1 p-4 sm:p-6 space-y-4 overflow-y-auto">
+      {/* Refresh bar — hard-refreshes the open tab (bypasses the 30s cache) */}
+      <div className="flex justify-end">
+        <button
+          onClick={refreshTab}
+          disabled={refreshing || loading}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-ccb-surface border border-ccb-border text-ccb-muted hover:border-ccb-primary/40 disabled:opacity-60"
+          title="Refresh this tab's data (bypasses the 30s cache)"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
+      </div>
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-ccb-muted" />
-        </div>
+        <TabSkeleton tab={tab} />
       ) : (
         <>
           {/* OVERVIEW */}
           {tab === "overview" && stats && (
-            <div className="space-y-4">
-              <PlatformSettingsPanel section="overview" />
-              <OverviewPanel formatMWK={formatMWK} onNavigate={(t) => setTab(t as Tab)} />
-            </div>
+            <OverviewPanel formatMWK={formatMWK} onNavigate={(t) => setTab(t as Tab)} />
           )}
 
           {/* USERS */}
           {tab === "users" && (
             <div className="space-y-3">
-              <PlatformSettingsPanel section="users" />
-              <CommunityRoomsCard />
-
               {/* KPIs */}
               {userKpis && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -1636,7 +1719,7 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
                     <h3 className="text-sm font-bold">Document verification queue</h3>
                     {kycSubmissions.length > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500">{kycSubmissions.length} pending</span>}
                   </div>
-                  <button onClick={fetchKycSubmissions} className="text-xs text-ccb-muted hover:text-ccb-text">Refresh</button>
+                  <button onClick={() => fetchKycSubmissions(true)} className="text-xs text-ccb-muted hover:text-ccb-text">Refresh</button>
                 </div>
                 {kycLoading ? (
                   <div className="py-6 text-center"><Loader2 className="w-5 h-5 mx-auto text-ccb-muted animate-spin" /></div>
@@ -1766,7 +1849,11 @@ export default function AdminDashboard({ adminName }: { adminName: string }) {
 
           {/* ========== PLATFORM SETTINGS ========== */}
           {tab === "settings" && (
-            <PlatformSettingsHub />
+            <div className="space-y-4">
+              <PlatformSettingsHub />
+              {/* Community room moderation — lives with settings, not in the Users data tab */}
+              <CommunityRoomsCard />
+            </div>
           )}
 
 

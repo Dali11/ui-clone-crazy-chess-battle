@@ -25,11 +25,16 @@ export default async function AdminPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("username, display_name, is_admin")
+    .select("username, display_name, is_admin, identity_verified")
     .eq("id", user.id)
     .single();
 
   if (!profile?.is_admin) redirect("/");
 
-  return <AdminDashboard adminName={profile?.display_name || profile?.username || "Admin"} />;
+  return (
+    <AdminDashboard
+      adminName={profile?.display_name || profile?.username || "Admin"}
+      adminKyc={!!profile?.identity_verified}
+    />
+  );
 }
