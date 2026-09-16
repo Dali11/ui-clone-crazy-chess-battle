@@ -1,52 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/email";
-import { createClient } from "@/lib/supabase/server";
 import { settleBattle } from "@/lib/battles/settle";
 
 /**
- * Settle a battle — pays out the winner, takes platform fee.
- * Called server-side after a game ends (from game resign/timeout/move API).
- * Body: { battleId: string, winnerId: string | null, result: string }
- * winnerId null = draw (triggers armageddon)
+ * Settle battles whose games have ended.
  *
- * Authentication: the caller must be authenticated AND be a participant in the
- * battle (white or black player). This prevents anyone from triggering
- * arbitrary battle settlements.
- */
-export async function POST(req: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const { battleId, winnerId, result } = await req.json();
-    if (!battleId) return NextResponse.json({ error: "Battle ID required" }, { status: 400 });
-
-    // Verify the caller is a participant in this battle
-    const admin = createAdminClient();
-    const { data: battle } = await admin
-      .from("battles")
-      .select("white_player_id, black_player_id")
-      .eq("id", battleId)
-      .single();
-
-    if (!battle) return NextResponse.json({ error: "Battle not found" }, { status: 404 });
-
-    if (battle.white_player_id !== user.id && battle.black_player_id !== user.id) {
-      return NextResponse.json({ error: "Not a battle participant" }, { status: 403 });
-    }
-
-    const outcome = await settleBattle(battleId, winnerId, result);
-    return NextResponse.json(outcome);
-  } catch (e: any) {
-    console.error("Battle settlement error:", e);
-    return NextResponse.json({ error: e.message || "Settlement failed" }, { status: 500 });
-  }
-}
-
-/**
- * Called by cron to auto-settle battles where a player timed out or disconnected.
+ * SECURITY FIX 2026-09-16 (CRITICAL): this route previously exposed a POST
+ * handler that authenticated the caller and checked they were a battle
+ * participant, but then passed the CLIENT-SUPPLIED winnerId/result straight
+ * into settleBattle() — which only validates that winnerId is one of the two
+ * participants, never that the game ended or who actually won. A losing
+ * player could settle themselves as the winner mid-game and steal the
+ * escrowed stake (the atomic settled flag then blocked the real result).
+ *
+ * The POST handler has been removed entirely. Every legitimate flow
+ * (game/move, game/resign, game/draw, heal-stuck, active-battles fallback,
+ * the cron below) computes the winner server-side from the games record and
+ * calls settleBattle() directly. There is no valid reason for a client to
+ * request a settlement.
+ *
+ * GET — called by cron to auto-settle battles where a player timed out or
+ * disconnected. Protected by CRON_SECRET.
  */
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
