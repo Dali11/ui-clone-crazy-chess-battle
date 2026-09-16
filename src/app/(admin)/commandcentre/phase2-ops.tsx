@@ -1207,3 +1207,412 @@ export function AuditView() {
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// VERIFICATION — migrated from the legacy admin "Verification" tab.
+// Two surfaces, both posting to the same requireAdmin endpoints the old
+// panel used:
+//   1. KYC document queue — /api/admin/kyc (GET pending, POST review).
+//      Doc + selfie open as 1-hour signed URLs from the private bucket.
+//   2. Player identity/gender list — /api/admin/identity-verification
+//      (GET by filter, POST verify with gender override / revoke).
+// ═══════════════════════════════════════════════════════════════════════
+
+interface KycSubmission {
+  id: string;
+  user_id: string;
+  doc_type: string;
+  doc_number: string | null;
+  status: string;
+  created_at: string;
+  player: { username?: string; display_name?: string; email?: string; avatar_url?: string; country?: string; phone?: string; full_name?: string } | null;
+  docUrl: string | null;
+  selfieUrl: string | null;
+}
+
+interface VerificationPlayer {
+  id: string;
+  username?: string;
+  display_name?: string;
+  full_name?: string;
+  email?: string;
+  gender?: string | null;
+  identity_verified?: boolean;
+  identity_verified_at?: string | null;
+  phone_verified?: boolean;
+  phone?: string | null;
+  avatar_url?: string | null;
+  country?: string | null;
+  created_at?: string;
+}
+
+type KycAction =
+  | { mode: "idle" }
+  | { mode: "approve_confirm" }
+  | { mode: "reject_form"; reason: string }
+  | { mode: "processing" }
+  | { mode: "success"; message: string }
+  | { mode: "error"; message: string };
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  national_id: "National ID",
+  passport: "Passport",
+  drivers_licence: "Driver's Licence",
+};
+
+export function VerificationView() {
+  const [kyc, setKyc] = useState<KycSubmission[]>([]);
+  const [kycLoading, setKycLoading] = useState(true);
+  const [kycError, setKycError] = useState<string | null>(null);
+  const [kycActions, setKycActions] = useState<Record<string, KycAction>>({});
+
+  const [idFilter, setIdFilter] = useState<"pending" | "verified" | "all">("pending");
+  const [players, setPlayers] = useState<VerificationPlayer[]>([]);
+  const [playersLoading, setPlayersLoading] = useState(true);
+  const [playersError, setPlayersError] = useState<string | null>(null);
+  const [playerBusy, setPlayerBusy] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const fetchKyc = useCallback(async () => {
+    setKycLoading(true);
+    setKycError(null);
+    try {
+      const res = await fetch("/api/admin/kyc?filter=pending", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load KYC queue");
+      const data = await res.json();
+      setKyc(data.submissions || []);
+    } catch (err: unknown) {
+      setKycError(err instanceof Error ? err.message : "Failed to load KYC queue");
+    } finally {
+      setKycLoading(false);
+    }
+  }, []);
+
+  const fetchPlayers = useCallback(async (filter: "pending" | "verified" | "all") => {
+    setPlayersLoading(true);
+    setPlayersError(null);
+    try {
+      const res = await fetch(`/api/admin/identity-verification?filter=${filter}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load players");
+      const data = await res.json();
+      setPlayers(data.players || []);
+    } catch (err: unknown) {
+      setPlayersError(err instanceof Error ? err.message : "Failed to load players");
+      setPlayers([]);
+    } finally {
+      setPlayersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchKyc(); }, [fetchKyc]);
+  useEffect(() => { fetchPlayers(idFilter); }, [idFilter, fetchPlayers]);
+
+  const setKycAction = (id: string, action: KycAction) =>
+    setKycActions((prev) => ({ ...prev, [id]: action }));
+
+  const reviewSubmission = async (id: string, decision: "approve" | "reject", reason?: string) => {
+    setKycAction(id, { mode: "processing" });
+    try {
+      const res = await fetch("/api/admin/kyc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionId: id, decision, reason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setKycAction(id, { mode: "error", message: data.error || "Review failed" });
+        return;
+      }
+      setKycAction(id, { mode: "success", message: decision === "approve" ? "Identity approved" : "Submission rejected" });
+      setToastMsg({ kind: "ok", text: decision === "approve" ? "Identity approved — player notified" : "Submission rejected — player can resubmit" });
+      setTimeout(() => { fetchKyc(); fetchPlayers(idFilter); }, 900);
+    } catch (err: any) {
+      setKycAction(id, { mode: "error", message: err?.message || "Unexpected error" });
+    }
+  };
+
+  const verifyPlayer = async (playerId: string, action: "verify" | "reject", genderOverride?: string) => {
+    setPlayerBusy(playerId);
+    try {
+      const res = await fetch("/api/admin/identity-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId, action, genderOverride }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setToastMsg({ kind: "err", text: data.error || data.message || "Action failed" });
+        return;
+      }
+      setToastMsg({ kind: "ok", text: data.message || "Done" });
+      fetchPlayers(idFilter);
+    } catch (err: any) {
+      setToastMsg({ kind: "err", text: err?.message || "Unexpected error" });
+    } finally {
+      setPlayerBusy(null);
+    }
+  };
+
+  const pendingDocs = kyc.filter((k) => k.status === "pending").length;
+
+  return (
+    <div className="space-y-6 text-[13px]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Identity & Verification</h2>
+          <p className="text-xs text-ccb-muted">
+            KYC document review and player identity/gender confirmation
+          </p>
+        </div>
+        <button
+          onClick={() => { fetchKyc(); fetchPlayers(idFilter); }}
+          className="rounded-lg border border-ccb-border bg-ccb-surface px-3 py-1.5 text-xs text-ccb-muted transition hover:border-violet-500 hover:text-white"
+        >
+          Refresh
+        </button>
+      </div>
+
+      {toastMsg && (
+        <div className={`rounded-lg px-3 py-2 text-xs font-medium ${toastMsg.kind === "ok" ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+          {toastMsg.text}
+          <button onClick={() => setToastMsg(null)} className="ml-2 text-ccb-muted hover:text-white underline">Dismiss</button>
+        </div>
+      )}
+
+      {/* KPI tiles */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-ccb-border bg-ccb-card p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Pending Documents</p>
+          <p className="mt-1 text-xl font-bold text-white">{pendingDocs}</p>
+        </div>
+        <div className="rounded-xl border border-ccb-border bg-ccb-card p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Players Shown</p>
+          <p className="mt-1 text-xl font-bold text-white">{players.length}</p>
+        </div>
+        <div className="rounded-xl border border-ccb-border bg-ccb-card p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Filter</p>
+          <p className="mt-1 text-xl font-bold text-white capitalize">{idFilter}</p>
+        </div>
+      </div>
+
+      {/* Document queue */}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-amber-400">KYC Document Queue</h3>
+            <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs font-bold text-amber-300">{pendingDocs}</span>
+          </div>
+          <span className="text-[11px] text-ccb-muted">Doc &amp; selfie links expire in 1 hour</span>
+        </div>
+
+        {kycLoading ? (
+          <p className="py-4 text-center text-xs text-ccb-muted">Loading queue...</p>
+        ) : kycError ? (
+          <p className="py-2 text-xs text-red-400">{kycError}</p>
+        ) : kyc.length === 0 ? (
+          <p className="py-2 text-xs text-ccb-muted">No ID documents awaiting review.</p>
+        ) : (
+          <div className="grid gap-2 lg:grid-cols-2">
+            {kyc.map((k) => {
+              const action = kycActions[k.id] || { mode: "idle" };
+              return (
+                <div key={k.id} className="space-y-2 rounded-lg border border-ccb-border bg-ccb-card p-3 text-xs">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="font-semibold text-white">
+                        {k.player?.display_name || k.player?.username || "Player"}
+                      </p>
+                      <p className="text-ccb-muted">{k.player?.email}{k.player?.phone ? ` · ${k.player.phone}` : ""}</p>
+                    </div>
+                    <span className="rounded-full bg-ccb-surface px-2 py-0.5 text-[10px] font-bold text-ccb-muted">
+                      {DOC_TYPE_LABELS[k.doc_type] || k.doc_type} · ••••{String(k.doc_number || "").slice(-4)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-wrap text-[11px]">
+                    {k.docUrl && (
+                      <a href={k.docUrl} target="_blank" rel="noreferrer" className="text-violet-300 underline hover:text-violet-200">View document</a>
+                    )}
+                    {k.selfieUrl && (
+                      <a href={k.selfieUrl} target="_blank" rel="noreferrer" className="text-violet-300 underline hover:text-violet-200">View selfie</a>
+                    )}
+                    <span className="text-ccb-muted">submitted {new Date(k.created_at).toLocaleString()}</span>
+                  </div>
+
+                  <div className="border-t border-ccb-border/40 pt-2">
+                    {action.mode === "processing" && (
+                      <p className="text-[11px] font-medium text-amber-400 animate-pulse">Processing...</p>
+                    )}
+                    {action.mode === "success" && (
+                      <p className="text-[11px] font-medium text-emerald-400">✓ {action.message}</p>
+                    )}
+                    {action.mode === "error" && (
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-medium text-red-400">{action.message}</p>
+                        <button onClick={() => setKycAction(k.id, { mode: "idle" })} className="text-[11px] text-ccb-muted hover:text-white underline">Dismiss</button>
+                      </div>
+                    )}
+
+                    {(action.mode === "idle" || action.mode === "approve_confirm") && (
+                      <div className="space-y-1.5">
+                        {action.mode === "approve_confirm" && (
+                          <p className="text-[11px] font-medium text-violet-300">Approve this identity? Unlocks tournaments &amp; wallet features.</p>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          {action.mode === "idle" ? (
+                            <>
+                              <button
+                                onClick={() => setKycAction(k.id, { mode: "approve_confirm" })}
+                                className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-emerald-500 transition-colors"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => setKycAction(k.id, { mode: "reject_form", reason: "" })}
+                                className="rounded-lg px-2 py-1 text-[13px] font-medium text-red-400 hover:text-red-300 transition-colors"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => reviewSubmission(k.id, "approve")}
+                                className="rounded-lg bg-violet-600 px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-violet-500 transition-colors"
+                              >
+                                Confirm
+                              </button>
+                              <button onClick={() => setKycAction(k.id, { mode: "idle" })} className="text-[12px] text-ccb-muted hover:text-white underline">Cancel</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {action.mode === "reject_form" && (
+                      <div className="space-y-1.5">
+                        <input
+                          type="text"
+                          value={action.reason}
+                          onChange={(e) => setKycAction(k.id, { mode: "reject_form", reason: e.target.value })}
+                          placeholder="Reason (shown to the player)..."
+                          className="w-full rounded-lg border border-ccb-border bg-ccb-surface px-2 py-1 text-[12px] text-white placeholder-ccb-muted focus:border-violet-500 focus:outline-none"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => reviewSubmission(k.id, "reject", action.reason.trim() || undefined)}
+                            className="rounded-lg bg-red-600 px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-red-500 transition-colors"
+                          >
+                            Confirm reject
+                          </button>
+                          <button onClick={() => setKycAction(k.id, { mode: "idle" })} className="text-[12px] text-ccb-muted hover:text-white underline">Cancel</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Player identity / gender confirmation */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          {(["pending", "verified", "all"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setIdFilter(f)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                idFilter === f ? "bg-ccb-primary text-white" : "border border-ccb-border bg-ccb-surface text-ccb-muted hover:text-white"
+              }`}
+            >
+              {f === "pending" ? "Pending" : f === "verified" ? "Verified" : "All"}
+            </button>
+          ))}
+        </div>
+
+        {playersLoading ? (
+          <p className="py-4 text-center text-xs text-ccb-muted">Loading players...</p>
+        ) : playersError ? (
+          <p className="py-2 text-xs text-red-400">{playersError}</p>
+        ) : players.length === 0 ? (
+          <p className="py-2 text-xs text-ccb-muted">
+            {idFilter === "pending" ? "No players pending verification" : "No players found"}
+          </p>
+        ) : (
+          <div className="grid gap-2 lg:grid-cols-2">
+            {players.map((p) => (
+              <div key={p.id} className="space-y-2 rounded-xl border border-ccb-border bg-ccb-card p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-ccb-border bg-ccb-surface">
+                      {p.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.avatar_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-sm font-bold text-ccb-muted">{(p.display_name || p.username || "?").charAt(0).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white">{p.display_name || p.username || "Unknown"}</div>
+                      <div className="text-xs text-ccb-muted">{p.email}</div>
+                      {p.phone && <div className="text-xs text-ccb-muted">{p.phone}</div>}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      p.gender === "female" ? "bg-pink-500/10 text-pink-400" :
+                      p.gender === "male" ? "bg-blue-500/10 text-blue-400" :
+                      "bg-ccb-surface text-ccb-muted"
+                    }`}>
+                      {p.gender || "Not set"}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      p.identity_verified ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-500"
+                    }`}>
+                      {p.identity_verified ? "Verified" : "Unverified"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 border-t border-ccb-border/40 pt-2">
+                  <select
+                    defaultValue=""
+                    id={`cc-gender-override-${p.id}`}
+                    className="rounded-lg border border-ccb-border bg-ccb-surface px-2 py-1 text-xs font-medium text-white focus:border-violet-500 focus:outline-none"
+                  >
+                    <option value="">Confirm gender...</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <button
+                    onClick={() => {
+                      const select = document.getElementById(`cc-gender-override-${p.id}`) as HTMLSelectElement;
+                      verifyPlayer(p.id, "verify", select.value || undefined);
+                    }}
+                    disabled={playerBusy === p.id}
+                    className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[13px] font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40"
+                  >
+                    {playerBusy === p.id ? "..." : "Verify"}
+                  </button>
+                  {p.identity_verified && (
+                    <button
+                      onClick={() => verifyPlayer(p.id, "reject")}
+                      disabled={playerBusy === p.id}
+                      className="rounded-lg px-2 py-1 text-[13px] font-medium text-red-400 transition hover:text-red-300 disabled:opacity-40"
+                    >
+                      Revoke
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

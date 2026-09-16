@@ -38,7 +38,7 @@ import {
 } from "./sections";
 import { LedgerView, DepositsView, WithdrawalsView } from "./phase2-finance";
 import { ReconciliationView, PlayersView } from "./phase2-recon";
-import { MarketsView, SettlementsView, ReportsView, AuditView } from "./phase2-ops";
+import { MarketsView, SettlementsView, ReportsView, AuditView, VerificationView } from "./phase2-ops";
 
 type View =
   | "dashboard"
@@ -52,6 +52,7 @@ type View =
   | "settlements"
   | "reports"
   | "audit"
+  | "verification"
   | `rev-${RevenueStream}`
   | "markets";
 
@@ -76,6 +77,7 @@ const VIEW_META: Record<string, { title: string; sub: string; txType?: string }>
   settlements: { title: "Settlements", sub: "Money between the payment infrastructure and CrazyChess accounts" },
   reports: { title: "Financial Reports", sub: "Downloadable reports, consolidated in USD" },
   audit: { title: "Financial Audit Log", sub: "Every financial admin action — immutable" },
+  verification: { title: "Verification", sub: "KYC document review and player identity confirmation" },
   "rev-battles": { title: "Revenue · Battles", sub: "Rake from settled battles", txType: "battle_fee" },
   "rev-tournaments": { title: "Revenue · Tournaments", sub: "Platform profit on tournaments", txType: "tournament" },
   "rev-memberships": { title: "Revenue · Memberships", sub: "Membership purchases", txType: "membership" },
@@ -281,6 +283,7 @@ export default function CommandCentreClient() {
         {navGroup("Players", navItem("players", "Wallet Ledger"))}
         {navGroup("Operations",
           <>
+            {navItem("verification", "Verification")}
             {navItem("settlements", "Settlements")}
             {navItem("reports", "Reports")}
           </>
@@ -404,6 +407,7 @@ export default function CommandCentreClient() {
             {view === "settlements" && <SettlementsView />}
             {view === "reports" && <ReportsView />}
             {view === "audit" && <AuditView />}
+            {view === "verification" && <VerificationView />}
           </div>
         ) : loading && !data ? (
           <div className="flex h-64 items-center justify-center">
