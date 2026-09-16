@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Chessboard } from "react-chessboard";
 import { customPieces } from "@/lib/game/piece-styles";
 import { getPremoveGhosts } from "@/lib/game/premove-ghost";
+import { getPremoveDestinations } from "@/lib/game/premove-moves";
 import { Chess } from "chess.js";
 import { Clock, Flag, ArrowLeft, Bot, Volume2, VolumeX, List, Palette, X, ChevronLeft, ChevronRight, MoreVertical, MessageCircle, RotateCcw, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -386,31 +387,17 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
   // strip en-passant) to ask "if it were my turn right now, where could
   // this piece go?" Premove candidates are re-validated against the real
   // position when they execute, so pseudo-legal is fine here.
-  const getPremoveMoves = useCallback((square: string): string[] => {
-    try {
-      const parts = fen.split(" ");
-      parts[1] = isPlayerWhite ? "w" : "b";
-      parts[3] = "-";
-      const myColor = isPlayerWhite ? "w" : "b";
-      let g = new Chess(parts.join(" "));
-      // Selecting on a GHOST square (a mid-chain hop of a piece with
-      // premoves queued) — replay the chain on the turn-swapped position
-      // so the piece exists there and its next-hop candidates generate.
-      if (!new Chess(fen).get(square as any)) {
-        for (const p of premoves) {
-          const mv = g.move({ from: p.from, to: p.to, promotion: "q" });
-          if (!mv) return []; // chain broken — nothing selectable past here
-          const f2 = g.fen().split(" ");
-          f2[1] = myColor;
-          f2[3] = "-";
-          g = new Chess(f2.join(" "));
-        }
-      }
-      return g.moves({ square: square as any, verbose: true }).map((m: any) => m.to);
-    } catch {
-      return [];
-    }
-  }, [fen, isPlayerWhite, premoves]);
+  const getPremoveMoves = useCallback(
+    (square: string): string[] => {
+      // PATTERN-based candidates (chess.com-style) — legal-move
+      // generation is the wrong question during the engine's turn: it
+      // made pawn-take premoves impossible (the take square is empty
+      // until the engine replies). Every premove is re-validated against
+      // the real position at execution time.
+      return getPremoveDestinations(fen, isPlayerWhite, square);
+    },
+    [fen, isPlayerWhite]
+  );
 
   // PURE SELECTION LOGIC — never executes moves. react-chessboard fires
   // onPieceClick AND the bubbled onSquareClick for the same piece tap on
@@ -426,8 +413,16 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
       // PROJECTED here mid-chain, select it to queue its next hop
       // (chess.com premove chaining). Otherwise clear/cancel as before.
       if (square && !isPlayerTurn && ghostSquares[square]) {
-        setSelectedSquare(square);
-        setLegalMoveSquares(getPremoveMoves(square));
+        // Tapping the projected (ghost) destination re-aims the SAME
+        // piece from its real origin — the queued premove is dropped and
+        // a new destination can be picked for it.
+        const origin = ghostSquares[square];
+        if (premoves.length > 0 || premovePromotion) {
+          setPremoves([]);
+          setPremovePromotion(null);
+        }
+        setSelectedSquare(origin);
+        setLegalMoveSquares(getPremoveMoves(origin));
         return;
       }
       if (premoves.length > 0 || premovePromotion) { setPremoves([]); setPremovePromotion(null); }
@@ -452,20 +447,18 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
       }
       const isMyPiece = (isPlayerWhite && squarePiece.color === "w") || (!isPlayerWhite && squarePiece.color === "b");
       if (!isMyPiece) {
+        // Clicked an opponent piece — unset any queued premove (chess.com/
+        // lichess: clicking a different square cancels it)
         if (premoves.length > 0 || premovePromotion) { setPremoves([]); setPremovePromotion(null); }
+        setSelectedSquare(null);
+        setLegalMoveSquares([]);
         return;
       }
-      // Clicked a piece that's part of a queued premove — cancel the whole
-      // queue (chess.com behavior: tap the premove piece to clear it).
-      if (premoves.some((p) => p.from === square || p.to === square)) {
-        setPremoves([]);
-        setPremovePromotion(null);
-        return;
-      }
-      // Select piece for a new premove. getPremoveMoves() generates our
-      // piece's destinations even though it's the engine's turn —
-      // chess.js would otherwise return an empty list here, which is why
-      // tap premoves never registered.
+      // Clicked one of OUR pieces — unset any queued premove and select
+      // the piece for a fresh one. Any new premove replaces the queued
+      // one instead of stacking behind it (single-premove semantics,
+      // exactly like chess.com and lichess).
+      if (premoves.length > 0 || premovePromotion) { setPremoves([]); setPremovePromotion(null); }
       setSelectedSquare(square);
       setLegalMoveSquares(getPremoveMoves(square));
       return;
@@ -510,10 +503,11 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
           applyMove(selectedSquare, square, "q");
         }
       } else {
-        // Not our turn — queue a premove, unlimited chain length.
-        // Promotions are detected at EXECUTION time so a promotion
-        // premove keeps its FIFO place in a mixed chain.
-        setPremoves((prev) => [...prev, { from: selectedSquare, to: square }]);
+        // Not our turn — SET the premove. Single-premove semantics like
+        // chess.com/lichess: a new premove replaces any queued one.
+        // Promotions are detected at EXECUTION time.
+        setPremoves([{ from: selectedSquare, to: square }]);
+        setPremovePromotion(null);
       }
       setSelectedSquare(null);
       setLegalMoveSquares([]);
@@ -546,39 +540,15 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
       return false;
     }
     // Resolve the drag source: a piece on its real square, or the same
-    // piece on its PROJECTED square mid-chain (chess.com chaining —
-    // after queuing g1->f3 the knight can be grabbed "from f3" to queue
-    // its next hop).
+    // piece on its PROJECTED destination (drag the ghost to re-aim it).
     const game = new Chess(fen);
     const piece = game.get(sourceSquare as any);
     const isMyPiece = piece && ((isPlayerWhite && piece.color === "w") || (!isPlayerWhite && piece.color === "b"));
     const realOrigin = isMyPiece ? sourceSquare : ghostSquares[sourceSquare];
     if (!realOrigin) return false;
-    if (!isMyPiece) {
-      // Ghost source — append the piece's next hop to the end of the queue
-      setPremoves((prev) => [
-        ...prev.filter((p) => p.from !== sourceSquare),
-        { from: sourceSquare, to: targetSquare },
-      ]);
-      return true;
-    }
-    // Real-square drag — re-route this piece: drop its WHOLE queued chain
-    // (including hops starting from ghost squares) and queue the new
-    // destination at the end of the queue. Other pieces' entries keep
-    // their FIFO slots.
-    setPremoves((prev) => {
-      const projAt: Record<string, string> = {};
-      const kept: { from: string; to: string }[] = [];
-      for (const p of prev) {
-        const origin = projAt[p.from] ?? p.from;
-        delete projAt[p.from];
-        projAt[p.to] = origin;
-        if (origin === realOrigin) continue; // old hop of the dragged piece
-        kept.push(p);
-      }
-      kept.push({ from: sourceSquare, to: targetSquare });
-      return kept;
-    });
+    // Single-premove semantics (chess.com/lichess): the new destination
+    // replaces whatever was queued.
+    setPremoves([{ from: realOrigin, to: targetSquare }]);
     return true;
   }, [isPlayerTurn, gameEnded, isPromotionMove, applyMove, fen, isPlayerWhite, isLiveView, premoves, ghostSquares]);
 
