@@ -44,6 +44,9 @@ export default function WithdrawalsPanel({
   actionLoading, configEdit, setConfigEdit,
   handleApprove, handleRejectWithReason, handleSaveFinanceConfig, handleToggleAutoApprove,
   formatMWK, formatDate,
+
+  // Withdrawal rows are stored in the PLAYER'S OWN currency (wallet system
+  // since migration 080) — display the stored currency, never assume MWK.
 }: WithdrawalsPanelProps) {
   return (
       <div className="space-y-4">
@@ -182,7 +185,15 @@ export default function WithdrawalsPanel({
           <div className="card text-center">
             <p className="text-xs text-ccb-muted">Total Paid Out</p>
             <p className="text-lg font-bold mt-1">
-              {formatMWK(withdrawals.reduce((s, w) => s + (w.status === "completed" ? w.amount : 0), 0))}
+              {Object.entries(withdrawals
+                .filter(w => w.status === "completed")
+                .reduce((acc, w) => {
+                  const cur = w.currency || "MWK";
+                  acc[cur] = (acc[cur] || 0) + w.amount;
+                  return acc;
+                }, {} as Record<string, number>))
+                .map(([cur, total]) => `${cur} ${total.toLocaleString()}`)
+                .join(" · ") || "—"}
             </p>
           </div>
           <div className="card text-center">
@@ -252,7 +263,10 @@ export default function WithdrawalsPanel({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold">{formatMWK(w.amount)}</span>
+                        <span className="text-sm font-bold">{w.currency || "MWK"} {w.amount.toLocaleString()}</span>
+                        {(w.fee ?? 0) > 0 && w.net_amount != null && (
+                          <span className="text-xs text-ccb-muted">· fee {w.currency || "MWK"} {w.fee!.toLocaleString()} · net {w.currency || "MWK"} {w.net_amount.toLocaleString()}</span>
+                        )}
                         <span className={`text-xs px-2 py-0.5 rounded ${
                           w.status === "completed" ? "bg-ccb-success/10 text-ccb-success" :
                           w.status === "pending" ? "bg-ccb-accent/10 text-ccb-accent" :

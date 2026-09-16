@@ -126,6 +126,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Payout failed. Wallet has been refunded." }, { status: 500 });
     }
 
+    // Immutable financial audit trail
+    try {
+      await admin.from("financial_audit_log").insert({
+        admin_id: user.id,
+        action: "withdrawal_approve",
+        entity_type: "withdrawal",
+        entity_id: id,
+        transaction_ref: chargeId,
+        reason: null,
+        previous_state: { status: "pending" },
+        new_state: {
+          status: "completed",
+          gross_amount: grossAmount,
+          fee: fee,
+          net_amount: netAmount,
+          provider,
+        },
+      });
+    } catch (auditErr) {
+      console.error("Financial audit log error (approve):", auditErr);
+    }
+
     // Log action with fee breakdown
     try {
       await admin.from("admin_logs").insert({

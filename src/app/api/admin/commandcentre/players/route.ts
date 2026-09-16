@@ -113,8 +113,11 @@ export async function GET(req: NextRequest) {
       }
     }
     for (const w of withdrawals || []) {
-      const gross = Math.abs(Number(w.amount || 0));
-      const fee = Math.max(0, Number(w.fee || 0));
+      // Withdrawal rows are stored in the PLAYER'S OWN wallet currency
+      // (currency=null rows predate migration 080 and were MWK) —
+      // normalize to MWK before mixing with MWK ledger aggregates.
+      const gross = Math.abs(fx.toMwk(Number(w.amount || 0), w.currency) ?? Number(w.amount || 0));
+      const fee = Math.max(0, fx.toMwk(Number(w.fee || 0), w.currency) ?? 0);
       if (w.status === "completed") {
         derivedMwk -= gross;
         totalWithdrawnMwk += gross;

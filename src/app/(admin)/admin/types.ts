@@ -1,6 +1,9 @@
 export interface Withdrawal {
   id: string;
   amount: number;
+  fee?: number | null;
+  net_amount?: number | null;
+  currency?: string | null;
   phone: string;
   operator_name: string;
   status: string;

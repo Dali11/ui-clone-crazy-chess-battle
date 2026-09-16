@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     let query = admin
       .from("withdrawals")
       .select(`
-        id, amount, phone, operator_name, status, charge_id, admin_notes,
+        id, amount, fee, net_amount, currency, phone, operator_name, status, charge_id, admin_notes,
         processed_at, created_at, updated_at,
         user_id, profiles!withdrawals_user_id_profiles_fkey(username, display_name, email)
       `)

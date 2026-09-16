@@ -935,6 +935,14 @@ export function DepositsView() {
 
 // ── Component 3: WithdrawalsView ─────────────────────────────────────────────
 
+type QueueRowAction =
+  | { mode: "idle" }
+  | { mode: "approve_confirm" }
+  | { mode: "reject_form"; reason: string }
+  | { mode: "processing" }
+  | { mode: "success"; message: string }
+  | { mode: "error"; message: string };
+
 export function WithdrawalsView() {
   const [country, setCountry] = useState("");
   const [player, setPlayer] = useState("");
@@ -954,7 +962,9 @@ export function WithdrawalsView() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const [rowActions, setRowActions] = useState<Record<string, QueueRowAction>>({});
+
+  const fetchWithdrawals = useCallback(() => {
     let ignore = false;
     setLoading(true);
     setError(null);
@@ -986,8 +996,14 @@ export function WithdrawalsView() {
         setLoading(false);
       });
 
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [country, player, status, from, to, min, max, page]);
+
+  useEffect(() => {
+    return fetchWithdrawals();
+  }, [fetchWithdrawals]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -1014,7 +1030,9 @@ export function WithdrawalsView() {
         setDetailLoading(false);
       });
 
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [selectedId]);
 
   const handleExportCsv = () => {
@@ -1028,6 +1046,85 @@ export function WithdrawalsView() {
     if (max) params.set("max", max);
     params.set("format", "csv");
     window.open(`/api/admin/commandcentre/withdrawals?${params.toString()}`, "_blank");
+  };
+
+  const handleApproveClick = (id: string) => {
+    setRowActions((prev) => ({ ...prev, [id]: { mode: "approve_confirm" } }));
+  };
+
+  const handleCancelAction = (id: string) => {
+    setRowActions((prev) => ({ ...prev, [id]: { mode: "idle" } }));
+  };
+
+  const handleConfirmApprove = async (id: string) => {
+    setRowActions((prev) => ({ ...prev, [id]: { mode: "processing" } }));
+    try {
+      const res = await fetch(`/api/admin/withdrawals/${id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      const resData = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const errMsg = resData.error || "Failed to approve withdrawal";
+        setRowActions((prev) => ({ ...prev, [id]: { mode: "error", message: errMsg } }));
+        fetchWithdrawals();
+        return;
+      }
+
+      setRowActions((prev) => ({ ...prev, [id]: { mode: "success", message: "Approved payout successfully" } }));
+      setTimeout(() => {
+        fetchWithdrawals();
+      }, 1000);
+    } catch (err: any) {
+      setRowActions((prev) => ({
+        ...prev,
+        [id]: { mode: "error", message: err?.message || "An unexpected error occurred" },
+      }));
+      fetchWithdrawals();
+    }
+  };
+
+  const handleRejectClick = (id: string) => {
+    setRowActions((prev) => ({ ...prev, [id]: { mode: "reject_form", reason: "" } }));
+  };
+
+  const handleReasonChange = (id: string, reason: string) => {
+    setRowActions((prev) => ({ ...prev, [id]: { mode: "reject_form", reason } }));
+  };
+
+  const handleConfirmReject = async (id: string, reason: string) => {
+    if (reason.trim().length < 5) return;
+    setRowActions((prev) => ({ ...prev, [id]: { mode: "processing" } }));
+    try {
+      const res = await fetch(`/api/admin/withdrawals/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: reason.trim() }),
+      });
+
+      const resData = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const errMsg = resData.error || "Failed to reject withdrawal";
+        setRowActions((prev) => ({ ...prev, [id]: { mode: "error", message: errMsg } }));
+        fetchWithdrawals();
+        return;
+      }
+
+      setRowActions((prev) => ({ ...prev, [id]: { mode: "success", message: "Rejected successfully" } }));
+      setTimeout(() => {
+        fetchWithdrawals();
+      }, 1000);
+    } catch (err: any) {
+      setRowActions((prev) => ({
+        ...prev,
+        [id]: { mode: "error", message: err?.message || "An unexpected error occurred" },
+      }));
+      fetchWithdrawals();
+    }
   };
 
   const kpis = data?.kpis;
@@ -1070,9 +1167,9 @@ export function WithdrawalsView() {
             href="/admin"
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-400/20 transition-colors"
+            className="text-xs text-ccb-muted hover:text-white transition-colors"
           >
-            Review in Admin Panel →
+            Legacy panel →
           </a>
         </div>
 
@@ -1080,24 +1177,114 @@ export function WithdrawalsView() {
           <p className="text-xs text-ccb-muted">No pending withdrawals in queue.</p>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {queue.map((q) => (
-              <div key={q.id} className="rounded-lg border border-ccb-border bg-ccb-card p-3 text-xs space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-white">
-                    {q.profiles?.username || q.profiles?.display_name || q.user_id.slice(0, 8)}
-                  </span>
-                  <CountryBadge country={q.country} />
+            {queue.map((q) => {
+              const action = rowActions[q.id] || { mode: "idle" };
+
+              return (
+                <div key={q.id} className="rounded-lg border border-ccb-border bg-ccb-card p-3 text-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-white">
+                      {q.profiles?.username || q.profiles?.display_name || q.user_id.slice(0, 8)}
+                    </span>
+                    <CountryBadge country={q.country} />
+                  </div>
+                  <div className="flex items-center justify-between font-mono">
+                    <span className="text-ccb-muted">{formatLocal(q.amount_local, q.currency) ?? "—"}</span>
+                    <span className="text-white font-medium">{formatUsd(q.amountUsd)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-ccb-muted">
+                    <span>Age: {timeAgo(q.created_at)}</span>
+                    <span>Operator: {q.operator_name || "—"}</span>
+                  </div>
+
+                  <div className="pt-2 border-t border-ccb-border/40">
+                    {action.mode === "processing" && (
+                      <p className="text-[11px] font-medium text-amber-400 animate-pulse">Processing...</p>
+                    )}
+
+                    {action.mode === "success" && (
+                      <p className="text-[11px] font-medium text-emerald-400">✓ {action.message}</p>
+                    )}
+
+                    {action.mode === "error" && (
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-medium text-red-400">{action.message}</p>
+                        <button
+                          onClick={() => handleCancelAction(q.id)}
+                          className="text-[11px] text-ccb-muted hover:text-white underline"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+
+                    {action.mode === "approve_confirm" && (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-medium text-violet-300">Confirm payout?</p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleConfirmApprove(q.id)}
+                            className="rounded-lg bg-violet-600 px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-violet-500 transition-colors"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={() => handleCancelAction(q.id)}
+                            className="rounded-lg border border-ccb-border bg-ccb-surface px-2.5 py-1 text-[13px] font-semibold text-ccb-muted hover:text-white transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {action.mode === "reject_form" && (
+                      <div className="space-y-1.5">
+                        <input
+                          type="text"
+                          placeholder="Reason (min 5 chars)..."
+                          value={action.reason}
+                          onChange={(e) => handleReasonChange(q.id, e.target.value)}
+                          className="w-full rounded-lg border border-ccb-border bg-ccb-surface px-2.5 py-1 text-[13px] text-white placeholder-ccb-muted focus:border-violet-500 focus:outline-none"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleConfirmReject(q.id, action.reason)}
+                            disabled={action.reason.trim().length < 5}
+                            className="rounded-lg border border-red-500/50 bg-red-500/10 px-2.5 py-1 text-[13px] font-semibold text-red-400 hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Confirm Reject
+                          </button>
+                          <button
+                            onClick={() => handleCancelAction(q.id)}
+                            className="rounded-lg border border-ccb-border bg-ccb-surface px-2.5 py-1 text-[13px] font-semibold text-ccb-muted hover:text-white transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {action.mode === "idle" && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleApproveClick(q.id)}
+                          className="rounded-lg bg-violet-600 px-2.5 py-1 text-[13px] font-semibold text-white hover:bg-violet-500 transition-colors"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleRejectClick(q.id)}
+                          className="rounded-lg border border-red-500/50 px-2.5 py-1 text-[13px] font-semibold text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between font-mono">
-                  <span className="text-ccb-muted">{formatLocal(q.amount_local, q.currency) ?? "—"}</span>
-                  <span className="text-white font-medium">{formatUsd(q.amountUsd)}</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-ccb-muted pt-1">
-                  <span>Age: {timeAgo(q.created_at)}</span>
-                  <span>Operator: {q.operator_name || "—"}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -1286,21 +1473,21 @@ export function WithdrawalsView() {
                   <div className="space-y-1.5 rounded-lg border border-ccb-border bg-ccb-surface p-3">
                     <div className="flex justify-between"><span className="text-ccb-muted">ID:</span> <span className="font-mono">{detail.withdrawal.id}</span></div>
                     <div className="flex justify-between"><span className="text-ccb-muted">Status:</span> <StatusBadge status={detail.withdrawal.status} /></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Amount Local:</span> <span>{formatLocal(detail.withdrawal.amount_local, detail.withdrawal.currency) ?? '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Amount Local:</span> <span>{formatLocal(detail.withdrawal.amount_local, detail.withdrawal.currency) ?? "—"}</span></div>
                     <div className="flex justify-between"><span className="text-ccb-muted">USD Equivalent:</span> <span>{formatUsd(detail.amountUsd)}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Fee:</span> <span>{formatLocal(detail.withdrawal.fee, detail.withdrawal.currency) ?? '—'} ({formatUsd(detail.feeUsd)})</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Net Amount:</span> <span>{formatLocal(detail.withdrawal.net_amount, detail.withdrawal.currency) ?? '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Provider:</span> <span>{detail.withdrawal.payment_provider || '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Operator:</span> <span>{detail.withdrawal.operator_name || '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Phone:</span> <span>{detail.withdrawal.phone || '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Bank Code:</span> <span>{detail.withdrawal.bank_code || '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Account Number:</span> <span>{detail.withdrawal.account_number || '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Recipient Name:</span> <span>{detail.withdrawal.recipient_name || '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Fee:</span> <span>{formatLocal(detail.withdrawal.fee, detail.withdrawal.currency) ?? "—"} ({formatUsd(detail.feeUsd)})</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Net Amount:</span> <span>{formatLocal(detail.withdrawal.net_amount, detail.withdrawal.currency) ?? "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Provider:</span> <span>{detail.withdrawal.payment_provider || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Operator:</span> <span>{detail.withdrawal.operator_name || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Phone:</span> <span>{detail.withdrawal.phone || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Bank Code:</span> <span>{detail.withdrawal.bank_code || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Account Number:</span> <span>{detail.withdrawal.account_number || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Recipient Name:</span> <span>{detail.withdrawal.recipient_name || "—"}</span></div>
                     <div className="flex justify-between"><span className="text-ccb-muted">Country:</span> <CountryBadge country={detail.withdrawal.country} /></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Payout Ref:</span> <span className="font-mono">{detail.withdrawal.pawapay_ref || '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Processed By:</span> <span>{detail.processor?.username || detail.processor?.display_name || detail.withdrawal.processed_by || '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Rejection Reason:</span> <span className="text-red-400">{detail.withdrawal.rejection_reason || '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Admin Notes:</span> <span>{detail.withdrawal.admin_notes || '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Payout Ref:</span> <span className="font-mono">{detail.withdrawal.pawapay_ref || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Processed By:</span> <span>{detail.processor?.username || detail.processor?.display_name || detail.withdrawal.processed_by || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Rejection Reason:</span> <span className="text-red-400">{detail.withdrawal.rejection_reason || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-ccb-muted">Admin Notes:</span> <span>{detail.withdrawal.admin_notes || "—"}</span></div>
                     <div className="flex justify-between"><span className="text-ccb-muted">Created:</span> <span>{new Date(detail.withdrawal.created_at).toLocaleString()}</span></div>
                     {detail.withdrawal.processed_at && (
                       <div className="flex justify-between"><span className="text-ccb-muted">Processed:</span> <span>{new Date(detail.withdrawal.processed_at).toLocaleString()}</span></div>
@@ -1310,32 +1497,39 @@ export function WithdrawalsView() {
 
                 <div>
                   <h4 className="text-[11px] font-medium uppercase tracking-[0.14em] text-ccb-muted mb-2">
-                    Player Details
+                    Player Profile
                   </h4>
-                  <div className="space-y-1.5 rounded-lg border border-ccb-border bg-ccb-surface p-3">
-                    <div className="flex justify-between"><span className="text-ccb-muted">User ID:</span> <span className="font-mono">{detail.withdrawal.user_id}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Username:</span> <span>{detail.withdrawal.profiles?.username || detail.withdrawal.profiles?.display_name || '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-ccb-muted">Wallet Balance:</span> <span>{formatLocal(detail.withdrawal.profiles?.wallet_balance ?? null, detail.withdrawal.currency) ?? '—'}</span></div>
-                  </div>
+                  {detail.withdrawal.profiles ? (
+                    <div className="space-y-1.5 rounded-lg border border-ccb-border bg-ccb-surface p-3">
+                      <div className="flex justify-between"><span className="text-ccb-muted">Username:</span> <span>{detail.withdrawal.profiles.username || "—"}</span></div>
+                      <div className="flex justify-between"><span className="text-ccb-muted">Display Name:</span> <span>{detail.withdrawal.profiles.display_name || "—"}</span></div>
+                      <div className="flex justify-between"><span className="text-ccb-muted">Country:</span> <CountryBadge country={detail.withdrawal.profiles.country || null} /></div>
+                      <div className="flex justify-between"><span className="text-ccb-muted">Current Wallet:</span> <span className="font-mono">{detail.withdrawal.profiles.wallet_balance ?? 0}</span></div>
+                    </div>
+                  ) : (
+                    <p className="text-ccb-muted">No profile details available.</p>
+                  )}
                 </div>
 
                 <div>
                   <h4 className="text-[11px] font-medium uppercase tracking-[0.14em] text-ccb-muted mb-2">
-                    Provider History ({detail.providerHistory.length})
+                    Provider Event Log ({detail.providerHistory.length})
                   </h4>
                   {detail.providerHistory.length === 0 ? (
-                    <p className="text-ccb-muted italic">No provider events recorded.</p>
+                    <p className="text-ccb-muted">No provider callbacks recorded for this withdrawal.</p>
                   ) : (
-                    <div className="space-y-2">
-                      {detail.providerHistory.map((ev, i) => (
-                        <div key={i} className="rounded-lg border border-ccb-border bg-ccb-surface p-3 space-y-1">
-                          <div className="flex justify-between font-semibold">
-                            <span>{ev.provider} ({ev.direction})</span>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {detail.providerHistory.map((ev, idx) => (
+                        <div key={idx} className="rounded-lg border border-ccb-border bg-ccb-surface p-2.5 space-y-1">
+                          <div className="flex justify-between">
+                            <span className="font-medium text-amber-400">{ev.provider} ({ev.direction})</span>
                             <StatusBadge status={ev.provider_status} />
                           </div>
-                          <div className="text-ccb-muted">Ref: <span className="font-mono text-white">{ev.provider_ref}</span></div>
-                          <div className="text-ccb-muted">Amount: <span className="text-white">{formatLocal(ev.amount_local, ev.currency) ?? '—'}</span></div>
-                          <div className="text-ccb-muted">Received: <span className="text-white">{new Date(ev.received_at).toLocaleString()}</span></div>
+                          <div className="flex justify-between text-ccb-muted font-mono">
+                            <span>Ref: {ev.provider_ref}</span>
+                            <span>{formatLocal(ev.amount_local, ev.currency) ?? "—"}</span>
+                          </div>
+                          <div className="text-[11px] text-ccb-muted"><span>Received: </span><span className="text-white">{new Date(ev.received_at).toLocaleString()}</span></div>
                         </div>
                       ))}
                     </div>

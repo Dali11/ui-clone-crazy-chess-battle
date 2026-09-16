@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { loadUsdConverter } from "@/lib/finance/usd";
+import { getExchangeRate } from "@/lib/geo/fx";
 
 /**
  * GET /api/admin/stats
@@ -105,6 +107,9 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const admin = createAdminClient();
+    // Withdrawal rows are stored in each player's own currency (null = pre-080 MWK)
+    // — normalize to MWK so platform totals are coherent.
+    const fx = await loadUsdConverter(admin, async () => getExchangeRate("MWK", "USD"));
     const { data: profile } = await admin
       .from("profiles")
       .select("is_admin")
@@ -160,9 +165,9 @@ export async function GET(req: NextRequest) {
     const totalDeposits = depositsData.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
 
     const withdrawalsData = await fetchAll(() =>
-      admin.from("withdrawals").select("amount")
+      admin.from("withdrawals").select("amount, currency")
         .eq("status", "completed"));
-    const totalWithdrawals = withdrawalsData.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
+    const totalWithdrawals = withdrawalsData.reduce((sum: number, w: any) => sum + (fx.toMwk(w.amount || 0, w.currency) ?? (w.amount || 0)), 0);
 
     const completedBattles = await fetchAll(() =>
       admin.from("battles")
@@ -259,13 +264,14 @@ export async function GET(req: NextRequest) {
     const withdrawalSeries = new Array(buckets.length).fill(0);
     if (!noCountryMatch) {
       const rows = await fetchAll(() =>
-        admin.from("withdrawals").select("created_at, amount, user_id")
+        admin.from("withdrawals").select("created_at, amount, currency, user_id")
           .eq("status", "completed").gte("created_at", sinceISO));
       for (const r of rows) {
         if (countryIdSet && !countryIdSet.has(r.user_id)) continue;
-        withdrawalsInRange += r.amount || 0;
+        const mwkAmt = fx.toMwk(r.amount || 0, r.currency) ?? (r.amount || 0);
+        withdrawalsInRange += mwkAmt;
         const idx = bucketIndexFor(buckets, r.created_at);
-        if (idx >= 0) withdrawalSeries[idx] += r.amount || 0;
+        if (idx >= 0) withdrawalSeries[idx] += mwkAmt;
       }
     }
 

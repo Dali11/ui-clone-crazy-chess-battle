@@ -34,6 +34,11 @@ export interface UsdConverter {
   toUsd(amount: number, currency: string | null | undefined): number | null;
   /** Convert an MWK-normalized amount → USD (deposits rows). */
   usdFromMwk(amountMwk: number): number | null;
+  /**
+   * Convert an amount denominated in `currency` to its MWK equivalent.
+   * null when the rate for that currency is unavailable.
+   */
+  toMwk(amount: number, currency: string | null | undefined): number | null;
   /** Same as toUsd but floored at 0 for summation safety. */
   toUsdOrZero(amount: number, currency: string | null | undefined): number;
   readonly unavailable: Set<string>;
@@ -79,9 +84,24 @@ export function makeUsdConverter(
     return (amount / rate) * usd;
   };
 
+  const toMwk = (amount: number, currency: string | null | undefined): number | null => {
+    const code = (currency || "MWK").toUpperCase();
+    if (!Number.isFinite(amount)) return null;
+    if (code === "MWK") return amount;
+    if (code === "USD") return usd > 0 ? amount / usd : null;
+    const rate = local[code];
+    if (!rate) {
+      unavailable.add(code);
+      return null;
+    }
+    // local rates are MWK->C, so C->MWK is amount / rate
+    return amount / rate;
+  };
+
   return {
     toUsd,
     usdFromMwk,
+    toMwk,
     toUsdOrZero: (amount, currency) => toUsd(amount, currency) ?? 0,
     unavailable,
   };

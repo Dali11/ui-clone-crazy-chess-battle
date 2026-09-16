@@ -50,6 +50,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
       .eq("id", id);
 
+    // Immutable financial audit trail
+    try {
+      await admin.from("financial_audit_log").insert({
+        admin_id: user.id,
+        action: "withdrawal_reject",
+        entity_type: "withdrawal",
+        entity_id: id,
+        transaction_ref: null,
+        reason: adminNotes,
+        previous_state: { status: "pending" },
+        new_state: { status: "rejected", refund: true },
+      });
+    } catch (auditErr) {
+      console.error("Financial audit log error (reject):", auditErr);
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Reject withdrawal error:", error);
