@@ -18,7 +18,7 @@ export async function GET() {
 
     const baseFields = `
         id, status, time_control, initial_minutes, increment_seconds, rated,
-        turn, move_count, fen, pgn, white_clock_ms, black_clock_ms,
+        turn, move_count, white_clock_ms, black_clock_ms,
         last_move_at, tournament_id, league_id, league_fixture_id,
         white_player_id, black_player_id,
         white_player:profiles!games_white_player_id_fkey(id, username, display_name, avatar_url, rating),
@@ -60,8 +60,6 @@ export async function GET() {
         rated: g.rated,
         turn: g.turn,
         move_count: g.move_count || 0,
-        fen: g.fen,
-        pgn: g.pgn,
         white_clock_ms: g.white_clock_ms,
         black_clock_ms: g.black_clock_ms,
         last_move_at: g.last_move_at,

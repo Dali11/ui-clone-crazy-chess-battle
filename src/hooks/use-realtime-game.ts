@@ -542,11 +542,19 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
     // it was trying to overcome.
     let fastPolls = 0;
     const scheduleNext = () => {
-      const delay = connectedRef.current
-        ? 1500 + Math.random() * 1500 // online: 1.5–3s safety net
-        : fastPolls < 8
-          ? 600 // just dropped: aggressive catch-up (~first 5 seconds)
-          : 2000 + Math.random() * 2000; // still down: back off to 2–4s
+      // EGRESS FIX (was 1.5–3s while online): realtime broadcasts drive
+      // live updates — the poll is only a safety net for silently-dropped
+      // events, so it runs at 10–15s when the channel is healthy and stays
+      // aggressive only when it isn't. A backgrounded tab polls at 15s
+      // heartbeat (the visibilitychange resync above force-fetches on
+      // return to the foreground, so nothing is lost).
+      const delay = document.visibilityState === "hidden"
+        ? 15000 // backgrounded: heartbeat only, no fetch
+        : connectedRef.current
+          ? 10000 + Math.random() * 5000 // online: 10–15s safety net
+          : fastPolls < 8
+            ? 600 // just dropped: aggressive catch-up (~first 5 seconds)
+            : 2000 + Math.random() * 2000; // still down: back off to 2–4s
       pollRef.current = setTimeout(() => {
         if (!connectedRef.current) fastPolls++;
         // Poll during "waiting" too — this is the only fallback that can
@@ -555,7 +563,10 @@ export function useRealtimeGame(gameId: string, initialState: GameState, current
         // mobile connections). Without this, a missed single UPDATE event
         // leaves the client frozen on the countdown screen forever, since
         // nothing else re-checks game state while status stays "waiting".
-        if (gameStatusRef.current === "playing" || gameStatusRef.current === "waiting") {
+        if (
+          document.visibilityState === "visible" &&
+          (gameStatusRef.current === "playing" || gameStatusRef.current === "waiting")
+        ) {
           fetchGameState();
         }
         scheduleNext();

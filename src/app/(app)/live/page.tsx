@@ -17,8 +17,6 @@ interface LiveGame {
   white_clock_ms: number;
   black_clock_ms: number;
   last_move_at: string;
-  fen: string;
-  pgn: string;
   white_player: {
     username: string;
     display_name: string;
@@ -76,7 +74,11 @@ export default function LiveMatchesPage() {
 
   useEffect(() => {
     fetchLiveGames();
-    const interval = setInterval(fetchLiveGames, 5000);
+    // EGRESS FIX: pause the 5s poll while the tab is backgrounded —
+    // a hidden tab can't be watching the list anyway.
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchLiveGames();
+    }, 5000);
     return () => clearInterval(interval);
   }, [fetchLiveGames]);
 
