@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
     // ── Full wallet dossier ─────────────────────────────────────────────
     const { data: player, error: pErr } = await admin
       .from("profiles")
-      .select("id, username, display_name, country, wallet_balance, created_at, is_banned, membership_until")
+      .select("id, username, display_name, country, wallet_balance, created_at, is_banned, is_admin, membership_until")
       .eq("id", id)
       .single();
     if (pErr || !player) return NextResponse.json({ error: "Player not found" }, { status: 404 });

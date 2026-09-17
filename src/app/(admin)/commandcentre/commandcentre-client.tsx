@@ -73,7 +73,7 @@ const VIEW_META: Record<string, { title: string; sub: string; txType?: string }>
   deposits: { title: "Deposits", sub: "Money into the platform, by market, network and player" },
   withdrawals: { title: "Withdrawals", sub: "Payouts to players + the pending review queue" },
   reconciliation: { title: "Reconciliation", sub: "Does the money recorded by CrazyChess match the money processed by pawaPay?" },
-  players: { title: "Players · Wallet Ledger", sub: "Per-player balances derived from the financial ledger" },
+  players: { title: "Players · Wallet & Management", sub: "Balances derived from the ledger, plus wallet adjustments, bans and roles" },
   settlements: { title: "Settlements", sub: "Money between the payment infrastructure and CrazyChess accounts" },
   reports: { title: "Financial Reports", sub: "Downloadable reports, consolidated in USD" },
   audit: { title: "Financial Audit Log", sub: "Every financial admin action — immutable" },
@@ -280,7 +280,7 @@ export default function CommandCentreClient() {
             {navItem("audit", "Audit Log")}
           </>
         )}
-        {navGroup("Players", navItem("players", "Wallet Ledger"))}
+        {navGroup("Players", navItem("players", "Wallet & Management"))}
         {navGroup("Operations",
           <>
             {navItem("verification", "Verification")}

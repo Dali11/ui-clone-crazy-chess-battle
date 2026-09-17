@@ -103,7 +103,7 @@ export async function PATCH(req: NextRequest) {
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const body = await req.json();
-    const { userId, action, value } = body;
+    const { userId, action, value, reason } = body;
 
     if (!userId || !action) return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
 
@@ -115,6 +115,26 @@ export async function PATCH(req: NextRequest) {
     const updates: Record<string, unknown> = {};
 
     switch (action) {
+      case "wallet_adjustment": {
+        // Signed MWK amount + mandatory reason. Goes through
+        // apply_financial_adjustment (same primitive as Command Centre
+        // reconciliation): ledger row + wallet RPC + audit entry.
+        // Wallet balances are never edited directly.
+        const amount = Number(value);
+        if (!Number.isFinite(amount) || amount === 0)
+          return NextResponse.json({ error: "Adjustment amount must be a non-zero number" }, { status: 400 });
+        const adjReason = typeof reason === "string" ? reason : "";
+        if (adjReason.trim().length < 3)
+          return NextResponse.json({ error: "A reason of at least 3 characters is required" }, { status: 400 });
+        const { error } = await admin.rpc("apply_financial_adjustment", {
+          p_admin_id: user.id,
+          p_player_id: userId,
+          p_amount_mwk: Math.round(amount),
+          p_reason: adjReason.trim(),
+        });
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        break;
+      }
       case "ban":
         updates.is_banned = true;
         break;
@@ -164,7 +184,7 @@ export async function PATCH(req: NextRequest) {
         action: `user_${action}`,
         target_type: "user",
         target_id: userId,
-        details: { value },
+        details: { value, reason: reason ?? null },
       });
     } catch {}
 

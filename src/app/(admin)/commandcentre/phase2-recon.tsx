@@ -735,6 +735,7 @@ interface PlayerDossier {
     storedBalanceUsd: number | null;
     created_at: string;
     is_banned?: boolean;
+    is_admin?: boolean;
     membership_until?: string | null;
   };
   totals: {
@@ -767,6 +768,13 @@ export function PlayersView() {
 
   // Pagination for history
   const [historyPageSize, setHistoryPageSize] = useState(50);
+
+  // Manage Player state (wallet adjustment, ban/unban, admin role)
+  const [manageAmount, setManageAmount] = useState("");
+  const [manageReason, setManageReason] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
+  const [manageMsg, setManageMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [manageConfirm, setManageConfirm] = useState<string | null>(null);
 
   const searchPlayers = useCallback(async (q: string) => {
     setSearching(true);
@@ -805,6 +813,10 @@ export function PlayersView() {
     setLoadingDossier(true);
     setDossierError(null);
     setHistoryPageSize(50);
+    setManageAmount("");
+    setManageReason("");
+    setManageMsg(null);
+    setManageConfirm(null);
 
     try {
       const res = await fetch(`/api/admin/commandcentre/players?id=${encodeURIComponent(id)}`, {
@@ -822,6 +834,29 @@ export function PlayersView() {
       setDossierError(e.message || "Failed to load player details");
     } finally {
       setLoadingDossier(false);
+    }
+  };
+
+  const runUserAction = async (action: string, value?: unknown, reason?: string) => {
+    if (!selectedPlayerId) return false;
+    setActionBusy(true);
+    setManageMsg(null);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: selectedPlayerId, action, value, reason }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.error) throw new Error(json.error || `HTTP ${res.status}`);
+      // Refresh dossier + list so balances / status reflect the change
+      await Promise.all([openPlayerDrawer(selectedPlayerId), searchPlayers(query)]);
+      return true;
+    } catch (e: any) {
+      setManageMsg({ ok: false, text: e.message || "Action failed" });
+      return false;
+    } finally {
+      setActionBusy(false);
     }
   };
 
@@ -997,6 +1032,136 @@ export function PlayersView() {
                       </span>
                     </div>
                   </div>
+                </div>
+
+                {/* Manage Player — wallet adjustment, ban/unban, admin role.
+                    Same security as the legacy panel (requireAdmin endpoints,
+                    atomic RPCs), but wallet moves go through
+                    apply_financial_adjustment: ledger row + audit trail. */}
+                <div className="rounded-xl border border-ccb-border bg-ccb-surface p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-ccb-muted">
+                      Manage Player
+                    </span>
+                    <div className="flex gap-1.5">
+                      {dossier.player.is_banned && (
+                        <span className="rounded bg-red-500/20 px-2 py-0.5 text-[10px] font-semibold text-red-400">BANNED</span>
+                      )}
+                      {dossier.player.is_admin && (
+                        <span className="rounded bg-violet-600/20 px-2 py-0.5 text-[10px] font-semibold text-violet-400">ADMIN</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Wallet adjustment */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-semibold text-white">
+                      Wallet adjustment (MWK, + credit / − debit)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={manageAmount}
+                      onChange={(e) => setManageAmount(e.target.value)}
+                      placeholder="e.g. 5000 or -2000"
+                      disabled={actionBusy}
+                      className="w-full rounded-md border border-ccb-border bg-ccb-surface px-3 py-1.5 text-xs text-white placeholder:text-ccb-muted focus:border-violet-500 focus:outline-none disabled:opacity-50"
+                    />
+                    <input
+                      type="text"
+                      value={manageReason}
+                      onChange={(e) => setManageReason(e.target.value)}
+                      placeholder="Reason (required, min 3 chars — recorded on the ledger row + audit log)"
+                      disabled={actionBusy}
+                      className="w-full rounded-md border border-ccb-border bg-ccb-surface px-3 py-1.5 text-xs text-white placeholder:text-ccb-muted focus:border-violet-500 focus:outline-none disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      disabled={actionBusy}
+                      onClick={async () => {
+                        const amt = Number(manageAmount);
+                        if (!Number.isFinite(amt) || amt === 0) {
+                          setManageMsg({ ok: false, text: "Enter a non-zero amount (MWK)" });
+                          return;
+                        }
+                        if (manageReason.trim().length < 3) {
+                          setManageMsg({ ok: false, text: "A reason of at least 3 characters is required" });
+                          return;
+                        }
+                        const ok = await runUserAction("wallet_adjustment", amt, manageReason.trim());
+                        if (ok) setManageMsg({ ok: true, text: "Wallet adjusted — ledger row created" });
+                      }}
+                      className="w-full rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
+                    >
+                      {actionBusy ? "Applying…" : "Apply adjustment"}
+                    </button>
+                  </div>
+
+                  {/* Ban / admin role */}
+                  <div className="flex flex-wrap gap-2 border-t border-ccb-border pt-3">
+                    {(() => {
+                      const isBanned = !!dossier.player.is_banned;
+                      const banKind = isBanned ? "unban" : "ban";
+                      return (
+                        <button
+                          type="button"
+                          disabled={actionBusy}
+                          onClick={async () => {
+                            if (manageConfirm !== banKind) { setManageConfirm(banKind); return; }
+                            const ok = await runUserAction(banKind);
+                            if (ok) setManageMsg({ ok: true, text: isBanned ? "Player unbanned" : "Player banned" });
+                          }}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                            manageConfirm === banKind
+                              ? "bg-red-600 text-white hover:bg-red-500"
+                              : isBanned
+                                ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                                : "border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                          }`}
+                        >
+                          {manageConfirm === banKind ? `Confirm ${banKind}?` : isBanned ? "Unban player" : "Ban player"}
+                        </button>
+                      );
+                    })()}
+                    {(() => {
+                      const isAdminP = !!dossier.player.is_admin;
+                      const roleKind = isAdminP ? "revoke" : "grant";
+                      return (
+                        <button
+                          type="button"
+                          disabled={actionBusy}
+                          onClick={async () => {
+                            if (manageConfirm !== roleKind) { setManageConfirm(roleKind); return; }
+                            const ok = await runUserAction("toggle_admin", !isAdminP);
+                            if (ok) setManageMsg({ ok: true, text: isAdminP ? "Admin access revoked" : "Admin access granted" });
+                          }}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                            manageConfirm === roleKind
+                              ? "bg-amber-600 text-white hover:bg-amber-500"
+                              : "border border-ccb-border bg-ccb-surface text-white hover:bg-ccb-surface/80"
+                          }`}
+                        >
+                          {manageConfirm === roleKind
+                            ? `Confirm ${roleKind} admin?`
+                            : isAdminP
+                              ? "Revoke admin"
+                              : "Grant admin"}
+                        </button>
+                      );
+                    })()}
+                  </div>
+
+                  {manageMsg && (
+                    <div
+                      className={`rounded-md border p-2.5 text-[11px] ${
+                        manageMsg.ok
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                          : "border-red-500/30 bg-red-500/10 text-red-400"
+                      }`}
+                    >
+                      {manageMsg.text}
+                    </div>
+                  )}
                 </div>
 
                 {/* Cross-Check Ledger Banner */}
