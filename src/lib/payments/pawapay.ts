@@ -210,6 +210,16 @@ export async function checkPayoutStatus(payoutId: string): Promise<PawaPayPayout
   if (!res.ok) {
     throw new Error(data.message || "Failed to check payout status");
   }
+
+  // PawaPay wraps the payout object in an envelope when the record is
+  // found: { status: "FOUND", data: { status: "COMPLETED" | "FAILED" |
+  // "ACCEPTED" | ..., amount, currency, failureReason, ... } }. The REAL
+  // payout status lives in the inner data object — unwrap it so callers
+  // (reconciliation sweep) see the true status instead of the outer
+  // "FOUND" shell. Verified against live payouts 2026-09-17.
+  if (data?.status === "FOUND" && data?.data && typeof data.data === "object") {
+    return data.data;
+  }
   return data;
 }
 

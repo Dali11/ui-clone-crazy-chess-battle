@@ -131,9 +131,10 @@ export async function GET(req: NextRequest) {
       } else if (internalStatus === "failed") {
         await recordStatus();
         if (w.status !== "rejected") {
+          const fr = (payout as any).failureReason;
           const { error: refundErr } = await admin.rpc("refund_failed_payout", {
             p_withdrawal_id: w.id,
-            p_reason: `PawaPay payout ${payout.status} (reconciliation sweep)`,
+            p_reason: `PawaPay payout ${payout.status}${fr ? `: ${fr.failureCode} (${fr.failureMessage})` : ""} (reconciliation sweep)`,
           });
           if (refundErr) {
             console.error(`MANUAL INTERVENTION: sweep refund failed for withdrawal ${w.id}:`, refundErr.message);
