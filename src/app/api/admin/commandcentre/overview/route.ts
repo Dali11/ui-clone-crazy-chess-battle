@@ -115,6 +115,7 @@ export async function GET(req: NextRequest) {
       revCur, revPrev,
       withdrawalsCur, withdrawalsPrev,
       battlesCur, battlesPrev,
+      playerFeeCur, playerFeePrev,
       profiles,
       pendingWithdrawals,
       failedDeposits,
@@ -131,6 +132,30 @@ export async function GET(req: NextRequest) {
       fetchWithdrawalsBetween(period.prevFromISO, period.prevToISO),
       fetchBattlesBetween(period.fromISO, period.toISO),
       fetchBattlesBetween(period.prevFromISO, period.prevToISO),
+
+      // Player-led tournament platform fees (5% of gross entry fees) are
+      // recorded on tournaments.platform_fee_collected — NOT as deposits
+      // ledger rows — so they must be added to the tournaments stream from
+      // the tournaments table directly. updated_at is used as the
+      // collection-timestamp proxy (fee is written at start/finish).
+      fetchAll((page) =>
+        within("updated_at", period.fromISO, period.toISO)(
+          admin
+            .from("tournaments")
+            .select("id, platform_fee_collected")
+            .eq("is_player_created", true)
+            .gt("platform_fee_collected", 0)
+        ).range(page * 1000, page * 1000 + 999)
+      ),
+      fetchAll((page) =>
+        within("updated_at", period.prevFromISO, period.prevToISO)(
+          admin
+            .from("tournaments")
+            .select("id, platform_fee_collected")
+            .eq("is_player_created", true)
+            .gt("platform_fee_collected", 0)
+        ).range(page * 1000, page * 1000 + 999)
+      ),
 
       // Snapshots / attention sources
       fetchAll((page) =>
@@ -231,13 +256,24 @@ export async function GET(req: NextRequest) {
       return out;
     };
 
+    // Player-led 5% entry-fee cut — entry fees are wallet-MWK-denominated,
+    // so the fee converts through the same MWK anchor as deposits.
+    const playerFeeUsd = (rows: any[]) =>
+      roundUsd(rows.reduce((sum, t) => sum + (fx.usdFromMwk(Number(t.platform_fee_collected || 0)) ?? 0), 0));
+
     const revenueCur: Record<RevenueStream, number> = {
       ...revenueFromDeposits(revCur),
+      tournaments: roundUsd(
+        (revenueFromDeposits(revCur).tournaments || 0) + playerFeeUsd(playerFeeCur)
+      ),
       battles: roundUsd(battlesCur.reduce((s, b) => s + battleRakeUsd(b), 0)),
       withdrawal_fees: roundUsd(withdrawalsCur.reduce((s, w) => s + withdrawalFeeUsd(w), 0)),
     };
     const revenuePrev: Record<RevenueStream, number> = {
       ...revenueFromDeposits(revPrev),
+      tournaments: roundUsd(
+        (revenueFromDeposits(revPrev).tournaments || 0) + playerFeeUsd(playerFeePrev)
+      ),
       battles: roundUsd(battlesPrev.reduce((s, b) => s + battleRakeUsd(b), 0)),
       withdrawal_fees: roundUsd(withdrawalsPrev.reduce((s, w) => s + withdrawalFeeUsd(w), 0)),
     };
