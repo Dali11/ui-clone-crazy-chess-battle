@@ -1,6 +1,7 @@
 "use client";
 
 import { detectOperator } from "@/lib/operator";
+import { detectPawaPayCorrespondent } from "@/lib/payments/pawapay-operators";
 import { useCurrency } from "@/hooks/use-currency";
 
 import { useState, useEffect, useCallback } from "react";
@@ -107,6 +108,19 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const depositMinLocal = isMalawi ? depositMinMwk : (fxLoaded && fxRate && fxRate !== 1 ? convert(depositMinMwk) : 1);
   const formatAmt = (amount: number) => fmtCurrency(amount || 0);
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+  // Auto-select the mobile money provider that matches the active
+  // deposit phone's network. A mismatched provider makes PawaPay reject
+  // the deposit with PAYER_NOT_FOUND (live 2026-09-17: MTN number routed
+  // as Zamtel — four failed ZMW 1,000 attempts). Falls back silently to
+  // the current selection when the prefix isn't confidently mappable.
+  useEffect(() => {
+    if (!usePawaPay || !depositPhone || pawapayProviders.length === 0) return;
+    const corr = detectPawaPayCorrespondent(country, depositPhone);
+    if (corr && pawapayProviders.some((p) => p.provider === corr)) {
+      setSelectedProvider((prev) => (prev === corr ? prev : corr));
+    }
+  }, [depositPhone, pawapayProviders, country, usePawaPay]);
 
   // Fetch PawaPay providers for the user's country
   useEffect(() => {
@@ -372,8 +386,12 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
 
       if (usePawaPay) {
         body.payment_provider = "pawapay";
-        body.operatorRefId = selectedProvider;
-        body.operatorName = pawapayProviders.find(p => p.provider === selectedProvider)?.displayName || selectedProvider;
+        // Route to the network the withdrawal number actually belongs to;
+        // fall back to the dropdown selection when undetectable.
+        const detected = detectPawaPayCorrespondent(country, withdrawPhone);
+        const chosen = detected && pawapayProviders.some(p => p.provider === detected) ? detected : selectedProvider;
+        body.operatorRefId = chosen;
+        body.operatorName = pawapayProviders.find(p => p.provider === chosen)?.displayName || chosen;
       } else {
         const operatorRefId = detectOperator(withdrawPhone);
         body.operatorRefId = operatorRefId;

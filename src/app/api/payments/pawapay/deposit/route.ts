@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { initiateDeposit } from "@/lib/payments/pawapay";
+import { detectPawaPayCorrespondent } from "@/lib/payments/pawapay-operators";
 import { isAllowedDepositPhone } from "@/lib/deposit-phones";
 import { getMwkToLocalRate } from "@/lib/geo/fx";
 import { toPawaPayMsisdn } from "@/lib/geo/iso3";
@@ -14,7 +15,9 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { amount, phoneNumber, provider, currency, country } = await req.json();
+    const body = await req.json();
+    const { amount, phoneNumber, currency, country } = body;
+    let provider = body.provider;
     // ─── Load platform config ──────────────────────────────────────────
     const admin = createAdminClient();
 
@@ -67,7 +70,22 @@ export async function POST(req: NextRequest) {
 
     // Deposits can only go through a number the player already saved and
     // locked in Settings (anti OTP-spam) — never an arbitrary free-text number.
-    const { data: depProfile } = await admin.from("profiles").select("deposit_phone_numbers").eq("id", user.id).single();
+    const { data: depProfile } = await admin.from("profiles").select("deposit_phone_numbers, country").eq("id", user.id).single();
+
+    // Operator auto-detection: route to the network the MSISDN actually
+    // belongs to. A mismatched correspondent makes PawaPay reject the
+    // whole deposit with PAYER_NOT_FOUND (live incident 2026-09-17: MTN
+    // number sent as ZAMTEL_ZMB). Unknown prefixes keep the player's pick.
+    const detectedCorrespondent = detectPawaPayCorrespondent(
+      country || depProfile?.country,
+      phoneNumber
+    );
+    if (detectedCorrespondent && detectedCorrespondent !== provider) {
+      console.warn(
+        `[pawapay-deposit] operator mismatch: requested ${provider}, MSISDN maps to ${detectedCorrespondent} — using detected`
+      );
+      provider = detectedCorrespondent;
+    }
     const savedDepositPhones = (depProfile?.deposit_phone_numbers as string[] | null) || [];
     if (savedDepositPhones.length === 0) {
       return NextResponse.json({ error: "Add a deposit phone number in Settings before depositing." }, { status: 400 });

@@ -6,6 +6,7 @@ import { moneySymbol, currencyCodeForCountry } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
 import { getMwkToLocalRate } from "@/lib/geo/fx";
 import { toPawaPayMsisdn } from "@/lib/geo/iso3";
+import { detectPawaPayCorrespondent, PAWAPAY_CORRESPONDENT_NAMES } from "@/lib/payments/pawapay-operators";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,7 +14,10 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { amount, phone, operatorRefId, operatorName, payment_provider, currency, country } = await req.json();
+    const reqBody = await req.json();
+    const { amount, phone, payment_provider, currency, country } = reqBody;
+    let operatorRefId = reqBody.operatorRefId;
+    let operatorName = reqBody.operatorName;
 
     // ─── Load platform config ──────────────────────────────────────────
     const admin = createAdminClient();
@@ -134,6 +138,21 @@ export async function POST(req: NextRequest) {
     // Call the atomic request_withdrawal RPC (debits wallet)
     // Determine payment provider
     const provider = payment_provider || (isMalawi ? "paychangu" : "pawapay");
+
+    // PawaPay operator auto-detection: payouts to a mismatched network fail
+    // with PAYER_NOT_FOUND exactly like deposits (live incident 2026-09-17:
+    // MTN Zambia number routed as ZAMTEL_ZMB). Unknown prefixes keep the
+    // player's manual selection.
+    if (provider === "pawapay") {
+      const detectedCorrespondent = detectPawaPayCorrespondent(country, phone);
+      if (detectedCorrespondent && detectedCorrespondent !== operatorRefId) {
+        console.warn(
+          `[pawapay-withdrawal] operator mismatch: requested ${operatorRefId}, MSISDN maps to ${detectedCorrespondent} — using detected`
+        );
+        operatorRefId = detectedCorrespondent;
+        operatorName = PAWAPAY_CORRESPONDENT_NAMES[detectedCorrespondent] || operatorName;
+      }
+    }
 
     const { data: withdrawalId, error } = await admin.rpc("request_withdrawal", {
       p_user_id: user.id,
