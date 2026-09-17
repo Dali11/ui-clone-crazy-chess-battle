@@ -12,13 +12,15 @@ describe("getPremoveGhosts", () => {
     expect(getPremoveGhosts(START, true, [{ from: "e2", to: "e4" }])).toEqual({ e4: "wP" });
   });
 
-  it("shows a ghost per hop when one piece is chained", () => {
-    // knight chain g1->f3 then "from f3" -> g5
+  it("shows ONE ghost at the chain's end when a piece is chained multiple hops", () => {
+    // knight chain g1->f3 then "from f3" -> g5: the ghost rides the chain
+    // (intermediate destination f3 stops showing a ghost once the knight
+    // is projected further, chess.com-style)
     const ghosts = getPremoveGhosts(START, true, [
       { from: "g1", to: "f3" },
       { from: "f3", to: "g5" },
     ]);
-    expect(ghosts).toEqual({ f3: "wN", g5: "wN" });
+    expect(ghosts).toEqual({ g5: "wN" });
   });
 
   it("shows each piece of a multi-piece chain at its own destination", () => {
@@ -41,16 +43,17 @@ describe("getPremoveGhosts", () => {
       { from: "h8", to: "h6" }, // no white piece there — broken hop
       { from: "e4", to: "e5" }, // valid continuation of the pawn chain
     ]);
-    expect(ghosts).toEqual({ e4: "wP", e5: "wP" });
+    expect(ghosts).toEqual({ e5: "wP" });
   });
 
   it("re-homing a piece from a projected square carries the right piece", () => {
-    // pawn chain e2->e4->e5: the second hop "from e4" must ghost as the same pawn
+    // pawn chain e2->e4->e5: the second hop "from e4" must ghost as the same
+    // pawn, shown only at the chain's end
     const ghosts = getPremoveGhosts(START, true, [
       { from: "e2", to: "e4" },
       { from: "e4", to: "e5" },
     ]);
-    expect(ghosts).toEqual({ e4: "wP", e5: "wP" });
+    expect(ghosts).toEqual({ e5: "wP" });
   });
 
   it("ghosts a capture destination with the moving piece, not the victim", () => {

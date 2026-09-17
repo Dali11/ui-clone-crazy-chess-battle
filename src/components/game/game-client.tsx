@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Chessboard } from "react-chessboard";
 import { customPieces } from "@/lib/game/piece-styles";
 import { getPremoveGhosts } from "@/lib/game/premove-ghost";
-import { getPremoveDestinations } from "@/lib/game/premove-moves";
+import { queuePremove, resolvePremoveGrab } from "@/lib/game/premove-queue";
 import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
 import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Swords, RefreshCw, Radio, Wifi, WifiOff, Share2, Check } from "lucide-react";
@@ -520,47 +520,19 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   // were my turn right now, where could this piece go?" These are premove
   // CANDIDATES only — every premove is re-validated against the real
   // position when it actually executes, so pseudo-legal is fine here.
-  // Projected ("ghost") piece positions after the queued premove chain —
-  // square -> the real origin square of the piece that will sit there if
-  // the whole chain plays out (opponent assumed not to interfere; every
-  // hop is re-validated at execution anyway). This is what lets the player
-  // chain the SAME piece through multiple squares, chess.com-style: after
-  // queuing g1->f3, the knight is projected at f3 and can be grabbed
-  // "from f3" to queue its next hop, and so on.
-  const ghostSquares = useMemo(() => {
-    const map: Record<string, string> = {};
-    try {
-      const g = new Chess(fen);
-      for (const f of ["a", "b", "c", "d", "e", "f", "g", "h"]) {
-        for (const r of ["1", "2", "3", "4", "5", "6", "7", "8"]) {
-          const sq = f + r;
-          const pc = g.get(sq as any);
-          if (pc && ((isWhite && pc.color === "w") || (isBlack && pc.color === "b"))) map[sq] = sq;
-        }
-      }
-      for (const p of premoves) {
-        const origin = map[p.from];
-        if (!origin) continue; // broken chain — later hops dangle until execution cancels
-        delete map[p.from];
-        map[p.to] = origin;
-      }
-    } catch {
-      // keep whatever was mapped so far
-    }
-    return map;
-  }, [fen, premoves, isWhite, isBlack]);
-
   const getPremoveMoves = useCallback(
     (square: string): string[] => {
       // PATTERN-based candidates (chess.com-style), not chess.js legal
       // moves. Legal-move generation asks the wrong question during the
       // opponent's turn — it's what made pawn-take premoves impossible
       // (the take square is EMPTY until the opponent replies) and hid
-      // captures behind enemy pieces. Every premove is re-validated
-      // against the real position at execution time.
-      return getPremoveDestinations(fen, isWhite, square);
+      // captures behind enemy pieces. Candidates are computed on the
+      // piece's PROJECTED position (its square mid-chain after the
+      // queued hops that precede this one), so a chained hop shows where
+      // the piece can actually go from where it will actually be.
+      return resolvePremoveGrab(premoves, fen, isWhite, square).targets;
     },
-    [fen, isWhite]
+    [fen, isWhite, premoves]
   );
 
   // PURE SELECTION LOGIC — never executes moves. react-chessboard fires
@@ -573,21 +545,20 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
     if (!piece || !square) {
       // Empty square during the opponent's turn — if one of our pieces is
-      // PROJECTED here mid-chain, select it to queue its next hop
-      // (chess.com premove chaining). Otherwise clear/cancel as before.
-      if (square && !myTurn && ghostSquares[square]) {
-        // Tapping the projected (ghost) destination re-aims the SAME
-        // piece from its real origin — the queued premove is dropped and
-        // a new destination can be picked for it.
-        const origin = ghostSquares[square];
-        if (premoves.length > 0 || premovePromotion) {
-          setPremoves([]);
-          setPremovePromotion(null);
+      // PROJECTED here mid-chain (ghost), select THAT square to queue its
+      // next hop. The hop originates from the projected square (where the
+      // piece will actually be), and any already-queued next hop of that
+      // piece gets re-aimed instead of the whole queue being dropped.
+      if (square && !myTurn) {
+        const grab = resolvePremoveGrab(premoves, fen, isWhite, square);
+        if (grab.ok) {
+          setSelectedSquare(square);
+          setLegalMoveSquares(grab.targets);
+          return;
         }
-        setSelectedSquare(origin);
-        setLegalMoveSquares(getPremoveMoves(origin));
-        return;
       }
+      // Anything else cancels the queue (chess.com: click a stray square
+      // to undo your premove) and deselects.
       if (premoves.length > 0 || premovePromotion) {
         setPremoves([]);
         setPremovePromotion(null);
@@ -620,14 +591,11 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         setLegalMoveSquares([]);
         return;
       }
-      // Clicked one of OUR pieces — unset any queued premove and select
-      // the piece for a fresh one. Any new premove replaces the queued
-      // one instead of stacking behind it (single-premove semantics,
-      // exactly like chess.com and lichess).
-      if (premoves.length > 0 || premovePromotion) {
-        setPremoves([]);
-        setPremovePromotion(null);
-      }
+      // Clicked one of OUR pieces — select it WITHOUT dropping the queue
+      // (stacked premoves: different pieces' hops coexist). If this piece
+      // already has hops queued, the next premove re-aims its chain —
+      // resolvePremoveGrab computes both the candidates and the replace
+      // point, so nothing else has to decide.
       setSelectedSquare(square);
       setLegalMoveSquares(getPremoveMoves(square));
       return;
@@ -653,7 +621,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     setSelectedSquare(square);
     const moves = game.moves({ square: square as any, verbose: true });
     setLegalMoveSquares(moves.map((m: any) => m.to));
-  }, [isSpectator, myTurn, gameEnded, fen, isWhite, isBlack, isLiveView, selectedSquare, legalMoveSquares, premoves, premovePromotion, getPremoveMoves, ghostSquares]);
+  }, [isSpectator, myTurn, gameEnded, fen, isWhite, isBlack, isLiveView, selectedSquare, legalMoveSquares, premoves, premovePromotion, getPremoveMoves]);
 
   // ALL move and premove execution lives here. react-chessboard fires
   // onSquareClick exactly once per tap — for empty squares directly, and
@@ -692,11 +660,12 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           } catch {}
         }
       } else {
-        // Not our turn — SET the premove. Single-premove semantics like
-        // chess.com/lichess: a new premove replaces any queued one.
+        // Not our turn — QUEUE the premove (stacked, chess.com-style).
+        // The hop is validated at queue time against the piece's
+        // projected position; impossible directions can't be queued.
         // Promotions are detected at EXECUTION time.
-        setPremoves([{ from: selectedSquare, to: square }]);
-        setPremovePromotion(null);
+        const res = queuePremove(premoves, fen, isWhite, selectedSquare, square);
+        if (res.ok) setPremoves(res.queue);
       }
       setSelectedSquare(null);
       setLegalMoveSquares([]);
@@ -704,7 +673,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     }
     // Everything else (selection, deselect, premove cancel) — defer
     handlePieceClick({ square, piece });
-  }, [selectedSquare, legalMoveSquares, myTurn, isPromotionMove, fen, makeMove, handlePieceClick]);
+  }, [selectedSquare, legalMoveSquares, myTurn, isPromotionMove, fen, makeMove, handlePieceClick, premoves, isWhite]);
 
   const onDrop = useCallback(
     (sourceSquare: string, targetSquare: string): boolean => {
@@ -750,19 +719,17 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         setPremovePromotion(null);
         return false;
       }
-      // Resolve the drag source: a piece on its real square, or the same
-      // piece on its PROJECTED destination (drag the ghost to re-aim it).
-      const game = new Chess(fen);
-      const piece = game.get(sourceSquare as any);
-      const isMyPiece = piece && ((isWhite && piece.color === "w") || (isBlack && piece.color === "b"));
-      const realOrigin = isMyPiece ? sourceSquare : ghostSquares[sourceSquare];
-      if (!realOrigin) return false;
-      // Single-premove semantics (chess.com/lichess): the new destination
-      // replaces whatever was queued.
-      setPremoves([{ from: realOrigin, to: targetSquare }]);
+      // Queue-time validation: the hop is only accepted if the piece can
+      // actually reach the target from its projected position (real
+      // square, or ghost square mid-chain). An impossible direction snaps
+      // back NOW — immediate feedback instead of a silent cancel when
+      // the turn arrives.
+      const res = queuePremove(premoves, fen, isWhite, sourceSquare, targetSquare);
+      if (!res.ok) return false;
+      setPremoves(res.queue);
       return true;
     },
-    [isSpectator, myTurn, gameEnded, fen, makeMove, isPromotionMove, isWhite, isBlack, isLiveView, premoves, ghostSquares]
+    [isSpectator, myTurn, gameEnded, fen, makeMove, isPromotionMove, isWhite, isBlack, isLiveView, premoves]
   );
 
   const handlePromotionSelect = useCallback((piece: "q" | "r" | "b" | "n") => {

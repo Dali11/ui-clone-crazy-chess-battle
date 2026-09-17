@@ -49,6 +49,10 @@ export function getPremoveGhosts(
       if (!pieceKey) continue; // broken chain — later hops dangle until execution cancels
       delete map[p.from];
       map[p.to] = pieceKey;
+      // The ghost moves along the chain: a later hop of the SAME piece
+      // supersedes the ghost at its intermediate destination, so the
+      // projected piece is shown once, where the chain currently ends.
+      delete ghosts[p.from];
       ghosts[p.to] = pieceKey;
     }
   } catch {
