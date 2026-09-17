@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAll, fetchByIdChunks } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
+import { loadUsdConverter, roundUsd, type UsdConverter } from "@/lib/finance/usd";
+import { getExchangeRate } from "@/lib/geo/fx";
 
 /**
  * GET /api/admin/battles
@@ -58,6 +60,10 @@ export async function GET(req: NextRequest) {
     const sinceISO = rangeStartISO(range) ?? rangeStartISO("7d");
     const stuckCutoffISO = new Date(Date.now() - 60_000).toISOString();
 
+    // Admin reporting currency is USD — stake/pot/fee figures ride along
+    // converted (the Command Centre Battles view never shows raw MWK).
+    const fx = await loadUsdConverter(admin, async () => getExchangeRate("MWK", "USD"));
+
     // Resolve player-id restriction from country/search filters
     let restrictToPlayerIds: string[] | null = null;
     if (country !== "all" || search) {
@@ -69,7 +75,7 @@ export async function GET(req: NextRequest) {
       if (restrictToPlayerIds.length === 0) {
         return NextResponse.json({
           battles: [], total: 0, page, limit,
-          stats: { total: 0, pending: 0, stuck: 0, playing: 0, completed: 0, disputed: 0, cancelled: 0, totalVolume: 0, totalRevenue: 0 },
+          stats: { total: 0, pending: 0, stuck: 0, playing: 0, completed: 0, disputed: 0, cancelled: 0, totalVolume: 0, totalRevenue: 0, totalVolumeUsd: 0, totalRevenueUsd: 0 },
           availableCountries: [],
         });
       }
@@ -113,6 +119,10 @@ export async function GET(req: NextRequest) {
       const isStuck = b.status === "pending" && (b.game_id ? true : new Date(b.created_at).getTime() < now - 60_000);
       return {
         ...b,
+        stakeUsd: roundUsd(fx.usdFromMwk(Number(b.stake || 0)) ?? 0),
+        potUsd: roundUsd(fx.usdFromMwk(Number(b.pot || 0)) ?? 0),
+        platformFeeUsd: roundUsd(fx.usdFromMwk(Number(b.platform_fee || 0)) ?? 0),
+        winnerPayoutUsd: roundUsd(fx.usdFromMwk(Number(b.winner_payout || 0)) ?? 0),
         white_player: playerMap.get(b.white_player_id) || null,
         black_player: playerMap.get(b.black_player_id) || null,
         winner: b.winner_id ? playerMap.get(b.winner_id) || null : null,
@@ -121,7 +131,7 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    const stats = await computeStats(admin, applyCommonFilters, stuckCutoffISO);
+    const stats = await computeStats(admin, applyCommonFilters, stuckCutoffISO, fx);
     const availableCountries = await getAvailableCountries(admin, sinceISO);
 
     return NextResponse.json({ battles: enrichedBattles, total: count ?? 0, page, limit, stats, availableCountries });
@@ -143,7 +153,7 @@ function applyStatusFilter(q: any, statusFilter: string, stuckCutoffISO: string)
   }
 }
 
-async function computeStats(admin: ReturnType<typeof createAdminClient>, applyCommonFilters: (q: any) => any, stuckCutoffISO: string) {
+async function computeStats(admin: ReturnType<typeof createAdminClient>, applyCommonFilters: (q: any) => any, stuckCutoffISO: string, fx: UsdConverter) {
   const countFor = async (statusFilter: string) => {
     let q = admin.from("battles").select("id", { count: "exact", head: true });
     q = applyCommonFilters(q);
@@ -166,7 +176,12 @@ async function computeStats(admin: ReturnType<typeof createAdminClient>, applyCo
   const totalVolume = revenueRows.reduce((sum: number, b: any) => sum + (b.pot || 0), 0);
   const totalRevenue = revenueRows.reduce((sum: number, b: any) => sum + (b.platform_fee || 0), 0);
 
-  return { total, pending, stuck, playing, completed, disputed, cancelled, totalVolume, totalRevenue };
+  return {
+    total, pending, stuck, playing, completed, disputed, cancelled,
+    totalVolume, totalRevenue,
+    totalVolumeUsd: roundUsd(fx.usdFromMwk(totalVolume) ?? 0),
+    totalRevenueUsd: roundUsd(fx.usdFromMwk(totalRevenue) ?? 0),
+  };
 }
 
 async function getAvailableCountries(admin: ReturnType<typeof createAdminClient>, sinceISO: string | null) {

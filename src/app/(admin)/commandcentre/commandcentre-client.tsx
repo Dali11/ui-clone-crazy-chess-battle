@@ -41,7 +41,7 @@ import {
 import { LedgerView, DepositsView, WithdrawalsView } from "./phase2-finance";
 import { ReconciliationView, PlayersView } from "./phase2-recon";
 import { ControlsView } from "./phase3-controls";
-import { TournamentsView, GamesView } from "./phase4-tournaments";
+import { TournamentsView, GamesView, BattlesView } from "./phase4-tournaments";
 import { MarketsView, SettlementsView, ReportsView, AuditView, VerificationView } from "./phase2-ops";
 
 type View =
@@ -61,6 +61,7 @@ type View =
   | "markets"
   | "tournaments"
   | "games"
+  | "battles"
   | "controls";
 
 const RANGE_CHIPS: Array<[RangePresetUi, string]> = [
@@ -74,6 +75,7 @@ const RANGE_CHIPS: Array<[RangePresetUi, string]> = [
 
 const VIEW_META: Record<string, { title: string; sub: string; txType?: string }> = {
   dashboard: { title: "Dashboard", sub: "Financial & operational pulse of CrazyChess" },
+  battles: { title: "Battles", sub: "Staked battles — set result, abort & refund, restart stuck matches" },
   "finance-overview": { title: "Finance · Overview", sub: "Revenue performance across all streams" },
   "finance-transactions": { title: "Finance · Transactions", sub: "Unified activity feed", txType: "all" },
   ledger: { title: "Finance · Transaction Ledger", sub: "Every money movement — CrazyChess ↔ pawaPay reconciliation-ready" },
@@ -343,6 +345,7 @@ export default function CommandCentreClient() {
       {navGroup("Operations", "operations",
         <>
           {navItem("tournaments", "Tournaments")}
+          {navItem("battles", "Battles")}
           {navItem("games", "Games")}
           {navItem("reconciliation", "Reconciliation")}
           {navItem("audit", "Audit Log")}
@@ -473,6 +476,7 @@ export default function CommandCentreClient() {
             {view === "verification" && <VerificationView />}
             {view === "controls" && <ControlsView />}
             {view === "tournaments" && <TournamentsView />}
+            {view === "battles" && <BattlesView />}
             {view === "games" && <GamesView />}
           </div>
         ) : loading && !data ? (

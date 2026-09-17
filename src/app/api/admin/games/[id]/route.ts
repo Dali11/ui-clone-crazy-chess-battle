@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { loadUsdConverter, roundUsd } from "@/lib/finance/usd";
+import { getExchangeRate } from "@/lib/geo/fx";
 import { Chess } from "chess.js";
 
 /**
@@ -63,6 +65,7 @@ export async function GET(
 
     const url = new URL(req.url);
     const engine = url.searchParams.get("engine") === "draughts" ? "draughts" : "chess";
+    const fx = await loadUsdConverter(admin, async () => getExchangeRate("MWK", "USD"));
 
     let game: any = null;
 
@@ -136,6 +139,17 @@ export async function GET(
       .or(`game_id.eq.${id},armageddon_game_id.eq.${id}`)
       .maybeSingle();
 
+    // Admin display currency is USD — convert the money figures so the
+    // Command Centre drawer never shows raw MWK.
+    const battleUsd = battle
+      ? {
+          stakeUsd: roundUsd(fx.usdFromMwk(Number(battle.stake || 0)) ?? 0),
+          potUsd: roundUsd(fx.usdFromMwk(Number(battle.pot || 0)) ?? 0),
+          platformFeeUsd: roundUsd(fx.usdFromMwk(Number(battle.platform_fee || 0)) ?? 0),
+          winnerPayoutUsd: roundUsd(fx.usdFromMwk(Number(battle.winner_payout || 0)) ?? 0),
+        }
+      : null;
+
     // Extract moves
     let moves: string[] = [];
 
@@ -167,7 +181,7 @@ export async function GET(
       game,
       white,
       black,
-      battle: battle || null,
+      battle: battle ? { ...battle, ...battleUsd } : null,
       moves,
     });
   } catch (e: any) {
