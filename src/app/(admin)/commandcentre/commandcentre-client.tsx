@@ -41,6 +41,7 @@ import {
 import { LedgerView, DepositsView, WithdrawalsView } from "./phase2-finance";
 import { ReconciliationView, PlayersView } from "./phase2-recon";
 import { ControlsView } from "./phase3-controls";
+import { TournamentsView, GamesView } from "./phase4-tournaments";
 import { MarketsView, SettlementsView, ReportsView, AuditView, VerificationView } from "./phase2-ops";
 
 type View =
@@ -58,6 +59,8 @@ type View =
   | "verification"
   | `rev-${RevenueStream}`
   | "markets"
+  | "tournaments"
+  | "games"
   | "controls";
 
 const RANGE_CHIPS: Array<[RangePresetUi, string]> = [
@@ -79,6 +82,8 @@ const VIEW_META: Record<string, { title: string; sub: string; txType?: string }>
   reconciliation: { title: "Reconciliation", sub: "Does the money recorded by CrazyChess match the money processed by pawaPay?" },
   players: { title: "Players · Wallet & Management", sub: "Balances derived from the ledger, plus wallet adjustments, bans and roles" },
   controls: { title: "Financial Controls", sub: "Money levers for the platform — fees, limits, pricing and payouts" },
+  tournaments: { title: "Operations · Tournaments", sub: "Full lifecycle control — platform and player-created events" },
+  games: { title: "Operations · Games", sub: "Chess & draughts oversight — abort and result override" },
   settlements: { title: "Settlements", sub: "Money between the payment infrastructure and CrazyChess accounts" },
   reports: { title: "Financial Reports", sub: "Downloadable reports, consolidated in USD" },
   audit: { title: "Financial Audit Log", sub: "Every financial admin action — immutable" },
@@ -92,7 +97,7 @@ const VIEW_META: Record<string, { title: string; sub: string; txType?: string }>
 };
 
 /** Self-fetching Phase 2 section views (independent of the overview API). */
-const PHASE2_VIEWS = new Set<View>(["ledger", "deposits", "withdrawals", "reconciliation", "players", "settlements", "reports", "audit", "markets", "verification", "controls"]);
+const PHASE2_VIEWS = new Set<View>(["ledger", "deposits", "withdrawals", "reconciliation", "players", "settlements", "reports", "audit", "markets", "verification", "controls", "tournaments", "games"]);
 
 
 export default function CommandCentreClient() {
@@ -109,6 +114,7 @@ export default function CommandCentreClient() {
     players: "players", verification: "players",
     reconciliation: "operations", audit: "operations", settlements: "operations",
     reports: "operations", markets: "operations", controls: "operations",
+    tournaments: "operations", games: "operations",
   };
   useEffect(() => {
     const g = GROUP_OF[view];
@@ -336,6 +342,8 @@ export default function CommandCentreClient() {
       )}
       {navGroup("Operations", "operations",
         <>
+          {navItem("tournaments", "Tournaments")}
+          {navItem("games", "Games")}
           {navItem("reconciliation", "Reconciliation")}
           {navItem("audit", "Audit Log")}
           {navItem("settlements", "Settlements")}
@@ -464,6 +472,8 @@ export default function CommandCentreClient() {
             {view === "audit" && <AuditView />}
             {view === "verification" && <VerificationView />}
             {view === "controls" && <ControlsView />}
+            {view === "tournaments" && <TournamentsView />}
+            {view === "games" && <GamesView />}
           </div>
         ) : loading && !data ? (
           <div className="flex h-64 items-center justify-center">

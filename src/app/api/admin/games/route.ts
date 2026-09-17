@@ -23,13 +23,20 @@ export async function GET(req: NextRequest) {
     // names for the fields selected here).
     const engine = url.searchParams.get("engine") === "draughts" ? "draughts" : "chess";
 
+    // tournament_id exists only on the chess games table (draughts games are
+    // never tournament-linked) — include it for chess so the admin UI can
+    // hide Abort on tournament pairings.
+    const selectCols = engine === "draughts"
+      ? `id, status, time_control, rated, white_player_id, black_player_id,
+         white_rating, black_rating, winner, created_at, ended_at,
+         move_count`
+      : `id, status, time_control, rated, white_player_id, black_player_id,
+         white_rating, black_rating, winner, created_at, ended_at,
+         move_count, tournament_id`;
+
     let query = admin
       .from(engine === "draughts" ? "draughts_games" : "games")
-      .select(`
-        id, status, time_control, rated, white_player_id, black_player_id,
-        white_rating, black_rating, winner, created_at, ended_at,
-        move_count
-      `)
+      .select(selectCols as any)
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -37,7 +44,8 @@ export async function GET(req: NextRequest) {
       query = query.eq("status", status);
     }
 
-    const { data: games, error } = await query;
+    const { data, error } = await query;
+    const games = (data as any[] | null);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     // Get player usernames
@@ -84,25 +92,34 @@ export async function PATCH(req: NextRequest) {
       .from("profiles").select("is_admin").eq("id", user.id).single();
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const { gameId, action, winner, note } = await req.json();
+    const { gameId, action, winner, note, engine } = await req.json();
     if (!gameId || !action) return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
+
+    // ENGINE 2026-09-17: the PATCH previously hard-coded the chess `games`
+    // table, so abort/override on a draughts game silently no-op'd. Draughts
+    // games have no tournament_id/tournament_round columns and are never
+    // battle-linked, so those paths stay chess-only.
+    const isDraughts = engine === "draughts";
+    const engineTable = isDraughts ? "draughts_games" : "games";
 
     let tournamentRecorded = false;
 
     if (action === "abort") {
-      const { data: abortGame } = await admin
-        .from("games")
-        .select("tournament_id")
-        .eq("id", gameId)
-        .single();
-      if (abortGame?.tournament_id) {
-        return NextResponse.json(
-          { error: "This is a tournament game — aborting it would leave the pairing unrecorded and stall the round. Use the result override instead." },
-          { status: 409 }
-        );
+      if (!isDraughts) {
+        const { data: abortGame } = await admin
+          .from("games")
+          .select("tournament_id")
+          .eq("id", gameId)
+          .single();
+        if (abortGame?.tournament_id) {
+          return NextResponse.json(
+            { error: "This is a tournament game — aborting it would leave the pairing unrecorded and stall the round. Use the result override instead." },
+            { status: 409 }
+          );
+        }
       }
       const { error } = await admin
-        .from("games")
+        .from(engineTable)
         .update({ status: "abort", winner: null, ended_at: new Date().toISOString() })
         .eq("id", gameId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -111,11 +128,14 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: "Invalid winner. Must be 'white', 'black', or 'draw'" }, { status: 400 });
       }
 
-      const { data: game, error: gameErr } = await admin
-        .from("games")
-        .select("id, status, white_player_id, black_player_id, winner, rated, tournament_id, tournament_round")
+      const { data: gameRaw, error: gameErr } = await admin
+        .from(engineTable)
+        .select(isDraughts
+          ? "id, status, white_player_id, black_player_id, winner, rated"
+          : "id, status, white_player_id, black_player_id, winner, rated, tournament_id, tournament_round" as any)
         .eq("id", gameId)
         .single();
+      const game = gameRaw as any;
 
       if (gameErr || !game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
 
@@ -168,7 +188,7 @@ export async function PATCH(req: NextRequest) {
       const winnerValue = winner === "draw" ? null : winner;
 
       const { error: updateErr } = await admin
-        .from("games")
+        .from(engineTable)
         .update({
           status: gameStatus,
           winner: winnerValue,
@@ -179,11 +199,15 @@ export async function PATCH(req: NextRequest) {
       if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
       // Handle battle settlement if this game is linked to a battle
-      const { data: battle } = await admin
-        .from("battles")
-        .select("id, settled, white_player_id, black_player_id, stake, winner_payout")
-        .or(`game_id.eq.${gameId},armageddon_game_id.eq.${gameId}`)
-        .single();
+      // (chess only — draughts games are never battle-linked)
+      let battle: any = null;
+      if (!isDraughts) {
+        ({ data: battle } = await admin
+          .from("battles")
+          .select("id, settled, white_player_id, black_player_id, stake, winner_payout")
+          .or(`game_id.eq.${gameId},armageddon_game_id.eq.${gameId}`)
+          .single());
+      }
 
       if (battle && !battle.settled) {
         let winnerId: string | null = null;
