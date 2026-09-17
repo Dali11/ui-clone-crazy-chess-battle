@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Trophy, X, Zap, Clock, Users, DollarSign, AlertCircle } from "lucide-react";
+import { useCurrency } from "@/hooks/use-currency";
 
 type PopupTournament = {
   id: string;
@@ -66,6 +67,7 @@ function formatResumeDate(isoString: string): string {
 }
 
 export default function TournamentPopup() {
+  const { formatMoney: fmtCurrency } = useCurrency();
   const [tournament, setTournament] = useState<PopupTournament | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -218,7 +220,7 @@ export default function TournamentPopup() {
               {tournament.entry_fee ? (
                 <span className="flex items-center gap-1 text-ccb-success">
                   <DollarSign className="w-3 h-3" />
-                  {tournament.entry_fee} MK
+                  {fmtCurrency(tournament.entry_fee)}
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-ccb-success font-medium">

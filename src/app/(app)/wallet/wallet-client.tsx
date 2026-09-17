@@ -107,6 +107,17 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const depositMinMwk = withdrawConfig?.deposit_min_amount || 1000;
   const depositMinLocal = isMalawi ? depositMinMwk : (fxLoaded && fxRate && fxRate !== 1 ? convert(depositMinMwk) : 1);
   const formatAmt = (amount: number) => fmtCurrency(amount || 0);
+
+  // Non-Malawi players: the form's initial "1000" default is LOCAL currency
+  // (ZK 1,000 ≈ $52) — a trap that made a Zambian player attempt four
+  // ZMW 1,000 deposits he never intended (2026-09-17). Once the real FX
+  // rate loads, reset an untouched field to the converted minimum so the
+  // player consciously raises it. Malawi keeps the MK 1,000 default.
+  const [depositTouched, setDepositTouched] = useState(false);
+  useEffect(() => {
+    if (isMalawi || !fxLoaded || depositTouched) return;
+    if (depositMinLocal > 0) setDepositAmount(depositMinLocal);
+  }, [isMalawi, fxLoaded, depositTouched, depositMinLocal]);
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
   // Auto-select the mobile money provider that matches the active
@@ -559,7 +570,10 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
             <input
               type="number"
               value={depositAmount}
-              onChange={(e) => setDepositAmount(Math.max(depositMinLocal, parseInt(e.target.value) || 0))}
+              onChange={(e) => {
+                setDepositTouched(true);
+                setDepositAmount(Math.max(depositMinLocal, parseInt(e.target.value) || 0));
+              }}
               className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
             />
             <p className="text-xs text-ccb-muted mt-2">

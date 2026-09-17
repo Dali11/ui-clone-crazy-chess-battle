@@ -48,10 +48,10 @@ export async function POST(req: NextRequest) {
     const maxFee = tConfig.max_entry_fee ?? 5000;
     const minFee = tConfig.min_entry_fee ?? 0;
     if (fee > maxFee) {
-      return NextResponse.json({ error: `Entry fee cannot exceed ${maxFee.toLocaleString()}` }, { status: 400 });
+      return NextResponse.json({ error: `Entry fee cannot exceed ${maxFee.toLocaleString()} MWK` }, { status: 400 });
     }
     if (fee < minFee) {
-      return NextResponse.json({ error: `Entry fee must be at least ${minFee.toLocaleString()}` }, { status: 400 });
+      return NextResponse.json({ error: `Entry fee must be at least ${minFee.toLocaleString()} MWK` }, { status: 400 });
     }
 
     // Enforce max players limit from platform settings

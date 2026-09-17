@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 import Link from "next/link";
 import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight, Target, Gamepad2, Crown, MessageCircle } from "lucide-react";
 import WhatsAppBanner from "@/components/layout/whatsapp-banner";
@@ -84,6 +85,16 @@ export default async function DashboardPage() {
 
   const recentGames = recentGamesRes.data;
   const activeTournaments = activeTournamentsRes.data;
+  // Entry fees are MWK-denominated in the DB — display them converted to
+  // each viewer's wallet currency (Zambians/Kenyans previously saw the raw
+  // MWK number behind their local symbol, e.g. "ZK 1,000" for a ZK 11 fee).
+  const tFeeLabels = await Promise.all(
+    (activeTournaments || []).map(async (t: any) => [
+      t.id,
+      t.entry_fee ? await formatMoneyConverted(t.entry_fee, profile?.country) : null,
+    ])
+  );
+  const feeLabelById = new Map(tFeeLabels as [string, string | null][]);
 
   // Fetch opponent profiles for recent games display
   const recentOpponentIds = new Set<string>();
@@ -247,7 +258,7 @@ export default async function DashboardPage() {
                       <div className="text-sm font-medium truncate">{t.name}</div>
                       <div className="text-xs text-ccb-muted">
                         {new Date(t.starts_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}, {new Date(t.starts_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                        {t.entry_fee ? ` · ${moneySymbol(profile?.country)} ${t.entry_fee}` : " · Free"}
+                        {t.entry_fee ? ` · ${feeLabelById.get(t.id) ?? ""}` : " · Free"}
                       </div>
                     </div>
                   </div>
