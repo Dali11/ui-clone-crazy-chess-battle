@@ -620,7 +620,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                          joinReason === 'full' ? 'Tournament is full' :
                          joinReason === 'rating_too_low' ? `Requires rating ${t.min_rating}+` :
                          joinReason === 'rating_too_high' ? `Max rating ${t.max_rating}` :
-                         joinReason === 'already_started' ? 'Tournament has started' :
+                         joinReason === 'already_started' ? 'Registration closed — knockout brackets are fixed at start' :
                          joinReason === 'completed' ? 'Tournament has ended' :
                          'Not available to join'}
                       </p>

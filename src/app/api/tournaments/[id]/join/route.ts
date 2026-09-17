@@ -51,6 +51,18 @@ export async function POST(
       );
     }
 
+    // Knockout brackets are generated once at start from the registered
+    // players. A participant joining after that would never be paired into
+    // any round — while still paying the entry fee — so block the join and
+    // say so clearly. (Arena and swiss legitimately support late joins:
+    // arena matchmaking waves and swiss per-round pairing pick up everyone.)
+    if (tournament.type === "knockout" && tournament.status === "active") {
+      return NextResponse.json(
+        { error: "Registration is closed — knockout tournaments can't be joined after they start" },
+        { status: 400 }
+      );
+    }
+
     // Check capacity if max_players is set
     if (tournament.max_players) {
       const { count } = await admin

@@ -147,6 +147,10 @@ export async function GET(
     } else if (isRegistered) {
       canJoin = false;
       joinReason = 'already_registered';
+    } else if (tournament.status === 'active' && tournament.type === 'knockout') {
+      // Bracket fixed at start — late joiners can never be paired
+      canJoin = false;
+      joinReason = 'already_started';
     } else if (tournament.max_players && (participants?.length || 0) >= tournament.max_players) {
       canJoin = false;
       joinReason = 'full';
