@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Trophy, Crown, Swords, Calendar, Users, RefreshCw, ShieldAlert,
-  CheckCircle2, Lock, Zap, Clock, DollarSign, Sparkles, Target, TrendingUp,
+  CheckCircle2, Lock, Zap, Clock, DollarSign, Sparkles, Target, TrendingUp, Plus,
 } from 'lucide-react';
 import { useCurrency } from '@/hooks/use-currency';
 import AdSlot from '@/components/ads/ad-slot';
@@ -143,6 +143,9 @@ export default function TournamentsPage() {
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Tournaments</h1>
           <p className="text-sm text-ccb-muted mt-1">Swiss · Arena · Knockout — play, climb, win.</p>
           <div className="flex items-center gap-2 mt-4">
+            <Link href="/tournaments/create" className="btn-primary text-xs px-3.5 py-2">
+              <Plus className="w-3.5 h-3.5" /> Create Tournament
+            </Link>
             <Link href="/league" className="btn-secondary text-xs px-3.5 py-2">
               <Crown className="w-3.5 h-3.5" /> View Leagues
             </Link>

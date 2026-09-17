@@ -1,3 +1,4 @@
+import { CREATOR_PLATFORM_FEE_PERCENT } from "@/lib/tournament/creator-economics";
 /**
  * Shared prize-pool economics calculation.
  *
@@ -22,6 +23,8 @@ export interface TournamentEconomicsInput {
   prize_pool: number | null;
   pool_source: string | null;
   creator_profit_percent: number | null;
+  /** Player-led (non-admin) tournament — platform takes 5% of gross entry fees */
+  is_player_created?: boolean | null;
 }
 
 export interface TournamentEconomics {
@@ -50,8 +53,28 @@ export function computeTournamentEconomics(
     return { totalCollected, platformCut: 0, creatorProfit: 0, actualPrizePool: totalCollected };
   }
 
+  if (tournament.is_player_created) {
+    // Player-led tournament: the platform takes 5% of GROSS first, then the
+    // creator's cut (percentage of gross), and winners split the remainder.
+    // Admin-hosted tournaments are unchanged (no platform cut).
+    const platformCut = Math.floor(
+      totalCollected * (CREATOR_PLATFORM_FEE_PERCENT / 100)
+    );
+    const creatorProfit =
+      creatorProfitPercent > 0
+        ? Math.floor(totalCollected * (creatorProfitPercent / 100))
+        : 0;
+    return {
+      totalCollected,
+      platformCut,
+      creatorProfit,
+      actualPrizePool: totalCollected - platformCut - creatorProfit,
+    };
+  }
+
   if (creatorProfitPercent > 0) {
-    // Creator takes their percentage of the total, rest is the prize pool
+    // Admin-created tournament: creator takes their percentage of the
+    // total, rest is the prize pool. No platform fee.
     const creatorProfit = Math.floor(totalCollected * (creatorProfitPercent / 100));
     const actualPrizePool = totalCollected - creatorProfit;
     return { totalCollected, platformCut: 0, creatorProfit, actualPrizePool };

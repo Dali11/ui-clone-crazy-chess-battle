@@ -1,3 +1,4 @@
+import { settleFixedPoolEntryFees, settlePlayerTournamentCancellation } from "@/lib/tournament/creator-economics";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateSwissPairings, extractPreviousByes } from "@/lib/tournament/swiss-pairing";
@@ -138,6 +139,9 @@ async function handleTournamentCron(req: NextRequest) {
             .select("entry_fee");
 
           if (claimed && claimed.length > 0) {
+            // Player-created fixed pools: return escrow / claw back entry share
+            await settlePlayerTournamentCancellation(admin, tournament.id);
+
             // Refund entry fees to all paid participants
             const entryFee = claimed[0].entry_fee || 0;
             if (entryFee > 0) {
@@ -312,6 +316,10 @@ async function handleTournamentCron(req: NextRequest) {
             .eq("status", "upcoming")
             .select("id");
           if (!claimed || claimed.length === 0) continue;
+
+          // Player-created fixed pools: split collected entry fees 95/5 at start
+          await settleFixedPoolEntryFees(admin, tournament.id);
+
                     await admin.from("tournament_rounds").insert({
             tournament_id: tournament.id,
             round_number: 1,
@@ -396,6 +404,9 @@ async function handleTournamentCron(req: NextRequest) {
         }
 
         await admin.from("tournaments").update({ status: "active", current_round: 1 }).eq("id", tournament.id);
+
+        // Player-created fixed pools: split collected entry fees 95/5 at start
+        await settleFixedPoolEntryFees(admin, tournament.id);
         results.started++;
       } catch (e: any) {
         results.errors.push(`${tournament.name}: ${e.message}`);

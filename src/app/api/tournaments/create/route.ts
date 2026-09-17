@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PRIZE_SPLITS_BY_TYPE, DEFAULT_PRIZE_SPLITS } from "@/lib/tournament/prizes";
 import { getPlatformConfig } from "@/lib/platform-config";
+import { checkCreatorEligibility, escrowFixedPoolPrize, MAX_CREATOR_PROFIT_PERCENT } from "@/lib/tournament/creator-economics";
 import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
@@ -27,6 +28,14 @@ export async function POST(req: NextRequest) {
 
     if (!name || !startsAt) {
       return NextResponse.json({ error: "Tournament name and start time are required" }, { status: 400 });
+    }
+
+    const startMs = new Date(startsAt).getTime();
+    if (Number.isNaN(startMs) || startMs < Date.now() + 15 * 60 * 1000) {
+      return NextResponse.json(
+        { error: "Start time must be at least 15 minutes from now" },
+        { status: 400 }
+      );
     }
 
     const admin = createAdminClient();
@@ -60,10 +69,6 @@ export async function POST(req: NextRequest) {
     const profitPercent = Math.max(0, Math.min(100, Number(creatorProfitPercent) || 0));
     const isPaid = Number(entryFee) > 0;
 
-    // Guard: a fixed prize pool backed by the house is only allowed on a
-    // paid-entry tournament (or by an admin). Free tournaments must use
-    // entry-fee pools (which collect nothing = no cash prize). This
-    // closes the unbacked-payout hole.
 
     const dbType = ["arena", "swiss", "knockout"].includes(type) ? type : "swiss";
     const GAME_TIME_CONTROL_MAP: Record<string, string> = {
@@ -78,11 +83,37 @@ export async function POST(req: NextRequest) {
       .from("profiles").select("is_admin").eq("id", user.id).single();
     const isCreatorAdmin = creatorProfile?.is_admin ?? false;
 
-    if (poolSource === "fixed" && !isPaid && !isCreatorAdmin) {
-      return NextResponse.json(
-        { error: "Fixed prize pools require a paid entry. Free tournaments can use entry-fee pools instead." },
-        { status: 400 }
-      );
+    // ── Player-created tournaments: qualification + economics guardrails ──
+    let finalProfitPercent = profitPercent;
+    let escrowAmountMwk = 0;
+
+    if (!isCreatorAdmin) {
+      // KYC + platform activity gate
+      const eligibility = await checkCreatorEligibility(admin, user.id);
+      if (!eligibility.ok) {
+        return NextResponse.json({ error: eligibility.reason }, { status: 403 });
+      }
+
+      if (poolSource === "entry_fees" && isPaid && profitPercent > MAX_CREATOR_PROFIT_PERCENT) {
+        return NextResponse.json(
+          { error: `Creator profit is capped at ${MAX_CREATOR_PROFIT_PERCENT}% on player tournaments` },
+          { status: 400 }
+        );
+      }
+
+      if (poolSource === "fixed") {
+        // Player-funded prize: escrowed from the creator's wallet at creation.
+        // Entry fee is optional (free-entry funded prize is allowed).
+        escrowAmountMwk = Number(prizePool) || 0;
+        if (escrowAmountMwk <= 0) {
+          return NextResponse.json(
+            { error: "Fixed prize pool tournaments require a prize amount, funded from your wallet" },
+            { status: 400 }
+          );
+        }
+        // Income comes from the entry-fee split at start, not a % of the prize.
+        finalProfitPercent = 0;
+      }
     }
 
     // Determine approval status based on platform settings
@@ -111,7 +142,8 @@ export async function POST(req: NextRequest) {
         entry_fee: Number(entryFee || 0),
         prize_pool: poolSource === 'fixed' ? (Number(prizePool) || 0) : (isPaid ? 0 : Number(entryFee || 0)),
         pool_source: poolSource === 'fixed' ? 'fixed' : 'entry_fees',
-        creator_profit_percent: isPaid ? profitPercent : 0,
+        creator_profit_percent: isPaid ? finalProfitPercent : 0,
+        is_player_created: !isCreatorAdmin,
         prize_distribution: { type: "percentage", payouts },
         min_rating: Number(minRating || 0),
         max_rating: maxRating ? Number(maxRating) : null,
@@ -124,6 +156,21 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Escrow the fixed prize pool from the creator's wallet (players only).
+    if (escrowAmountMwk > 0) {
+      const escrowErr = await escrowFixedPoolPrize(
+        admin,
+        tournament.id,
+        user.id,
+        escrowAmountMwk
+      );
+      if (escrowErr) {
+        // Roll back the tournament row so no unbacked prize can exist.
+        await admin.from("tournaments").delete().eq("id", tournament.id);
+        return NextResponse.json({ error: escrowErr }, { status: 402 });
+      }
     }
 
     // ── Send announcement emails to all users if tournament is live ──
@@ -155,7 +202,7 @@ export async function POST(req: NextRequest) {
                   rounds: rounds ? Number(rounds) : null,
                   durationMinutes: durationMinutes ? Number(durationMinutes) : null,
                   poolSource: poolSource === "fixed" ? "fixed" : "entry_fees",
-                  creatorProfitPercent: isPaid ? profitPercent : 0,
+                  creatorProfitPercent: isPaid ? finalProfitPercent : 0,
                 },
               })
             );

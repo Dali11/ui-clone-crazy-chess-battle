@@ -1,3 +1,4 @@
+import { settleFixedPoolEntryFees, settlePlayerTournamentCancellation } from "@/lib/tournament/creator-economics";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateKnockoutBracket, knockoutRoundCount, generateGroups, generateGroupRoundRobin } from "@/lib/tournament/knockout";
@@ -60,6 +61,9 @@ async function handleAutoStart(req: NextRequest) {
             continue;
           }
 
+          // Player-created fixed pools: return escrow / claw back entry share
+          await settlePlayerTournamentCancellation(admin, tournament.id);
+
           // Refund entry fees
           if (tournament.entry_fee && tournament.entry_fee > 0) {
             for (const p of participants || []) {
@@ -103,6 +107,9 @@ async function handleAutoStart(req: NextRequest) {
           .from("tournaments")
           .update({ status: "active", started_at: now })
           .eq("id", tournament.id);
+
+        // Player-created fixed pools: split collected entry fees 95/5 at start
+        await settleFixedPoolEntryFees(admin, tournament.id);
 
         started++;
       } catch (err: any) {

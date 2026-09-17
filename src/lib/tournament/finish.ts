@@ -32,6 +32,7 @@ export async function finishTournament(tournamentId: string): Promise<void> {
       creator_profit_percent,
       created_by,
       pool_source,
+      is_player_created,
       status,
       type
     `)
@@ -155,10 +156,11 @@ export async function finishTournament(tournamentId: string): Promise<void> {
   }
 
   // Calculate prize distribution (shared with admin revenue view + public display)
-  const { totalCollected, creatorProfit, actualPrizePool } =
+  const { totalCollected, creatorProfit, platformCut, actualPrizePool } =
     computeTournamentEconomics(tournament);
   const creatorProfitPercent = tournament.creator_profit_percent || 0;
   const isFixedPool = tournament.pool_source === "fixed";
+  const isPlayerCreated = tournament.is_player_created === true;
 
   if (totalCollected > 0) {
     // Distribute the actual prize pool to winners
@@ -175,7 +177,10 @@ export async function finishTournament(tournamentId: string): Promise<void> {
       );
     }
 
-    if (!isFixedPool && creatorProfitPercent > 0) {
+    // Settle creator economics for entry-fee (non-fixed) pools. Fixed pools
+    // need no settlement here: the player-funded prize is distributed in
+    // full above, and its entry fees were already split at start.
+    if (!isFixedPool && (creatorProfitPercent > 0 || isPlayerCreated)) {
       // Credit creator profit to creator's wallet
       if (creatorProfit > 0 && tournament.created_by) {
         await admin.rpc("credit_wallet", {
@@ -193,6 +198,16 @@ export async function finishTournament(tournamentId: string): Promise<void> {
         });
       }
 
+      // Persist the platform's 5% cut of gross for player-led tournaments
+      // (atomic claim 0 -> fee keeps re-runs from double-counting revenue).
+      if (isPlayerCreated && platformCut > 0) {
+        await admin
+          .from("tournaments")
+          .update({ platform_fee_collected: platformCut })
+          .eq("id", tournamentId)
+          .eq("platform_fee_collected", 0);
+      }
+
       // Update tournament with the economics breakdown
       await admin
         .from("tournaments")
@@ -201,7 +216,7 @@ export async function finishTournament(tournamentId: string): Promise<void> {
             ...(tournament.prize_distribution || {}),
             economics: {
               totalCollected,
-              platformCut: 0,
+              platformCut,
               creatorProfit,
               creatorProfitPercent,
               actualPrizePool,

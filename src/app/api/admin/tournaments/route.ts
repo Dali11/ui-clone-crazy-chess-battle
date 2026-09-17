@@ -1,3 +1,4 @@
+import { settleFixedPoolEntryFees, settlePlayerTournamentCancellation } from "@/lib/tournament/creator-economics";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
         id, name, description, type, status, time_control, initial_minutes, increment_seconds,
         entry_fee, prize_pool, prize_distribution, pool_source,
         max_players, min_players, min_rating, max_rating, current_round, rounds, duration_minutes,
-        creator_profit_percent,
+        creator_profit_percent, is_player_created, entry_fees_collected, platform_fee_collected,
         starts_at, ends_at, created_at, created_by
       `)
       .order("created_at", { ascending: false })
@@ -258,6 +259,9 @@ export async function PATCH(req: NextRequest) {
         }
       }
 
+      // Player-created fixed pools: return the escrowed prize to the creator
+      await settlePlayerTournamentCancellation(admin, tournamentId);
+
       try {
         await admin.from("admin_logs").insert({
           admin_id: user.id, action: "tournament_rejected",
@@ -283,6 +287,11 @@ export async function PATCH(req: NextRequest) {
       }
 
       const entryFee = claimed[0].entry_fee || 0;
+
+      // Player-created fixed pools: claw back the creator's entry share
+      // (active cancels) or return the escrow (upcoming cancels) first, so
+      // participant refunds below are fully funded.
+      await settlePlayerTournamentCancellation(admin, tournamentId);
 
       if (entryFee > 0) {
         const { data: participants } = await admin
@@ -406,6 +415,19 @@ export async function DELETE(req: NextRequest) {
         }
       }
     }
+
+    // Player-created fixed pools: settle escrow before deletion. Free-entry
+    // funded tournaments skip the entry-fee claim above, so claim-cancel here
+    // first — the settlement helper is idempotent and status-guarded.
+    await admin
+      .from("tournaments")
+      .update({ status: "cancelled", ended_at: new Date().toISOString() })
+      .eq("id", tournamentId)
+      .in("status", ["upcoming", "active"])
+      .eq("is_player_created", true)
+      .select("id")
+      .then(() => {}, () => {});
+    await settlePlayerTournamentCancellation(admin, tournamentId);
 
     // Delete participants, then the tournament
     await admin.from("tournament_participants").delete().eq("tournament_id", tournamentId);

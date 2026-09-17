@@ -78,6 +78,9 @@ export interface Tournament {
   prize_pool: number;
   pool_source: string | null;
   creator_profit_percent: number | null;
+  is_player_created?: boolean | null;
+  entry_fees_collected?: number | null;
+  platform_fee_collected?: number | null;
   prize_distribution: any;
   max_players: number | null;
   min_players: number | null;

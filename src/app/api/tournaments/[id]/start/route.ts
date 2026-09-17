@@ -1,3 +1,4 @@
+import { settleFixedPoolEntryFees, settlePlayerTournamentCancellation } from "@/lib/tournament/creator-economics";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -373,6 +374,9 @@ export async function POST(
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
+
+    // Player-created fixed pools: split collected entry fees 95/5 at start
+    await settleFixedPoolEntryFees(admin, tournamentId);
 
     // Send notifications to all participants
     const notifData = { tournamentName: tournament.name, tournamentId, startTime: scheduledStart.toISOString() };

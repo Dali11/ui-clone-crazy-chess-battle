@@ -284,6 +284,9 @@ export default function TournamentsPanel({
                       {t.pool_source === 'fixed' && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-ccb-accent/10 text-ccb-accent border border-ccb-accent/30">FIXED</span>
                       )}
+                      {t.is_player_created && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30">PLAYER{t.pool_source === 'fixed' ? ' · ESCROW' : ''}</span>
+                      )}
                     </div>
                     {t.description && (
                       <div className="text-xs text-ccb-muted mt-1 line-clamp-1">{t.description}</div>

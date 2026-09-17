@@ -28,7 +28,7 @@ export async function POST(
     // Verify tournament exists and is upcoming
     const { data: tournament, error: tErr } = await admin
       .from("tournaments")
-      .select("id, type, status, max_players, min_rating, max_rating, entry_fee, prize_pool, pool_source")
+      .select("id, type, status, max_players, min_rating, max_rating, entry_fee, prize_pool, pool_source, is_player_created")
       .eq("id", tournamentId)
       .single();
 
@@ -163,7 +163,11 @@ export async function POST(
       paidEntryFee = true;
       didDebit = true;
 
-      // Add entry fee to prize pool ONLY if pool_source is 'entry_fees' (not 'fixed').
+      // Entry-fee accounting, by pool ownership:
+      //  - entry_fees mode: fees accumulate into the gross prize pool (as before)
+      //  - fixed pool (admin-hosted): fee is pure platform revenue (affiliate-eligible)
+      //  - fixed pool (player-created): fees are tracked in entry_fees_collected
+      //    and split 95/5 to the creator/platform when the tournament starts
       // Uses an atomic RPC (single UPDATE) instead of read-then-write, which
       // silently lost increments when multiple players joined concurrently.
       if (tournament.pool_source !== 'fixed') {
@@ -173,6 +177,13 @@ export async function POST(
         });
 
         if (poolErr) console.error("Prize pool update failed:", poolErr);
+      } else if (tournament.is_player_created) {
+        const { error: feesErr } = await admin.rpc("increment_tournament_entry_fees", {
+          p_tournament_id: tournamentId,
+          p_amount: entryFee,
+        });
+
+        if (feesErr) console.error("Entry fee collection update failed:", feesErr);
       }
 
       // Record deposit entry for audit trail (non-fatal — must not block the join)
@@ -186,11 +197,12 @@ export async function POST(
 
       if (depositErr) console.error("Deposit audit log failed:", depositErr);
 
-      // AFFILIATE FEE SHARE (2026-09-16): on fixed-pool tournaments the
-      // entry fee is platform revenue, so the referrer earns a share
-      // (default 25%). Entry-fee pools fund the prize — player money, not
-      // revenue — so they are excluded. Non-fatal: must not block the join.
-      if (tournament.pool_source === "fixed") {
+      // AFFILIATE FEE SHARE (2026-09-16): on PLATFORM-HOSTED fixed-pool
+      // tournaments the entry fee is platform revenue, so the referrer earns
+      // a share (default 25%). Entry-fee pools fund the prize — player money,
+      // not revenue — so they are excluded, and player-created tournaments
+      // pay affiliates nothing in any mode. Non-fatal: must not block the join.
+      if (tournament.pool_source === "fixed" && !tournament.is_player_created) {
         try {
           await admin.rpc("pay_affiliate_fee_share", {
             p_user_id: user.id,

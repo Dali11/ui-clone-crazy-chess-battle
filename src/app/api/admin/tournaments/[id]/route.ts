@@ -1,7 +1,9 @@
+import { settleFixedPoolEntryFees, settlePlayerTournamentCancellation } from "@/lib/tournament/creator-economics";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { computeTournamentEconomics } from "@/lib/tournament/economics";
+import { CREATOR_PLATFORM_FEE_PERCENT } from "@/lib/tournament/creator-economics";
 
 export const maxDuration = 60;
 
@@ -93,12 +95,23 @@ export async function GET(
     const economics = computeTournamentEconomics(tournament);
     const totalCollected = poolSource === 'fixed' ? paidTotal : economics.totalCollected;
     const actualPrizePool = economics.actualPrizePool;
-    // For a fixed pool, the "platform revenue" is whatever was collected above the
-    // fixed prize amount (a fixed pool has no percentage-based cut).
+    // Admin-hosted fixed pool: entry fees are pure platform revenue (whatever
+    // was collected above the house-backed prize).
+    // Player-created fixed pool: the platform keeps 5% of collected entry fees
+    // (split 95/5 with the creator at start) and the escrowed prize is paid out
+    // in full — never raked.
+    const isPlayerCreated = tournament.is_player_created === true;
     const platformRevenue = poolSource === 'fixed'
-      ? Math.max(0, paidTotal - prizePool)
+      ? (isPlayerCreated
+          ? Math.floor(paidTotal * (CREATOR_PLATFORM_FEE_PERCENT / 100))
+          : Math.max(0, paidTotal - prizePool))
       : economics.platformCut;
-    const creatorProfit = poolSource === 'fixed' ? 0 : economics.creatorProfit;
+    // For player fixed pools the creator's share came from entry fees at start.
+    const creatorProfit = poolSource === 'fixed'
+      ? (isPlayerCreated
+          ? paidTotal - Math.floor(paidTotal * (CREATOR_PLATFORM_FEE_PERCENT / 100))
+          : 0)
+      : economics.creatorProfit;
 
     return NextResponse.json({
       success: true,
@@ -426,6 +439,10 @@ export async function PATCH(
       if (!claimed || claimed.length === 0) {
         return NextResponse.json({ error: "Tournament already cancelled or finished" }, { status: 400 });
       }
+
+      // Player-created fixed pools: claw back the creator's entry share
+      // (active cancels) or return the escrow (upcoming cancels) first.
+      await settlePlayerTournamentCancellation(admin, tournamentId);
 
       // Refund paid participants
       const entryFee = claimed[0].entry_fee || 0;
