@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Menu, X } from "lucide-react";
 import type {
   AttentionItem,
   FeedRow,
@@ -93,6 +94,7 @@ const PHASE3_NAV = [["Financial Controls", "Phase 3"]] as const;
 
 export default function CommandCentreClient() {
   const [view, setView] = useState<View>("dashboard");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [range, setRange] = useState<RangePresetUi>("30d");
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
@@ -227,10 +229,18 @@ export default function CommandCentreClient() {
     return { cur, prev, pct: prev === 0 ? null : ((cur - prev) / prev) * 100, best, series };
   }, [streamForView, data]);
 
+  useEffect(() => {
+    document.body.style.overflow = mobileNavOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileNavOpen]);
+
   const navItem = (v: View, label: string, opts?: { dot?: boolean }) => (
     <button
       key={v}
-      onClick={() => setView(v)}
+      onClick={() => {
+        setView(v);
+        setMobileNavOpen(false);
+      }}
       className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] transition-colors ${
         view === v
           ? "bg-violet-600/20 font-semibold text-white"
@@ -251,84 +261,111 @@ export default function CommandCentreClient() {
     </div>
   );
 
+  const sidebarNav = (
+    <>
+      <div className="mb-6 px-2">
+        <p className="text-sm font-bold tracking-tight text-white">
+          <span className="text-violet-400">♞</span> CrazyChess
+        </p>
+        <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-ccb-muted">
+          Command Centre
+        </p>
+      </div>
+
+      {navItem("dashboard", "Dashboard")}
+      {navGroup("Finance",
+        <>
+          {navItem("finance-overview", "Overview")}
+          {navItem("finance-transactions", "Transactions")}
+          {navItem("ledger", "Ledger")}
+          {navItem("deposits", "Deposits")}
+          {navItem("withdrawals", "Withdrawals")}
+        </>
+      )}
+      {navGroup("Reconciliation",
+        <>
+          {navItem("reconciliation", "Reconciliation")}
+          {navItem("audit", "Audit Log")}
+        </>
+      )}
+      {navGroup("Players", navItem("players", "Wallet & Management"))}
+      {navGroup("Operations",
+        <>
+          {navItem("verification", "Verification")}
+          {navItem("settlements", "Settlements")}
+          {navItem("reports", "Reports")}
+        </>
+      )}
+      {navGroup("Revenue",
+        <>
+          {navItem("rev-battles", "Battles")}
+          {navItem("rev-tournaments", "Tournaments")}
+          {navItem("rev-memberships", "Memberships")}
+          {navItem("rev-ads", "Ads")}
+          {navItem("rev-withdrawal_fees", "Withdrawal Fees")}
+        </>
+      )}
+      {navGroup("Markets", navItem("markets", "Country Finance"))}
+
+      <div className="mb-4 opacity-50">
+        <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ccb-muted/70">
+          Coming Soon
+        </p>
+        <div className="space-y-0.5">
+          {PHASE3_NAV.map(([label, phase]) => (
+            <div
+              key={label}
+              className="flex items-center justify-between rounded-lg px-3 py-1.5 text-[13px] text-ccb-muted"
+            >
+              <span>{label}</span>
+              <span className="rounded bg-ccb-card px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-ccb-muted">
+                {phase}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-auto space-y-1 border-t border-ccb-border pt-3">
+        <Link
+          href="/admin"
+          className="block rounded-lg px-3 py-1.5 text-[13px] text-ccb-muted hover:bg-ccb-surface hover:text-white"
+        >
+          Legacy Admin Panel →
+        </Link>
+        <p className="px-3 pt-1 text-[10px] text-ccb-muted/60">
+          Reporting currency: USD · Phase 1 read-only + Phase 2 finance ops
+        </p>
+      </div>
+
+    </>
+  );
+
   return (
-    <div className="flex min-h-screen">
+    <>
+      {/* ── Mobile top bar ──────────────────────────────────────────── */}
+      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-ccb-border bg-ccb-surface/90 px-4 py-3 backdrop-blur lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileNavOpen(true)}
+          aria-label="Open navigation menu"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-ccb-border text-ccb-muted hover:bg-ccb-surface hover:text-white"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <p className="text-sm font-bold tracking-tight text-white">
+          <span className="text-violet-400">♞</span> CrazyChess
+          <span className="ml-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-ccb-muted">
+            Command Centre
+          </span>
+        </p>
+        <span className="w-9" aria-hidden />
+      </div>
+
+      <div className="flex min-h-screen">
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-ccb-border bg-ccb-surface/60 px-3 py-5 lg:flex">
-        <div className="mb-6 px-2">
-          <p className="text-sm font-bold tracking-tight text-white">
-            <span className="text-violet-400">♞</span> CrazyChess
-          </p>
-          <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-ccb-muted">
-            Command Centre
-          </p>
-        </div>
-
-        {navItem("dashboard", "Dashboard")}
-        {navGroup("Finance",
-          <>
-            {navItem("finance-overview", "Overview")}
-            {navItem("finance-transactions", "Transactions")}
-            {navItem("ledger", "Ledger")}
-            {navItem("deposits", "Deposits")}
-            {navItem("withdrawals", "Withdrawals")}
-          </>
-        )}
-        {navGroup("Reconciliation",
-          <>
-            {navItem("reconciliation", "Reconciliation")}
-            {navItem("audit", "Audit Log")}
-          </>
-        )}
-        {navGroup("Players", navItem("players", "Wallet & Management"))}
-        {navGroup("Operations",
-          <>
-            {navItem("verification", "Verification")}
-            {navItem("settlements", "Settlements")}
-            {navItem("reports", "Reports")}
-          </>
-        )}
-        {navGroup("Revenue",
-          <>
-            {navItem("rev-battles", "Battles")}
-            {navItem("rev-tournaments", "Tournaments")}
-            {navItem("rev-memberships", "Memberships")}
-            {navItem("rev-ads", "Ads")}
-            {navItem("rev-withdrawal_fees", "Withdrawal Fees")}
-          </>
-        )}
-        {navGroup("Markets", navItem("markets", "Country Finance"))}
-
-        <div className="mb-4 opacity-50">
-          <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ccb-muted/70">
-            Coming Soon
-          </p>
-          <div className="space-y-0.5">
-            {PHASE3_NAV.map(([label, phase]) => (
-              <div
-                key={label}
-                className="flex items-center justify-between rounded-lg px-3 py-1.5 text-[13px] text-ccb-muted"
-              >
-                <span>{label}</span>
-                <span className="rounded bg-ccb-card px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-ccb-muted">
-                  {phase}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-auto space-y-1 border-t border-ccb-border pt-3">
-          <Link
-            href="/admin"
-            className="block rounded-lg px-3 py-1.5 text-[13px] text-ccb-muted hover:bg-ccb-surface hover:text-white"
-          >
-            Legacy Admin Panel →
-          </Link>
-          <p className="px-3 pt-1 text-[10px] text-ccb-muted/60">
-            Reporting currency: USD · Phase 1 read-only + Phase 2 finance ops
-          </p>
-        </div>
+        {sidebarNav}
       </aside>
 
       {/* ── Main ─────────────────────────────────────────────────────── */}
@@ -586,6 +623,34 @@ export default function CommandCentreClient() {
       </main>
 
       {openMarket && <MarketModal market={openMarket} onClose={() => setOpenMarket(null)} />}
-    </div>
+      </div>
+
+      {/* ── Mobile navigation drawer ───────────────────────────────── */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileNavOpen(false)}
+            aria-hidden
+          />
+          <aside className="absolute left-0 top-0 h-full w-72 max-w-[85vw] overflow-y-auto border-r border-ccb-border bg-ccb-surface px-3 py-5 shadow-2xl">
+            <div className="mb-6 flex items-start justify-between px-2">
+              <p className="text-sm font-bold tracking-tight text-white">
+                <span className="text-violet-400">♞</span> CrazyChess
+              </p>
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(false)}
+                aria-label="Close navigation menu"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-ccb-border text-ccb-muted hover:bg-ccb-surface hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {sidebarNav}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }
