@@ -418,7 +418,7 @@ export function TransactionFeed({
         <button
           key={r.id}
           onClick={() => onOpen(r)}
-          className={`flex w-full items-center gap-3 text-left transition-colors hover:bg-ccb-surface ${
+          className={`flex w-full items-center gap-2 overflow-hidden text-left transition-colors hover:bg-ccb-surface sm:gap-3 ${
             dense ? "px-3 py-2" : "px-4 py-3"
           }`}
         >
@@ -435,14 +435,14 @@ export function TransactionFeed({
             })()}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <p className="truncate text-sm font-medium text-white">
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="min-w-0 truncate text-sm font-medium text-white">
                 {r.playerName || "Unknown"}
                 <span className="ml-1.5 text-ccb-muted">
                   {r.country ? `${COUNTRY_FLAGS[r.country] || ""}` : ""}
                 </span>
               </p>
-              <span className="rounded bg-ccb-surface px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ccb-muted">
+              <span className="shrink-0 rounded bg-ccb-surface px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ccb-muted">
                 {KIND_LABEL[r.kind] || r.kind}
               </span>
             </div>
@@ -457,7 +457,7 @@ export function TransactionFeed({
           </div>
           <div className="shrink-0 text-right">
             <p className="text-sm font-semibold tabular-nums text-white">
-              {r.amountUsd != null ? `${formatUsd(r.amountUsd)} USD` : "—"}
+              {r.amountUsd != null ? formatUsd(r.amountUsd) : "—"}
             </p>
             <p className="flex items-center justify-end gap-1.5 text-[11px] text-ccb-muted">
               <span className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[r.status]}`} />

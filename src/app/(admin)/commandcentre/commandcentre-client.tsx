@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Castle, Menu, X } from "lucide-react";
+import { Castle, ChevronDown, Menu, X } from "lucide-react";
 import type {
   AttentionItem,
   FeedRow,
@@ -39,6 +39,7 @@ import {
 } from "./sections";
 import { LedgerView, DepositsView, WithdrawalsView } from "./phase2-finance";
 import { ReconciliationView, PlayersView } from "./phase2-recon";
+import { ControlsView } from "./phase3-controls";
 import { MarketsView, SettlementsView, ReportsView, AuditView, VerificationView } from "./phase2-ops";
 
 type View =
@@ -55,7 +56,8 @@ type View =
   | "audit"
   | "verification"
   | `rev-${RevenueStream}`
-  | "markets";
+  | "markets"
+  | "controls";
 
 const RANGE_CHIPS: Array<[RangePresetUi, string]> = [
   ["today", "Today"],
@@ -75,6 +77,7 @@ const VIEW_META: Record<string, { title: string; sub: string; txType?: string }>
   withdrawals: { title: "Withdrawals", sub: "Payouts to players + the pending review queue" },
   reconciliation: { title: "Reconciliation", sub: "Does the money recorded by CrazyChess match the money processed by pawaPay?" },
   players: { title: "Players · Wallet & Management", sub: "Balances derived from the ledger, plus wallet adjustments, bans and roles" },
+  controls: { title: "Financial Controls", sub: "Money levers for the platform — fees, limits, pricing and payouts" },
   settlements: { title: "Settlements", sub: "Money between the payment infrastructure and CrazyChess accounts" },
   reports: { title: "Financial Reports", sub: "Downloadable reports, consolidated in USD" },
   audit: { title: "Financial Audit Log", sub: "Every financial admin action — immutable" },
@@ -88,13 +91,28 @@ const VIEW_META: Record<string, { title: string; sub: string; txType?: string }>
 };
 
 /** Self-fetching Phase 2 section views (independent of the overview API). */
-const PHASE2_VIEWS = new Set<View>(["ledger", "deposits", "withdrawals", "reconciliation", "players", "settlements", "reports", "audit", "markets"]);
+const PHASE2_VIEWS = new Set<View>(["ledger", "deposits", "withdrawals", "reconciliation", "players", "settlements", "reports", "audit", "markets", "verification", "controls"]);
 
-const PHASE3_NAV = [["Financial Controls", "Phase 3"]] as const;
 
 export default function CommandCentreClient() {
   const [view, setView] = useState<View>("dashboard");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Collapsible nav groups — collapsed by default; switching views
+  // auto-expands the section that owns the view.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const GROUP_OF: Partial<Record<View, string>> = {
+    "finance-transactions": "finance", ledger: "finance", deposits: "finance", withdrawals: "finance",
+    "finance-overview": "revenue", "rev-battles": "revenue", "rev-tournaments": "revenue",
+    "rev-memberships": "revenue", "rev-ads": "revenue", "rev-withdrawal_fees": "revenue",
+    players: "players", verification: "players",
+    reconciliation: "operations", audit: "operations", settlements: "operations",
+    reports: "operations", markets: "operations", controls: "operations",
+  };
+  useEffect(() => {
+    const g = GROUP_OF[view];
+    if (g) setExpandedGroups((prev) => new Set(prev).add(g));
+  }, [view]);
   const [range, setRange] = useState<RangePresetUi>("30d");
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
@@ -252,14 +270,32 @@ export default function CommandCentreClient() {
     </button>
   );
 
-  const navGroup = (label: string, children: React.ReactNode) => (
-    <div className="mb-4">
-      <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ccb-muted/70">
-        {label}
-      </p>
-      <div className="space-y-0.5">{children}</div>
-    </div>
-  );
+  const navGroup = (label: string, groupId: string, children: React.ReactNode) => {
+    const open = expandedGroups.has(groupId);
+    return (
+      <div className="mb-2">
+        <button
+          type="button"
+          onClick={() =>
+            setExpandedGroups((prev) => {
+              const next = new Set(prev);
+              if (next.has(groupId)) next.delete(groupId);
+              else next.add(groupId);
+              return next;
+            })
+          }
+          aria-expanded={open}
+          className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ccb-muted/70 transition-colors hover:bg-ccb-surface hover:text-white"
+        >
+          {label}
+          <ChevronDown
+            className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
+          />
+        </button>
+        {open && <div className="mt-1 space-y-0.5">{children}</div>}
+      </div>
+    );
+  };
 
   const sidebarNav = (
     <>
@@ -273,31 +309,17 @@ export default function CommandCentreClient() {
       </div>
 
       {navItem("dashboard", "Dashboard")}
-      {navGroup("Finance",
+      {navGroup("Finance", "finance",
         <>
-          {navItem("finance-overview", "Overview")}
           {navItem("finance-transactions", "Transactions")}
           {navItem("ledger", "Ledger")}
           {navItem("deposits", "Deposits")}
           {navItem("withdrawals", "Withdrawals")}
         </>
       )}
-      {navGroup("Reconciliation",
+      {navGroup("Revenue", "revenue",
         <>
-          {navItem("reconciliation", "Reconciliation")}
-          {navItem("audit", "Audit Log")}
-        </>
-      )}
-      {navGroup("Players", navItem("players", "Wallet & Management"))}
-      {navGroup("Operations",
-        <>
-          {navItem("verification", "Verification")}
-          {navItem("settlements", "Settlements")}
-          {navItem("reports", "Reports")}
-        </>
-      )}
-      {navGroup("Revenue",
-        <>
+          {navItem("finance-overview", "Overview")}
           {navItem("rev-battles", "Battles")}
           {navItem("rev-tournaments", "Tournaments")}
           {navItem("rev-memberships", "Memberships")}
@@ -305,27 +327,22 @@ export default function CommandCentreClient() {
           {navItem("rev-withdrawal_fees", "Withdrawal Fees")}
         </>
       )}
-      {navGroup("Markets", navItem("markets", "Country Finance"))}
-
-      <div className="mb-4 opacity-50">
-        <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-ccb-muted/70">
-          Coming Soon
-        </p>
-        <div className="space-y-0.5">
-          {PHASE3_NAV.map(([label, phase]) => (
-            <div
-              key={label}
-              className="flex items-center justify-between rounded-lg px-3 py-1.5 text-[13px] text-ccb-muted"
-            >
-              <span>{label}</span>
-              <span className="rounded bg-ccb-card px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-ccb-muted">
-                {phase}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
+      {navGroup("Players", "players",
+        <>
+          {navItem("players", "Wallet & Management")}
+          {navItem("verification", "Verification")}
+        </>
+      )}
+      {navGroup("Operations", "operations",
+        <>
+          {navItem("reconciliation", "Reconciliation")}
+          {navItem("audit", "Audit Log")}
+          {navItem("settlements", "Settlements")}
+          {navItem("reports", "Reports")}
+          {navItem("markets", "Country Finance")}
+          {navItem("controls", "Financial Controls")}
+        </>
+      )}
       <div className="mt-auto space-y-1 border-t border-ccb-border pt-3">
         <Link
           href="/admin"
@@ -445,6 +462,7 @@ export default function CommandCentreClient() {
             {view === "reports" && <ReportsView />}
             {view === "audit" && <AuditView />}
             {view === "verification" && <VerificationView />}
+            {view === "controls" && <ControlsView />}
           </div>
         ) : loading && !data ? (
           <div className="flex h-64 items-center justify-center">
