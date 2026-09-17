@@ -35,6 +35,18 @@ export const LEDGER_TYPE_LABELS: Record<LedgerType, string> = {
 };
 
 /** deposits.method → ledger type. Anything unmapped lands in "adjustment" (generic). */
+// Money direction for colour-coding in the Command Centre:
+// money paid INTO the platform is green, money paid OUT is red,
+// internal wallet transfers (stakes, entries, ads, rake) stay neutral.
+const MONEY_IN_KINDS = new Set(["deposit", "membership", "membership_payment"]);
+const MONEY_OUT_KINDS = new Set(["withdrawal", "withdrawal_fee", "sweep"]);
+
+export function moneyDirectionClass(kind: string): string {
+  if (MONEY_IN_KINDS.has(kind)) return "text-emerald-400";
+  if (MONEY_OUT_KINDS.has(kind)) return "text-red-400";
+  return "text-white";
+}
+
 export const METHOD_LEDGER_TYPE: Record<string, LedgerType> = {
   // Money in from the outside world
   mobile_money: "deposit",

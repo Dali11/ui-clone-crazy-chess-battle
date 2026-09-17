@@ -1,4 +1,5 @@
 "use client";
+import { moneyDirectionClass } from "@/lib/finance/phase2";
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Check, CircleDot, Megaphone, Percent, Star, Swords, Trophy, type LucideIcon } from "lucide-react";
 
 /**
@@ -456,7 +457,7 @@ export function TransactionFeed({
             </p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-sm font-semibold tabular-nums text-white">
+            <p className={`text-sm font-semibold tabular-nums ${moneyDirectionClass(r.kind)}`}>
               {r.amountUsd != null ? formatUsd(r.amountUsd) : "—"}
             </p>
             <p className="flex items-center justify-end gap-1.5 text-[11px] text-ccb-muted">

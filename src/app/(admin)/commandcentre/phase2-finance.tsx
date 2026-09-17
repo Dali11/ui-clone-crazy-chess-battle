@@ -4,7 +4,7 @@ import { Check, X } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { formatUsd, formatLocal, timeAgo } from "./sections";
 import { countryFlag } from "@/lib/geo/flags";
-import { LEDGER_TYPE_LABELS, type LedgerType } from "@/lib/finance/phase2";
+import { LEDGER_TYPE_LABELS, moneyDirectionClass, type LedgerType } from "@/lib/finance/phase2";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -481,13 +481,13 @@ export function LedgerView() {
                   <td className="px-4 py-3">
                     <CountryBadge country={row.country} />
                   </td>
-                  <td className="px-4 py-3 font-mono text-white">
+                  <td className={`px-4 py-3 font-mono ${moneyDirectionClass(row.type)}`}>
                     {formatLocal(row.localAmount, row.localCurrency) ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-ccb-muted font-mono text-xs">
                     {row.localCurrency || "MWK"}
                   </td>
-                  <td className="px-4 py-3 font-mono font-medium text-white">
+                  <td className={`px-4 py-3 font-mono font-medium ${moneyDirectionClass(row.type)}`}>
                     {formatUsd(row.amountUsd)}
                   </td>
                   <td className="px-4 py-3">
@@ -769,7 +769,7 @@ export function DepositsView() {
                     <span className="text-ccb-muted">
                       {q.amount_local != null ? `${q.currency || ""} ${q.amount_local.toLocaleString()}` : `${Math.abs(q.amount).toLocaleString()} MWK`}
                     </span>
-                    <span className="text-white font-medium">{formatUsd(q.amountUsd)}</span>
+                    <span className="text-emerald-400 font-medium">{formatUsd(q.amountUsd)}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-ccb-muted">
                     <span>Age: {timeAgo(q.created_at)}</span>
@@ -1008,10 +1008,10 @@ export function DepositsView() {
                   <td className="px-4 py-3">
                     <CountryBadge country={row.country} />
                   </td>
-                  <td className="px-4 py-3 font-mono text-white">
+                  <td className={`px-4 py-3 font-mono ${moneyDirectionClass("deposit")}`}>
                     {formatLocal(row.amount_local, row.currency) ?? "—"}
                   </td>
-                  <td className="px-4 py-3 font-mono font-medium text-white">
+                  <td className={`px-4 py-3 font-mono font-medium ${moneyDirectionClass("deposit")}`}>
                     {formatUsd(row.amountUsd)}
                   </td>
                   <td className="px-4 py-3">
@@ -1432,7 +1432,7 @@ export function WithdrawalsView() {
                   </div>
                   <div className="flex items-center justify-between font-mono">
                     <span className="text-ccb-muted">{formatLocal(q.amount_local, q.currency) ?? "—"}</span>
-                    <span className="text-white font-medium">{formatUsd(q.amountUsd)}</span>
+                    <span className="text-red-400 font-medium">{formatUsd(q.amountUsd)}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-ccb-muted">
                     <span>Age: {timeAgo(q.created_at)}</span>
@@ -1630,10 +1630,10 @@ export function WithdrawalsView() {
                   <td className="px-4 py-3">
                     <CountryBadge country={row.country} />
                   </td>
-                  <td className="px-4 py-3 font-mono text-white">
+                  <td className={`px-4 py-3 font-mono ${moneyDirectionClass("withdrawal")}`}>
                     {formatLocal(row.amount_local, row.currency) ?? "—"}
                   </td>
-                  <td className="px-4 py-3 font-mono font-medium text-white">
+                  <td className={`px-4 py-3 font-mono font-medium ${moneyDirectionClass("withdrawal")}`}>
                     {formatUsd(row.amountUsd)}
                   </td>
                   <td className="px-4 py-3 font-mono text-ccb-muted">
