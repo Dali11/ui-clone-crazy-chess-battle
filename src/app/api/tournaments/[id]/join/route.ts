@@ -165,9 +165,10 @@ export async function POST(
 
       // Entry-fee accounting, by pool ownership:
       //  - entry_fees mode: fees accumulate into the gross prize pool (as before)
-      //  - fixed pool (admin-hosted): fee is pure platform revenue (affiliate-eligible)
-      //  - fixed pool (player-created): fees are tracked in entry_fees_collected
-      //    and split 95/5 to the creator/platform when the tournament starts
+      //  - fixed pool (any owner): fees are tracked in entry_fees_collected.
+      //    Player-created pools split them 95/5 to creator/platform at start;
+      //    house pools keep them as platform revenue, netted against the
+      //    fixed prize in the Command Centre (profit = fees − prize).
       // Uses an atomic RPC (single UPDATE) instead of read-then-write, which
       // silently lost increments when multiple players joined concurrently.
       if (tournament.pool_source !== 'fixed') {
@@ -177,7 +178,7 @@ export async function POST(
         });
 
         if (poolErr) console.error("Prize pool update failed:", poolErr);
-      } else if (tournament.is_player_created) {
+      } else {
         const { error: feesErr } = await admin.rpc("increment_tournament_entry_fees", {
           p_tournament_id: tournamentId,
           p_amount: entryFee,

@@ -32,7 +32,8 @@ export const dynamic = "force-dynamic";
  *
  * Definitions (USD reporting currency):
  *   Total Revenue      = battle rake + platform tournament profit +
- *                        memberships + ads + withdrawal fees
+ *                        memberships + ads + withdrawal fees +
+ *                        house fixed-pool net (entry fees − prize)
  *   Transaction Volume= successful money-in deposits + completed withdrawals
  *   Total Deposits     = successful money-in deposits (gross, NOT revenue)
  *   Total Withdrawals  = completed withdrawals (gross)
@@ -115,6 +116,7 @@ export async function GET(req: NextRequest) {
       revCur, revPrev,
       withdrawalsCur, withdrawalsPrev,
       battlesCur, battlesPrev,
+      houseNetCur, houseNetPrev,
       playerFeeCur, playerFeePrev,
       profiles,
       pendingWithdrawals,
@@ -132,6 +134,31 @@ export async function GET(req: NextRequest) {
       fetchWithdrawalsBetween(period.prevFromISO, period.prevToISO),
       fetchBattlesBetween(period.fromISO, period.toISO),
       fetchBattlesBetween(period.prevFromISO, period.prevToISO),
+
+      // House (admin-hosted) fixed-pool tournaments: platform net =
+      // entry fees collected − fixed prize. Free-entry pools are pure
+      // cost (net = −prize). Realized when the tournament finishes, so
+      // attributed at ended_at (migration 090 keeps fees on the row).
+      fetchAll((page) =>
+        within("ended_at", period.fromISO, period.toISO)(
+          admin
+            .from("tournaments")
+            .select("id, prize_pool, entry_fees_collected")
+            .eq("pool_source", "fixed")
+            .eq("is_player_created", false)
+            .eq("status", "finished")
+        ).range(page * 1000, page * 1000 + 999)
+      ),
+      fetchAll((page) =>
+        within("ended_at", period.prevFromISO, period.prevToISO)(
+          admin
+            .from("tournaments")
+            .select("id, prize_pool, entry_fees_collected")
+            .eq("pool_source", "fixed")
+            .eq("is_player_created", false)
+            .eq("status", "finished")
+        ).range(page * 1000, page * 1000 + 999)
+      ),
 
       // Player-led tournament platform fees (5% of gross entry fees) are
       // recorded on tournaments.platform_fee_collected — NOT as deposits
@@ -262,10 +289,22 @@ export async function GET(req: NextRequest) {
     const playerFeeUsd = (rows: any[]) =>
       roundUsd(rows.reduce((sum, t) => sum + (fx.usdFromMwk(Number(t.platform_fee_collected || 0)) ?? 0), 0));
 
+    // House fixed-pool net: entry fees collected − fixed prize paid.
+    // Free-entry pools net negative (pure marketing cost) — by design.
+    const houseNetUsd = (rows: any[]) =>
+      roundUsd(rows.reduce(
+        (sum, t) => sum + (fx.usdFromMwk(
+          (Number(t.entry_fees_collected || 0)) - Number(t.prize_pool || 0)
+        ) ?? 0),
+        0
+      ));
+
     const revenueCur: Record<RevenueStream, number> = {
       ...revenueFromDeposits(revCur),
       tournaments: roundUsd(
-        (revenueFromDeposits(revCur).tournaments || 0) + playerFeeUsd(playerFeeCur)
+        (revenueFromDeposits(revCur).tournaments || 0) +
+        playerFeeUsd(playerFeeCur) +
+        houseNetUsd(houseNetCur)
       ),
       battles: roundUsd(battlesCur.reduce((s, b) => s + battleRakeUsd(b), 0)),
       withdrawal_fees: roundUsd(withdrawalsCur.reduce((s, w) => s + withdrawalFeeUsd(w), 0)),
@@ -273,7 +312,9 @@ export async function GET(req: NextRequest) {
     const revenuePrev: Record<RevenueStream, number> = {
       ...revenueFromDeposits(revPrev),
       tournaments: roundUsd(
-        (revenueFromDeposits(revPrev).tournaments || 0) + playerFeeUsd(playerFeePrev)
+        (revenueFromDeposits(revPrev).tournaments || 0) +
+        playerFeeUsd(playerFeePrev) +
+        houseNetUsd(houseNetPrev)
       ),
       battles: roundUsd(battlesPrev.reduce((s, b) => s + battleRakeUsd(b), 0)),
       withdrawal_fees: roundUsd(withdrawalsPrev.reduce((s, w) => s + withdrawalFeeUsd(w), 0)),
