@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Trophy, Crown, Swords, Calendar, Users, RefreshCw, ShieldAlert,
-  CheckCircle2, Lock, Zap, Clock, DollarSign, Sparkles, Target, TrendingUp, Plus,
+  CheckCircle2, Lock, Zap, Clock, DollarSign, Sparkles, Target, TrendingUp, Plus, User,
 } from 'lucide-react';
 import { useCurrency } from '@/hooks/use-currency';
 import AdSlot from '@/components/ads/ad-slot';
@@ -24,6 +24,7 @@ interface Competition {
   currency?: string;
   currencySymbol?: string;
   isRegistered?: boolean;
+  isCreator?: boolean;
   qualification: { canJoin: boolean; reason: string | null };
 }
 
@@ -62,6 +63,7 @@ export default function TournamentsPage() {
   const [joining, setJoining] = useState<string | null>(null);
   const [joinMessage, setJoinMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [filter, setFilter] = useState<FilterTab>('upcoming');
+  const [mineOnly, setMineOnly] = useState(false);
 
   const fetchTournaments = useCallback(async () => {
     setLoading(true);
@@ -105,7 +107,10 @@ export default function TournamentsPage() {
 
   const allTournaments = data?.tournaments || [];
 
-  const filtered = allTournaments.filter(t => {
+  const mineTournaments = allTournaments.filter(t => t.isRegistered || t.isCreator);
+  const mineCount = mineTournaments.length;
+
+  const filtered = (mineOnly ? mineTournaments : allTournaments).filter(t => {
     if (filter === 'active') return t.status === 'active';
     if (filter === 'upcoming') return t.status === 'upcoming' || t.status === 'pending';
     if (filter === 'completed') return t.status === 'completed';
@@ -146,9 +151,17 @@ export default function TournamentsPage() {
             <Link href="/tournaments/create" className="btn-primary text-xs px-3.5 py-2">
               <Plus className="w-3.5 h-3.5" /> Create Tournament
             </Link>
-            <Link href="/league" className="btn-secondary text-xs px-3.5 py-2">
-              <Crown className="w-3.5 h-3.5" /> View Leagues
-            </Link>
+            <button
+              onClick={() => setMineOnly(v => !v)}
+              className={`btn-secondary text-xs px-3.5 py-2 ${mineOnly ? 'bg-ccb-accent/10 text-ccb-accent border-ccb-accent/30' : ''}`}
+            >
+              <User className="w-3.5 h-3.5" /> My Tournaments
+              {mineCount > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  mineOnly ? 'bg-ccb-accent/20 text-ccb-accent' : 'bg-ccb-border/30 text-ccb-muted'
+                }`}>{mineCount}</span>
+              )}
+            </button>
           </div>
         </div>
         {/* Decorative bg */}
@@ -178,6 +191,19 @@ export default function TournamentsPage() {
           <p className="text-ccb-muted text-sm">{error}</p>
           <button onClick={fetchTournaments} className="mt-4 btn-primary text-sm">
             <RefreshCw className="w-4 h-4 mr-2" /> Try Again
+          </button>
+        </div>
+      ) : mineOnly && mineCount === 0 ? (
+        <div className="card text-center p-12">
+          <div className="w-16 h-16 rounded-2xl bg-ccb-accent/10 border border-ccb-accent/30 flex items-center justify-center mx-auto mb-4">
+            <User className="w-8 h-8 text-ccb-accent" />
+          </div>
+          <h3 className="text-lg font-bold mb-2">No tournaments yet</h3>
+          <p className="text-ccb-muted text-sm max-w-sm mx-auto">
+            You haven't joined or created a tournament. Join one below or create your own to see it here.
+          </p>
+          <button onClick={() => setMineOnly(false)} className="mt-4 btn-secondary text-sm">
+            Browse all tournaments
           </button>
         </div>
       ) : allTournaments.length === 0 ? (
@@ -261,13 +287,20 @@ function TournamentCard({ competition, onJoin, joining, fmtCurrency }: { competi
             </div>
           </div>
         </div>
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-          isPaid
-            ? 'bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30'
-            : 'bg-ccb-success/10 text-ccb-success border border-ccb-success/30'
-        }`}>
-          {isPaid ? 'PAID' : 'FREE'}
-        </span>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+            isPaid
+              ? 'bg-ccb-primary/10 text-ccb-primary border border-ccb-primary/30'
+              : 'bg-ccb-success/10 text-ccb-success border border-ccb-success/30'
+          }`}>
+            {isPaid ? 'PAID' : 'FREE'}
+          </span>
+          {competition.isCreator && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-accent/10 text-ccb-accent border border-ccb-accent/30 flex items-center gap-1">
+              <Crown className="w-2.5 h-2.5" /> CREATOR
+            </span>
+          )}
+        </div>
       </div>
 
       {/* STATS ROW */}

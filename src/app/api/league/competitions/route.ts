@@ -34,7 +34,7 @@ export async function GET(_request: NextRequest) {
 
     const { data: tournaments, error: tournamentError } = await admin
       .from("tournaments")
-      .select("id, name, status, entry_fee, max_players, min_rating, max_rating, rounds, starts_at, time_control")
+      .select("id, name, status, entry_fee, max_players, min_rating, max_rating, rounds, starts_at, time_control, created_by")
       .in("status", ["upcoming", "active", "pending_approval", "completed", "finished"])
       .order("starts_at", { ascending: true })
       .limit(50);
@@ -62,6 +62,7 @@ export async function GET(_request: NextRequest) {
     const tournamentList = (tournaments || []).map((tournament) => {
       const participantCount = participantCounts[tournament.id] || 0;
       const isRegistered = user ? myTournamentIds.has(tournament.id) : false;
+      const isCreator = user ? tournament.created_by === user.id : false;
 
       let canJoin = true;
       let reason: string | null = null;
@@ -85,6 +86,7 @@ export async function GET(_request: NextRequest) {
         startsAt: tournament.starts_at,
         timeControl: tournament.time_control,
         isRegistered,
+        isCreator,
         qualification: { canJoin, reason },
       };
     });
