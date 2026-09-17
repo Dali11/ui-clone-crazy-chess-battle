@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       .select(`
         id, name, description, type, status, time_control, initial_minutes, increment_seconds,
         entry_fee, prize_pool, prize_distribution, pool_source,
-        max_players, min_rating, max_rating, current_round, rounds, duration_minutes,
+        max_players, min_players, min_rating, max_rating, current_round, rounds, duration_minutes,
         creator_profit_percent,
         starts_at, ends_at, created_at, created_by
       `)
@@ -80,7 +80,7 @@ export async function PATCH(req: NextRequest) {
     if (action === "edit") {
       // Only allow editing upcoming tournaments
       const { data: tournament } = await admin
-        .from("tournaments").select("status").eq("id", tournamentId).single();
+        .from("tournaments").select("status, max_players").eq("id", tournamentId).single();
       if (!tournament) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
       // The admin UI exposes Edit for both "upcoming" and "active" tournaments
       // (e.g. adjusting creator profit % or total rounds mid-tournament), so
@@ -93,7 +93,7 @@ export async function PATCH(req: NextRequest) {
       const updates: Record<string, any> = {};
       const editableFields = [
         "name", "description", "type", "time_control", "initial_minutes",
-        "increment_seconds", "max_players", "min_rating", "max_rating",
+        "increment_seconds", "max_players", "min_players", "min_rating", "max_rating",
         "rounds", "duration_minutes", "starts_at", "ends_at",
         "entry_fee", "prize_pool", "pool_source", "creator_profit_percent"
       ];
@@ -101,7 +101,7 @@ export async function PATCH(req: NextRequest) {
       for (const field of editableFields) {
         if (body[field] !== undefined) {
           // Convert numeric fields
-          if (["initial_minutes", "increment_seconds", "max_players", "min_rating", "max_rating", "rounds", "duration_minutes", "entry_fee", "prize_pool", "creator_profit_percent"].includes(field)) {
+          if (["initial_minutes", "increment_seconds", "max_players", "min_players", "min_rating", "max_rating", "rounds", "duration_minutes", "entry_fee", "prize_pool", "creator_profit_percent"].includes(field)) {
             const numVal = body[field] === null ? null : Number(body[field]);
             // Cap entry fee at MK5000
             if (field === "entry_fee" && numVal !== null && numVal > 5000) {
@@ -117,6 +117,18 @@ export async function PATCH(req: NextRequest) {
       // Validate type and time_control against CHECK constraints
       if (updates.type && !["arena", "swiss", "knockout"].includes(updates.type)) {
         return NextResponse.json({ error: "Invalid tournament type" }, { status: 400 });
+      }
+
+      // Validate minimum players: at least 2, and never above the
+      // effective max (updated value or the one already stored).
+      if (updates.min_players !== undefined && updates.min_players !== null) {
+        if (updates.min_players < 2) {
+          return NextResponse.json({ error: "Minimum players must be at least 2" }, { status: 400 });
+        }
+        const effectiveMax = updates.max_players !== undefined ? updates.max_players : (tournament as any).max_players;
+        if (effectiveMax != null && updates.min_players > effectiveMax) {
+          return NextResponse.json({ error: "Minimum players cannot exceed max players" }, { status: 400 });
+        }
       }
       if (updates.time_control && !["bullet", "blitz", "rapid", "classical"].includes(updates.time_control)) {
         return NextResponse.json({ error: "Invalid time control" }, { status: 400 });
@@ -182,7 +194,7 @@ export async function PATCH(req: NextRequest) {
     // ── Approve pending tournament ──
     if (action === "approve") {
       const { data: tournament } = await admin
-        .from("tournaments").select("status").eq("id", tournamentId).single();
+        .from("tournaments").select("status, max_players").eq("id", tournamentId).single();
       if (!tournament) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
       if (tournament.status !== "pending_approval") {
         return NextResponse.json({ error: "Tournament is not pending approval" }, { status: 400 });

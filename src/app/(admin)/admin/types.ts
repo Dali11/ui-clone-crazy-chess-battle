@@ -80,6 +80,7 @@ export interface Tournament {
   creator_profit_percent: number | null;
   prize_distribution: any;
   max_players: number | null;
+  min_players: number | null;
   min_rating: number;
   max_rating: number | null;
   current_round: number;

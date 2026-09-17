@@ -734,6 +734,7 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
       initial_minutes: t.initial_minutes,
       increment_seconds: t.increment_seconds,
       max_players: t.max_players || "",
+      min_players: t.min_players || "",
       min_rating: t.min_rating || 0,
       max_rating: t.max_rating || "",
       rounds: t.rounds || "",

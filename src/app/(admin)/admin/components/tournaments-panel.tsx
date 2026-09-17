@@ -951,7 +951,11 @@ export default function TournamentsPanel({
                     <input type="number" value={editForm.increment_seconds ?? ""} onChange={(e) => setEditForm({ ...editForm, increment_seconds: e.target.value })} className="input-field mt-1 w-full" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label className="text-xs font-medium text-ccb-muted">Min Players (blank = 2)</label>
+                    <input type="number" min={2} value={editForm.min_players ?? ""} onChange={(e) => setEditForm({ ...editForm, min_players: e.target.value })} className="input-field mt-1 w-full" />
+                  </div>
                   <div>
                     <label className="text-xs font-medium text-ccb-muted">Max Players (blank = ∞)</label>
                     <input type="number" value={editForm.max_players ?? ""} onChange={(e) => setEditForm({ ...editForm, max_players: e.target.value })} className="input-field mt-1 w-full" />
