@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Users } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 
-const WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/Jn1pLCUVbv09ECOiS8UM1o";
+const WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/DGb3TKaEoITFmOroHP3eHw";
 const JOINED_KEY = "ccb-wa-joined";
 const LAST_SHOWN_KEY = "ccb-wa-last-shown";
 
