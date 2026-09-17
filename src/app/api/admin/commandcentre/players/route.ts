@@ -42,23 +42,35 @@ export async function GET(req: NextRequest) {
     // ── Search ──────────────────────────────────────────────────────────
     if (!id) {
       const q = (url.searchParams.get("q") || "").trim();
+      // Paginated roster — the full player base is browsable, not just the
+      // first 40 rows (live finding 2026-09-17: CC showed 40 of 710 players
+      // because the original quick-search capped the list with no paging).
+      const page = Math.max(1, parseInt(url.searchParams.get("page") || "1") || 1);
+      const pageSize = Math.min(200, Math.max(10, parseInt(url.searchParams.get("pageSize") || "50") || 50));
+      const from = (page - 1) * pageSize;
+
       let query = admin
         .from("profiles")
-        .select("id, username, display_name, country, wallet_balance, created_at")
-        .limit(40) as any;
+        .select("id, username, display_name, country, wallet_balance, created_at", { count: "exact" }) as any;
       if (q) {
         const isUuid = /^[0-9a-f-]{36}$/i.test(q);
         query = query.or(`username.ilike.%${q}%,display_name.ilike.%${q}%,id.eq.${isUuid ? q : "00000000-0000-0000-0000-000000000000"}`);
       } else {
         query = query.order("created_at", { ascending: false });
       }
-      const { data: players } = await query;
+      query = query.range(from, from + pageSize - 1);
+      const { data: players, count } = await query;
+      const total = count ?? (players || []).length;
       return NextResponse.json({
         players: (players || []).map((p: any) => ({
           ...p,
           walletCurrency: COUNTRY_CURRENCY[(p.country || "").toUpperCase()] || "MWK",
           walletBalanceUsd: fx.toUsd(Number(p.wallet_balance || 0), COUNTRY_CURRENCY[(p.country || "").toUpperCase()] || "MWK"),
         })),
+        total,
+        page,
+        pageSize,
+        hasMore: from + (players || []).length < total,
       });
     }
 

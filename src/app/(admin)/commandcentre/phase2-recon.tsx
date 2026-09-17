@@ -762,6 +762,11 @@ export function PlayersView() {
   const [players, setPlayers] = useState<PlayerSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  // Roster pagination — full player base is browsable page by page
+  const [page, setPage] = useState(1);
+  const [totalPlayers, setTotalPlayers] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Selected player dossier drawer
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -779,11 +784,11 @@ export function PlayersView() {
   const [manageMsg, setManageMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [manageConfirm, setManageConfirm] = useState<string | null>(null);
 
-  const searchPlayers = useCallback(async (q: string) => {
-    setSearching(true);
-    setSearchError(null);
+  const searchPlayers = useCallback(async (q: string, nextPage = 1, append = false) => {
+    if (append) setLoadingMore(true);
+    else { setSearching(true); setSearchError(null); }
     try {
-      const res = await fetch(`/api/admin/commandcentre/players?q=${encodeURIComponent(q)}`, {
+      const res = await fetch(`/api/admin/commandcentre/players?q=${encodeURIComponent(q)}&page=${nextPage}&pageSize=50`, {
         cache: "no-store",
       });
       if (!res.ok) {
@@ -793,13 +798,21 @@ export function PlayersView() {
       if (json.error) {
         throw new Error(json.error);
       }
-      setPlayers(json.players || []);
+      setPlayers((prev) => append ? [...prev, ...(json.players || [])] : (json.players || []));
+      setPage(nextPage);
+      setTotalPlayers(typeof json.total === "number" ? json.total : null);
+      setHasMore(!!json.hasMore);
     } catch (e: any) {
       setSearchError(e.message || "Search failed");
     } finally {
       setSearching(false);
+      setLoadingMore(false);
     }
   }, []);
+
+  const loadMorePlayers = () => {
+    if (!searching && !loadingMore) searchPlayers(query, page + 1, true);
+  };
 
   useEffect(() => {
     searchPlayers("");
@@ -909,7 +922,7 @@ export function PlayersView() {
       <div className="rounded-xl border border-ccb-border bg-ccb-card overflow-hidden">
         <div className="border-b border-ccb-border px-4 py-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-white">
-            Players ({players.length})
+            Players{totalPlayers != null ? ` (${totalPlayers}${players.length < totalPlayers ? `, showing ${players.length}` : ""})` : ` (${players.length})`}
           </h3>
           <span className="text-xs text-ccb-muted">Click player to view full wallet dossier</span>
         </div>
@@ -970,6 +983,17 @@ export function PlayersView() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+        {hasMore && players.length > 0 && (
+          <div className="border-t border-ccb-border px-4 py-3 text-center">
+            <button
+              onClick={loadMorePlayers}
+              disabled={loadingMore}
+              className="rounded-lg bg-violet-600/20 px-4 py-2 text-xs font-semibold text-violet-400 hover:bg-violet-600/40 disabled:opacity-50"
+            >
+              {loadingMore ? "Loading..." : `Load more (${totalPlayers != null ? totalPlayers - players.length : "more"} remaining)`}
+            </button>
           </div>
         )}
       </div>
