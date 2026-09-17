@@ -155,7 +155,7 @@ export default function TournamentsPage() {
               onClick={() => setMineOnly(v => !v)}
               className={`btn-secondary text-xs px-3.5 py-2 ${mineOnly ? 'bg-ccb-accent/10 text-ccb-accent border-ccb-accent/30' : ''}`}
             >
-              <User className="w-3.5 h-3.5" /> My Tournaments
+              <User className="w-3.5 h-3.5" /> My Tournoz
               {mineCount > 0 && (
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                   mineOnly ? 'bg-ccb-accent/20 text-ccb-accent' : 'bg-ccb-border/30 text-ccb-muted'
