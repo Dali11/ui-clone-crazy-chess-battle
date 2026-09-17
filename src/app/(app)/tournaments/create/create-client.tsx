@@ -19,12 +19,11 @@ import { useCurrency } from "@/hooks/use-currency";
  *    creator / 5% to the platform once the tournament starts.
  *  - Free: no fees at all — community events.
  *
- * Requires KYC identity verification + platform activity (enforced server-side).
+ * Requires some platform activity (enforced server-side); KYC is not required.
  */
 
 interface Props {
   walletBalance: number; // local currency
-  identityVerified: boolean;
   isAdmin: boolean;
   countryCode: string | null;
 }
@@ -48,7 +47,6 @@ const TC_OPTIONS = [
 
 export default function CreateTournamentClient({
   walletBalance,
-  identityVerified,
   isAdmin,
   countryCode,
 }: Props) {
@@ -84,30 +82,6 @@ export default function CreateTournamentClient({
     }
     return null;
   }, [poolMode, prizePoolLocal, walletBalance, formatWallet, walletBalance]);
-
-  // KYC gate — admins bypass
-  if (!identityVerified && !isAdmin) {
-    return (
-      <div className="max-w-xl mx-auto space-y-4 pb-20">
-        <Link href="/tournaments" className="inline-flex items-center gap-1 text-sm text-ccb-muted hover:text-ccb-text">
-          <ArrowLeft className="w-4 h-4" /> Back to tournaments
-        </Link>
-        <div className="card text-center p-8">
-          <div className="w-14 h-14 rounded-2xl bg-ccb-danger/10 border border-ccb-danger/30 flex items-center justify-center mx-auto mb-4">
-            <ShieldAlert className="w-7 h-7 text-ccb-danger" />
-          </div>
-          <h2 className="text-lg font-bold mb-2">Identity verification required</h2>
-          <p className="text-sm text-ccb-muted mb-5 max-w-sm mx-auto">
-            Tournament creators handle prize money, so every creator must complete KYC identity
-            verification first. It only takes a few minutes.
-          </p>
-          <Link href="/settings" className="btn-primary text-sm inline-flex items-center gap-2 px-4 py-2">
-            Verify your identity
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   if (created) {
     return (

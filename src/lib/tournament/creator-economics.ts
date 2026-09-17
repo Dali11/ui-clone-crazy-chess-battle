@@ -46,28 +46,16 @@ export interface CreatorEligibility {
 
 /**
  * Qualification gate for player-created tournaments:
- *  - KYC identity verified, AND
  *  - proven activity: joined a tournament, OR played a game, OR
  *    (deposited funds AND played a settled staked battle).
+ *
+ * KYC is NOT required (owner decision 2026-09-17) — activity alone
+ * qualifies a player to create tournaments.
  */
 export async function checkCreatorEligibility(
   admin: AdminClient,
   userId: string
 ): Promise<CreatorEligibility> {
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("identity_verified")
-    .eq("id", userId)
-    .single();
-
-  if (!profile?.identity_verified) {
-    return {
-      ok: false,
-      reason:
-        "Identity verification (KYC) is required to create tournaments. Complete verification in your account settings first.",
-    };
-  }
-
   const [joined, played, deposits, battles] = await Promise.all([
     admin
       .from("tournament_participants")

@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     let escrowAmountMwk = 0;
 
     if (!isCreatorAdmin) {
-      // KYC + platform activity gate
+      // Platform activity gate (no KYC requirement)
       const eligibility = await checkCreatorEligibility(admin, user.id);
       if (!eligibility.ok) {
         return NextResponse.json({ error: eligibility.reason }, { status: 403 });
