@@ -136,10 +136,11 @@ export async function GET(req: NextRequest) {
       // Player-led tournament platform fees (5% of gross entry fees) are
       // recorded on tournaments.platform_fee_collected — NOT as deposits
       // ledger rows — so they must be added to the tournaments stream from
-      // the tournaments table directly. updated_at is used as the
-      // collection-timestamp proxy (fee is written at start/finish).
+      // the tournaments table directly. fee_collected_at (migration 089)
+      // is the exact settlement timestamp, written atomically alongside
+      // the fee in settleFixedPoolEntryFees / finish.ts.
       fetchAll((page) =>
-        within("updated_at", period.fromISO, period.toISO)(
+        within("fee_collected_at", period.fromISO, period.toISO)(
           admin
             .from("tournaments")
             .select("id, platform_fee_collected")
@@ -148,7 +149,7 @@ export async function GET(req: NextRequest) {
         ).range(page * 1000, page * 1000 + 999)
       ),
       fetchAll((page) =>
-        within("updated_at", period.prevFromISO, period.prevToISO)(
+        within("fee_collected_at", period.prevFromISO, period.prevToISO)(
           admin
             .from("tournaments")
             .select("id, platform_fee_collected")

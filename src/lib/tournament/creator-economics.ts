@@ -176,7 +176,7 @@ export async function settleFixedPoolEntryFees(
   // A non-zero value means this tournament's entry fees were already split.
   const { data: claimed } = await admin
     .from("tournaments")
-    .update({ platform_fee_collected: platformFee })
+    .update({ platform_fee_collected: platformFee, fee_collected_at: new Date().toISOString() })
     .eq("id", t.id)
     .eq("platform_fee_collected", 0)
     .select("id");

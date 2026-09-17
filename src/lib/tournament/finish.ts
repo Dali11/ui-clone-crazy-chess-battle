@@ -203,7 +203,7 @@ export async function finishTournament(tournamentId: string): Promise<void> {
       if (isPlayerCreated && platformCut > 0) {
         await admin
           .from("tournaments")
-          .update({ platform_fee_collected: platformCut })
+          .update({ platform_fee_collected: platformCut, fee_collected_at: new Date().toISOString() })
           .eq("id", tournamentId)
           .eq("platform_fee_collected", 0);
       }
