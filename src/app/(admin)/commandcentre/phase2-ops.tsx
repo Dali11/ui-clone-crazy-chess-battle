@@ -1,4 +1,5 @@
 "use client";
+import { Check, X } from "lucide-react";
 
 import { useEffect, useState, useCallback } from "react";
 import { formatUsd, formatLocal, countryName } from "./sections";
@@ -152,7 +153,7 @@ export function MarketsView() {
                     className="cursor-pointer transition hover:bg-ccb-surface"
                   >
                     <td className="whitespace-nowrap px-4 py-3 font-medium text-white">
-                      <span className="mr-1.5">{COUNTRY_FLAGS[m.code] || "🏳"}</span>
+                      <span className="mr-1.5">{COUNTRY_FLAGS[m.code] || ""}</span>
                       {countryName(m.code)}{" "}
                       <span className="text-xs text-ccb-muted">({m.code})</span>
                     </td>
@@ -219,7 +220,7 @@ export function MarketsView() {
             <div className="flex items-start justify-between border-b border-ccb-border pb-4">
               <div>
                 <h3 className="text-lg font-semibold text-white">
-                  <span className="mr-2">{COUNTRY_FLAGS[selectedMarket.code] || "🏳"}</span>
+                  <span className="mr-2">{COUNTRY_FLAGS[selectedMarket.code] || ""}</span>
                   {countryName(selectedMarket.code)} ({selectedMarket.code})
                 </h3>
                 <p className="mt-1 text-xs text-violet-400">
@@ -230,7 +231,7 @@ export function MarketsView() {
                 onClick={() => setSelectedMarket(null)}
                 className="rounded-lg border border-ccb-border px-2.5 py-1 text-xs text-ccb-muted hover:border-violet-500 hover:text-white"
               >
-                ✕ Close
+                <X className="h-3.5 w-3.5" /> Close
               </button>
             </div>
 
@@ -712,7 +713,7 @@ export function SettlementsView() {
                     <td className="whitespace-nowrap px-4 py-3 text-white">
                       {s.country ? (
                         <>
-                          <span className="mr-1">{COUNTRY_FLAGS[s.country] || "🏳"}</span>
+                          <span className="mr-1">{COUNTRY_FLAGS[s.country] || ""}</span>
                           {s.country}
                         </>
                       ) : (
@@ -1444,7 +1445,7 @@ export function VerificationView() {
                       <p className="text-[11px] font-medium text-amber-400 animate-pulse">Processing...</p>
                     )}
                     {action.mode === "success" && (
-                      <p className="text-[11px] font-medium text-emerald-400">✓ {action.message}</p>
+                      <p className="flex items-center gap-1 text-[11px] font-medium text-emerald-400"><Check className="h-3.5 w-3.5 shrink-0" />{action.message}</p>
                     )}
                     {action.mode === "error" && (
                       <div className="space-y-1">

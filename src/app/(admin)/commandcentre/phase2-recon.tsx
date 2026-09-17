@@ -1,4 +1,5 @@
 "use client";
+import { AlertTriangle, Check, X } from "lucide-react";
 
 import { useState, useEffect, useCallback } from "react";
 import { formatUsd, formatLocal, timeAgo, countryName } from "./sections";
@@ -272,15 +273,17 @@ export function ReconciliationView() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-400">
-          ✓ {toastMessage}
+        <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-400">
+          <Check className="h-4 w-4 shrink-0" />
+          {toastMessage}
         </div>
       )}
 
       {/* Main Error */}
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
-          ⚠️ {error}
+        <div className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          {error}
         </div>
       )}
 
@@ -374,7 +377,7 @@ export function ReconciliationView() {
           </div>
         ) : data?.exceptions.length === 0 ? (
           <div className="p-8 text-center text-xs text-emerald-400">
-            ✓ No open reconciliation exceptions.
+            <Check className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />No open reconciliation exceptions.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -531,7 +534,7 @@ export function ReconciliationView() {
                 onClick={handleCloseResolveModal}
                 className="rounded p-1 text-ccb-muted hover:text-white hover:bg-ccb-surface"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -896,8 +899,9 @@ export function PlayersView() {
       </form>
 
       {searchError && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
-          ⚠️ {searchError}
+        <div className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          {searchError}
         </div>
       )}
 
@@ -988,7 +992,7 @@ export function PlayersView() {
                 onClick={closePlayerDrawer}
                 className="rounded p-1 text-ccb-muted hover:text-white hover:bg-ccb-surface"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -998,8 +1002,9 @@ export function PlayersView() {
                 Loading wallet history...
               </div>
             ) : dossierError ? (
-              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
-                ⚠️ {dossierError}
+              <div className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                {dossierError}
               </div>
             ) : dossier ? (
               <>
@@ -1182,9 +1187,17 @@ export function PlayersView() {
                             hasDiscrepancy ? "text-amber-400" : "text-emerald-400"
                           }`}
                         >
-                          {hasDiscrepancy
-                            ? `⚠️ Discrepancy: ${formatUsd(dossier.totals.discrepancyUsd)}`
-                            : "✓ Ledger matches stored balance"}
+                          {hasDiscrepancy ? (
+                            <>
+                              <AlertTriangle className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
+                              Discrepancy: {formatUsd(dossier.totals.discrepancyUsd)}
+                            </>
+                          ) : (
+                            <>
+                              <Check className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
+                              Ledger matches stored balance
+                            </>
+                          )}
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center justify-between text-[11px] text-ccb-muted border-t border-current/10 pt-1.5">

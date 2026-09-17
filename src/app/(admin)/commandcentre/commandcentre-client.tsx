@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Castle, Menu, X } from "lucide-react";
 import type {
   AttentionItem,
   FeedRow,
@@ -265,7 +265,7 @@ export default function CommandCentreClient() {
     <>
       <div className="mb-6 px-2">
         <p className="text-sm font-bold tracking-tight text-white">
-          <span className="text-violet-400">♞</span> CrazyChess
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-violet-500 to-violet-700 text-white" aria-hidden><Castle className="h-3.5 w-3.5" /></span> CrazyChess
         </p>
         <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-ccb-muted">
           Command Centre
@@ -354,7 +354,7 @@ export default function CommandCentreClient() {
           <Menu className="h-5 w-5" />
         </button>
         <p className="text-sm font-bold tracking-tight text-white">
-          <span className="text-violet-400">♞</span> CrazyChess
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-violet-500 to-violet-700 text-white" aria-hidden><Castle className="h-3.5 w-3.5" /></span> CrazyChess
           <span className="ml-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-ccb-muted">
             Command Centre
           </span>
@@ -636,7 +636,7 @@ export default function CommandCentreClient() {
           <aside className="absolute left-0 top-0 h-full w-72 max-w-[85vw] overflow-y-auto border-r border-ccb-border bg-ccb-surface px-3 py-5 shadow-2xl">
             <div className="mb-6 flex items-start justify-between px-2">
               <p className="text-sm font-bold tracking-tight text-white">
-                <span className="text-violet-400">♞</span> CrazyChess
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-violet-500 to-violet-700 text-white" aria-hidden><Castle className="h-3.5 w-3.5" /></span> CrazyChess
               </p>
               <button
                 type="button"

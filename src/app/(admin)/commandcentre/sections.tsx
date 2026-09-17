@@ -1,4 +1,5 @@
 "use client";
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Check, CircleDot, Megaphone, Percent, Star, Swords, Trophy, type LucideIcon } from "lucide-react";
 
 /**
  * Command Centre building blocks: KPI cards, revenue tiles, the
@@ -62,9 +63,15 @@ const KIND_LABEL: Record<string, string> = {
   withdrawal_fee: "Withdrawal fee",
 };
 
-const KIND_ICON: Record<string, string> = {
-  deposit: "↓", withdrawal: "↑", battle_fee: "⚔", tournament: "🏆",
-  membership: "★", ad: "📣", withdrawal_fee: "✂",
+// Transaction-kind icons (lucide) — sized by the badge they render in.
+const KIND_ICON: Record<string, LucideIcon> = {
+  deposit: ArrowDownLeft,
+  withdrawal: ArrowUpRight,
+  battle_fee: Swords,
+  tournament: Trophy,
+  membership: Star,
+  ad: Megaphone,
+  withdrawal_fee: Percent,
 };
 
 const COUNTRY_NAMES: Record<string, string> = {
@@ -217,7 +224,7 @@ export function AttentionStrip({
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4">
-        <p className="text-sm font-medium text-emerald-400">✓ All clear — nothing needs attention right now.</p>
+        <p className="flex items-center gap-1.5 text-sm font-medium text-emerald-400"><Check className="h-4 w-4" />All clear — nothing needs attention right now.</p>
         <p className="mt-0.5 text-xs text-ccb-muted">
           No pending withdrawals, failed payments, stuck deposits or open flags in view.
         </p>
@@ -313,7 +320,7 @@ export function MarketsTable({
                 className="cursor-pointer border-t border-ccb-border/60 transition-colors hover:bg-ccb-surface"
               >
                 <td className="whitespace-nowrap px-4 py-2.5 font-medium text-white">
-                  {COUNTRY_FLAGS[m.code] || "🏳"} {countryName(m.code)}
+                  {COUNTRY_FLAGS[m.code] || ""} {countryName(m.code)}
                 </td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-white">{formatUsd(m.volume)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-emerald-400">+{formatUsd(m.deposits)}</td>
@@ -349,7 +356,7 @@ export function MarketModal({ market, onClose }: { market: MarketRow; onClose: (
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xl font-semibold text-white">
-              {COUNTRY_FLAGS[market.code] || "🏳"} {countryName(market.code)}
+              {COUNTRY_FLAGS[market.code] || ""} {countryName(market.code)}
             </p>
             <p className="mt-0.5 text-xs text-ccb-muted">
               Local currency: <span className="font-semibold text-white">{market.currency}</span>
@@ -370,7 +377,7 @@ export function MarketModal({ market, onClose }: { market: MarketRow; onClose: (
             ["Withdrawals", `−${formatUsd(market.withdrawals)}`, "text-red-400"],
             ["Revenue", formatUsd(market.revenue), "text-white"],
             ["Players", market.players.toLocaleString(), "text-white"],
-            ["Status", market.status === "active" ? "🟢 Active" : "⚪ No activity", "text-white"],
+            ["Status", market.status === "active" ? "Active" : "No activity", "text-white"],
           ].map(([label, value, cls]) => (
             <div key={label} className="rounded-lg border border-ccb-border bg-ccb-surface p-3">
               <p className="text-[10px] font-medium uppercase tracking-wider text-ccb-muted">{label}</p>
@@ -422,7 +429,10 @@ export function TransactionFeed({
               : "text-violet-400"
             }`}
           >
-            {KIND_ICON[r.kind]}
+            {(() => {
+              const KindIcon = KIND_ICON[r.kind] ?? CircleDot;
+              return <KindIcon className="h-4 w-4" />;
+            })()}
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -451,7 +461,6 @@ export function TransactionFeed({
             </p>
             <p className="flex items-center justify-end gap-1.5 text-[11px] text-ccb-muted">
               <span className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[r.status]}`} />
-              {r.status === "completed" ? "🟢" : r.status === "pending" ? "🟡" : r.status === "failed" ? "🔴" : ""}
               {" "}{timeAgo(r.time)}
             </p>
           </div>

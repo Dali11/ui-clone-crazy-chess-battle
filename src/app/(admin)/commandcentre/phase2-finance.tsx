@@ -1,4 +1,5 @@
 'use client';
+import { Check, X } from "lucide-react";
 
 import { useEffect, useState, useCallback } from "react";
 import { formatUsd, formatLocal, timeAgo } from "./sections";
@@ -780,7 +781,7 @@ export function DepositsView() {
                       <p className="text-[11px] font-medium text-amber-400 animate-pulse">Processing...</p>
                     )}
                     {action.mode === "success" && (
-                      <p className="text-[11px] font-medium text-emerald-400">✓ {action.message}</p>
+                      <p className="flex items-center gap-1 text-[11px] font-medium text-emerald-400"><Check className="h-3.5 w-3.5 shrink-0" />{action.message}</p>
                     )}
                     {action.mode === "error" && (
                       <div className="space-y-1">
@@ -1078,7 +1079,7 @@ export function DepositsView() {
                 onClick={() => setSelectedId(null)}
                 className="rounded-lg p-1 text-ccb-muted hover:bg-ccb-surface hover:text-white"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
             {detailLoading && <p className="mt-4 text-xs text-ccb-muted">Loading detail...</p>}
@@ -1444,7 +1445,7 @@ export function WithdrawalsView() {
                     )}
 
                     {action.mode === "success" && (
-                      <p className="text-[11px] font-medium text-emerald-400">✓ {action.message}</p>
+                      <p className="flex items-center gap-1 text-[11px] font-medium text-emerald-400"><Check className="h-3.5 w-3.5 shrink-0" />{action.message}</p>
                     )}
 
                     {action.mode === "error" && (
@@ -1700,7 +1701,7 @@ export function WithdrawalsView() {
                 onClick={() => setSelectedId(null)}
                 className="rounded-lg p-1 text-ccb-muted hover:bg-ccb-surface hover:text-white"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
             {detailLoading && <p className="mt-4 text-xs text-ccb-muted">Loading detail...</p>}
