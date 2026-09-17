@@ -5,6 +5,7 @@ import { PRIZE_SPLITS_BY_TYPE, DEFAULT_PRIZE_SPLITS } from "@/lib/tournament/pri
 import { getPlatformConfig } from "@/lib/platform-config";
 import { checkCreatorEligibility, escrowFixedPoolPrize, MAX_CREATOR_PROFIT_PERCENT } from "@/lib/tournament/creator-economics";
 import { sendEmail } from "@/lib/email";
+import { formatMoneyConverted } from "@/lib/geo/server-format";
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,6 +41,11 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient();
 
+    // Check if creator is admin
+    const { data: creatorProfile } = await admin
+      .from("profiles").select("is_admin, country").eq("id", user.id).single();
+    const isCreatorAdmin = creatorProfile?.is_admin ?? false;
+
     // ─── Load platform config ──────────────────────────────────────────
     const tConfig = await getPlatformConfig(admin, "tournaments");
 
@@ -47,11 +53,15 @@ export async function POST(req: NextRequest) {
     const fee = Number(entryFee || 0);
     const maxFee = tConfig.max_entry_fee ?? 5000;
     const minFee = tConfig.min_entry_fee ?? 0;
+    // Player enters the fee in THEIR OWN currency — the UI converts to MWK
+    // before calling us. Quote limits back in their currency (MWK only as
+    // fallback when FX is down).
+    const feeCountry = creatorProfile?.country;
     if (fee > maxFee) {
-      return NextResponse.json({ error: `Entry fee cannot exceed ${maxFee.toLocaleString()} MWK` }, { status: 400 });
+      return NextResponse.json({ error: `Entry fee cannot exceed ${await formatMoneyConverted(maxFee, feeCountry)}` }, { status: 400 });
     }
     if (fee < minFee) {
-      return NextResponse.json({ error: `Entry fee must be at least ${minFee.toLocaleString()} MWK` }, { status: 400 });
+      return NextResponse.json({ error: `Entry fee must be at least ${await formatMoneyConverted(minFee, feeCountry)}` }, { status: 400 });
     }
 
     // Enforce max players limit from platform settings
@@ -77,11 +87,6 @@ export async function POST(req: NextRequest) {
     };
     const dbTimeControl = GAME_TIME_CONTROL_MAP[timeControl] || "blitz";
     const payouts = PRIZE_SPLITS_BY_TYPE[dbType] || DEFAULT_PRIZE_SPLITS;
-
-    // Check if creator is admin
-    const { data: creatorProfile } = await admin
-      .from("profiles").select("is_admin").eq("id", user.id).single();
-    const isCreatorAdmin = creatorProfile?.is_admin ?? false;
 
     // ── Player-created tournaments: qualification + economics guardrails ──
     let finalProfitPercent = profitPercent;

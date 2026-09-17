@@ -30,8 +30,8 @@ export default function AcademyClient({ member }: { member: boolean }) {
           <Lock className="w-6 h-6 text-ccb-primary mx-auto mb-2" />
           <p className="text-sm font-semibold mb-1">The Academy is a Club Membership benefit</p>
           <p className="text-xs text-ccb-muted mb-4">
-            $10/month gets you the full curriculum, your progress tracking, zero ads and 1.5x
-            league XP.
+            Club membership gets you the full curriculum, your progress tracking,
+            zero ads and 1.5x league XP — priced in your own currency.
           </p>
           <Link
             href="/membership"

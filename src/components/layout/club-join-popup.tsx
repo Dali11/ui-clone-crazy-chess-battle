@@ -50,6 +50,9 @@ export default function ClubJoinPopup() {
   const pathname = usePathname();
   const [visible, setVisible] = useState(false);
   const [priceUsd, setPriceUsd] = useState<number | null>(null);
+  const [priceLocal, setPriceLocal] = useState<number | null>(null);
+  const [localCurrency, setLocalCurrency] = useState<string | null>(null);
+  const [priceMwk, setPriceMwk] = useState<number | null>(null);
 
   useEffect(() => {
     if (pathname?.startsWith("/membership")) return;
@@ -76,6 +79,9 @@ export default function ClubJoinPopup() {
 
         if (!cancelled) {
           if (typeof d.priceUsd === "number") setPriceUsd(d.priceUsd);
+          if (typeof d.priceLocal === "number") setPriceLocal(d.priceLocal);
+          if (typeof d.localCurrency === "string") setLocalCurrency(d.localCurrency);
+          if (typeof d.priceMwk === "number") setPriceMwk(d.priceMwk);
           localStorage.setItem(DISMISS_KEY, String(Date.now()));
           setVisible(true);
         }
@@ -147,7 +153,13 @@ export default function ClubJoinPopup() {
           className="mt-6 w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-ccb-primary to-ccb-accent hover:opacity-90 text-white text-sm font-bold px-4 py-3 transition-all shadow-lg shadow-ccb-primary/25"
         >
           <Crown className="w-4 h-4" />
-          {priceUsd ? `Join the Club — $${priceUsd}/month` : "Join the Club"}
+          {priceMwk
+            ? `Join the Club — MK${priceMwk.toLocaleString()}/month`
+            : priceLocal && localCurrency
+              ? `Join the Club — ${priceLocal.toLocaleString()} ${localCurrency}/month`
+              : priceUsd
+                ? `Join the Club — $${priceUsd}/month`
+                : "Join the Club"}
         </Link>
 
         <button

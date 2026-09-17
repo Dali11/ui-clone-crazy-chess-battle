@@ -164,6 +164,11 @@ export default function MembershipClient() {
   const localCurrency = status?.localCurrency ?? null;
   const period = status?.periodDays || 30;
   const fmtUsd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
+  // LOCAL-BY-DEFAULT PRICING: headline what the player's own wallet/mobile
+  // money will actually charge — MWK for Malawi, their local currency
+  // everywhere else. USD only appears when no FX rate is available yet.
+  const fmtLocal = (n: number, cur: string) =>
+    `${Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2)} ${cur}`;
 
   const perks = [
     { icon: Zap, title: "1.5x league XP", line: "Earn league XP half again as fast." },
@@ -183,7 +188,7 @@ export default function MembershipClient() {
         </div>
         <h1 className="text-xl sm:text-2xl font-bold mb-2">Membership</h1>
         <p className="text-sm text-ccb-muted">
-          {fmtUsd(price)} a month. Zero ads. 1.5x XP. Full Academy.
+          {priceMwk ? fmtMK(priceMwk) : priceLocal && localCurrency ? fmtLocal(priceLocal, localCurrency) : fmtUsd(price)} a month. Zero ads. 1.5x XP. Full Academy.
         </p>
       </div>
 
@@ -215,11 +220,12 @@ export default function MembershipClient() {
         /* Buy card */
         <div className="rounded-2xl border border-ccb-border bg-card p-6">
           <div className="text-center mb-6">
-            <p className="text-3xl font-bold">{fmtUsd(price)}</p>
+            <p className="text-3xl font-bold">
+              {priceMwk ? fmtMK(priceMwk) : priceLocal && localCurrency ? fmtLocal(priceLocal, localCurrency) : fmtUsd(price)}
+            </p>
             <p className="text-sm text-ccb-muted">
               every {period} days · mobile money
-              {priceMwk ? <> · charged as <span className="font-semibold text-ccb-foreground">{fmtMK(priceMwk)}</span></> : null}
-              {priceLocal && localCurrency ? <> · charged as <span className="font-semibold text-ccb-foreground">{priceLocal.toLocaleString()} {localCurrency}</span></> : null}
+              {priceMwk == null && !priceLocal ? <> · approx. {fmtUsd(price)} USD</> : null}
             </p>
           </div>
 
@@ -308,7 +314,7 @@ export default function MembershipClient() {
               ) : polling ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Waiting for your PIN…</>
               ) : (
-                <><Crown className="w-4 h-4" /> Join the Club — {fmtUsd(price)}</>
+                <><Crown className="w-4 h-4" /> Join the Club — {priceMwk ? fmtMK(priceMwk) : priceLocal && localCurrency ? fmtLocal(priceLocal, localCurrency) : fmtUsd(price)}</>
               )}
             </button>
           )}
