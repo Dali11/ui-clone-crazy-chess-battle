@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyAdminsMoneyEvent } from "@/lib/admin-alerts";
 
 // PayChangu signs webhooks with HMAC-SHA256 of the raw JSON body, using the
 // webhook secret from the dashboard. The digest is sent in the "Signature" header.
@@ -116,6 +117,24 @@ export async function POST(req: NextRequest) {
           });
         } catch {}
 
+        // Admin alert (email + push) — membership revenue in
+        try {
+          const { data: memProfile } = await admin
+            .from("profiles")
+            .select("username, display_name")
+            .eq("id", deposit.user_id)
+            .single();
+          await notifyAdminsMoneyEvent(admin, {
+            kind: "deposit_success",
+            playerName: memProfile?.display_name || memProfile?.username || "Unknown player",
+            amount: deposit.amount,
+            currency: "MWK",
+            method: "membership_purchase",
+            reference: deposit.reference,
+            txId: deposit.id,
+          });
+        } catch {}
+
         // Affiliate commission (when the buyer used a referral link and the
         // program switch is ON): pays the referrer 25%, properly ledgered.
         // Wrapped so a commission failure never blocks membership activation.
@@ -144,6 +163,24 @@ export async function POST(req: NextRequest) {
         .from("deposits")
         .update({ status: "success", updated_at: new Date().toISOString() })
         .eq("id", deposit.id);
+
+      // Admin alert (email + push) — money in
+      try {
+        const { data: depProfile } = await admin
+          .from("profiles")
+          .select("username, display_name")
+          .eq("id", deposit.user_id)
+          .single();
+        await notifyAdminsMoneyEvent(admin, {
+          kind: "deposit_success",
+          playerName: depProfile?.display_name || depProfile?.username || "Unknown player",
+          amount: deposit.amount,
+          currency: "MWK",
+          method: deposit.method || "paychangu",
+          reference: deposit.reference,
+          txId: deposit.id,
+        });
+      } catch {}
 
     } else if (status === "failed" || status === "cancelled") {
       await admin

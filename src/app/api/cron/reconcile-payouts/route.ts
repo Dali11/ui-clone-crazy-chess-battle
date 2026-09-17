@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyAdminsMoneyEvent } from "@/lib/admin-alerts";
 import { checkPayoutStatus, mapPawaPayStatus } from "@/lib/payments/pawapay";
 
 export const dynamic = "force-dynamic";
@@ -124,6 +125,25 @@ export async function GET(req: NextRequest) {
               body: `Your withdrawal of ${w.amount.toLocaleString()} has been sent to your mobile money wallet.`,
               data: { amount: w.amount, method: "pawapay" },
               read: false,
+            });
+          } catch {}
+
+          // Admin alert (email + push) — money out confirmed by the sweep
+          try {
+            const { data: wProfile } = await admin
+              .from("profiles")
+              .select("username, display_name")
+              .eq("id", w.user_id)
+              .single();
+            await notifyAdminsMoneyEvent(admin, {
+              kind: "withdrawal_success",
+              playerName: wProfile?.display_name || wProfile?.username || "Unknown player",
+              amount: w.amount,
+              amountLocal: w.net_amount ?? w.amount,
+              currency: w.currency,
+              method: w.payment_provider || "pawapay",
+              country: w.country,
+              txId: w.id,
             });
           } catch {}
         }

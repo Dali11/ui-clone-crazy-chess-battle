@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { mapPawaPayStatus, type PawaPayCallback } from "@/lib/payments/pawapay";
+import { notifyAdminsMoneyEvent } from "@/lib/admin-alerts";
 
 /**
  * PawaPay callback handler.
@@ -111,6 +112,25 @@ export async function POST(req: NextRequest) {
             });
           } catch {}
 
+          // Admin alert (email + push) — membership revenue in
+          try {
+            const { data: memProfile } = await admin
+              .from("profiles")
+              .select("username, display_name")
+              .eq("id", deposit.user_id)
+              .single();
+            await notifyAdminsMoneyEvent(admin, {
+              kind: "deposit_success",
+              playerName: memProfile?.display_name || memProfile?.username || "Unknown player",
+              amount: deposit.amount,
+              amountLocal: deposit.amount_local,
+              currency: deposit.currency,
+              method: "membership_purchase",
+              reference: deposit.reference,
+              txId: deposit.id,
+            });
+          } catch {}
+
           // Affiliate commission (same as the PayChangu rails): pays the
           // referrer 25%, properly ledgered. Never blocks activation.
           try {
@@ -151,6 +171,25 @@ export async function POST(req: NextRequest) {
           });
         } catch {}
 
+        // Admin alert (email + push) — money in
+        try {
+          const { data: depProfile } = await admin
+            .from("profiles")
+            .select("username, display_name")
+            .eq("id", deposit.user_id)
+            .single();
+          await notifyAdminsMoneyEvent(admin, {
+            kind: "deposit_success",
+            playerName: depProfile?.display_name || depProfile?.username || "Unknown player",
+            amount: deposit.amount,
+            amountLocal: deposit.amount_local,
+            currency: deposit.currency,
+            method: "pawapay",
+            reference: deposit.reference,
+            txId: deposit.id,
+          });
+        } catch {}
+
       } else if (internalStatus === "failed") {
         await admin
           .from("deposits")
@@ -168,7 +207,7 @@ export async function POST(req: NextRequest) {
       // Find the withdrawal by PawaPay payoutId
       const { data: withdrawal } = await admin
         .from("withdrawals")
-        .select("id, user_id, amount, status")
+        .select("id, user_id, amount, fee, net_amount, currency, country, status")
         .eq("pawapay_ref", body.payoutId)
         .single();
 
@@ -198,6 +237,24 @@ export async function POST(req: NextRequest) {
               body: `Your withdrawal of ${withdrawal.amount.toLocaleString()} has been sent to your mobile money wallet.`,
               data: { amount: withdrawal.amount, method: "pawapay" },
               read: false,
+            });
+
+            // Admin alert (email + push) — money out, fired once per
+            // transition to terminal COMPLETED
+            const { data: wProfile } = await admin
+              .from("profiles")
+              .select("username, display_name")
+              .eq("id", withdrawal.user_id)
+              .single();
+            await notifyAdminsMoneyEvent(admin, {
+              kind: "withdrawal_success",
+              playerName: wProfile?.display_name || wProfile?.username || "Unknown player",
+              amount: withdrawal.amount,
+              amountLocal: withdrawal.net_amount ?? withdrawal.amount,
+              currency: withdrawal.currency,
+              method: "pawapay",
+              country: withdrawal.country,
+              txId: withdrawal.id,
             });
           }
         } catch {}

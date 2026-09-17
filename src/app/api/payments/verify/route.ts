@@ -3,6 +3,7 @@ import { moneySymbol } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyAdminsMoneyEvent } from "@/lib/admin-alerts";
 import { checkDepositStatus, mapPawaPayStatus } from "@/lib/payments/pawapay";
 
 export async function POST(req: NextRequest) {
@@ -114,6 +115,24 @@ export async function POST(req: NextRequest) {
           });
         } catch {}
 
+        // Admin alert (email + push) — membership revenue in
+        try {
+          const { data: memProfile } = await admin
+            .from("profiles")
+            .select("username, display_name")
+            .eq("id", deposit.user_id)
+            .single();
+          await notifyAdminsMoneyEvent(admin, {
+            kind: "deposit_success",
+            playerName: memProfile?.display_name || memProfile?.username || "Unknown player",
+            amount: deposit.amount,
+            amountLocal: deposit.amount_local,
+            currency: deposit.currency,
+            method: "membership_purchase",
+            txId: deposit.id,
+          });
+        } catch {}
+
         try {
           const affCfg = await getPlatformConfig(admin, "affiliate");
           if (affCfg.enabled) {
@@ -148,6 +167,24 @@ export async function POST(req: NextRequest) {
           body: `Your deposit of ${(deposit.amount_local ?? deposit.amount).toLocaleString()}${deposit.currency && deposit.currency !== "MWK" ? ` ${deposit.currency}` : ""} has been credited to your wallet.`,
           data: { amount: deposit.amount, method: "pawapay" },
           read: false,
+        });
+      } catch {}
+
+      // Admin alert (email + push) — money in
+      try {
+        const { data: depProfile } = await admin
+          .from("profiles")
+          .select("username, display_name")
+          .eq("id", deposit.user_id)
+          .single();
+        await notifyAdminsMoneyEvent(admin, {
+          kind: "deposit_success",
+          playerName: depProfile?.display_name || depProfile?.username || "Unknown player",
+          amount: deposit.amount,
+          amountLocal: deposit.amount_local,
+          currency: deposit.currency,
+          method: deposit.payment_provider || deposit.method || "pawapay",
+          txId: deposit.id,
         });
       } catch {}
 
@@ -223,6 +260,24 @@ export async function POST(req: NextRequest) {
           });
         } catch {}
 
+        // Admin alert (email + push) — membership revenue in
+        try {
+          const { data: memProfile2 } = await admin
+            .from("profiles")
+            .select("username, display_name")
+            .eq("id", deposit.user_id)
+            .single();
+          await notifyAdminsMoneyEvent(admin, {
+            kind: "deposit_success",
+            playerName: memProfile2?.display_name || memProfile2?.username || "Unknown player",
+            amount: deposit.amount,
+            amountLocal: deposit.amount_local,
+            currency: deposit.currency,
+            method: "membership_purchase",
+            txId: deposit.id,
+          });
+        } catch {}
+
         // Affiliate commission (when the buyer used a referral link and the
         // program switch is ON): pays the referrer 25%, properly ledgered.
         // Wrapped so a commission failure never blocks membership activation.
@@ -265,6 +320,24 @@ export async function POST(req: NextRequest) {
           body: `Your deposit of ${await formatMoneyConverted(amountMWK, _up?.country)} has been credited to your wallet.`,
           data: { amount: amountMWK, method: deposit.method },
           read: false,
+        });
+      } catch {}
+
+      // Admin alert (email + push) — money in
+      try {
+        const { data: depProfile2 } = await admin
+          .from("profiles")
+          .select("username, display_name")
+          .eq("id", deposit.user_id)
+          .single();
+        await notifyAdminsMoneyEvent(admin, {
+          kind: "deposit_success",
+          playerName: depProfile2?.display_name || depProfile2?.username || "Unknown player",
+          amount: deposit.amount,
+          amountLocal: deposit.amount_local,
+          currency: deposit.currency,
+          method: deposit.payment_provider || deposit.method || "paychangu",
+          txId: deposit.id,
         });
       } catch {}
 
