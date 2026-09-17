@@ -41,6 +41,11 @@ export interface UsdConverter {
   toMwk(amount: number, currency: string | null | undefined): number | null;
   /** Same as toUsd but floored at 0 for summation safety. */
   toUsdOrZero(amount: number, currency: string | null | undefined): number;
+  /**
+   * Convert an MWK-normalized amount → the player's local wallet currency.
+   * null when the rate for that currency is unavailable.
+   */
+  mwkToLocal(amountMwk: number, currency: string | null | undefined): number | null;
   readonly unavailable: Set<string>;
 }
 
@@ -98,10 +103,24 @@ export function makeUsdConverter(
     return amount / rate;
   };
 
+  const convertMwkToLocal = (amountMwk: number, currency: string | null | undefined): number | null => {
+    const code = (currency || "MWK").toUpperCase();
+    if (!Number.isFinite(amountMwk)) return null;
+    if (code === "MWK") return amountMwk;
+    const rate = local[code];
+    if (!rate) {
+      unavailable.add(code);
+      return null;
+    }
+    // local rates are MWK->C
+    return amountMwk * rate;
+  };
+
   return {
     toUsd,
     usdFromMwk,
     toMwk,
+    mwkToLocal: convertMwkToLocal,
     toUsdOrZero: (amount, currency) => toUsd(amount, currency) ?? 0,
     unavailable,
   };

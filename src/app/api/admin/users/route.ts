@@ -116,20 +116,50 @@ export async function PATCH(req: NextRequest) {
 
     switch (action) {
       case "wallet_adjustment": {
-        // Signed MWK amount + mandatory reason. Goes through
+        // Signed amount + mandatory reason. Goes through
         // apply_financial_adjustment (same primitive as Command Centre
         // reconciliation): ledger row + wallet RPC + audit entry.
         // Wallet balances are never edited directly.
+        //
+        // Amount currency: MWK (default, legacy callers) or one of the
+        // dossier's display currencies — "USD" or "local" (the player's
+        // own wallet currency, resolved from their profile country).
+        // Non-MWK inputs are converted to MWK with the same shared FX
+        // converter the Command Centre reports use.
         const amount = Number(value);
         if (!Number.isFinite(amount) || amount === 0)
           return NextResponse.json({ error: "Adjustment amount must be a non-zero number" }, { status: 400 });
         const adjReason = typeof reason === "string" ? reason : "";
         if (adjReason.trim().length < 3)
           return NextResponse.json({ error: "A reason of at least 3 characters is required" }, { status: 400 });
+
+        let amountMwk = Math.round(amount);
+        const currency = typeof body.currency === "string" ? body.currency.trim().toUpperCase() : "MWK";
+        if (currency && currency !== "MWK") {
+          const { COUNTRY_CURRENCY } = await import("@/lib/geo/currency-map");
+          const { loadUsdConverter } = await import("@/lib/finance/usd");
+          const { getExchangeRate } = await import("@/lib/geo/fx");
+          const { data: target } = await admin
+            .from("profiles")
+            .select("country")
+            .eq("id", userId)
+            .single();
+          const walletCurrency = COUNTRY_CURRENCY[(target?.country || "").toUpperCase()] || "MWK";
+          const fx = await loadUsdConverter(admin, async () => getExchangeRate("MWK", "USD"));
+          const denom = currency === "USD" ? "USD" : walletCurrency;
+          const converted = fx.toMwk(amount, denom);
+          if (converted == null)
+            return NextResponse.json(
+              { error: `Exchange rate unavailable — cannot convert ${denom} to MWK right now` },
+              { status: 503 }
+            );
+          amountMwk = Math.round(converted);
+        }
+
         const { error } = await admin.rpc("apply_financial_adjustment", {
           p_admin_id: user.id,
           p_player_id: userId,
-          p_amount_mwk: Math.round(amount),
+          p_amount_mwk: amountMwk,
           p_reason: adjReason.trim(),
         });
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });

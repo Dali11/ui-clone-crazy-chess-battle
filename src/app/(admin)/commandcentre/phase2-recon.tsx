@@ -748,13 +748,25 @@ interface PlayerDossier {
     totalFeesMwk: number;
     pendingDepositsMwk: number;
     pendingWithdrawalsMwk: number;
+    totalDepositedLocal: number | null;
+    totalWithdrawnLocal: number | null;
+    totalWinningsLocal: number | null;
+    totalFeesLocal: number | null;
+    pendingDepositsLocal: number | null;
+    pendingWithdrawalsLocal: number | null;
+    totalDepositedUsd: number | null;
+    totalWithdrawnUsd: number | null;
+    totalWinningsUsd: number | null;
+    totalFeesUsd: number | null;
+    pendingDepositsUsd: number | null;
+    pendingWithdrawalsUsd: number | null;
     derivedLedgerMwk: number;
     derivedLedgerUsd: number | null;
     storedBalanceUsd: number | null;
     discrepancyUsd: number | null;
     entryCount: number;
   };
-  history: WalletEntry[];
+  history: (WalletEntry & { usdAmount: number | null })[];
 }
 
 export function PlayersView() {
@@ -779,6 +791,7 @@ export function PlayersView() {
 
   // Manage Player state (wallet adjustment, ban/unban, admin role)
   const [manageAmount, setManageAmount] = useState("");
+  const [manageCurrency, setManageCurrency] = useState<"local" | "usd" | "mwk">("local");
   const [manageReason, setManageReason] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
   const [manageMsg, setManageMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -830,6 +843,7 @@ export function PlayersView() {
     setDossierError(null);
     setHistoryPageSize(50);
     setManageAmount("");
+    setManageCurrency("local");
     setManageReason("");
     setManageMsg(null);
     setManageConfirm(null);
@@ -853,7 +867,7 @@ export function PlayersView() {
     }
   };
 
-  const runUserAction = async (action: string, value?: unknown, reason?: string) => {
+  const runUserAction = async (action: string, value?: unknown, reason?: string, currency?: string) => {
     if (!selectedPlayerId) return false;
     setActionBusy(true);
     setManageMsg(null);
@@ -861,7 +875,7 @@ export function PlayersView() {
       const res = await fetch("/api/admin/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: selectedPlayerId, action, value, reason }),
+        body: JSON.stringify({ userId: selectedPlayerId, action, value, reason, currency }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json.error) throw new Error(json.error || `HTTP ${res.status}`);
@@ -1054,7 +1068,7 @@ export function PlayersView() {
                     </span>
                     <div className="mt-0.5 flex items-baseline gap-2">
                       <span className="text-2xl font-bold tracking-tight text-white">
-                        {formatLocal(dossier.player.wallet_balance, dossier.player.walletCurrency) || "0 MWK"}
+                        {formatLocal(dossier.player.wallet_balance, dossier.player.walletCurrency) || `0 ${dossier.player.walletCurrency}`}
                       </span>
                       <span className="text-xs text-ccb-muted">
                         ({formatUsd(dossier.player.storedBalanceUsd)})
@@ -1085,14 +1099,35 @@ export function PlayersView() {
                   {/* Wallet adjustment */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-semibold text-white">
-                      Wallet adjustment (MWK, + credit / − debit)
+                      Wallet adjustment (+ credit / − debit)
                     </label>
+                    <div className="flex gap-1.5">
+                      {(["local", "usd"] as const).map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          disabled={actionBusy}
+                          onClick={() => setManageCurrency(c)}
+                          className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50 ${
+                            manageCurrency === c
+                              ? "bg-violet-600 text-white"
+                              : "border border-ccb-border bg-ccb-surface text-ccb-muted hover:text-white"
+                          }`}
+                        >
+                          {c === "local" ? dossier.player.walletCurrency : "USD"}
+                        </button>
+                      ))}
+                    </div>
                     <input
                       type="number"
                       step="any"
                       value={manageAmount}
                       onChange={(e) => setManageAmount(e.target.value)}
-                      placeholder="e.g. 5000 or -2000"
+                      placeholder={
+                        manageCurrency === "usd"
+                          ? "e.g. 5 or -2"
+                          : `e.g. ${dossier.player.walletCurrency === "MWK" ? "5000" : "100"} or -50`
+                      }
                       disabled={actionBusy}
                       className="w-full rounded-md border border-ccb-border bg-ccb-surface px-3 py-1.5 text-xs text-white placeholder:text-ccb-muted focus:border-violet-500 focus:outline-none disabled:opacity-50"
                     />
@@ -1110,14 +1145,19 @@ export function PlayersView() {
                       onClick={async () => {
                         const amt = Number(manageAmount);
                         if (!Number.isFinite(amt) || amt === 0) {
-                          setManageMsg({ ok: false, text: "Enter a non-zero amount (MWK)" });
+                          setManageMsg({ ok: false, text: "Enter a non-zero amount" });
                           return;
                         }
                         if (manageReason.trim().length < 3) {
                           setManageMsg({ ok: false, text: "A reason of at least 3 characters is required" });
                           return;
                         }
-                        const ok = await runUserAction("wallet_adjustment", amt, manageReason.trim());
+                        const ok = await runUserAction(
+                          "wallet_adjustment",
+                          amt,
+                          manageReason.trim(),
+                          manageCurrency === "usd" ? "USD" : "local"
+                        );
                         if (ok) setManageMsg({ ok: true, text: "Wallet adjusted — ledger row created" });
                       }}
                       className="w-full rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
@@ -1249,7 +1289,10 @@ export function PlayersView() {
                       Deposited
                     </span>
                     <span className="font-semibold text-white">
-                      {formatLocal(dossier.totals.totalDepositedMwk, "MWK") || "0 MWK"}
+                      {formatLocal(dossier.totals.totalDepositedLocal, dossier.player.walletCurrency) || formatUsd(dossier.totals.totalDepositedUsd) || "—"}
+                    </span>
+                    <span className="text-[10px] text-ccb-muted font-mono">
+                      {formatUsd(dossier.totals.totalDepositedUsd) || "—"}
                     </span>
                   </div>
                   <div className="rounded-lg border border-ccb-border bg-ccb-surface p-2.5">
@@ -1257,7 +1300,10 @@ export function PlayersView() {
                       Withdrawn
                     </span>
                     <span className="font-semibold text-white">
-                      {formatLocal(dossier.totals.totalWithdrawnMwk, "MWK") || "0 MWK"}
+                      {formatLocal(dossier.totals.totalWithdrawnLocal, dossier.player.walletCurrency) || formatUsd(dossier.totals.totalWithdrawnUsd) || "—"}
+                    </span>
+                    <span className="text-[10px] text-ccb-muted font-mono">
+                      {formatUsd(dossier.totals.totalWithdrawnUsd) || "—"}
                     </span>
                   </div>
                   <div className="rounded-lg border border-ccb-border bg-ccb-surface p-2.5">
@@ -1265,7 +1311,10 @@ export function PlayersView() {
                       Battle Winnings
                     </span>
                     <span className="font-semibold text-white">
-                      {formatLocal(dossier.totals.totalWinningsMwk, "MWK") || "0 MWK"}
+                      {formatLocal(dossier.totals.totalWinningsLocal, dossier.player.walletCurrency) || formatUsd(dossier.totals.totalWinningsUsd) || "—"}
+                    </span>
+                    <span className="text-[10px] text-ccb-muted font-mono">
+                      {formatUsd(dossier.totals.totalWinningsUsd) || "—"}
                     </span>
                   </div>
                   <div className="rounded-lg border border-ccb-border bg-ccb-surface p-2.5">
@@ -1273,7 +1322,10 @@ export function PlayersView() {
                       Fees
                     </span>
                     <span className="font-semibold text-white">
-                      {formatLocal(dossier.totals.totalFeesMwk, "MWK") || "0 MWK"}
+                      {formatLocal(dossier.totals.totalFeesLocal, dossier.player.walletCurrency) || formatUsd(dossier.totals.totalFeesUsd) || "—"}
+                    </span>
+                    <span className="text-[10px] text-ccb-muted font-mono">
+                      {formatUsd(dossier.totals.totalFeesUsd) || "—"}
                     </span>
                   </div>
                   <div className="rounded-lg border border-ccb-border bg-ccb-surface p-2.5">
@@ -1281,7 +1333,10 @@ export function PlayersView() {
                       Pending Deposits
                     </span>
                     <span className="font-semibold text-amber-400">
-                      {formatLocal(dossier.totals.pendingDepositsMwk, "MWK") || "0 MWK"}
+                      {formatLocal(dossier.totals.pendingDepositsLocal, dossier.player.walletCurrency) || formatUsd(dossier.totals.pendingDepositsUsd) || "—"}
+                    </span>
+                    <span className="text-[10px] text-ccb-muted font-mono">
+                      {formatUsd(dossier.totals.pendingDepositsUsd) || "—"}
                     </span>
                   </div>
                   <div className="rounded-lg border border-ccb-border bg-ccb-surface p-2.5">
@@ -1289,7 +1344,10 @@ export function PlayersView() {
                       Pending Withdrawals
                     </span>
                     <span className="font-semibold text-amber-400">
-                      {formatLocal(dossier.totals.pendingWithdrawalsMwk, "MWK") || "0 MWK"}
+                      {formatLocal(dossier.totals.pendingWithdrawalsLocal, dossier.player.walletCurrency) || formatUsd(dossier.totals.pendingWithdrawalsUsd) || "—"}
+                    </span>
+                    <span className="text-[10px] text-ccb-muted font-mono">
+                      {formatUsd(dossier.totals.pendingWithdrawalsUsd) || "—"}
                     </span>
                   </div>
                 </div>
@@ -1313,8 +1371,8 @@ export function PlayersView() {
                               <th className="px-2.5 py-2 font-medium">Time</th>
                               <th className="px-2.5 py-2 font-medium">Type</th>
                               <th className="px-2.5 py-2 font-medium">Label</th>
-                              <th className="px-2.5 py-2 font-medium">MWK Amount</th>
-                              <th className="px-2.5 py-2 font-medium">Local Amt</th>
+                              <th className="px-2.5 py-2 font-medium">USD Amount</th>
+                              <th className="px-2.5 py-2 font-medium">{dossier.player.walletCurrency}</th>
                               <th className="px-2.5 py-2 font-medium">Status</th>
                               <th className="px-2.5 py-2 font-medium">Ref</th>
                             </tr>
@@ -1347,7 +1405,7 @@ export function PlayersView() {
                                       }
                                     >
                                       {positive ? "+" : ""}
-                                      {formatLocal(entry.amountMwk, "MWK")}
+                                      {formatUsd(entry.usdAmount) || "—"}
                                     </span>
                                   </td>
                                   <td className="px-2.5 py-2 text-ccb-muted whitespace-nowrap">

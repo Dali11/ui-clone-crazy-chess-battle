@@ -99,7 +99,15 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(2000);
 
-    const history = buildWalletHistory(deposits || [], withdrawals || []);
+    const history = buildWalletHistory(deposits || [], withdrawals || []).map((h) => ({
+      ...h,
+      // Older ledger rows (pre amount_local migration) carry no local amount —
+      // derive it from the MWK-normalized value so every row is displayable in
+      // the player's own currency.
+      localAmount: h.localAmount ?? fx.mwkToLocal(Math.abs(h.amountMwk), walletCurrency),
+      localCurrency: h.localCurrency || walletCurrency,
+      usdAmount: fx.usdFromMwk(h.amountMwk),
+    }));
 
     // ── Totals (settled rows only) ───────────────────────────────────────
     let totalDepositedMwk = 0;   // external money-in, success
@@ -162,6 +170,21 @@ export async function GET(req: NextRequest) {
         totalFeesMwk,
         pendingDepositsMwk,
         pendingWithdrawalsMwk,
+        // Admin display currency: the player's local wallet currency + USD.
+        // (MWK is the internal ledger unit only — the dossier UI no longer
+        // shows it.)
+        totalDepositedLocal: fx.mwkToLocal(totalDepositedMwk, walletCurrency),
+        totalWithdrawnLocal: fx.mwkToLocal(totalWithdrawnMwk, walletCurrency),
+        totalWinningsLocal: fx.mwkToLocal(totalWinningsMwk, walletCurrency),
+        totalFeesLocal: fx.mwkToLocal(totalFeesMwk, walletCurrency),
+        pendingDepositsLocal: fx.mwkToLocal(pendingDepositsMwk, walletCurrency),
+        pendingWithdrawalsLocal: fx.mwkToLocal(pendingWithdrawalsMwk, walletCurrency),
+        totalDepositedUsd: fx.usdFromMwk(totalDepositedMwk),
+        totalWithdrawnUsd: fx.usdFromMwk(totalWithdrawnMwk),
+        totalWinningsUsd: fx.usdFromMwk(totalWinningsMwk),
+        totalFeesUsd: fx.usdFromMwk(totalFeesMwk),
+        pendingDepositsUsd: fx.usdFromMwk(pendingDepositsMwk),
+        pendingWithdrawalsUsd: fx.usdFromMwk(pendingWithdrawalsMwk),
         derivedLedgerMwk: derivedMwk,
         derivedLedgerUsd: derivedUsd != null ? roundUsd(derivedUsd) : null,
         storedBalanceUsd: storedBalanceUsd != null ? roundUsd(storedBalanceUsd) : null,
