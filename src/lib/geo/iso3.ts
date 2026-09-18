@@ -44,6 +44,22 @@ export const ALPHA2_TO_DIALING_CODE: Record<string, string> = {
   GH: "233", ET: "251", ZA: "27", MG: "261", ML: "223",
 };
 
+/** Normalize a player-entered phone number into PayChangu's mobile-money
+ *  format. PayChangu is Malawi-only and its payouts API REQUIRES the local
+ *  MSISDN (e.g. "0999086648"). Live incident 2026-09-17/18: withdrawals whose
+ *  stored phone was "+265992620513" or "+265 986 57 23 21" were sent raw and
+ *  PayChangu rejected every one instantly (auto-refund, status "rejected"),
+ *  while clean local-format numbers on the same day paid out fine.
+ *  Accepts local (09...), international (+265.../265...) and spaced forms. */
+export function toPaychanguMobile(rawPhone: string, countryCode: string | null | undefined): string {
+  let digits = (rawPhone || "").replace(/\D/g, "");
+  const dial = ALPHA2_TO_DIALING_CODE[(countryCode || "").toUpperCase()];
+  if (dial && digits.startsWith(dial)) {
+    digits = "0" + digits.slice(dial.length);
+  }
+  return digits;
+}
+
 /** Normalize a player-entered phone number into PawaPay's MSISDN format:
  *  digits only, country dialing code prefix, no leading 0, no "+". */
 export function toPawaPayMsisdn(rawPhone: string, countryCode: string | null | undefined): string {

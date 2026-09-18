@@ -5,7 +5,7 @@ import { getPlatformConfig } from "@/lib/platform-config";
 import { moneySymbol, currencyCodeForCountry } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
 import { getMwkToLocalRate } from "@/lib/geo/fx";
-import { toPawaPayMsisdn } from "@/lib/geo/iso3";
+import { toPawaPayMsisdn, toPaychanguMobile } from "@/lib/geo/iso3";
 import { detectPawaPayCorrespondent, PAWAPAY_CORRESPONDENT_NAMES } from "@/lib/payments/pawapay-operators";
 
 export async function POST(req: NextRequest) {
@@ -15,7 +15,8 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const reqBody = await req.json();
-    const { amount, phone, payment_provider, currency, country } = reqBody;
+    const { amount, payment_provider, currency, country } = reqBody;
+    let phone = reqBody.phone;
     let operatorRefId = reqBody.operatorRefId;
     let operatorName = reqBody.operatorName;
 
@@ -106,6 +107,11 @@ export async function POST(req: NextRequest) {
       if (localPhone.length < 9 || !localPhone.match(/^0[89]/)) {
         return NextResponse.json({ error: "Invalid Malawi mobile money number" }, { status: 400 });
       }
+      // Store the CANONICAL local MSISDN (09...). Players paste "+265 986 57
+      // 23 21" etc.; the raw form used to be stored and PayChangu's payouts
+      // API rejects non-local formats instantly (live incident 2026-09-17/18:
+      // every such withdrawal auto-refunded as "rejected").
+      phone = localPhone;
     } else {
       // International: just require at least 8 digits
       if (phoneDigits.length < 8) {
@@ -206,6 +212,7 @@ export async function POST(req: NextRequest) {
         const chargeId = `wd_${withdrawal.id.slice(0, 8)}_${Date.now()}`;
         const amountMWK = (netAmount || withdrawal.amount);
         let payoutSucceeded = false;
+        let payoutFailureReason: string | null = null;
         const payoutProvider = withdrawal.payment_provider || "paychangu";
         // Wallet amounts are ALREADY in the player's local currency —
         // pay out exactly the net that was debited. No conversion.
@@ -248,6 +255,7 @@ export async function POST(req: NextRequest) {
             }
           } catch (payoutErr: any) {
             console.error("Auto-approve PawaPay payout error:", payoutErr);
+            payoutFailureReason = String(payoutErr?.message || payoutErr).slice(0, 200);
           }
         } else {
           try {
@@ -258,7 +266,9 @@ export async function POST(req: NextRequest) {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                mobile: withdrawal.phone,
+                // Legacy rows may hold "+265 986 57 23 21" style numbers —
+                // normalize to the local MSISDN PayChangu requires.
+                mobile: toPaychanguMobile(withdrawal.phone, withdrawal.country),
                 mobile_money_operator_ref_id: withdrawal.operator_ref_id,
                 amount: String(amountMWK),
                 charge_id: chargeId,
@@ -266,6 +276,9 @@ export async function POST(req: NextRequest) {
             });
 
             const payoutData = await payoutResponse.json();
+            if (payoutData && (payoutData.message || payoutData.error)) {
+              payoutFailureReason = String(payoutData.message || payoutData.error).slice(0, 200);
+            }
 
             if (payoutData.status === "success" || payoutData.status === "pending") {
               payoutSucceeded = true;
@@ -287,11 +300,23 @@ export async function POST(req: NextRequest) {
             }
           } catch (payoutErr: any) {
             console.error("Auto-approve PayChangu payout error:", payoutErr);
+            payoutFailureReason = String(payoutErr?.message || payoutErr).slice(0, 200);
           }
         }
 
         if (!payoutSucceeded) {
           await admin.rpc("refund_withdrawal", { p_withdrawal_id: withdrawalId, p_admin_id: null });
+          // Keep the provider's failure message on the row — Command Centre
+          // previously showed "rejected" with no reason, so systematic
+          // phone-format rejections were invisible.
+          if (payoutFailureReason) {
+            try {
+              await admin
+                .from("withdrawals")
+                .update({ rejection_reason: `Auto payout failed: ${payoutFailureReason}` })
+                .eq("id", withdrawalId);
+            } catch {}
+          }
           try {
             await admin.from("notifications").insert({
               user_id: withdrawal.user_id,

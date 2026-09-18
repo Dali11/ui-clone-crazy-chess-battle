@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { initiatePayout } from "@/lib/payments/pawapay";
-import { toPawaPayMsisdn } from "@/lib/geo/iso3";
+import { toPawaPayMsisdn, toPaychanguMobile } from "@/lib/geo/iso3";
 import { randomUUID } from "crypto";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            mobile: withdrawal.phone,
+            mobile: toPaychanguMobile(withdrawal.phone, withdrawal.country),
             mobile_money_operator_ref_id: withdrawal.operator_ref_id,
             amount: String(netAmount),
             charge_id: chargeId,
