@@ -134,19 +134,36 @@ describe("queuePremove — stacking", () => {
     ]);
   });
 
+  it("allows ray-through-own-piece premoves — the blocker may vacate in a stacked chain", () => {
+    const fen = swapTurn(START);
+    // Rook a1 to a3 "through" the a2 pawn: the pawn may move (its own
+    // queued premove) or die first. Impossible GEOMETRY is still
+    // rejected at queue time; occupancy never is — the hop re-validates
+    // at execution and cancels if the square is still blocked.
+    const res = queuePremove([], fen, true, "a1", "a3");
+    expect(res.ok).toBe(true);
+    expect(res.queue).toEqual([{ from: "a1", to: "a3" }]);
+  });
+
   it("rejects impossible directions at queue time (the premove can never be legal)", () => {
     const fen = swapTurn(START);
-    // Rook a1 to a3: blocked by a2 pawn now AND forever (own pawn doesn't move)
-    const res = queuePremove([], fen, true, "a1", "a3");
+    // Bishop c1 to c3 — vertical, never a bishop line; no projected
+    // state ever makes it legal. Geometry can't change, occupancy can.
+    const res = queuePremove([], fen, true, "c1", "c3");
     expect(res.ok).toBe(false);
     expect(res.queue).toEqual([]);
   });
 
-  it("rejects hops to own-piece squares at queue time", () => {
+  it("allows hops onto own-piece squares — the recapture premove", () => {
     const fen = swapTurn(START);
-    // Bishop c1 to d2 — own pawn there and not projected to move
+    // Bishop c1 to d2 — own pawn d2 sits there now, but it may die or
+    // move before the hop executes (the classic recapture premove).
+    // The drag path queues it; the executor cancels it if the pawn is
+    // still there at turn arrival. (The tap UI filters these out via
+    // filterTapTargets so tapping own pieces keeps re-selecting them.)
     const res = queuePremove([], fen, true, "c1", "d2");
-    expect(res.ok).toBe(false);
+    expect(res.ok).toBe(true);
+    expect(res.queue).toEqual([{ from: "c1", to: "d2" }]);
   });
 
   it("allows pawn-take diagonal premoves onto EMPTY squares", () => {

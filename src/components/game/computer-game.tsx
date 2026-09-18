@@ -5,6 +5,7 @@ import { Chessboard } from "react-chessboard";
 import { customPieces } from "@/lib/game/piece-styles";
 import { getPremoveGhosts } from "@/lib/game/premove-ghost";
 import { queuePremove, resolvePremoveGrab } from "@/lib/game/premove-queue";
+import { filterTapTargets } from "@/lib/game/premove-moves";
 import { Chess } from "chess.js";
 import { Clock, Flag, ArrowLeft, Bot, Volume2, VolumeX, List, Palette, X, ChevronLeft, ChevronRight, MoreVertical, MessageCircle, RotateCcw, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -366,7 +367,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
       // until the engine replies). Candidates are computed on the
       // piece's PROJECTED position (mid-chain), so a chained hop shows
       // where the piece can actually go from where it will actually be.
-      return resolvePremoveGrab(premoves, fen, isPlayerWhite, square).targets;
+      return filterTapTargets(fen, isPlayerWhite, resolvePremoveGrab(premoves, fen, isPlayerWhite, square).targets);
     },
     [fen, isPlayerWhite, premoves]
   );
@@ -389,7 +390,7 @@ export default function ComputerGame({ difficulty, playerColor, initialMinutes, 
         const grab = resolvePremoveGrab(premoves, fen, isPlayerWhite, square);
         if (grab.ok) {
           setSelectedSquare(square);
-          setLegalMoveSquares(grab.targets);
+          setLegalMoveSquares(filterTapTargets(fen, isPlayerWhite, grab.targets));
           return;
         }
       }

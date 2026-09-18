@@ -6,6 +6,7 @@ import { Chessboard } from "react-chessboard";
 import { customPieces } from "@/lib/game/piece-styles";
 import { getPremoveGhosts } from "@/lib/game/premove-ghost";
 import { queuePremove, resolvePremoveGrab } from "@/lib/game/premove-queue";
+import { filterTapTargets } from "@/lib/game/premove-moves";
 import { Chess } from "chess.js";
 import { useRealtimeGame, type GameState } from "@/hooks/use-realtime-game";
 import { Clock, Flag, Eye, ArrowLeft, Volume2, VolumeX, Palette, X, MessageCircle, MoreVertical, Handshake, ChevronLeft, ChevronRight, Swords, RefreshCw, Radio, Wifi, WifiOff, Share2, Check } from "lucide-react";
@@ -530,7 +531,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       // piece's PROJECTED position (its square mid-chain after the
       // queued hops that precede this one), so a chained hop shows where
       // the piece can actually go from where it will actually be.
-      return resolvePremoveGrab(premoves, fen, isWhite, square).targets;
+      return filterTapTargets(fen, isWhite, resolvePremoveGrab(premoves, fen, isWhite, square).targets);
     },
     [fen, isWhite, premoves]
   );
@@ -553,7 +554,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
         const grab = resolvePremoveGrab(premoves, fen, isWhite, square);
         if (grab.ok) {
           setSelectedSquare(square);
-          setLegalMoveSquares(grab.targets);
+          setLegalMoveSquares(filterTapTargets(fen, isWhite, grab.targets));
           return;
         }
       }

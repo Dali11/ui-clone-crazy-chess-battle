@@ -10,17 +10,27 @@ import { Chess, type Square } from "chess.js";
  * whatever lands on d5 — d5 is EMPTY right now, so chess.js reports no
  * diagonal move and the premove could never be queued.
  *
- * So candidates are PATTERN-based, like chess.com/lichess:
- *   pawn  — forward 1/2 only through currently-empty squares, but BOTH
- *           diagonals always (that's the take: empty or occupied)
- *   knight— all 8 jumps that don't land on my own piece
- *   king  — all 8 neighbors that aren't my own piece
- *   slider— rays that stop at my own pieces; enemy pieces are INCLUDED
- *           (capture if they stay) and RAY-THROUGH (they may vacate)
+ * Candidates are PATTERN-based and deliberately MAXIMALLY PERMISSIVE —
+ * every square the piece can geometrically reach is a candidate,
+ * regardless of what stands on it right now:
  *
- * Every premove is re-validated against the real position at execution
- * time, so over-eager candidates can never produce an illegal move —
- * they just cancel, exactly like chess.com.
+ *   - enemy piece on the target: capture if it stays (it may also vacate)
+ *   - EMPTY target: the victim may arrive with the opponent's reply
+ *   - MY OWN piece on the target: the RECAPTURE premove — queue a take
+ *     onto your own piece's square, expecting the opponent to capture
+ *     it first (the single most common capture premove)
+ *   - MY OWN piece on the path: it may vacate earlier in a stacked
+ *     premove chain (sliders ray THROUGH everything, to the board edge)
+ *
+ * Over-eager candidates can never produce an illegal move: every premove
+ * is re-validated against the real position at execution time and simply
+ * cancels when reality disagrees — exactly like chess.com.
+ *
+ * One deliberate exception: the TAP-to-move selection UI filters
+ * own-occupied squares out via `filterTapTargets` — tapping your own
+ * piece must re-SELECT it, not queue a premove at it. The DRAG path
+ * queues through `queuePremove` without that filter, so drags can queue
+ * recaptures while taps keep selecting pieces.
  */
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
@@ -38,15 +48,9 @@ export function getPremoveDestinations(fen: string, isWhite: boolean, square: st
     const myColor = isWhite ? "w" : "b";
     if (piece.color !== myColor) return [];
 
-    const ownAt = (s: string | null): boolean => {
-      if (!s) return false;
-      const p = g.get(s as Square);
-      return !!p && p.color === myColor;
-    };
-
     const dests: string[] = [];
     const push = (s: string | null) => {
-      if (s && !ownAt(s) && !dests.includes(s)) dests.push(s);
+      if (s && !dests.includes(s)) dests.push(s);
     };
 
     const fi = FILES.indexOf(square[0]);
@@ -56,16 +60,11 @@ export function getPremoveDestinations(fen: string, isWhite: boolean, square: st
     if (piece.type === "p") {
       const dir = isWhite ? 1 : -1;
       const startRank = isWhite ? 2 : 7;
-      // Forward moves must be empty in the current position
-      const one = sq(fi, ri + dir);
-      if (one && !g.get(one as Square)) {
-        push(one);
-        const two = sq(fi, ri + 2 * dir);
-        if (ri === startRank && two && !g.get(two as Square)) push(two);
-      }
-      // BOTH diagonals — the premove take. Included even when the square
-      // is empty (the victim may arrive with the opponent's reply); also
-      // included when an enemy piece is already there.
+      // Forward 1/2 and BOTH diagonals, regardless of occupancy: the
+      // blocker on a forward square (or a double-push intermediate) may
+      // vacate with the opponent's reply; the diagonals are the take.
+      push(sq(fi, ri + dir));
+      if (ri === startRank) push(sq(fi, ri + 2 * dir));
       push(sq(fi - 1, ri + dir));
       push(sq(fi + 1, ri + dir));
     } else if (piece.type === "n") {
@@ -83,23 +82,17 @@ export function getPremoveDestinations(fen: string, isWhite: boolean, square: st
           : piece.type === "r"
             ? [[1, 0], [-1, 0], [0, 1], [0, -1]]
             : [[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]];
+      // Full geometric ray to the board edge. Pieces on the ray do NOT
+      // stop it: an enemy piece may vacate (capture if it stays), and my
+      // own piece may vacate earlier in a stacked chain — or die, opening
+      // the recapture line.
       for (const [df, dr] of dirs) {
         let f = fi + df;
         let r = ri + dr;
         for (;;) {
           const s = sq(f, r);
           if (!s) break;
-          const p = g.get(s as Square);
-          if (!p) {
-            dests.push(s); // open square — keep sliding
-          } else if (p.color === myColor) {
-            break; // own piece blocks, never a destination
-          } else {
-            dests.push(s); // capture if it stays…
-            f += df; // …and keep going: it may vacate
-            r += dr;
-            continue;
-          }
+          dests.push(s);
           f += df;
           r += dr;
         }
@@ -108,5 +101,32 @@ export function getPremoveDestinations(fen: string, isWhite: boolean, square: st
     return dests;
   } catch {
     return [];
+  }
+}
+
+/**
+ * Tap-selection filter: drop targets that hold MY OWN piece in the BASE
+ * position, so tapping your own piece re-selects it instead of queuing a
+ * premove at it. The drag path (queuePremove) deliberately skips this
+ * filter — that's how a drag queues the recapture premove.
+ *
+ * Squares holding an ENEMY piece or nothing stay selectable: tapping an
+ * enemy piece that is a capture target queues the premove (it fires from
+ * handleSquareClick, not here).
+ */
+export function filterTapTargets(fen: string, isWhite: boolean, targets: string[]): string[] {
+  try {
+    const g = new Chess(fen);
+    const myColor = isWhite ? "w" : "b";
+    return targets.filter((t) => {
+      try {
+        const p = g.get(t as Square);
+        return !(p && p.color === myColor);
+      } catch {
+        return true;
+      }
+    });
+  } catch {
+    return targets;
   }
 }
