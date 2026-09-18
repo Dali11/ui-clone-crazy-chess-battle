@@ -158,9 +158,8 @@ describe("queuePremove — stacking", () => {
     const fen = swapTurn(START);
     // Bishop c1 to d2 — own pawn d2 sits there now, but it may die or
     // move before the hop executes (the classic recapture premove).
-    // The drag path queues it; the executor cancels it if the pawn is
-    // still there at turn arrival. (The tap UI filters these out via
-    // filterTapTargets so tapping own pieces keeps re-selecting them.)
+    // Tap and drag both queue it; the executor cancels it if the pawn is
+    // still there at turn arrival.
     const res = queuePremove([], fen, true, "c1", "d2");
     expect(res.ok).toBe(true);
     expect(res.queue).toEqual([{ from: "c1", to: "d2" }]);

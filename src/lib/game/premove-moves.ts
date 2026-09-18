@@ -26,11 +26,11 @@ import { Chess, type Square } from "chess.js";
  * is re-validated against the real position at execution time and simply
  * cancels when reality disagrees — exactly like chess.com.
  *
- * One deliberate exception: the TAP-to-move selection UI filters
- * own-occupied squares out via `filterTapTargets` — tapping your own
- * piece must re-SELECT it, not queue a premove at it. The DRAG path
- * queues through `queuePremove` without that filter, so drags can queue
- * recaptures while taps keep selecting pieces.
+ * Tap and drag behave IDENTICALLY here (product spec): if a piece is
+ * selected and the tapped square is a reachable candidate, the premove
+ * queues — including onto squares holding your own pieces (the
+ * recapture). Tapping an own piece on a NON-reachable square still
+ * re-selects it in the click handler, so piece switching keeps working.
  */
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
@@ -104,29 +104,3 @@ export function getPremoveDestinations(fen: string, isWhite: boolean, square: st
   }
 }
 
-/**
- * Tap-selection filter: drop targets that hold MY OWN piece in the BASE
- * position, so tapping your own piece re-selects it instead of queuing a
- * premove at it. The drag path (queuePremove) deliberately skips this
- * filter — that's how a drag queues the recapture premove.
- *
- * Squares holding an ENEMY piece or nothing stay selectable: tapping an
- * enemy piece that is a capture target queues the premove (it fires from
- * handleSquareClick, not here).
- */
-export function filterTapTargets(fen: string, isWhite: boolean, targets: string[]): string[] {
-  try {
-    const g = new Chess(fen);
-    const myColor = isWhite ? "w" : "b";
-    return targets.filter((t) => {
-      try {
-        const p = g.get(t as Square);
-        return !(p && p.color === myColor);
-      } catch {
-        return true;
-      }
-    });
-  } catch {
-    return targets;
-  }
-}

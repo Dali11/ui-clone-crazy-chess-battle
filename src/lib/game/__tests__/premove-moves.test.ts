@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getPremoveDestinations, filterTapTargets } from "../premove-moves";
+import { getPremoveDestinations } from "../premove-moves";
 
 const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -89,22 +89,3 @@ describe("getPremoveDestinations", () => {
   });
 });
 
-describe("filterTapTargets — tap path keeps selecting own pieces", () => {
-  const fen = "4k3/8/8/8/1n6/2N5/1P6/4K3 b - - 0 1"; // own Nc3, own Pb2
-
-  it("drops own-occupied squares so a tap re-selects instead of queueing", () => {
-    const tap = filterTapTargets(fen, true, ["c3", "a3", "b3", "b4", "c1"]);
-    expect(tap).not.toContain("c3"); // own knight — tap must re-select it
-    expect(tap).toContain("a3");
-    expect(tap).toContain("b4");
-  });
-
-  it("keeps enemy-occupied and empty squares (capture targets stay tappable)", () => {
-    const tap = filterTapTargets(fen, true, ["b4"]); // enemy knight square
-    expect(tap).toContain("b4");
-  });
-
-  it("passes the list through on an invalid fen", () => {
-    expect(filterTapTargets("not a fen", true, ["a1", "b2"])).toEqual(["a1", "b2"]);
-  });
-});
