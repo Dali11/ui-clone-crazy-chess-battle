@@ -232,6 +232,16 @@ export async function POST(
       }
     } else {
       // ─── Swiss pairing (existing logic) ───
+      // Swiss round count is creator-controlled (see create-client.tsx),
+      // but the player-facing create flow historically had no field for it,
+      // so rounds can arrive null here. Mirror the cron auto-starter's
+      // fallback so a manually-started Swiss tournament never gets stuck
+      // at round 1 (advance-round refuses to progress a null-rounds event).
+      if (!tournament.rounds) {
+        await admin.from("tournaments").update({ rounds: 8 }).eq("id", tournamentId);
+        tournament.rounds = 8;
+      }
+
       if (seeded.length === 1) {
         pairings.push({ white: "", black: "", bye: seeded[0].player_id });
       } else {

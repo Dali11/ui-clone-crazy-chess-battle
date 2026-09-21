@@ -67,6 +67,8 @@ export default function CreateTournamentClient({
   const [creatorCut, setCreatorCut] = useState(10);
   const [maxPlayers, setMaxPlayers] = useState(32);
   const [minPlayers, setMinPlayers] = useState(4);
+  const [rounds, setRounds] = useState(5);
+  const [durationMinutes, setDurationMinutes] = useState(60);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ id: string; status: string } | null>(null);
@@ -109,6 +111,8 @@ export default function CreateTournamentClient({
     if (!name.trim()) return setError("Give your tournament a name.");
     if (poolMode === "fixed" && prizePoolMwk <= 0) return setError("Set a prize pool amount to fund.");
     if (poolMode !== "free" && entryFeeMwk < 0) return setError("Entry fee can't be negative.");
+    if (type === "swiss" && (!rounds || rounds < 1)) return setError("Set how many rounds this Swiss tournament will run.");
+    if (type === "arena" && (!durationMinutes || durationMinutes < 5)) return setError("Set how long the arena runs (minutes).");
     if (minPlayers < 2) return setError("You need at least 2 players.");
     if (maxPlayers < minPlayers) return setError("Max players must be at least the minimum.");
 
@@ -132,6 +136,8 @@ export default function CreateTournamentClient({
           creatorProfitPercent: poolMode === "entry_fees" && entryFeeMwk > 0 ? creatorCut : 0,
           minPlayers,
           maxPlayers,
+          rounds: type === "swiss" ? rounds : undefined,
+          durationMinutes: type === "arena" ? durationMinutes : undefined,
           knockoutFormat: "pure",
         }),
       });
@@ -228,6 +234,31 @@ export default function CreateTournamentClient({
             </select>
           </div>
         </div>
+
+        {type === "swiss" && (
+          <div>
+            <span className={label}>Number of rounds</span>
+            <input
+              type="number" min={1} max={20} className={input}
+              value={rounds} onChange={e => setRounds(Number(e.target.value) || 1)}
+            />
+            <p className="text-[11px] text-ccb-muted mt-1">How many rounds this tournament runs before it finishes.</p>
+          </div>
+        )}
+        {type === "arena" && (
+          <div>
+            <span className={label}>Duration (minutes)</span>
+            <input
+              type="number" min={5} max={480} className={input}
+              value={durationMinutes} onChange={e => setDurationMinutes(Number(e.target.value) || 5)}
+            />
+            <p className="text-[11px] text-ccb-muted mt-1">How long the arena stays open for continuous pairing.</p>
+          </div>
+        )}
+        {type === "knockout" && (
+          <p className="text-[11px] text-ccb-muted">Bracket rounds are calculated automatically from the number of players once the tournament starts.</p>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <span className={label}>Starts at</span>
