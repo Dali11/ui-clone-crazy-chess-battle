@@ -17,8 +17,19 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const admin = createAdminClient();
-    const { data: config } = await admin.from("battle_config").select("*").limit(1).single();
-    return NextResponse.json(config || { enabled: false });
+    const { data: config, error } = await admin.from("battle_config").select("*").limit(1).single();
+
+    // A real DB/connectivity error (or a genuinely missing row) must NOT be
+    // reported as "battles: false" — that was the bug: any transient outage
+    // silently rendered as a normal 200 response shaped like a real config
+    // with enabled:false, so the battles page showed players a permanent-
+    // looking "Chess Battles are currently disabled" message during outages
+    // that had nothing to do with an admin actually disabling battles.
+    if (error || !config) {
+      return NextResponse.json({ error: "Failed to fetch config" }, { status: 503 });
+    }
+
+    return NextResponse.json(config);
   } catch {
     return NextResponse.json({ error: "Failed to fetch config" }, { status: 500 });
   }

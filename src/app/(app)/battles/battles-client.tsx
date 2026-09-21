@@ -52,6 +52,10 @@ export default function BattlesPage() {
 
   const [view, setView] = useState<View>(FIND_MATCH_ENABLED ? "main" : "challenge");
   const [config, setConfig] = useState<BattleConfig | null>(null);
+  // Distinct from "disabled by admin" — a fetch that genuinely failed
+  // (transient DB/network issue) should say so and offer a retry,
+  // not sit in an endless loading spinner or claim battles are off.
+  const [configLoadFailed, setConfigLoadFailed] = useState(false);
   const [balance, setBalance] = useState(0);
   const [userCountry, setUserCountry] = useState<string | null>(null);
   const [gamesPlayed, setGamesPlayed] = useState(0);
@@ -136,17 +140,22 @@ export default function BattlesPage() {
     setProfileLoaded(true);
   };
 
+  const loadBattleConfig = useCallback(() => {
+    setConfigLoadFailed(false);
+    fetch("/api/battles/config")
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok || d?.error) { setConfigLoadFailed(true); return; }
+        setConfig(d);
+      })
+      .catch(() => setConfigLoadFailed(true));
+  }, []);
+
   useEffect(() => {
     checkActiveBattle();
     loadProfile();
     fetch("/api/battles/challenge/cleanup-expired", { method: "POST" }).catch(() => {});
-    fetch("/api/battles/config")
-      .then(async (r) => {
-        const d = await r.json();
-        if (!r.ok || d?.error) return;
-        setConfig(d);
-      })
-      .catch(() => {});
+    loadBattleConfig();
     // Currency is loaded via useCurrency hook — no manual fetch needed.
   }, [checkActiveBattle]);
 
@@ -367,8 +376,27 @@ export default function BattlesPage() {
   const feeAmount = feePct > 0 ? Math.max(1, Math.round(BATTLE_STAKE * 2 * (feePct / 100))) : 0;
   const payout = BATTLE_STAKE * 2 - feeAmount;
 
-  // Disabled state
-  if (!config?.enabled && config !== null) {
+  // Couldn't load config at all (transient DB/network issue) — say so
+  // plainly and offer a retry, instead of quietly pretending battles were
+  // turned off by an admin.
+  if (configLoadFailed && config === null) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+        <AlertCircle className="w-12 h-12 text-ccb-muted mb-4" />
+        <p className="text-lg font-semibold">Couldn't load Chess Battles</p>
+        <p className="text-sm text-ccb-muted mt-2">There was a connection issue. Please try again.</p>
+        <button
+          onClick={loadBattleConfig}
+          className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-ccb-primary text-white font-medium"
+        >
+          <RefreshCw className="w-4 h-4" /> Try Again
+        </button>
+      </div>
+    );
+  }
+
+  // Disabled state — config loaded successfully and enabled is actually false.
+  if (config !== null && !config.enabled) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
         <AlertCircle className="w-12 h-12 text-ccb-muted mb-4" />
