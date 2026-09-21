@@ -66,7 +66,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<"deposit" | "withdraw" | "history">("deposit");
-  const [depositAmount, setDepositAmount] = useState(1000);
+  const [depositAmount, setDepositAmount] = useState("1000");
   const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number; processing_fee_pct: number; currency_symbol?: string; deposit_min_amount?: number; deposit_max_amount?: number } | null>(null);
   // Deposits must use one of the player's up-to-3 saved numbers (editable in Settings)
@@ -107,6 +107,10 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const depositMinMwk = withdrawConfig?.deposit_min_amount || 1000;
   const depositMinLocal = isMalawi ? depositMinMwk : (fxLoaded && fxRate && fxRate !== 1 ? convert(depositMinMwk) : 1);
   const formatAmt = (amount: number) => fmtCurrency(amount || 0);
+  // Deposit field is free-typing: players can clear it and enter any amount.
+  // Minimum is validated on submit (and flagged visually), never forced while typing.
+  const depositValue = parseInt(depositAmount, 10) || 0;
+  const belowMin = depositAmount !== "" && depositValue < depositMinLocal;
 
   // Non-Malawi players: the form's initial "1000" default is LOCAL currency
   // (ZK 1,000 ≈ $52) — a trap that made a Zambian player attempt four
@@ -116,7 +120,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [depositTouched, setDepositTouched] = useState(false);
   useEffect(() => {
     if (isMalawi || !fxLoaded || depositTouched) return;
-    if (depositMinLocal > 0) setDepositAmount(depositMinLocal);
+    if (depositMinLocal > 0) setDepositAmount(String(depositMinLocal));
   }, [isMalawi, fxLoaded, depositTouched, depositMinLocal]);
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -282,6 +286,11 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         setLoading(false);
         return;
       }
+      if (belowMin || depositAmount === "") {
+        setError(`Minimum deposit is ${formatAmt(depositMinMwk)}`);
+        setLoading(false);
+        return;
+      }
 
       // Normalize phone with country code if needed
       let normalizedPhone = depositPhone.replace(/\s/g, "");
@@ -293,7 +302,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: depositAmount,
+          amount: depositValue,
           phoneNumber: normalizedPhone,
           provider: selectedProvider,
           currency: currencyCode,
@@ -328,12 +337,17 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
         setLoading(false);
         return;
       }
+      if (belowMin || depositAmount === "") {
+        setError(`Minimum deposit is ${formatAmt(depositMinMwk)}`);
+        setLoading(false);
+        return;
+      }
 
       const res = await fetch("/api/payments/deposit/mobile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: depositAmount,
+          amount: depositValue,
           phone: depositPhone,
           operatorRefId: detectOperator(depositPhone),
           email,
@@ -572,13 +586,22 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
               value={depositAmount}
               onChange={(e) => {
                 setDepositTouched(true);
-                setDepositAmount(Math.max(depositMinLocal, parseInt(e.target.value) || 0));
+                setDepositAmount(e.target.value.replace(/[^0-9]/g, ""));
               }}
-              className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border text-lg font-semibold"
+              placeholder="0"
+              className={`w-full px-4 py-3 rounded-xl bg-ccb-surface border text-lg font-semibold ${
+                belowMin ? "border-red-500" : "border-ccb-border"
+              }`}
             />
-            <p className="text-xs text-ccb-muted mt-2">
-              Min deposit: {formatAmt(depositMinMwk)}{withdrawConfig?.deposit_max_amount ? ` · Max: ${formatAmt(withdrawConfig.deposit_max_amount)}` : ""}
-            </p>
+            {belowMin ? (
+              <p className="text-xs text-red-500 mt-2 font-medium">
+                That's below the minimum — deposit at least {formatAmt(depositMinMwk)}.
+              </p>
+            ) : (
+              <p className="text-xs text-ccb-muted mt-2">
+                Min deposit: {formatAmt(depositMinMwk)}{withdrawConfig?.deposit_max_amount ? ` · Max: ${formatAmt(withdrawConfig.deposit_max_amount)}` : ""}
+              </p>
+            )}
           </div>
 
           {/* PawaPay provider selector (non-Malawi, non-Zambia) */}
@@ -663,7 +686,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 {polling ? "Waiting for payment..." : "Processing..."}
               </>
             ) : (
-              <>Deposit {formatWallet(depositAmount)}</>
+              <>Deposit {formatWallet(depositValue)}</>
             )}
           </button>
         </div>
