@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeDepositPhone } from "../deposit-phone-normalize";
+import { normalizeDepositPhone, depositPhoneFormatHint, depositPhonePlaceholder } from "../deposit-phone-normalize";
 
 describe("normalizeDepositPhone", () => {
   describe("Malawi (MW)", () => {
@@ -58,5 +58,20 @@ describe("normalizeDepositPhone", () => {
     const once = normalizeDepositPhone("+265 991 23 45 67", "MW");
     const twice = normalizeDepositPhone(once.phone, "MW");
     expect(twice.phone).toBe(once.phone);
+  });
+});
+
+describe("format hint + placeholder helpers", () => {
+  it("gives a Malawi rule notice", () => {
+    expect(depositPhoneFormatHint("MW")).toContain("0991234567");
+    expect(depositPhoneFormatHint("MW")).toContain("+265");
+  });
+  it("gives a Zambia rule notice", () => {
+    expect(depositPhoneFormatHint("ZM")).toContain("0761234567");
+    expect(depositPhonePlaceholder("ZM")).toBe("e.g. 0761234567");
+  });
+  it("falls back to country-code instructions for other countries", () => {
+    expect(depositPhoneFormatHint("GH")).toContain("country code");
+    expect(depositPhonePlaceholder(null)).toContain("+");
   });
 });

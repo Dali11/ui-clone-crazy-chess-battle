@@ -91,3 +91,27 @@ export function normalizeDepositPhone(raw: string, country: string | null | unde
     }
   }
 }
+
+/** Player-facing format notice for the Settings deposit-phone field. */
+export function depositPhoneFormatHint(country: string | null | undefined): string {
+  switch ((country || "").toUpperCase()) {
+    case "MW":
+      return "Use a Malawi number: 0991234567, +265 991 23 45 67 or 265991234567 — we save it as 0991234567.";
+    case "ZM":
+      return "Use a Zambian number: 0761234567, +260 761 234 567 or 260761234567 — we save it as 0761234567.";
+    case "KE":
+      return "Use a Kenyan number: 0712345678, +254 712 345 678 or 254712345678 — we save it as 0712345678.";
+    default:
+      return "Enter your mobile number including the country code, e.g. +234 801 234 5678.";
+  }
+}
+
+/** Country-aware placeholder for the deposit-phone input. */
+export function depositPhonePlaceholder(country: string | null | undefined): string {
+  switch ((country || "").toUpperCase()) {
+    case "MW": return "e.g. 0991234567";
+    case "ZM": return "e.g. 0761234567";
+    case "KE": return "e.g. 0712345678";
+    default: return "e.g. +2348012345678";
+  }
+}

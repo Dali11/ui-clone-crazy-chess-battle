@@ -2,7 +2,7 @@
 
 import BoardThemePicker from "@/components/game/board-theme-picker";
 import { getStoredBoardTheme, storeBoardTheme, BOARD_THEMES, type BoardTheme } from "@/lib/game/board-themes";
-import { normalizeDepositPhone } from "@/lib/payments/deposit-phone-normalize";
+import { normalizeDepositPhone, depositPhoneFormatHint, depositPhonePlaceholder } from "@/lib/payments/deposit-phone-normalize";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -407,7 +407,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
     }
     setDepositPhones(next);
     setNewDepositPhone("");
-    setDepositPhoneMsg("Saved.");
+    setDepositPhoneMsg(`Saved ${canonical}.`);
   };
 
   const removeDepositPhone = async (num: string) => {
@@ -544,6 +544,10 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
             <div>
               <label className="text-sm font-medium block mb-1.5">Deposit phone numbers</label>
               <p className="text-xs text-ccb-muted mb-2">Deposits and mobile payments can only use these numbers. You can add or remove them anytime. Maximum 3.</p>
+              <div className="flex items-start gap-2 px-3 py-2 mb-2 rounded-xl bg-ccb-surface border border-ccb-border text-xs text-ccb-muted">
+                <Smartphone className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>{depositPhoneFormatHint(country)}</span>
+              </div>
               {depositPhones.length > 0 && (
                 <div className="space-y-1.5 mb-2">
                   {depositPhones.map((dp) => (
@@ -556,7 +560,7 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
               )}
               {depositPhones.length < 3 && (
                 <div className="flex gap-2">
-                  <input type="tel" value={newDepositPhone} onChange={(e) => { setNewDepositPhone(e.target.value); setDepositPhoneErr(null); setDepositPhoneMsg(null); }} className="input flex-1" placeholder="e.g. 0991234567" disabled={depositPhoneSaving} />
+                  <input type="tel" value={newDepositPhone} onChange={(e) => { setNewDepositPhone(e.target.value); setDepositPhoneErr(null); setDepositPhoneMsg(null); }} className="input flex-1" placeholder={depositPhonePlaceholder(country)} disabled={depositPhoneSaving} />
                   <button type="button" onClick={addDepositPhone} disabled={depositPhoneSaving || !newDepositPhone.trim()} className="shrink-0 px-4 py-2.5 rounded-xl bg-ccb-primary text-white text-sm font-semibold hover:bg-ccb-primary/90 disabled:opacity-50 transition-colors">{depositPhoneSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add"}</button>
                 </div>
               )}
