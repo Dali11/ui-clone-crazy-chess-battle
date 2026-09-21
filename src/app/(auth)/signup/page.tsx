@@ -3,7 +3,39 @@ import SignupClient from "./signup-client";
 
 import { pageMetadata } from "@/lib/seo/metadata";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { moneySymbol } from "@/lib/geo/format";
+import { getServerCurrency } from "@/lib/geo/server-currency";
+import { headers } from "next/headers";
+
+/**
+ * Detect the currency of whoever is actually fetching this metadata —
+ * WhatsApp/Facebook/etc. generate the link preview from the request that
+ * hits this very page, which carries the OPENER's own IP (not the
+ * challenger's saved profile country). Same header-then-IP-lookup chain
+ * as detectCountryCode(), adapted for a context with no NextRequest.
+ */
+async function detectViewerCountry(): Promise<string> {
+  const h = await headers();
+  let cc = h.get("x-vercel-ip-country")?.toUpperCase() || "";
+
+  if (!cc) {
+    const forwarded = h.get("x-forwarded-for");
+    if (forwarded) {
+      const ip = forwarded.split(",")[0].trim();
+      if (ip && !ip.startsWith("127.") && !ip.startsWith("10.") && !ip.startsWith("192.168.")) {
+        try {
+          const res = await fetch(`https://ipapi.co/${ip}/country/`, {
+            signal: AbortSignal.timeout(3000),
+          });
+          if (res.ok) cc = (await res.text()).trim().toUpperCase();
+        } catch {
+          // Geolocation failed — fall through to the Malawi default below
+        }
+      }
+    }
+  }
+
+  return cc && cc.length === 2 ? cc : "MW";
+}
 
 const TC_LABELS: Record<string, string> = {
   bullet: "Bullet",
@@ -46,12 +78,17 @@ export async function generateMetadata({
         if (challenge && challenge.status === "pending") {
           const { data: profile } = await admin
             .from("profiles")
-            .select("username, display_name, country")
+            .select("username, display_name")
             .eq("id", challenge.challenger_id)
             .single();
 
           const name = profile?.display_name || profile?.username || "A player";
-          const stake = `${moneySymbol(profile?.country)} ${Math.floor(challenge.stake).toLocaleString("en-US")}`;
+          // Currency shown matches whoever is opening this link right now —
+          // not the challenger's own country (that was the bug: a Zambian
+          // challenger's stake showed "ZK" even to a Malawian opening it).
+          const viewerCountry = await detectViewerCountry();
+          const { formatMoney } = await getServerCurrency(viewerCountry);
+          const stake = formatMoney(challenge.stake);
 
           return pageMetadata({
             title: `⚔️ ${name} challenged you to a ${stake} chess battle!`,
@@ -71,7 +108,7 @@ export async function generateMetadata({
         if (challenge && challenge.status === "pending") {
           const { data: profile } = await admin
             .from("profiles")
-            .select("username, display_name, country")
+            .select("username, display_name")
             .eq("id", challenge.challenger_id)
             .single();
 
