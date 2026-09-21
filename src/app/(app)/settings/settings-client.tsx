@@ -2,6 +2,7 @@
 
 import BoardThemePicker from "@/components/game/board-theme-picker";
 import { getStoredBoardTheme, storeBoardTheme, BOARD_THEMES, type BoardTheme } from "@/lib/game/board-themes";
+import { normalizeDepositPhone } from "@/lib/payments/deposit-phone-normalize";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -385,11 +386,18 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
   const addDepositPhone = async () => {
     const num = newDepositPhone.trim();
     setDepositPhoneErr(null); setDepositPhoneMsg(null);
-    if (!/^\+?[0-9]{7,15}$/.test(num)) { setDepositPhoneErr("Enter a valid mobile number (digits only, e.g. 0991234567)"); return; }
+
+    // Canonicalize for the player's country BEFORE saving — players paste
+    // "+265 991 23 45 67", "265991234567", "991234567" etc.; the list now
+    // stores one clean local form per country (09… for MW, 0… for ZM/KE),
+    // so display, dedupe and the payment rails all see the same shape.
+    const { phone: canonical, error: normErr } = normalizeDepositPhone(num, country);
+    if (normErr || !canonical) { setDepositPhoneErr(normErr || "Enter a valid mobile number."); return; }
+
     if (depositPhones.length >= 3) { setDepositPhoneErr("You can save up to 3 deposit numbers — remove one first to add another."); return; }
     const last9 = (n: string) => n.replace(/\D/g, "").slice(-9);
-    if (depositPhones.some((p) => last9(p) === last9(num))) { setDepositPhoneErr("That number is already in your list."); return; }
-    const next = [...depositPhones, num];
+    if (depositPhones.some((p) => last9(p) === last9(canonical))) { setDepositPhoneErr("That number is already in your list."); return; }
+    const next = [...depositPhones, canonical];
     setDepositPhoneSaving(true);
     const { error } = await supabase.from("profiles").update({ deposit_phone_numbers: next }).eq("id", userId);
     setDepositPhoneSaving(false);
