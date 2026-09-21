@@ -90,6 +90,7 @@ export interface PawaPayCallback {
   created: string;
   providerTransactionId?: string;
   customerMessage?: string;
+  failureReason?: { failureCode?: string; failureMessage?: string };
 }
 
 // ─── API Methods ────────────────────────────────────────────────────────

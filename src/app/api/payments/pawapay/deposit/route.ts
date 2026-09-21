@@ -151,9 +151,14 @@ export async function POST(req: NextRequest) {
           requiresApproval,
         });
       } else {
-        // Update deposit status to failed
+        // Update deposit status to failed — keep the provider's response
+        // for support (previously dropped entirely).
         await admin.from("deposits")
-          .update({ status: "failed", updated_at: new Date().toISOString() })
+          .update({
+            status: "failed",
+            updated_at: new Date().toISOString(),
+            admin_notes: `PawaPay initiation not accepted: ${JSON.stringify(response)}`,
+          })
           .eq("id", deposit.id);
 
         return NextResponse.json(
@@ -162,9 +167,15 @@ export async function POST(req: NextRequest) {
         );
       }
     } catch (e: any) {
-      // Deposit initiation failed — mark as failed
+      // Deposit initiation failed — mark as failed, persist the provider
+      // error so support can see the real reason (INVALID_PAYER_FORMAT,
+      // amount limits, etc.)
       await admin.from("deposits")
-        .update({ status: "failed", updated_at: new Date().toISOString() })
+        .update({
+          status: "failed",
+          updated_at: new Date().toISOString(),
+          admin_notes: `PawaPay initiation error: ${e?.message || "unknown"}`,
+        })
         .eq("id", deposit.id);
 
       return NextResponse.json(

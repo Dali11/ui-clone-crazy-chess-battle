@@ -210,7 +210,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
             setWalletBal((prev) => prev + data.amount);
             router.refresh();
           } else if (data.status === "failed") {
-            setError("Payment failed. Please try again.");
+            setError(data.reason || "Payment failed. Please try again.");
             setPolling(false);
             clearInterval(interval);
           }
@@ -246,7 +246,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
           setWalletBal((prev) => prev + data.amount);
           router.refresh();
         } else if (data.status === "failed") {
-          setError("Payment failed or timed out. Please try again.");
+          setError(data.reason || "Payment failed or timed out. Please try again.");
           setPolling(false);
           setPendingChargeId(null);
           clearInterval(interval);

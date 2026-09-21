@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyAdminsMoneyEvent } from "@/lib/admin-alerts";
 import { checkDepositStatus, mapPawaPayStatus } from "@/lib/payments/pawapay";
+import { describeDepositFailure } from "@/lib/payments/failure-reasons";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,14 +21,14 @@ export async function POST(req: NextRequest) {
 
     let { data: deposit } = await admin
       .from("deposits")
-      .select("id, user_id, amount, status, method, payment_provider, pawapay_ref, amount_local, currency")
+      .select("id, user_id, amount, status, method, payment_provider, pawapay_ref, amount_local, currency, admin_notes")
       .eq("charge_id", chargeId)
       .single();
 
     if (!deposit) {
       const { data: txDeposit } = await admin
         .from("deposits")
-        .select("id, user_id, amount, status, method, payment_provider, pawapay_ref, amount_local, currency")
+        .select("id, user_id, amount, status, method, payment_provider, pawapay_ref, amount_local, currency, admin_notes")
         .eq("tx_ref", chargeId)
         .single();
       deposit = txDeposit;
@@ -51,6 +52,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: "pending", depositId: deposit.id });
     }
 
+    // Already terminal-failed (initiation reject or earlier callback) —
+    // tell the player WHY, not just "failed".
+    if (deposit.status === "failed") {
+      return NextResponse.json({
+        status: "failed",
+        depositId: deposit.id,
+        reason: describeDepositFailure(deposit.admin_notes),
+      });
+    }
+
     // ── PawaPay deposits/memberships: check status with PawaPay directly ──
     if (deposit.payment_provider === "pawapay" && deposit.pawapay_ref) {
       let remote: Awaited<ReturnType<typeof checkDepositStatus>>;
@@ -62,10 +73,13 @@ export async function POST(req: NextRequest) {
       const pwStatus = mapPawaPayStatus(remote.status as any);
 
       if (pwStatus === "failed") {
+        const notes = remote
+          ? `PawaPay failure: ${JSON.stringify((remote as any).failureReason || { failureCode: remote.status })}`
+          : null;
         await admin.from("deposits")
-          .update({ status: "failed", updated_at: new Date().toISOString() })
+          .update({ status: "failed", updated_at: new Date().toISOString(), admin_notes: notes })
           .eq("id", deposit.id);
-        return NextResponse.json({ status: "failed", depositId: deposit.id });
+        return NextResponse.json({ status: "failed", depositId: deposit.id, reason: describeDepositFailure(notes) });
       }
       if (pwStatus !== "success") {
         return NextResponse.json({ status: "pending", depositId: deposit.id });
@@ -345,10 +359,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (remoteStatus === "failed" || remoteStatus === "cancelled") {
+      const notes = `PayChangu ${remoteStatus}: ${JSON.stringify(data?.data || data).slice(0, 300)}`;
       await admin.from("deposits")
-        .update({ status: "failed", updated_at: new Date().toISOString() })
+        .update({ status: "failed", updated_at: new Date().toISOString(), admin_notes: notes })
         .eq("id", deposit.id);
-      return NextResponse.json({ status: "failed", depositId: deposit.id });
+      return NextResponse.json({ status: "failed", depositId: deposit.id, reason: describeDepositFailure(notes) });
     }
 
     return NextResponse.json({ status: remoteStatus || "pending", depositId: deposit.id });

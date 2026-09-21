@@ -191,9 +191,16 @@ export async function POST(req: NextRequest) {
         } catch {}
 
       } else if (internalStatus === "failed") {
+        // Keep the provider's failure reason (INSUFFICIENT_BALANCE,
+        // PAYMENT_NOT_APPROVED, …) so support and the player-facing verify
+        // endpoint can explain the failure instead of a bare "failed".
         await admin
           .from("deposits")
-          .update({ status: "failed", updated_at: new Date().toISOString() })
+          .update({
+            status: "failed",
+            updated_at: new Date().toISOString(),
+            admin_notes: `PawaPay failure: ${JSON.stringify(body.failureReason || { failureCode: body.status })}`,
+          })
           .eq("id", deposit.id);
       }
 

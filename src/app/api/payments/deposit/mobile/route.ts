@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { isAllowedDepositPhone } from "@/lib/deposit-phones";
+import { toMalawiLocalMsisdn } from "@/lib/payments/malawi-phone";
 import { moneySymbol } from "@/lib/geo/format";
 import { formatMoneyConverted } from "@/lib/geo/server-format";
 
@@ -46,6 +47,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Phone number and operator required" }, { status: 400 });
     }
 
+    // Canonicalize to the local MSISDN format PayChangu requires
+    // ("09XXXXXXXX"). Players save numbers as "+265 991 23 45 67" etc.;
+    // the raw form is rejected by PayChangu's API — the same live
+    // incident the withdrawals route fixed 2026-09-17/18 (deposits from
+    // international-format numbers failed 11/11 in the 2 weeks to
+    // 2026-09-21).
+    const canonicalPhone = toMalawiLocalMsisdn(phone);
+    if (!canonicalPhone) {
+      return NextResponse.json({ error: "Invalid Malawi mobile money number — use a 09… or 08… number." }, { status: 400 });
+    }
+
     // Deposits can only go through a number the player already saved and
     // saved in Settings (anti OTP-spam) — never an arbitrary free-text number.
     const savedDepositPhones = (_profile?.deposit_phone_numbers as string[] | null) || [];
@@ -70,7 +82,7 @@ export async function POST(req: NextRequest) {
         method: "mobile_money",
         status: "pending",
         charge_id: chargeId,
-        phone,
+        phone: canonicalPhone,
         operator: operatorRefId,
       })
       .select("id")
@@ -87,7 +99,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        mobile: phone,
+        mobile: canonicalPhone,
         mobile_money_operator_ref_id: operatorRefId,
         amount,
         charge_id: chargeId,
@@ -100,9 +112,30 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
 
     if (!res.ok || data.error || data.status === "failed") {
+      // Keep the REAL provider error for support/reconciliation — the
+      // deposits ledger previously lost it entirely (0 paychangu rows in
+      // provider_transactions before this fix).
+      const reasonPayload = {
+        failureCode: data?.code || data?.error || null,
+        failureMessage: (data?.message || data?.error || (typeof data.error === "object" ? JSON.stringify(data.error) : null)) || null,
+        httpStatus: res.status,
+      };
       await admin.from("deposits")
-        .update({ status: "failed", updated_at: new Date().toISOString() })
+        .update({
+          status: "failed",
+          updated_at: new Date().toISOString(),
+          admin_notes: `PayChangu initiation rejected: ${JSON.stringify(reasonPayload)}`,
+        })
         .eq("id", deposit.id);
+      try {
+        await admin.from("provider_transactions").insert({
+          provider: "paychangu",
+          provider_ref: data?.reference || data?.tx_ref || chargeId,
+          direction: "deposit",
+          provider_status: "failed",
+          raw_payload: reasonPayload,
+        });
+      } catch {}
 
       const safeError = data.status === "failed"
         ? "Payment request failed. Please check your phone number and try again."
