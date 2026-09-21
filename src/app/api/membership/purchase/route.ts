@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid membership price configured" }, { status: 500 });
       }
 
-      // Anti-fraud: PawaPay charges only go to a locked deposit phone the
+      // Anti-fraud: PawaPay charges only go to a saved deposit phone the
       // player saved in Settings (same rule as wallet deposits).
       const savedPhones = (profile?.deposit_phone_numbers as string[] | null) || [];
       if (savedPhones.length === 0) {

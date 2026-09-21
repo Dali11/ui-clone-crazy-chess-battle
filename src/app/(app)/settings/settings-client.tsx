@@ -379,13 +379,14 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
   };
 
   // Deposit phone numbers: max 3, used for deposits/mobile payments only.
-  // First save is free; after that the DB trigger locks the list — only
-  // support (service_role) can change it. Anti OTP-spam (PawaPay/Gordon).
+  // Fully editable by the player (migration 091 unlocked the list);
+  // deposits still only pay out to numbers on the list — the OTP-spam
+  // guard lives in the payment routes, not the lock anymore.
   const addDepositPhone = async () => {
     const num = newDepositPhone.trim();
     setDepositPhoneErr(null); setDepositPhoneMsg(null);
     if (!/^\+?[0-9]{7,15}$/.test(num)) { setDepositPhoneErr("Enter a valid mobile number (digits only, e.g. 0991234567)"); return; }
-    if (depositPhones.length >= 3) { setDepositPhoneErr("You already have 3 deposit numbers. Contact support to change one."); return; }
+    if (depositPhones.length >= 3) { setDepositPhoneErr("You can save up to 3 deposit numbers — remove one first to add another."); return; }
     const last9 = (n: string) => n.replace(/\D/g, "").slice(-9);
     if (depositPhones.some((p) => last9(p) === last9(num))) { setDepositPhoneErr("That number is already in your list."); return; }
     const next = [...depositPhones, num];
@@ -393,16 +394,23 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
     const { error } = await supabase.from("profiles").update({ deposit_phone_numbers: next }).eq("id", userId);
     setDepositPhoneSaving(false);
     if (error) {
-      setDepositPhoneErr(
-        error.message.toLowerCase().includes("locked")
-          ? "Your deposit numbers are locked. Contact support to change them."
-          : error.message
-      );
+      setDepositPhoneErr(error.message);
       return;
     }
     setDepositPhones(next);
     setNewDepositPhone("");
     setDepositPhoneMsg("Saved.");
+  };
+
+  const removeDepositPhone = async (num: string) => {
+    const next = depositPhones.filter((p) => p !== num);
+    setDepositPhoneErr(null); setDepositPhoneMsg(null);
+    setDepositPhoneSaving(true);
+    const { error } = await supabase.from("profiles").update({ deposit_phone_numbers: next }).eq("id", userId);
+    setDepositPhoneSaving(false);
+    if (error) { setDepositPhoneErr(error.message); return; }
+    setDepositPhones(next);
+    setDepositPhoneMsg("Removed.");
   };
 
   const handleSaveProfile = async () => {
@@ -527,13 +535,13 @@ export default function SettingsClient({ profile, userId }: { profile: Profile |
             <div><label className="text-sm font-medium block mb-1.5">Phone (for withdrawals)</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="input" placeholder="+265 991 23 45 67" /><p className="text-xs text-ccb-muted mt-1">Withdrawals can go to any number — this is just a convenience default.</p></div>
             <div>
               <label className="text-sm font-medium block mb-1.5">Deposit phone numbers</label>
-              <p className="text-xs text-ccb-muted mb-2">Deposits and mobile payments can only use these numbers. Maximum 3. Once saved, the list is locked — contact support to change it.</p>
+              <p className="text-xs text-ccb-muted mb-2">Deposits and mobile payments can only use these numbers. You can add or remove them anytime. Maximum 3.</p>
               {depositPhones.length > 0 && (
                 <div className="space-y-1.5 mb-2">
                   {depositPhones.map((dp) => (
                     <div key={dp} className="flex items-center justify-between px-3 py-2 rounded-xl bg-ccb-surface border border-ccb-border text-sm">
                       <span>{dp}</span>
-                      <span className="flex items-center gap-1 text-xs text-ccb-muted"><Lock className="w-3 h-3" /> Locked</span>
+                      <button type="button" onClick={() => removeDepositPhone(dp)} disabled={depositPhoneSaving} className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50 transition-colors">Remove</button>
                     </div>
                   ))}
                 </div>

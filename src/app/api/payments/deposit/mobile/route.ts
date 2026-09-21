@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Deposits can only go through a number the player already saved and
-    // locked in Settings (anti OTP-spam) — never an arbitrary free-text number.
+    // saved in Settings (anti OTP-spam) — never an arbitrary free-text number.
     const savedDepositPhones = (_profile?.deposit_phone_numbers as string[] | null) || [];
     if (savedDepositPhones.length === 0) {
       return NextResponse.json({ error: "Add a deposit phone number in Settings before depositing." }, { status: 400 });

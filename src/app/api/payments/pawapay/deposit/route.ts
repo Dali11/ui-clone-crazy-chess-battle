@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Deposits can only go through a number the player already saved and
-    // locked in Settings (anti OTP-spam) — never an arbitrary free-text number.
+    // saved in Settings (anti OTP-spam) — never an arbitrary free-text number.
     const { data: depProfile } = await admin.from("profiles").select("deposit_phone_numbers, country").eq("id", user.id).single();
 
     // Operator auto-detection: route to the network the MSISDN actually

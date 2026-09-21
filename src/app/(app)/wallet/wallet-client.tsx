@@ -69,7 +69,7 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
   const [depositAmount, setDepositAmount] = useState(1000);
   const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [withdrawConfig, setWithdrawConfig] = useState<{ min_amount: number; max_amount: number; daily_limit: number; processing_fee_pct: number; currency_symbol?: string; deposit_min_amount?: number; deposit_max_amount?: number } | null>(null);
-  // Deposits must use one of the player's up-to-3 saved, support-locked numbers
+  // Deposits must use one of the player's up-to-3 saved numbers (editable in Settings)
   // (anti OTP-spam). Withdrawals stay free-text — can go to any number.
   const [depositPhone, setDepositPhone] = useState(depositPhones[0] || "");
   const [withdrawPhone, setWithdrawPhone] = useState(savedPhone || "");
@@ -625,13 +625,13 @@ export default function WalletClient({ balance, email, deposits, phone: savedPho
                 <p className="mt-1 text-yellow-600/90">
                   Add a phone number in{" "}
                   <Link href="/settings" className="underline underline-offset-2">Settings</Link>{" "}
-                  before you can deposit. Once saved it can&apos;t be changed without contacting support (max 3, to prevent OTP abuse).
+                  before you can deposit. You can add or remove numbers anytime in Settings (max 3).
                 </p>
               </div>
             ) : depositPhones.length === 1 ? (
               <div className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border flex items-center justify-between">
                 <span className="font-medium">{depositPhones[0]}</span>
-                <span className="text-xs text-ccb-muted flex items-center gap-1"><Lock className="w-3 h-3" /> Locked</span>
+                <Link href="/settings" className="text-xs text-ccb-muted underline underline-offset-2">Manage in Settings</Link>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-2">

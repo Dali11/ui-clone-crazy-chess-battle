@@ -1,10 +1,10 @@
 /**
  * Deposit phone numbers — anti OTP-spam guard (raised by Gordon on the
- * PawaPay compliance call). Players can save up to 3 numbers in Settings;
- * once saved they're locked (DB trigger enforces this — see migration 078)
- * and every deposit/mobile-money route must check the submitted phone
- * against this saved list before initiating a payment. Withdrawals are
- * unaffected — those stay free-text and can go to any number.
+ * PawaPay compliance call). Players can save up to 3 numbers in Settings
+ * and edit the list anytime (migration 091 unlocked it); every
+ * deposit/mobile-money route must check the submitted phone against this
+ * saved list before initiating a payment. Withdrawals are unaffected —
+ * those stay free-text and can go to any number.
  */
 
 export const MAX_DEPOSIT_PHONES = 3;
