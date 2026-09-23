@@ -253,7 +253,7 @@ export default async function BattleChallengePage({
 
   const { data: myProfile } = await admin
     .from("profiles")
-    .select("wallet_balance, email, phone")
+    .select("wallet_balance, email, phone, country, deposit_phone_numbers")
     .eq("id", user.id)
     .single();
 
@@ -271,6 +271,8 @@ export default async function BattleChallengePage({
       initialBalance={myProfile?.wallet_balance ?? 0}
       email={myProfile?.email || user.email || ""}
       phone={myProfile?.phone || ""}
+      country={myProfile?.country || null}
+      depositPhones={Array.isArray(myProfile?.deposit_phone_numbers) ? myProfile.deposit_phone_numbers : []}
     />
   );
 }
