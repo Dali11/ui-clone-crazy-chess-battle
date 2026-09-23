@@ -984,6 +984,12 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           return onDrop(sourceSquare, targetSquare);
         },
         allowDragging: !gameEnded && !isSpectator && isLiveView && !isWaiting,
+        // Tap-to-move fix (2026-09-24): every pointer-class sensor (including the
+        // pointer-events path mobile browsers use for touches) requires 16px of
+        // movement before a drag activates. Real-thumb taps drift 3-15px; without
+        // this they activated phantom drags and the tap silently died ("pieces
+        // stuck"). Real drags move far more than 16px, so dragging is unaffected.
+        dragActivationDistance: 16,
         squareStyles: squareStyles,
         // chess.com-style premove ghosts: faded piece on each premove
         // destination. Non-ghost squares render the library default

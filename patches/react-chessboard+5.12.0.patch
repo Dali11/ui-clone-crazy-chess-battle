@@ -1,5 +1,19 @@
+diff --git a/node_modules/react-chessboard/dist/index.esm.js b/node_modules/react-chessboard/dist/index.esm.js
+index c7d5a68..0bdf720 100644
+--- a/node_modules/react-chessboard/dist/index.esm.js
++++ b/node_modules/react-chessboard/dist/index.esm.js
+@@ -5158,7 +5158,8 @@ function ChessboardProvider({ children, options, }) {
+                 distance: dragActivationDistance,
+             }
+             : undefined,
+-    }), useSensor(KeyboardSensor), useSensor(TouchSensor), useSensor(MouseSensor));
++    }), useSensor(KeyboardSensor), useSensor(TouchSensor, { activationConstraint: { distance: Math.max(dragActivationDistance, 12) } }), useSensor(MouseSensor, { activationConstraint: { distance: Math.max(dragActivationDistance, 12) } }));
++// CCB PATCH v2 (2026-09-24): ALL pointer-class sensors honor dragActivationDistance (floor 12). v1 (2026-09-13) patched ONLY dist/index.js (CJS) — but package.json exports maps 'import' to THIS ESM file, which Next.js bundles, so the v1 tap fix NEVER reached production (build log said 'patch applied ✔' yet the shipped artifact was pristine). That is why mobile taps with ANY finger drift (>=1px) still activated phantom drags and died — 'pieces stuck'. The app now passes dragActivationDistance: 16.
+     // collision detection that first tries pointer-based detection and then falls back to rectangle intersection for keyboards
+     function collisionDetection(args) {
+         // if a pointer is found, return those
 diff --git a/node_modules/react-chessboard/dist/index.js b/node_modules/react-chessboard/dist/index.js
-index 1e67f53..789a767 100644
+index 1e67f53..d066fed 100644
 --- a/node_modules/react-chessboard/dist/index.js
 +++ b/node_modules/react-chessboard/dist/index.js
 @@ -5160,7 +5160,8 @@ function ChessboardProvider({ children, options, }) {
@@ -7,8 +21,8 @@ index 1e67f53..789a767 100644
              }
              : undefined,
 -    }), useSensor(KeyboardSensor), useSensor(TouchSensor), useSensor(MouseSensor));
-+    }), useSensor(KeyboardSensor), useSensor(TouchSensor, { activationConstraint: { distance: 12 } }), useSensor(MouseSensor, { activationConstraint: { distance: 12 } }));
-+    // CCB PATCH (2026-09-13): require 12px of movement before a piece drag activates. Without this, ANY finger jitter during a mobile tap (even 1-2px) starts a drag, which resets the Square's isClickingOnMobile flag and kills the tap's onSquareClick — tap-to-move pieces felt 'frozen' on phones while drag-and-drop worked fine. 12px is standard touch slop: taps stay taps, real drags still drag.
++    }), useSensor(KeyboardSensor), useSensor(TouchSensor, { activationConstraint: { distance: Math.max(dragActivationDistance, 12) } }), useSensor(MouseSensor, { activationConstraint: { distance: Math.max(dragActivationDistance, 12) } }));
++    // CCB PATCH v2 (2026-09-24): ALL pointer-class sensors now honor the board's dragActivationDistance option (floor 12). v1 (2026-09-13) only fixed TouchSensor+MouseSensor at a hardcoded 12px, but modern mobile browsers ALSO emit pointer events for every touch, which the FIRST sensor (RightClickCancelSensor extends PointerSensor) receives with distance=1 (the option default the app never set). So any real-thumb tap drifting 2px+ activated a phantom drag via the pointer path, set draggingPiece, reset the Square's isClickingOnMobile flag, and silently killed the tap — pieces felt 'stuck' for tap-to-move players while drag worked (reproduced live 2026-09-24: 0px drift=works, 3px=dead). The app now passes dragActivationDistance: 16; Touch/Mouse take max(option, 12) so any mount without the option keeps v1 behavior.
      // collision detection that first tries pointer-based detection and then falls back to rectangle intersection for keyboards
      function collisionDetection(args) {
          // if a pointer is found, return those
