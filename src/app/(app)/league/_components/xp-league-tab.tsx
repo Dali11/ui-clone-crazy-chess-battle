@@ -199,6 +199,24 @@ export default function XpLeagueTab() {
           </Link>
         </div>
 
+        {/* Cash-rewards pause (owner 2026-09-24) — same notice seeded
+            players see, so newcomers hear it up front. */}
+        {data.weeklyRewardsPaused && (
+          <div className="card p-4 border-amber-400/40">
+            <div className="flex items-start gap-3">
+              <PauseCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold">Cash rewards paused for now</h3>
+                <p className="text-xs text-ccb-muted mt-1 leading-relaxed">
+                  Real cash rewards on the XP Leagues are on hold — we&apos;ll bring them back once things are stable.
+                  Nothing else changes: every game still earns XP, and the leagues, rankings and weekly
+                  rebalance keep running exactly as they are.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {data.tiers && (
           <div className="card p-4">
             <h3 className="text-sm font-semibold mb-3">The five leagues</h3>
