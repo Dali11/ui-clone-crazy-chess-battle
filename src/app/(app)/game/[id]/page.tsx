@@ -77,8 +77,8 @@ export default async function GamePage({
 
   // Get player profiles for names
   const [whiteProfile, blackProfile] = await Promise.all([
-    supabase.from("profiles").select("username, display_name, rating, avatar_url, country").eq("id", game.white_player_id).single(),
-    supabase.from("profiles").select("username, display_name, rating, avatar_url, country").eq("id", game.black_player_id).single(),
+    supabase.from("profiles").select("username, display_name, rating, avatar_url, country, identity_verified").eq("id", game.white_player_id).single(),
+    supabase.from("profiles").select("username, display_name, rating, avatar_url, country, identity_verified").eq("id", game.black_player_id).single(),
   ]);
 
   const isPlayer = user && (user.id === game.white_player_id || user.id === game.black_player_id);
@@ -141,6 +141,8 @@ export default async function GamePage({
         blackAvatar={blackProfile.data?.avatar_url}
         whiteCountry={whiteProfile.data?.country}
         blackCountry={blackProfile.data?.country}
+        whiteVerified={whiteProfile.data?.identity_verified === true}
+        blackVerified={blackProfile.data?.identity_verified === true}
         battleInfo={battleInfo}
         tournamentId={game.tournament_id}
         countryCode={myProfile?.country}

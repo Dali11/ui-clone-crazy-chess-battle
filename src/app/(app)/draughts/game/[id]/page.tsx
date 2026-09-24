@@ -35,8 +35,8 @@ export default async function DraughtsGamePage({
 
   // Get player profiles for names + avatars (mirrors chess game page)
   const [whiteProfile, blackProfile] = await Promise.all([
-    supabase.from("profiles").select("username, display_name, avatar_url, country").eq("id", game.white_player_id).single(),
-    supabase.from("profiles").select("username, display_name, avatar_url, country").eq("id", game.black_player_id).single(),
+    supabase.from("profiles").select("username, display_name, avatar_url, country, identity_verified").eq("id", game.white_player_id).single(),
+    supabase.from("profiles").select("username, display_name, avatar_url, country, identity_verified").eq("id", game.black_player_id).single(),
   ]);
 
   return (
@@ -47,6 +47,8 @@ export default async function DraughtsGamePage({
       blackName={blackProfile.data?.display_name || blackProfile.data?.username || "Black"}
       whiteAvatar={whiteProfile.data?.avatar_url}
       blackAvatar={blackProfile.data?.avatar_url}
+      whiteVerified={whiteProfile.data?.identity_verified === true}
+      blackVerified={blackProfile.data?.identity_verified === true}
       whiteCountry={whiteProfile.data?.country}
       blackCountry={blackProfile.data?.country}
     />

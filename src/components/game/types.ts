@@ -21,6 +21,8 @@ export interface GameClientProps {
   blackAvatar?: string | null;
   whiteCountry?: string | null;
   blackCountry?: string | null;
+  whiteVerified?: boolean;
+  blackVerified?: boolean;
   battleInfo?: BattleInfo | null;
   tournamentId?: string | null;
   countryCode?: string | null;
