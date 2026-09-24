@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Swords, TrendingUp, ChevronDown, Zap, Gift, ArrowDownCircle, Trophy, Info, Share2, X } from "lucide-react";
+import { PauseCircle, Loader2, Swords, TrendingUp, ChevronDown, Zap, Gift, ArrowDownCircle, Trophy, Info, Share2, X } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
 import { formatUsd } from "@/lib/geo/format";
 import { countryFlag } from "@/lib/geo/flags";
@@ -50,6 +50,9 @@ interface StandingsResponse {
   memberBoost?: boolean;
   /** Referrals activated in the last 7 days. */
   activeReferrals?: number;
+  /** Cash-rewards pause (owner 2026-09-24): figures hidden while true. */
+  weeklyRewardsPaused?: boolean;
+  monthlyRewardsPaused?: boolean;
 }
 
 /**
@@ -188,8 +191,8 @@ export default function XpLeagueTab() {
           </div>
           <p className="text-sm text-ccb-muted mt-4 leading-relaxed">
             Play any game — chess or draughts — and you start in the Open League.
-            Every game you finish earns XP. The top {data.promoteCount ?? 5} players in each league are rewarded
-            and promoted every week — climb all the way to the Premier League.
+            Every game you finish earns XP. Climb the ladder all the way to the Premier League —
+            the leagues rebalance every week.
           </p>
           <Link href="/play" className="btn-primary w-full flex items-center justify-center gap-2 mt-5 py-3 rounded-xl text-sm font-bold">
             <Swords className="w-4 h-4" /> Play your first game
@@ -251,7 +254,7 @@ export default function XpLeagueTab() {
               <h3 className="text-sm font-semibold">Season 1 is underway</h3>
               <p className="text-xs text-ccb-muted mt-1 leading-relaxed">
                 Weeks run <b className="text-ccb-text">the 1st–7th, 8th–14th, 15th–21st and 22nd–month end</b> —
-                rewards are paid out the morning after each week closes. Every finished PvP game earns XP, and a
+                each week closes and the leagues rebalance the morning after. Every finished PvP game earns XP, and a
                 loss costs XP too. All-time XP never resets.
               </p>
             </div>
@@ -262,6 +265,25 @@ export default function XpLeagueTab() {
             >
               <X className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Cash-rewards pause (owner 2026-09-24) — replaces the figures
+          while the payout kill-switches are on; disappears automatically
+          the moment admin re-enables payouts. */}
+      {(isMonth ? data.monthlyRewardsPaused : data.weeklyRewardsPaused) && (
+        <div className="card p-4 border-amber-400/40">
+          <div className="flex items-start gap-3">
+            <PauseCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold">Cash rewards paused for now</h3>
+              <p className="text-xs text-ccb-muted mt-1 leading-relaxed">
+                Real cash rewards on the XP Leagues are on hold — we&apos;ll bring them back once things are stable.
+                Nothing else changes: every game still earns XP, and the leagues, rankings and weekly
+                rebalance keep running exactly as they are.
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -277,7 +299,7 @@ export default function XpLeagueTab() {
             </div>
           </div>
           <div className="text-left sm:text-right shrink-0">
-            <div className="text-xs text-ccb-muted">{isMonth ? "Ends on the 1st · 00:00 CAT" : "Week closes soon · paid next morning"}</div>
+            <div className="text-xs text-ccb-muted">{isMonth ? "Ends on the 1st · 00:00 CAT" : "Week closes soon · rebalance next morning"}</div>
             <div className="text-sm font-bold text-ccb-primary tabular-nums">{countdown || "…"}</div>
           </div>
         </div>
@@ -339,7 +361,7 @@ export default function XpLeagueTab() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-ccb-muted/10">
           <h3 className="text-sm font-semibold">{isMonth ? "Monthly standings" : "Weekly standings"}</h3>
           <div className="flex items-center gap-3 text-[10px] text-ccb-muted">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> {isMonth ? "Monthly reward" : "Reward + promotion"}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> {isMonth ? (data.monthlyRewardsPaused ? "Monthly board" : "Monthly reward") : (data.weeklyRewardsPaused ? "League leaders" : "Reward + promotion")}</span>
             {demoteStart !== Infinity && <span className="flex items-center gap-1"><ArrowDownCircle className="w-2.5 h-2.5 text-red-400" /> Demotion</span>}
           </div>
         </div>
@@ -399,9 +421,9 @@ export default function XpLeagueTab() {
           <div className="px-4 pb-4 space-y-2 text-xs text-ccb-muted leading-relaxed">
             <p>Every finished game earns XP — wins <b className="text-ccb-text">{rules.win} XP</b>, draws <b className="text-ccb-text">{rules.draw} XP</b>{rules.loss !== 0 ? <> , losses <b className="text-ccb-text">{rules.loss} XP</b></> : <> — losses earn nothing</>}.{rules.upsetBonus > 0 && <> Beat a higher-rated player for <b className="text-ccb-text">+{rules.upsetBonus} XP</b> extra.</>}</p>
             <p>To keep it fair, you can earn at most <b className="text-ccb-text">{rules.dailyCap} XP per day</b>, and games against the computer never count.</p>
-            <p>Weeks run the <b className="text-ccb-text">1st–7th, 8th–14th, 15th–21st and 22nd–month end</b> — rewards are paid the morning after each week closes. The top {promote} players in each league earn cash rewards every week. Every league has its own payout — the higher you climb, the bigger the rewards. League rosters <b className="text-ccb-text">auto-rebalance</b>: when one runs short or overfull, players move in one weekly wave so all five stay evenly filled — climb by outplaying your league and riding the wave up.</p>
+            <p>Weeks run the <b className="text-ccb-text">1st–7th, 8th–14th, 15th–21st and 22nd–month end</b> — each week closes and rosters rebalance the morning after. <b className="text-ccb-text">Cash rewards are paused for now</b> and will return once the platform settles in. League rosters <b className="text-ccb-text">auto-rebalance</b>: when one runs short or overfull, players move in one weekly wave so all five stay evenly filled — climb by outplaying your league and riding the wave up.</p>
             <p>Everyone joins the Open League and climbs the ladder — Open → Amateur → Bronze → Knights Championship → Premier League. Existing players were placed by rating when the season started. The Open League is unlimited; every league above it holds up to {tierCap.toLocaleString()} players, so promotion happens when there&apos;s a free spot. You stay in your league unless you are promoted or demoted.</p>
-            <p><b className="text-ccb-text">Monthly championship:</b> alongside the weekly ladder, every league also runs a <b className="text-ccb-text">monthly leaderboard</b> from the 1st to the end of the month. The top players in each league earn <b className="text-ccb-text">bigger monthly rewards</b> — same tier, separate prizes, paid on the 30th. Your tier only moves on the weekly cycle.</p>
+            <p><b className="text-ccb-text">Monthly championship:</b> alongside the weekly ladder, every league also runs a <b className="text-ccb-text">monthly leaderboard</b> from the 1st to the end of the month — same tier, separate monthly prizes (paused for now). Your tier only moves on the weekly cycle.</p>
           </div>
         )}
       </div>

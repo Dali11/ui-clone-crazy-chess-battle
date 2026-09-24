@@ -170,6 +170,45 @@ describe("planWeeklySettlement — standard moves (tier_moves_enabled)", () => {
   });
 });
 
+describe("planWeeklySettlement — auto-gate: standard moves at tier_cap (owner policy 2026-09-24)", () => {
+  it("keeps standard moves OFF while any top-4 league is under tier_cap, even with clear top/bottom splits", () => {
+    // One strong top-3 and one weak bottom in tier 2 — classic promote/demote
+    // candidates — but tier 2 only has 6 players, far under cap 1000.
+    const members = [
+      m(2, 30), m(2, 25), m(2, 20), m(2, 5), m(2, 4), m(2, 3),
+    ];
+    const plan = planWeeklySettlement({ members, cfg: baseCfg, closingWeek: CLOSING, newWeek: NEW });
+    expect(plan.movesAuto).toBe(false);
+    expect(plan.snapshots.every((s) => !s.promoted && !s.demoted)).toBe(true);
+  });
+
+  it("auto-enables standard moves once tiers 2–5 all have tier_cap players", () => {
+    const cap = 6; // small cap so the roster stays test-sized
+    const cfg = { ...baseCfg, tier_cap: cap };
+    const members: PlanMember[] = [];
+    // Tier 2 overfull (cap + 6), tiers 3–5 exactly at cap. All of t2–t5
+    // are at/over cap → the auto-gate opens. Standard demotion runs
+    // (bottom 5 of t2 drop); promotion from t1 stays capped because
+    // t2 has no free room — the cap binds exactly as designed.
+    for (let i = 0; i < cap + 6; i++) members.push(m(2, 40 - i));
+    for (const t of [3, 4, 5]) for (let i = 0; i < cap; i++) members.push(m(t, 20 - i));
+    for (let i = 0; i < 8; i++) members.push(m(1, 50 - i));
+    const plan = planWeeklySettlement({ members, cfg, closingWeek: CLOSING, newWeek: NEW });
+    expect(plan.movesAuto).toBe(true);
+    const t2 = plan.snapshots.filter((s) => s.tier === 2);
+    expect(t2.filter((s) => s.demoted).length).toBe(baseCfg.demote_count as number);
+    expect(t2.filter((s) => s.promoted).length).toBe(0); // t5 bound: no t2→t3 room
+    expect(plan.snapshots.filter((s) => s.promoted).length).toBe(0); // t1→t2 capped
+  });
+
+  it("tier_moves_enabled=true still forces moves regardless of roster size", () => {
+    const cfg = { ...baseCfg, tier_moves_enabled: true };
+    const members = [m(2, 30), m(2, 25), m(2, 20), m(2, 5), m(2, 4), m(2, 3), m(2, 2), m(2, 1)];
+    const plan = planWeeklySettlement({ members, cfg, closingWeek: CLOSING, newWeek: NEW });
+    expect(plan.snapshots.filter((s) => s.promoted).length).toBe(baseCfg.promote_count as number);
+  });
+});
+
 describe("planWeeklySettlement — fair-share rebalance", () => {
   const fill = (counts: number[], activeFraction = 1) => {
     const members: PlanMember[] = [];

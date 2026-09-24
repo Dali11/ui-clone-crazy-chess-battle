@@ -29,6 +29,9 @@ interface OverviewResponse {
   week: string;
   rewardsCurrency?: "MWK" | "USD";
   leagues: LeagueSummary[];
+  /** Cash-rewards pause (owner 2026-09-24): figures hidden while true. */
+  rewardsPaused?: boolean;
+  monthlyRewardsPaused?: boolean;
 }
 
 /** One league card: roster, rewards, and this week's top 5. */
@@ -36,10 +39,14 @@ function LeagueCard({
   league,
   currency,
   usdRewards,
+  rewardsPaused,
+  monthlyRewardsPaused,
 }: {
   league: LeagueSummary;
   currency: ReturnType<typeof useCurrency>;
   usdRewards: boolean;
+  rewardsPaused?: boolean;
+  monthlyRewardsPaused?: boolean;
 }) {
   const weeklyTotal = league.rewards.reduce((s, r) => s + r, 0);
   return (
@@ -50,10 +57,17 @@ function LeagueCard({
           <h3 className="text-sm font-bold truncate">{league.name}</h3>
           <p className="text-[11px] text-ccb-muted">{league.ratingBand} · {league.players} player{league.players === 1 ? "" : "s"} · {league.activeThisWeek} active</p>
         </div>
-        <div className="text-right shrink-0">
-          <p className="text-[10px] text-ccb-muted">Weekly pot</p>
-          <p className="text-sm font-bold text-ccb-primary tabular-nums">{usdRewards ? formatUsd(weeklyTotal) : currency.formatRewardMoney(weeklyTotal)}</p>
-        </div>
+        {!rewardsPaused ? (
+          <div className="text-right shrink-0">
+            <p className="text-[10px] text-ccb-muted">Weekly pot</p>
+            <p className="text-sm font-bold text-ccb-primary tabular-nums">{usdRewards ? formatUsd(weeklyTotal) : currency.formatRewardMoney(weeklyTotal)}</p>
+          </div>
+        ) : (
+          <div className="text-right shrink-0">
+            <p className="text-[10px] text-amber-500 font-semibold">Rewards</p>
+            <p className="text-[10px] text-ccb-muted">paused for now</p>
+          </div>
+        )}
       </div>
 
       {/* Top 5 this week with per-rank rewards */}
@@ -73,10 +87,14 @@ function LeagueCard({
                 <p className="text-xs font-semibold truncate">{p.name}{p.country ? ` · ${p.country}` : ""}</p>
                 <p className="text-[10px] text-ccb-muted">{p.xp.toLocaleString()} XP</p>
               </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs font-bold tabular-nums">{usdRewards ? formatUsd(league.rewards[i] ?? 0) : currency.formatRewardMoney(league.rewards[i] ?? 0)}</p>
-                <p className="text-[9px] text-ccb-muted/70">{currency.formatRewardMoney(league.monthlyRewards[i] ?? 0)} monthly</p>
-              </div>
+              {!rewardsPaused ? (
+                <div className="text-right shrink-0">
+                  <p className="text-xs font-bold tabular-nums">{usdRewards ? formatUsd(league.rewards[i] ?? 0) : currency.formatRewardMoney(league.rewards[i] ?? 0)}</p>
+                  {!monthlyRewardsPaused && <p className="text-[9px] text-ccb-muted/70">{currency.formatRewardMoney(league.monthlyRewards[i] ?? 0)} monthly</p>}
+                </div>
+              ) : (
+                <span className="text-[10px] text-ccb-muted/60 shrink-0">#{i + 1}</span>
+              )}
             </div>
           ))
         )}
@@ -121,8 +139,9 @@ export default function LeagueOverviewTab() {
           <div>
             <h3 className="text-sm font-semibold">All leagues — Season 1</h3>
             <p className="text-xs text-ccb-muted mt-1 leading-relaxed">
-              Weeks run the 1st–7th, 8th–14th, 15th–21st and 22nd–month end; rewards are paid
-              the morning after each week closes. Top 5 climb, bottom 5 drop. Amounts in your currency.
+              Weeks run the 1st–7th, 8th–14th, 15th–21st and 22nd–month end; rosters rebalance
+              the morning after each week closes so all five leagues stay evenly filled.
+              {data.rewardsPaused ? " Cash rewards are paused for now — the leagues themselves keep running." : " Top 5 climb, bottom 5 drop. Amounts in your currency."}
             </p>
           </div>
         </div>
@@ -130,7 +149,7 @@ export default function LeagueOverviewTab() {
 
       {[...data.leagues].sort((a, b) => b.tier - a.tier).map((lg, i) => (
         <React.Fragment key={lg.tier}>
-          <LeagueCard league={lg} currency={currency} usdRewards={data.rewardsCurrency === "USD"} />
+          <LeagueCard league={lg} currency={currency} usdRewards={data.rewardsCurrency === "USD"} rewardsPaused={data.rewardsPaused} monthlyRewardsPaused={data.monthlyRewardsPaused} />
           {/* Mid-feed inline ad: between the 2nd and 3rd league card
              (e.g. Premier / Knights done, Bronze / Amateur / Open below).
              Separate placement from the bottom "leagues" ad — smaller

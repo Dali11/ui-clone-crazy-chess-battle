@@ -45,13 +45,21 @@ export async function GET() {
       ratingBand: t.ratingBand,
       players: tierMembers.length,
       activeThisWeek: tierMembers.filter((m: any) => m.week_start === week).length,
-      rewards: cfg.rewards_enabled ? rewardsForTier(cfg, t.tier) : [0, 0, 0, 0, 0],
-      monthlyRewards: cfg.monthly_rewards_enabled !== false && cfg.rewards_enabled
+      // Cash-rewards pause (owner 2026-09-24): figures hidden while the
+      // weekly/monthly kill switches are off.
+      rewards: cfg.rewards_enabled && cfg.weekly_payouts_enabled !== false ? rewardsForTier(cfg, t.tier) : [0, 0, 0, 0, 0],
+      monthlyRewards: cfg.rewards_enabled && cfg.monthly_rewards_enabled !== false
         ? monthlyRewardsForTier(cfg, t.tier)
         : [0, 0, 0, 0, 0],
       top: ranked,
     };
   });
 
-  return NextResponse.json({ week, leagues, rewardsCurrency: rewardsCurrency(cfg) });
+  return NextResponse.json({
+    week,
+    leagues,
+    rewardsCurrency: rewardsCurrency(cfg),
+    rewardsPaused: cfg.weekly_payouts_enabled === false,
+    monthlyRewardsPaused: cfg.monthly_rewards_enabled === false,
+  });
 }

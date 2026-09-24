@@ -56,8 +56,12 @@ export async function GET(req: NextRequest) {
         enabled: cfg.enabled,
         scope,
         xpRules: { win: cfg.xp_win, draw: cfg.xp_draw, loss: cfg.xp_loss, upsetBonus: cfg.xp_upset_bonus, dailyCap: cfg.daily_xp_cap },
-        rewards: cfg.rewards_enabled ? rewardsForTier(cfg, 1) : [],
-        tierRewards: cfg.rewards_enabled ? allTierRewards(cfg) : {},
+        rewards: cfg.rewards_enabled && cfg.weekly_payouts_enabled !== false ? rewardsForTier(cfg, 1) : [],
+        tierRewards: cfg.rewards_enabled && cfg.weekly_payouts_enabled !== false ? allTierRewards(cfg) : {},
+        // Cash-rewards pause surface (owner 2026-09-24): the UI hides all
+        // payout figures and shows a paused note while these are true.
+        weeklyRewardsPaused: cfg.weekly_payouts_enabled === false,
+        monthlyRewardsPaused: cfg.monthly_rewards_enabled === false,
         tiers: LEAGUE_TIERS,
         registrationOpen: cfg.registration_open !== false,
         seasonStart: cfg.season_start ?? null,
@@ -199,6 +203,10 @@ export async function GET(req: NextRequest) {
     const allTimeXp = (myEvents ?? []).reduce((s, e) => s + (e.amount ?? 0), 0);
     const rewardsOn = cfg.rewards_enabled;
     const monthlyOn = cfg.monthly_rewards_enabled !== false && rewardsOn;
+    // Cash-rewards pause (owner 2026-09-24): the weekly/monthly kill
+    // switches also hide the figures from the UI while payouts are off.
+    const weeklyPaused = cfg.weekly_payouts_enabled === false;
+    const monthlyPaused = cfg.monthly_rewards_enabled === false;
 
     return NextResponse.json({
       seeded: true,
@@ -219,11 +227,13 @@ export async function GET(req: NextRequest) {
       xpRules: { win: cfg.xp_win, draw: cfg.xp_draw, loss: cfg.xp_loss, upsetBonus: cfg.xp_upset_bonus, dailyCap: cfg.daily_xp_cap },
       // Payout for the player's own league; tierRewards covers all leagues.
       rewards: scope === "month"
-        ? (monthlyOn ? monthlyRewardsForTier(cfg, member.tier) : [])
-        : (rewardsOn ? rewardsForTier(cfg, member.tier) : []),
+        ? (monthlyOn && !monthlyPaused ? monthlyRewardsForTier(cfg, member.tier) : [])
+        : (rewardsOn && !weeklyPaused ? rewardsForTier(cfg, member.tier) : []),
       tierRewards: scope === "month"
-        ? (monthlyOn ? allMonthlyTierRewards(cfg) : {})
-        : (rewardsOn ? allTierRewards(cfg) : {}),
+        ? (monthlyOn && !monthlyPaused ? allMonthlyTierRewards(cfg) : {})
+        : (rewardsOn && !weeklyPaused ? allTierRewards(cfg) : {}),
+      weeklyRewardsPaused: weeklyPaused,
+      monthlyRewardsPaused: monthlyPaused,
       tiers: LEAGUE_TIERS,
       rewardsCurrency: scope === "month" ? "MWK" : rewardsCurrencyOf(cfg),
       // XP boost surface (owner decision 2026-09-15)

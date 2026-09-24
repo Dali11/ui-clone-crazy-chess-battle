@@ -62,6 +62,9 @@ export interface WeeklySettlePlan {
   payOn: boolean;
   /** Human-readable reason when payOn is false. */
   unpaidReason: string | null;
+  /** True when the standard promote/relegate auto-gate (top-4 leagues at
+   *  tier_cap) has opened moves without an admin flip. */
+  movesAuto: boolean;
   payouts: SettlementPayout[];
   snapshots: SettlementSnapshot[];
   /** newTier -> user_ids to reset (xp 0, new week_start, tier). */
@@ -117,8 +120,18 @@ export function planWeeklySettlement(args: {
 
   const promoted = cfg.promote_count;
   const demoted = cfg.demote_count;
-  const movesOn = cfg.tier_moves_enabled === true;
   const cap = cfg.tier_cap > 0 ? cfg.tier_cap : Infinity;
+
+  // ── Standard moves gate (owner policy 2026-09-24) ────────────────────
+  // The standard promote-top / relegate-bottom system stays OFF until
+  // every one of the top four leagues (tiers 2–5) has filled to tier_cap
+  // players; until then the weekly fair-share rebalance below is the
+  // only thing that moves rosters, so the leagues keep running exactly
+  // as they are. Admin can still force moves on with tier_moves_enabled.
+  const rosterCount: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  for (const m of members) rosterCount[m.tier] = (rosterCount[m.tier] ?? 0) + 1;
+  const autoMovesOn = [2, 3, 4, 5].every((t) => rosterCount[t] >= cap);
+  const movesOn = cfg.tier_moves_enabled === true || autoMovesOn;
   // Rewards in the credit currency (always MWK): convert USD arrays at
   // the live rate when the ladder is dollar-denominated.
   const rewardsFor = (tier: number) => {
@@ -299,6 +312,7 @@ export function planWeeklySettlement(args: {
     newWeek,
     payOn,
     unpaidReason,
+    movesAuto: autoMovesOn,
     payouts,
     snapshots,
     updateGroups,
