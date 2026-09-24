@@ -7,6 +7,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *        Doc/selfie are returned as 1-hour signed URLs from the private
  *        kyc-documents bucket (RLS blocks all reads; service role only).
  *
+ *        NOTE (2026-09-24 fix): this used to embed `profiles!inner(...)` in
+ *        the select, but kyc_submissions.user_id has NO foreign key to
+ *        profiles (it points at auth.users), so PostgREST answered
+ *        PGRST200 on EVERY fetch and admins saw an empty queue — real
+ *        players' ID documents sat unreviewed. Profiles are now fetched
+ *        separately and merged in JS.
+ *
  * POST /api/admin/kyc  { submissionId, decision: "approve"|"reject", reason? }
  *        approve → kyc_submissions.status=approved + profiles.identity_verified=true
  *        reject  → status=rejected + reason; player can resubmit.
@@ -25,7 +32,7 @@ export async function GET(req: NextRequest) {
     const filter = new URL(req.url).searchParams.get("filter") || "pending";
     let q = admin
       .from("kyc_submissions")
-      .select("*, profiles!inner(username, display_name, email, avatar_url, country, phone, full_name)")
+      .select("id, user_id, doc_type, doc_number, doc_path, selfie_path, status, rejection_reason, reviewed_at, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
     if (filter === "pending") q = q.eq("status", "pending");
@@ -33,16 +40,27 @@ export async function GET(req: NextRequest) {
     const { data: rows, error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    // Merge player profiles in a second query (no FK kyc_submissions → profiles exists)
+    const userIds = [...new Set((rows ?? []).map((r: any) => r.user_id).filter(Boolean))];
+    const playersById = new Map<string, any>();
+    if (userIds.length > 0) {
+      const { data: players } = await admin
+        .from("profiles")
+        .select("id, username, display_name, email, avatar_url, country, phone, full_name")
+        .in("id", userIds);
+      for (const p of players ?? []) playersById.set(p.id, p);
+    }
+
     const withUrls = [];
     for (const r of rows ?? []) {
+      const { doc_path, selfie_path, ...rest } = r as any;
       const [docUrl, selfieUrl] = await Promise.all([
-        admin.storage.from("kyc-documents").createSignedUrl(r.doc_path, 3600),
-        admin.storage.from("kyc-documents").createSignedUrl(r.selfie_path, 3600),
+        doc_path ? admin.storage.from("kyc-documents").createSignedUrl(doc_path, 3600) : Promise.resolve({ data: null }),
+        selfie_path ? admin.storage.from("kyc-documents").createSignedUrl(selfie_path, 3600) : Promise.resolve({ data: null }),
       ]);
-      const { profiles, ...rest } = r as any;
       withUrls.push({
         ...rest,
-        player: profiles,
+        player: playersById.get(r.user_id) ?? null,
         docUrl: docUrl.data?.signedUrl ?? null,
         selfieUrl: selfieUrl.data?.signedUrl ?? null,
       });
