@@ -1,91 +1,75 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Eye, Radio, Swords, Trophy, ChevronRight } from "lucide-react";
-import { useCurrency } from "@/hooks/use-currency";
-import CountryFlag from "@/components/game/country-flag";
+import { Eye, Clock, Swords } from "lucide-react";
 
 interface LivePlayer {
-  name: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
   rating: number | null;
-  avatarUrl: string | null;
-  country: string | null;
-  verified: boolean;
 }
 
 interface LiveGame {
   id: string;
-  category: "battle" | "tournament" | "free";
-  stake: number | null;
-  tournamentName: string | null;
-  timeControl: string;
-  moveCount: number;
-  white: LivePlayer;
-  black: LivePlayer;
+  status: string;
+  time_control: string;
+  initial_minutes: number;
+  increment_seconds: number;
+  rated: boolean;
+  move_count: number;
+  last_move_at: string;
+  tournament_id: string | null;
+  league_id: string | null;
+  spectator_count: number;
+  is_my_game: boolean;
+  white_player: LivePlayer | null;
+  black_player: LivePlayer | null;
+}
+
+function timeAgo(dateStr: string): string {
+  const sec = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  return `${Math.floor(min / 60)}h ago`;
 }
 
 /**
- * "Live now" broadcast strip for the dashboard. Polls /api/games/live
- * every 15s. Broadcast rules: tournament matches and staked battles are
- * always listed; free play appears when a player opts in with the
- * in-game Broadcast toggle. Rows link straight into the spectator view.
+ * "Live now" strip on the dashboard. Same data source and visual design
+ * as the Live Matches page (/live): all in-progress games via
+ * /api/live/games, own games first (Resume), everyone else (Watch).
  */
 export default function LiveGamesCard() {
   const [games, setGames] = useState<LiveGame[] | null>(null);
-  const currency = useCurrency();
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const r = await fetch("/api/games/live");
-        if (!r.ok) return;
-        const data = await r.json();
-        if (!cancelled) setGames(data.games ?? []);
-      } catch { /* transient network error — keep last list */ }
-    };
-    load();
-    const t = setInterval(load, 15000);
-    return () => { cancelled = true; clearInterval(t); };
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch("/api/live/games");
+      if (!r.ok) return;
+      const data = await r.json();
+      setGames(data.games || []);
+    } catch {
+      // transient network error — keep last list
+    }
   }, []);
 
-  const categoryBadge = (g: LiveGame) => {
-    if (g.category === "battle" && g.stake) {
-      return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-gold/15 text-ccb-gold shrink-0">
-          <Swords className="w-3 h-3" /> {currency.formatRewardMoney(g.stake)}
-        </span>
-      );
-    }
-    if (g.category === "tournament") {
-      return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-primary/15 text-ccb-primary shrink-0 max-w-[120px] truncate">
-          <Trophy className="w-3 h-3 shrink-0" /> {g.tournamentName || "Tournament"}
-        </span>
-      );
-    }
-    return (
-      <span className="text-[10px] text-ccb-muted shrink-0">Free play</span>
-    );
-  };
+  useEffect(() => {
+    load();
+    // EGRESS FIX: pause polling while the tab is backgrounded (same
+    // pattern as the Live Matches page).
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 15000);
+    return () => clearInterval(t);
+  }, [load]);
 
-  const player = (p: LivePlayer) => (
-    <span className="inline-flex items-center gap-1 min-w-0">
-      {p.country && <CountryFlag code={p.country} className="w-3 h-3 rounded-[2px]" />}
-      <span className="truncate max-w-[110px] text-ccb-text">{p.name}</span>
-      {p.verified && (
-        <svg className="w-3 h-3 text-ccb-primary shrink-0" viewBox="0 0 24 24" fill="currentColor" role="img" aria-label="Verified player">
-          <path d="M12 2l2.39 2.08 3.12-.37 1 3 2.74 1.53L20 12l1.25 2.76-2.74 1.53-1 3-3.12-.37L12 22l-2.39-2.08-3.12.37-1-3-2.74-1.53L4 12 2.75 9.24l2.74-1.53 1-3 3.12.37L12 2z" opacity=".2"/>
-          <path d="M10.6 13.4l-2.2-2.2-1.4 1.4 3.6 3.6 6-6-1.4-1.4-4.6 4.6z"/>
-        </svg>
-      )}
-      {p.rating != null && <span className="text-[10px] text-ccb-muted shrink-0">{p.rating}</span>}
-    </span>
-  );
+  const visible = (games ?? []).slice(0, 4);
+  const extra = (games?.length ?? 0) - visible.length;
 
   return (
-    <div className="card p-4">
+    <div className="card p-3 sm:p-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="flex items-center gap-2 text-sm font-bold text-ccb-text">
           <span className="relative flex h-2 w-2">
@@ -94,45 +78,142 @@ export default function LiveGamesCard() {
           </span>
           Live now
         </h2>
-        <span className="text-[10px] text-ccb-muted flex items-center gap-1">
-          <Eye className="w-3 h-3" /> Watch any match
-        </span>
+        <Link href="/live" className="text-xs text-ccb-primary hover:underline">
+          View all
+        </Link>
       </div>
 
-      {games === null && <p className="text-xs text-ccb-muted py-4 text-center">Loading live games…</p>}
-
-      {games && games.length === 0 && (
-        <p className="text-xs text-ccb-muted py-4 text-center">
-          No live games right now — start one and it&apos;ll show up here.
-        </p>
+      {games === null && (
+        <p className="text-xs text-ccb-muted py-4 text-center">Loading…</p>
       )}
 
-      {games && games.length > 0 && (
-        <div className="space-y-1">
-          {games.map((g) => (
-            <Link
-              key={g.id}
-              href={`/game/${g.id}`}
-              className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-ccb-surface/60 transition-colors group"
-            >
-              <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
-                {player(g.white)}
-                <span className="text-ccb-muted text-[10px] shrink-0">vs</span>
-                {player(g.black)}
-              </div>
-              {categoryBadge(g)}
-              <span className="text-[10px] text-ccb-muted shrink-0 hidden sm:inline">
-                {g.moveCount} moves · {g.timeControl}
-              </span>
-              <ChevronRight className="w-4 h-4 text-ccb-muted group-hover:text-ccb-primary shrink-0" />
-            </Link>
-          ))}
+      {games && games.length === 0 && (
+        <div className="py-3 text-center">
+          <p className="text-xs font-bold text-ccb-text mb-1">No live games right now</p>
+          <p className="text-[10px] text-ccb-muted mb-3">
+            Games appear here in real-time as players start matches.
+          </p>
+          <Link
+            href="/play"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-ccb-primary to-ccb-accent text-white text-xs font-bold"
+          >
+            <Swords className="w-3.5 h-3.5" /> Play Now
+          </Link>
         </div>
       )}
 
-      <p className="text-[10px] text-ccb-muted/60 mt-3 flex items-center gap-1">
-        <Radio className="w-3 h-3" /> Tournament and staked matches broadcast automatically. Free play is opt-in from the game.
-      </p>
+      {games && visible.length > 0 && (
+        <div className="space-y-2">
+          {visible.map((game) => {
+            const white = game.white_player;
+            const black = game.black_player;
+            const whiteName = white?.display_name || white?.username || "White";
+            const blackName = black?.display_name || black?.username || "Black";
+            const href = game.is_my_game ? `/game/${game.id}` : `/game/${game.id}?spectate=1`;
+            return (
+              <Link
+                key={game.id}
+                href={href}
+                className={`block rounded-2xl p-3 transition-all ${
+                  game.is_my_game
+                    ? "bg-ccb-surface border border-ccb-primary/40 shadow-lg shadow-ccb-primary/10 hover:border-ccb-primary/60"
+                    : "bg-ccb-surface border border-ccb-border hover:border-ccb-primary/40"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  {/* Players */}
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="w-7 h-7 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">
+                        {white?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={white.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[10px] font-bold text-ccb-muted">
+                            {whiteName[0]?.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-ccb-text truncate">{whiteName}</p>
+                        <p className="text-[10px] text-ccb-muted">{white?.rating ?? "—"}</p>
+                      </div>
+                    </div>
+
+                    <span className="text-[10px] font-bold text-ccb-muted shrink-0">vs</span>
+
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="w-7 h-7 rounded-full bg-ccb-dark border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">
+                        {black?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={black.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[10px] font-bold text-white/70">
+                            {blackName[0]?.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-ccb-text truncate">{blackName}</p>
+                        <p className="text-[10px] text-ccb-muted">{black?.rating ?? "—"}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Watch / Resume button */}
+                  <span
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 ${
+                      game.is_my_game
+                        ? "bg-gradient-to-r from-ccb-primary to-ccb-accent text-white"
+                        : "bg-ccb-card border border-ccb-border text-ccb-primary"
+                    }`}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    {game.is_my_game ? "Resume" : "Watch"}
+                  </span>
+                </div>
+
+                {/* Meta row — same chips as the Live Matches page */}
+                <div className="flex items-center gap-3 mt-2.5 pt-2.5 border-t border-ccb-border/50">
+                  <span className="flex items-center gap-1 text-[10px] text-ccb-muted">
+                    <Clock className="w-3 h-3" />
+                    {game.initial_minutes}+{game.increment_seconds}
+                  </span>
+                  <span className="text-[10px] text-ccb-muted">Move {game.move_count}</span>
+                  {game.spectator_count > 0 && (
+                    <span className="flex items-center gap-1 text-[10px] text-ccb-muted">
+                      <Eye className="w-3 h-3" />
+                      {game.spectator_count}
+                    </span>
+                  )}
+                  {game.rated && <span className="text-[10px] font-bold text-ccb-accent">Rated</span>}
+                  {game.tournament_id && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-primary/10 text-ccb-primary">
+                      Tournament
+                    </span>
+                  )}
+                  {game.league_id && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-accent/10 text-ccb-accent">
+                      League
+                    </span>
+                  )}
+                  <span className="text-[10px] text-ccb-muted ml-auto">
+                    {timeAgo(game.last_move_at)}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+          {extra > 0 && (
+            <Link
+              href="/live"
+              className="block text-center text-[10px] text-ccb-muted hover:text-ccb-primary py-1"
+            >
+              {extra} more live game{extra === 1 ? "" : "s"} on Live Matches
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }
