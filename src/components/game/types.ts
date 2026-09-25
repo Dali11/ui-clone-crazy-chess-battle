@@ -26,6 +26,11 @@ export interface GameClientProps {
   battleInfo?: BattleInfo | null;
   tournamentId?: string | null;
   countryCode?: string | null;
+  /** Free-play broadcast opt-in is available to this user (player of a
+   *  live game with no tournament and no battle). */
+  canBroadcast?: boolean;
+  /** games.broadcast current value at page load. */
+  broadcasting?: boolean;
 }
 
 export const STATUS_LABELS: Record<string, string> = {

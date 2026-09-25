@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Swords, Trophy, TrendingUp, Wallet, Zap, ChevronRight, Target, Gamepad2, Crown, MessageCircle } from "lucide-react";
 import WhatsAppBanner from "@/components/layout/whatsapp-banner";
 import AdSlot from "@/components/ads/ad-slot";
+import LiveGamesCard from "@/components/dashboard/live-games-card";
 import { moneySymbol } from "@/lib/geo/format";
 
 const LEVEL_RATINGS: Record<string, number> = {
@@ -235,6 +236,9 @@ export default async function DashboardPage() {
         </div>
       </Link>
 
+
+      {/* Live now — broadcast games anyone can watch */}
+      <LiveGamesCard />
 
       {/* Tournaments + Recent Games */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">

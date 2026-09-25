@@ -128,6 +128,14 @@ export default async function GamePage({
     isArmageddon: battle.armageddon_game_id === id,
   } : null;
 
+  // Live broadcast (owner decision 2026-09-25): tournament matches and
+  // staked battles are always public; free play is opt-in via the
+  // in-game Broadcast toggle. Only players of a live free-play game
+  // get the toggle.
+  const canBroadcast =
+    !!isPlayer && game.status === "playing" && !game.tournament_id && !battle;
+
+
   return (
     <>
       <GameClientWrapper
@@ -146,6 +154,8 @@ export default async function GamePage({
         battleInfo={battleInfo}
         tournamentId={game.tournament_id}
         countryCode={myProfile?.country}
+        canBroadcast={canBroadcast}
+        broadcasting={game.broadcast === true}
       />
     </>
   );

@@ -38,6 +38,8 @@ export default function GameClientWrapper(props: {
   battleInfo?: BattleInfo | null;
   tournamentId?: string | null;
   countryCode?: string | null;
+  canBroadcast?: boolean;
+  broadcasting?: boolean;
 }) {
   return <GameClient {...props} />;
 }

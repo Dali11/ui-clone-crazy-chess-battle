@@ -67,7 +67,7 @@ function ConnectionStatus({ quality }: { quality: "online" | "reconnecting" | "o
 }
 
 
-export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, whiteCountry, blackCountry, whiteVerified, blackVerified, battleInfo, tournamentId, countryCode }: GameClientProps) {
+export default function GameClient({ gameId, initialGame, currentUserId, isSpectator = false, whiteName = "White", blackName = "Black", whiteAvatar, blackAvatar, whiteCountry, blackCountry, whiteVerified, blackVerified, battleInfo, tournamentId, countryCode, canBroadcast = false, broadcasting: initialBroadcasting = false }: GameClientProps) {
   const { game, connected, connectionQuality, drawOffer, makeMove, resign, checkTimeout, offerDraw, acceptDraw, declineDraw, spectatorCount } = useRealtimeGame(gameId, initialGame, currentUserId);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -772,6 +772,33 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
   };
 
   const [shareCopied, setShareCopied] = useState(false);
+  // Live broadcast opt-in (free play only). Tournament matches and staked
+  // battles are always public, so the toggle only exists for free play.
+  const [broadcasting, setBroadcasting] = useState(initialBroadcasting);
+  const [broadcastBusy, setBroadcastBusy] = useState(false);
+  const publiclyLive = !!tournamentId || battleInfo?.isBattle === true || broadcasting;
+  const toggleBroadcast = async () => {
+    if (broadcastBusy) return;
+    const next = !broadcasting;
+    setBroadcasting(next); // optimistic
+    setBroadcastBusy(true);
+    try {
+      const res = await fetch(`/api/games/${gameId}/broadcast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ broadcast: next }),
+      });
+      if (!res.ok) {
+        setBroadcasting(!next);
+        const data = await res.json().catch(() => null);
+        console.error("broadcast toggle failed:", data?.error || res.status);
+      }
+    } catch {
+      setBroadcasting(!next);
+    } finally {
+      setBroadcastBusy(false);
+    }
+  };
   const handleShare = async () => {
     const url = typeof window !== "undefined" ? window.location.href : `https://crazychessbattles.live/game/${gameId}`;
     const shareData = { title: "Crazy Chess Battles", text: `Watch ${whiteName} vs ${blackName} live on Crazy Chess Battles!`, url };
@@ -1347,6 +1374,12 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
               <span>Board Theme</span>
               <Palette className="w-4 h-4 text-ccb-muted" />
             </button>
+            {canBroadcast && !gameEnded && (
+              <button onClick={toggleBroadcast} disabled={broadcastBusy} className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-ccb-surface transition-colors text-sm">
+                <span className={broadcasting ? "text-red-400 font-semibold" : ""}>{broadcasting ? "LIVE — anyone can watch" : "Broadcast this game"}</span>
+                <Radio className={`w-4 h-4 ${broadcasting ? "text-red-400" : "text-ccb-muted"}`} />
+              </button>
+            )}
             <Link href="/history" className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-ccb-surface transition-colors text-sm">
               <span>Game History</span>
               <Clock className="w-4 h-4 text-ccb-muted" />
@@ -1377,6 +1410,15 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
           <div className="flex items-center gap-1.5">
             {isSpectator && <span className="flex items-center gap-1 text-xs text-ccb-muted"><Eye className="w-3.5 h-3.5" />Spectating</span>}
             <ConnectionStatus quality={connectionQuality} />
+            {publiclyLive && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 text-[9px] font-bold tracking-wide">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
+                </span>
+                LIVE
+              </span>
+            )}
             <Swords className="w-4 h-4 text-ccb-primary" />
             <span className="text-sm font-bold text-ccb-text">Crazy Chess Battles</span>
           </div>
@@ -1389,6 +1431,21 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
             <span>Sound</span>
           </button>
           <BoardThemePicker onThemeChange={setBoardTheme} />
+          {canBroadcast && !gameEnded && (
+            <button
+              onClick={toggleBroadcast}
+              disabled={broadcastBusy}
+              title={broadcasting ? "Your game is public in Live — anyone can watch" : "Make this game public in Live so anyone can watch"}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
+                broadcasting
+                  ? "bg-red-500/10 border-red-500/30 text-red-400"
+                  : "bg-ccb-surface border-ccb-border text-ccb-muted hover:text-ccb-text"
+              }`}
+            >
+              <Radio className="w-4 h-4" />
+              <span className="font-semibold">{broadcasting ? "LIVE" : "Broadcast"}</span>
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
