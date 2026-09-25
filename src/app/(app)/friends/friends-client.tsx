@@ -254,27 +254,48 @@ export default function FriendsClient() {
               </div>
             )}
             {friends.map((f) => (
-              <div key={f.id} className="flex items-center gap-3 p-3 rounded-xl bg-ccb-surface border border-ccb-border">
-                <Avatar u={f.user} />
-                <div className="flex-1 min-w-0">
-                  <Link href={`/profile/${f.user.username}`} className="font-semibold text-sm truncate block hover:underline">
-                    {name(f.user)}
-                  </Link>
-                  <p className="text-xs text-ccb-muted">{f.user.rating ?? "—"} rating</p>
+              <div key={f.id} className="rounded-xl bg-ccb-surface border border-ccb-border overflow-hidden">
+                <div className="flex items-center gap-3 p-3">
+                  <Avatar u={f.user} />
+                  <div className="flex-1 min-w-0">
+                    <Link href={`/profile/${f.user.username}`} className="font-semibold text-sm truncate block hover:underline">
+                      {name(f.user)}
+                    </Link>
+                    <p className="text-xs text-ccb-muted">{f.user.rating ?? "—"} rating</p>
+                  </div>
+                  {/* Desktop actions inline — mobile gets the action bar below */}
+                  <div className="hidden sm:flex items-center gap-2">
+                    <Link href={`/chats/dm/${f.user.id}`} aria-label="Chat"
+                         className="p-2 rounded-lg text-ccb-muted hover:text-ccb-text hover:bg-ccb-border/30">
+                      <MessageCircle className="w-4 h-4" />
+                    </Link>
+                    <button
+                      onClick={() => setChallengeFor(f.user)}
+                      className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg bg-ccb-accent text-white">
+                      <Swords className="w-4 h-4" /> Challenge
+                    </button>
+                    <button onClick={() => removeFriend(f.user.id)} aria-label="Remove friend"
+                            className="p-2 rounded-lg text-ccb-muted/50 hover:text-red-400">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <Link href={`/chats/dm/${f.user.id}`} aria-label="Chat"
-                     className="p-2 rounded-lg text-ccb-muted hover:text-ccb-text hover:bg-ccb-border/30">
-                  <MessageCircle className="w-4 h-4" />
-                </Link>
-                <button
-                  onClick={() => setChallengeFor(f.user)}
-                  className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg bg-ccb-accent text-white">
-                  <Swords className="w-4 h-4" /> Challenge
-                </button>
-                <button onClick={() => removeFriend(f.user.id)} aria-label="Remove friend"
-                        className="p-2 rounded-lg text-ccb-muted/50 hover:text-red-400">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {/* Mobile action bar — keeps the name fully visible on small screens */}
+                <div className="flex sm:hidden border-t border-ccb-border divide-x divide-ccb-border">
+                  <Link href={`/chats/dm/${f.user.id}`}
+                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-ccb-muted active:bg-ccb-surface/60">
+                    <MessageCircle className="w-4 h-4" /> Chat
+                  </Link>
+                  <button
+                    onClick={() => setChallengeFor(f.user)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-ccb-accent active:bg-ccb-surface/60">
+                    <Swords className="w-4 h-4" /> Challenge
+                  </button>
+                  <button onClick={() => removeFriend(f.user.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-ccb-muted/70 active:bg-ccb-surface/60">
+                    <Trash2 className="w-4 h-4" /> Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -291,19 +312,34 @@ export default function FriendsClient() {
                 <h2 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-2">Received</h2>
                 <div className="space-y-2">
                   {incoming.map((f) => (
-                    <div key={f.id} className="flex items-center gap-3 p-3 rounded-xl bg-ccb-surface border border-ccb-border">
-                      <Avatar u={f.user} size={36} />
-                      <Link href={`/profile/${f.user.username}`} className="font-semibold text-sm flex-1 truncate hover:underline">
-                        {name(f.user)}
-                      </Link>
-                      <button onClick={() => respond(f.id, "decline")} disabled={sending === f.id}
-                              className="p-2 rounded-lg text-ccb-muted hover:text-red-400" aria-label="Decline">
-                        <X className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => respond(f.id, "accept")} disabled={sending === f.id}
-                              className="flex items-center gap-1 text-sm font-semibold px-3 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-50">
-                        {sending === f.id ? "…" : (<><Check className="w-4 h-4" /> Accept</>)}
-                      </button>
+                    <div key={f.id} className="rounded-xl bg-ccb-surface border border-ccb-border overflow-hidden">
+                      <div className="flex items-center gap-3 p-3">
+                        <Avatar u={f.user} size={36} />
+                        <Link href={`/profile/${f.user.username}`} className="font-semibold text-sm flex-1 min-w-0 truncate block hover:underline">
+                          {name(f.user)}
+                        </Link>
+                        <div className="hidden sm:flex items-center gap-2">
+                          <button onClick={() => respond(f.id, "decline")} disabled={sending === f.id}
+                                  className="p-2 rounded-lg text-ccb-muted hover:text-red-400" aria-label="Decline">
+                            <X className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => respond(f.id, "accept")} disabled={sending === f.id}
+                                  className="flex items-center gap-1 text-sm font-semibold px-3 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-50">
+                            {sending === f.id ? "…" : (<><Check className="w-4 h-4" /> Accept</>)}
+                          </button>
+                        </div>
+                      </div>
+                      {/* Mobile action bar — full-width Accept/Decline */}
+                      <div className="flex sm:hidden border-t border-ccb-border divide-x divide-ccb-border">
+                        <button onClick={() => respond(f.id, "decline")} disabled={sending === f.id}
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-ccb-muted active:bg-ccb-surface/60 disabled:opacity-50">
+                          <X className="w-4 h-4" /> Decline
+                        </button>
+                        <button onClick={() => respond(f.id, "accept")} disabled={sending === f.id}
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-emerald-500 active:bg-ccb-surface/60 disabled:opacity-50">
+                          <Check className="w-4 h-4" /> {sending === f.id ? "…" : "Accept"}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -314,7 +350,7 @@ export default function FriendsClient() {
                 <h2 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-2">Sent (waiting)</h2>
                 <div className="space-y-2">
                   {outgoing.map((f) => (
-                    <div key={f.id} className="flex items-center gap-3 p-3 rounded-xl bg-ccb-surface/60 border border-ccb-border">
+                    <div key={f.id} className="flex items-center gap-3 p-3 rounded-xl bg-ccb-surface/60 border border-ccb-border min-w-0">
                       <Avatar u={f.user} size={36} />
                       <div className="flex-1 min-w-0">
                         <Link href={`/profile/${f.user.username}`} className="font-semibold text-sm truncate block hover:underline">
