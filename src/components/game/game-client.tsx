@@ -30,6 +30,7 @@ import { getAbortSeconds, BATTLE_FIRST_MOVE_GRACE_SECONDS, BATTLE_REPLY_GRACE_SE
 import PlayerProfilePreview from "./player-profile-preview";
 import PlayerBar from "./player-bar";
 import { formatClock } from "./utils";
+import ScreenshotGuard from "./screenshot-guard";
 import { moneySymbol } from "@/lib/geo/format";
 import type { BattleInfo, GameClientProps, SheetType } from "./types";
 import { STATUS_LABELS } from "./types";
@@ -1490,6 +1491,9 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
     return (
       <>
+        {/* Owner rule (2026-09-25): screenshots / screen recording not
+            allowed on the game page — spectators too. */}
+        <ScreenshotGuard />
         <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 lg:-mx-8 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
           {boardColumn(topPlayer, bottomPlayer, false)}
           {renderDesktopSidebar()}
@@ -1562,6 +1566,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
 
   return (
     <>
+      {/* Owner rule (2026-09-25): screenshots / screen recording not
+          allowed on the game page — hides the game when the page loses
+          focus or visibility, blocks context menus and print. */}
+      <ScreenshotGuard />
       <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 lg:-mx-8 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
         {boardColumn(playerData, myData, true)}
         {renderDesktopSidebar()}

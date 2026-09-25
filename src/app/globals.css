@@ -254,3 +254,9 @@ div[style*="color-scheme"] svg, div[style*="color-scheme"] svg * {
   filter: none !important;
   -webkit-filter: none !important;
 }
+
+/* Game page protection (owner rule 2026-09-25): no screenshot-friendly
+   long-press callouts / image save menus while on a game page. */
+body.game-page-protected {
+  -webkit-touch-callout: none;
+}
