@@ -236,10 +236,14 @@ export async function GET(
     // start (owner decision 2026-09-25). Admins always see real data.
     // isRegistered/canJoin were computed above from the full data, so
     // hiding here does not affect join logic.
+    // Owner rule (2026-09-25): the tournament CREATOR can also see the
+    // real roster/standings pre-start, same as admins — only other
+    // players see it hidden until the tournament actually starts.
+    const isCreator = !!user && tournament.created_by === user.id;
     const started =
       ["active", "completed", "finished"].includes(tournament.status) ||
       (tournament.starts_at ? new Date(tournament.starts_at).getTime() <= Date.now() : false);
-    const hideRoster = !started && !isAdmin;
+    const hideRoster = !started && !isAdmin && !isCreator;
 
     // Owner rule (2026-09-25): the prize distribution card stays hidden
     // until the number-5 payout exceeds the entry price. Strip it from
@@ -256,6 +260,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       isAdmin,
+      isCreator,
       isRegistered,
       currentPlayerId: user?.id || null,
       canJoin,

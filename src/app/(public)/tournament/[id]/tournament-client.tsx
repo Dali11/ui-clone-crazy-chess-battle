@@ -15,6 +15,7 @@ import { shouldShowPrizeDistribution } from "@/lib/tournament/prize-display";
 interface TournamentData {
   success: boolean;
   isAdmin: boolean;
+  isCreator: boolean;
   isRegistered: boolean;
   currentPlayerId: string | null;
   canJoin: boolean;
@@ -249,6 +250,20 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
   useEffect(() => { fetchData(); }, [resolvedParams.id]);
 
+  // Bounce off the Standings tab if it's no longer visible to this viewer
+  // (pre-start + not admin/creator) — keeps the tab bar and content in sync.
+  // (Derived inline from `data`, not the later `canSeeStandings` const, to
+  // avoid a block-scope ordering issue in this render function.)
+  useEffect(() => {
+    if (activeTab !== 'standings' || !data) return;
+    const started =
+      ['active', 'completed', 'finished'].includes(data.tournament.status) ||
+      (data.tournament.starts_at ? new Date(data.tournament.starts_at).getTime() <= Date.now() : false);
+    if (!started && !data.isAdmin && !data.isCreator) {
+      setActiveTab('rounds');
+    }
+  }, [activeTab, data]);
+
   // Auto-redirect to game when tournament is live and user has a pending game
   useEffect(() => {
     if (!data || !data.isRegistered || !data.currentPlayerId || data.tournament.status !== 'active') return;
@@ -410,7 +425,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     );
   }
 
-  const { tournament: t, participants, rounds, isAdmin, isRegistered, currentPlayerId, canJoin, joinReason } = data;
+  const { tournament: t, participants, rounds, isAdmin, isCreator, isRegistered, currentPlayerId, canJoin, joinReason } = data;
 
   // Find the current round and check if it has a scheduled start time
   const currentRoundData = rounds?.find(r => r.round_number === t.current_round);
@@ -435,6 +450,15 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     );
   }
   const isFinished = t.status === 'finished' || t.status === 'completed';
+
+  // Owner rule (2026-09-25): the Standings tab is only meaningful once the
+  // roster is real — before the tournament starts it's hidden from regular
+  // players entirely (not just shown empty). Admins and the tournament's
+  // own creator can always see it, so they can check on their setup.
+  const tournamentStarted =
+    ['active', 'completed', 'finished'].includes(t.status) ||
+    (t.starts_at ? new Date(t.starts_at).getTime() <= Date.now() : false);
+  const canSeeStandings = tournamentStarted || isAdmin || isCreator;
 
   const statusInfo = {
     upcoming: { label: 'UPCOMING', color: 'text-ccb-primary bg-ccb-primary/10 border-ccb-primary/30', dot: 'bg-ccb-primary' },
@@ -713,10 +737,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         </div>
       )}
 
-      {/* TAB BAR */}
+      {/* TAB BAR — Standings omitted entirely pre-start for regular players */}
       <div className="px-3 sm:px-6 lg:px-8 mb-4">
         <div className="flex gap-1.5 p-1 bg-ccb-surface rounded-xl border border-ccb-border">
-          {(['rounds', 'standings', 'info'] as const).map(tab => (
+          {(['rounds', 'standings', 'info'] as const).filter(tab => tab !== 'standings' || canSeeStandings).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -739,7 +763,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       <div className="px-3 sm:px-6 lg:px-8">
 
         {/* ========== STANDINGS ========== */}
-        {activeTab === 'standings' && (
+        {activeTab === 'standings' && canSeeStandings && (
           <div className="space-y-3">
             {sortedParticipants.length === 0 ? (
               <div className="bg-ccb-card border border-ccb-border rounded-2xl p-10 text-center">
