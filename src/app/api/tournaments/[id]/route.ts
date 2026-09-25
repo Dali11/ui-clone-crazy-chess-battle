@@ -231,6 +231,15 @@ export async function GET(
       });
     }
 
+    // Registered-player roster and count are hidden until it's time to
+    // start (owner decision 2026-09-25). Admins always see real data.
+    // isRegistered/canJoin were computed above from the full data, so
+    // hiding here does not affect join logic.
+    const started =
+      ["active", "completed", "finished"].includes(tournament.status) ||
+      (tournament.starts_at ? new Date(tournament.starts_at).getTime() <= Date.now() : false);
+    const hideRoster = !started && !isAdmin;
+
     return NextResponse.json({
       success: true,
       isAdmin,
@@ -239,9 +248,9 @@ export async function GET(
       canJoin,
       joinReason,
       tournament: { ...tournament, actual_prize_pool: actualPrizePool },
-      participants: participants || [],
-      rounds: roundsWithGameIds,
-      participantCount: participants?.length || 0,
+      participants: hideRoster ? [] : (participants || []),
+      rounds: hideRoster ? [] : roundsWithGameIds,
+      participantCount: hideRoster ? null : (participants?.length || 0),
       arenaGames,
       arenaRecentResults,
     });

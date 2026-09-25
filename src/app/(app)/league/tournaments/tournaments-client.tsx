@@ -15,7 +15,7 @@ interface Competition {
   name: string;
   status: string;
   entryType?: string;
-  playerCount: number;
+  playerCount: number | null;
   maxPlayers?: number | null;
   rounds?: number;
   startsAt?: string;
@@ -305,10 +305,12 @@ function TournamentCard({ competition, onJoin, joining, fmtCurrency }: { competi
 
       {/* STATS ROW */}
       <div className="flex items-center gap-3 mb-3 text-xs text-ccb-muted flex-wrap">
-        <span className="flex items-center gap-1">
-          <Users className="w-3.5 h-3.5" />
-          {competition.playerCount}{competition.maxPlayers ? `/${competition.maxPlayers}` : ' players'}
-        </span>
+        {competition.playerCount != null && (
+          <span className="flex items-center gap-1">
+            <Users className="w-3.5 h-3.5" />
+            {competition.playerCount}{competition.maxPlayers ? `/${competition.maxPlayers}` : ' players'}
+          </span>
+        )}
         {competition.rounds ? (
           <span className="flex items-center gap-1">
             <Trophy className="w-3.5 h-3.5" />

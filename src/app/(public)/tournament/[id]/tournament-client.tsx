@@ -104,7 +104,7 @@ interface TournamentData {
     blackName: string;
     result: 'white' | 'black' | 'draw';
   }>;
-  participantCount: number;
+  participantCount: number | null;
 }
 
 // Currency formatting via useCurrency hook
@@ -534,7 +534,15 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             {/* STATS GRID */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <StatTile icon={Clock} label="Time Control" value={`${t.initial_minutes}+${t.increment_seconds}`} />
-              <StatTile icon={Users} label="Players" value={`${data.participantCount}${t.max_players ? `/${t.max_players}` : ''}`} />
+              <StatTile
+                icon={Users}
+                label="Players"
+                value={
+                  data.participantCount != null
+                    ? `${data.participantCount}${t.max_players ? `/${t.max_players}` : ''}`
+                    : "At start"
+                }
+              />
               <StatTile icon={Calendar} label="Starts" value={formatDate(t.starts_at)} sub={formatTime(t.starts_at)} />
               <StatTile icon={Award} label={isArena ? "Duration" : "Rounds"} value={isArena ? `${t.duration_minutes || 60}min` : (t.rounds || '—')} />
             </div>
@@ -626,7 +634,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       </p>
                     </div>
                   )}
-                  {isAdmin && data.participantCount >= (t.min_players || 2) && (
+                  {isAdmin && (data.participantCount || 0) >= (t.min_players || 2) && (
                     <button
                       onClick={handleStart}
                       disabled={actionLoading}
@@ -738,7 +746,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               <div className="bg-ccb-card border border-ccb-border rounded-2xl p-10 text-center">
                 <Users className="w-10 h-10 text-ccb-muted mx-auto mb-3" />
                 <h3 className="font-bold text-sm mb-1">No participants yet</h3>
-                <p className="text-xs text-ccb-muted">Players will appear here once they join.</p>
+                <p className="text-xs text-ccb-muted">
+                  {t.status === 'upcoming' && data.participantCount == null
+                    ? 'Registered players are hidden until the tournament starts.'
+                    : 'Players will appear here once they join.'}
+                </p>
               </div>
             ) : (
               <>

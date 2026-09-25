@@ -64,6 +64,13 @@ export async function GET(_request: NextRequest) {
       const isRegistered = user ? myTournamentIds.has(tournament.id) : false;
       const isCreator = user ? tournament.created_by === user.id : false;
 
+      // Registered-player counts are hidden until it's time to start
+      // (owner decision 2026-09-25). Admins always see real counts.
+      const started =
+        ["active", "completed", "finished"].includes(tournament.status) ||
+        (tournament.starts_at ? new Date(tournament.starts_at).getTime() <= Date.now() : false);
+      const showCount = started || isAdmin;
+
       let canJoin = true;
       let reason: string | null = null;
       if (!user) { canJoin = false; reason = "not_authenticated"; }
@@ -80,7 +87,7 @@ export async function GET(_request: NextRequest) {
         status: tournament.status === "pending_approval" ? "pending" : tournament.status === "finished" ? "completed" : tournament.status,
         entryType: (tournament.entry_fee || 0) > 0 ? "paid" : "free",
         entryFee: tournament.entry_fee || 0,
-        playerCount: participantCount,
+        playerCount: showCount ? participantCount : null,
         maxPlayers: tournament.max_players || null,
         rounds: tournament.rounds,
         startsAt: tournament.starts_at,
