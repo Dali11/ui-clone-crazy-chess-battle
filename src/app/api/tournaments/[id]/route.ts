@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { computeTournamentEconomics } from '@/lib/tournament/economics';
+import { shouldShowPrizeDistribution } from '@/lib/tournament/prize-display';
 
 export async function GET(
   req: NextRequest,
@@ -240,6 +241,18 @@ export async function GET(
       (tournament.starts_at ? new Date(tournament.starts_at).getTime() <= Date.now() : false);
     const hideRoster = !started && !isAdmin;
 
+    // Owner rule (2026-09-25): the prize distribution card stays hidden
+    // until the number-5 payout exceeds the entry price. Strip it from
+    // the payload for non-admins while the pool is still too small;
+    // admins keep it for the edit panel.
+    const showPrizeDist =
+      isAdmin ||
+      shouldShowPrizeDistribution(
+        tournament.prize_distribution,
+        actualPrizePool,
+        tournament.entry_fee || 0
+      );
+
     return NextResponse.json({
       success: true,
       isAdmin,
@@ -247,7 +260,11 @@ export async function GET(
       currentPlayerId: user?.id || null,
       canJoin,
       joinReason,
-      tournament: { ...tournament, actual_prize_pool: actualPrizePool },
+      tournament: {
+        ...tournament,
+        actual_prize_pool: actualPrizePool,
+        prize_distribution: showPrizeDist ? tournament.prize_distribution : null,
+      },
       participants: hideRoster ? [] : (participants || []),
       rounds: hideRoster ? [] : roundsWithGameIds,
       participantCount: hideRoster ? null : (participants?.length || 0),

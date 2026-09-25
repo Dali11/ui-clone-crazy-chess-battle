@@ -10,6 +10,7 @@ import {
   CheckCircle, XCircle, Play, Settings, Target, Gamepad2, LogIn, UserPlus,
   Share2, Check, Flame, Eye, History,
 } from 'lucide-react';
+import { shouldShowPrizeDistribution } from "@/lib/tournament/prize-display";
 
 interface TournamentData {
   success: boolean;
@@ -1368,6 +1369,11 @@ function PrizeDistribution({ t, formatMoney }: { t: any; formatMoney: (c: number
   if (!dist || !dist.payouts || dist.payouts.length === 0) return null;
 
   const pool = t.actual_prize_pool ?? t.prize_pool ?? 0;
+
+  // Owner rule (2026-09-25): hidden until the number-5 payout exceeds
+  // the entry price. Server normally strips the data pre-reveal; this
+  // is the same check client-side as defense.
+  if (!shouldShowPrizeDistribution(dist, pool, t.entry_fee || 0)) return null;
   const isFixed = t.pool_source === 'fixed';
   const isFlat = dist.type === 'flat';
 
