@@ -105,15 +105,10 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
 
   const groups = profile?.is_admin ? [...navGroups, adminGroup] : navGroups;
 
-  // Bottom nav: Play · Battles · Advertise · Tournaments · Leagues
-  // (Chats moved to a floating bubble — bottom-right, above this nav)
-  const bottomNav = [
-    { href: "/play", label: "Play", icon: Swords },
-    { href: "/battles", label: "Battles", icon: Coins },
-    { href: "/advertise", label: "Advertise", icon: Megaphone },
-    { href: "/tournaments", label: "Tournaments", icon: Trophy },
-    { href: "/league", label: "Leagues", icon: Crown },
-  ];
+  // Bottom nav (redesign C, owner-approved 2026-09-26): dark bar with a
+  // raised central Play FAB — Battles · Advertise · [PLAY] · Tournaments ·
+  // Leagues. Layout is rendered inline below. Chats remains a floating
+  // bubble at bottom-right, above this nav.
 
   // Wallet balances are stored in the player's OWN currency (local wallets)
   const formatBalance = (bal: number | null | undefined) => formatWallet(bal ?? 0);
@@ -359,14 +354,19 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         </div>
       )}
 
-      {/* === MOBILE BOTTOM NAV: Play · Battles · Advertise · Tournaments · Leagues === */}
+      {/* === MOBILE BOTTOM NAV — redesign C (owner-approved 2026-09-26):
+            dark bar · Battles · Advertise · [raised Play FAB] · Tournaments · Leagues === */}
       {!isGameRoute && (
         <nav
-          className="fixed bottom-0 left-0 right-0 z-[100] border-t border-gray-200 bg-white sm:hidden"
+          className="fixed bottom-0 left-0 right-0 z-[100] border-t border-ccb-border bg-ccb-dark sm:hidden"
           style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
-          <div className="flex items-stretch justify-around h-14">
-            {bottomNav.map((item) => {
+          <div className="relative flex items-stretch justify-around h-14">
+            {/* Left pair */}
+            {[
+              { href: "/battles", label: "Battles", icon: Coins },
+              { href: "/advertise", label: "Advertise", icon: Megaphone },
+            ].map((item) => {
               const Icon = item.icon;
               const active = isPathActive(pathname, item.href);
               return (
@@ -374,13 +374,52 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
                   key={item.href}
                   href={item.href}
                   prefetch={true}
-                  className="flex-1 flex flex-col items-center justify-center gap-0.5 relative active:bg-gray-100 active:scale-95 transition-all duration-150"
+                  className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative active:scale-95 transition-all duration-150 ${
+                    active ? "text-ccb-primary" : "text-ccb-muted"
+                  }`}
                 >
-                  {active && (
-                    <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-ccb-primary" />
-                  )}
-                  <Icon className={`w-5 h-5 transition-colors ${active ? "text-ccb-primary" : "text-gray-400"}`} />
-                  <span className={`text-[9px] font-medium transition-colors ${active ? "text-ccb-primary" : "text-gray-500"}`}>
+                  <Icon className="w-5 h-5" />
+                  <span className={`text-[9px] font-medium ${active ? "text-ccb-primary" : "text-ccb-muted"}`}>
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+
+            {/* Center: raised Play FAB — the hero action */}
+            <Link
+              href="/play"
+              prefetch={true}
+              aria-label="Play"
+              className="relative w-16 flex items-center justify-center"
+            >
+              <span
+                className={`absolute -top-5 w-12 h-12 rounded-full flex items-center justify-center bg-ccb-primary ring-4 ring-ccb-dark shadow-xl shadow-black/40 transition-transform duration-150 active:scale-90 ${
+                  isPathActive(pathname, "/play") ? "scale-105" : ""
+                }`}
+              >
+                <Swords className="w-6 h-6 text-white" />
+              </span>
+            </Link>
+
+            {/* Right pair */}
+            {[
+              { href: "/tournaments", label: "Tournaments", icon: Trophy },
+              { href: "/league", label: "Leagues", icon: Crown },
+            ].map((item) => {
+              const Icon = item.icon;
+              const active = isPathActive(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  prefetch={true}
+                  className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative active:scale-95 transition-all duration-150 ${
+                    active ? "text-ccb-primary" : "text-ccb-muted"
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className={`text-[9px] font-medium ${active ? "text-ccb-primary" : "text-ccb-muted"}`}>
                     {item.label}
                   </span>
                 </Link>
