@@ -157,8 +157,13 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
           ))}
         </nav>
 
-        {/* User footer */}
+        {/* User footer — notifications first (bell moved here from the
+            top bar, owner 2026-09-26), then wallet, then profile */}
         <div className="border-t border-ccb-border p-3 space-y-1 shrink-0">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Notifications</span>
+            <NotificationBell />
+          </div>
           <Link
             href="/wallet"
             className="flex items-center gap-2 px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm hover:bg-ccb-accent/10 transition-colors"
@@ -227,7 +232,6 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <NotificationBell />
             <Link
               href="/wallet"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ccb-surface border border-ccb-border text-sm hover:bg-ccb-accent/10 transition-colors"
@@ -250,35 +254,29 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
         </div>
       </nav>
 
-      {/* === MOBILE HEADER: Menu·Bell · Brand · Wallet·Profile === */}
+      {/* === MOBILE HEADER (option 1, owner 2026-09-26): Brand · Wallet ·
+          Profile — nothing else. The avatar opens the menu overlay; the
+          notification bell lives in that overlay's top bar. === */}
       {!isGameRoute && (
         <header className="sm:hidden sticky top-0 z-50 border-b border-ccb-border bg-ccb-dark">
           <div className="flex items-center justify-between px-3 h-12">
-            {/* Left: Menu + Bell (mirrors Wallet + Profile on right) */}
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setMenuOpen(true)}
-                className="p-2 rounded-md text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
-                aria-label="Open menu"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              <NotificationBell />
-            </div>
-
-            {/* Center: Brand */}
+            {/* Left: Brand */}
             <Link href="/dashboard" className="flex items-center gap-1.5">
               <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="w-6 h-6 rounded-full" />
               <span className="font-bold text-sm tracking-tight">CCB</span>
             </Link>
 
-            {/* Right: Wallet + Profile */}
+            {/* Right: Wallet then Profile (avatar opens the menu) */}
             <div className="flex items-center gap-1">
               <Link href="/wallet" className="flex items-center gap-1 px-2 py-1 rounded-md bg-ccb-surface border border-ccb-border">
                 <Wallet className="w-3.5 h-3.5 text-ccb-accent" />
                 <span className="text-[11px] font-bold text-ccb-text">{formatBalance(profile?.wallet_balance)}</span>
               </Link>
-              <Link href="/settings" className="flex items-center p-1">
+              <button
+                onClick={() => setMenuOpen(true)}
+                className="flex items-center p-1 rounded-md hover:bg-ccb-surface transition-colors"
+                aria-label="Open menu"
+              >
                 <div className="w-6 h-6 rounded-full bg-ccb-surface border border-ccb-border flex items-center justify-center overflow-hidden shrink-0">
                   {profile?.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -287,7 +285,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
                     <User className="w-3.5 h-3.5" />
                   )}
                 </div>
-              </Link>
+              </button>
             </div>
           </div>
         </header>
@@ -296,16 +294,20 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
       {/* === FULL-SCREEN MENU OVERLAY (mobile + tablet "More") === */}
       {menuOpen && (
         <div className="fixed inset-0 z-[200] bg-ccb-dark flex flex-col">
-          {/* Top bar — close button */}
+          {/* Top bar — notifications + close (bell moved here from the
+              mobile header, owner 2026-09-26) */}
           <div className="flex items-center justify-between px-4 h-12 border-b border-ccb-border shrink-0">
             <span className="font-bold text-sm">Menu</span>
-            <button
-              onClick={() => setMenuOpen(false)}
-              className="p-2 rounded-md text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center">
+              <NotificationBell />
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="p-2 rounded-md text-ccb-muted hover:text-ccb-text hover:bg-ccb-surface"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* User mini-profile */}
