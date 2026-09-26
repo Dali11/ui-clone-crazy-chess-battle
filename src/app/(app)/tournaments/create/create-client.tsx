@@ -68,6 +68,7 @@ export default function CreateTournamentClient({
   const [maxPlayers, setMaxPlayers] = useState(32);
   const [minPlayers, setMinPlayers] = useState(4);
   const [rounds, setRounds] = useState(5);
+  const [restMinutes, setRestMinutes] = useState<string>("auto");
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +140,7 @@ export default function CreateTournamentClient({
           rounds: type === "swiss" ? rounds : undefined,
           durationMinutes: type === "arena" ? durationMinutes : undefined,
           knockoutFormat: "pure",
+          restMinutes: restMinutes !== "auto" ? Number(restMinutes) : undefined,
         }),
       });
       const json = await res.json();
@@ -257,6 +259,20 @@ export default function CreateTournamentClient({
         )}
         {type === "knockout" && (
           <p className="text-[11px] text-ccb-muted">Bracket rounds are calculated automatically from the number of players once the tournament starts.</p>
+        )}
+        {type !== "arena" && (
+          <div>
+            <span className={label}>Rest between rounds</span>
+            <select className={input} value={restMinutes} onChange={e => setRestMinutes(e.target.value)}>
+              <option value="auto">Auto (based on time control)</option>
+              <option value="1">1 minute</option>
+              <option value="2">2 minutes</option>
+              <option value="3">3 minutes</option>
+              <option value="5">5 minutes</option>
+              <option value="10">10 minutes</option>
+            </select>
+            <p className="text-[11px] text-ccb-muted mt-1">How long players wait before the next round's games start. Auto picks a rest that fits the time control.</p>
+          </div>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

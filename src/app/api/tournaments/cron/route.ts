@@ -8,6 +8,7 @@ import { finishTournament } from "@/lib/tournament/finish";
 import { sendEmail } from "@/lib/email";
 import { generateKnockoutBracket, knockoutRoundCount, advanceKnockoutRound, generateGroups, generateGroupRoundRobin, getGroupAdvancers, isKnockoutComplete } from "@/lib/tournament/knockout";
 import { roundAlreadyExists, atomicAdvanceRound } from "@/lib/tournament/guards";
+import { getRestMinutes } from "@/lib/tournament/rest";
 
 // Combined tournament cron — does auto-start + auto-advance + start-scheduled in one call.
 // Triggered by Vercel Cron (see vercel.json, every 5 min). Auth: CRON_SECRET header.
@@ -655,7 +656,7 @@ async function handleTournamentCron(req: NextRequest) {
           if (koPairings.length === 0) continue;
 
           // Create the next round
-          const restMin = tournament.rest_minutes || 1;
+          const restMin = getRestMinutes(tournament);
           const koStart = new Date(Date.now() + restMin * 60 * 1000);
 
           // Fetch ratings for game creation
@@ -804,7 +805,7 @@ async function handleTournamentCron(req: NextRequest) {
           previousByes,
         );
 
-        const restMin = tournament.rest_minutes || 1;
+        const restMin = getRestMinutes(tournament);
         const rnStart = new Date(Date.now() + restMin * 60 * 1000);
 
         // Guard: skip if round already exists (prevents duplicate game creation)
@@ -1247,7 +1248,7 @@ async function handleTournamentCron(req: NextRequest) {
           // Swiss re-advance (simplified — same logic as section 2)
           if (tournament.type !== "knockout") {
             const nextRound = currentRound + 1;
-            const restMin = tournament.rest_minutes || 1;
+            const restMin = getRestMinutes(tournament);
             const rnStart = new Date(Date.now() + restMin * 60 * 1000);
 
             const { data: participants } = await admin

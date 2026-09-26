@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { clampRestMinutes } from "@/lib/tournament/rest";
 import { PRIZE_SPLITS_BY_TYPE, DEFAULT_PRIZE_SPLITS } from "@/lib/tournament/prizes";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { checkCreatorEligibility, escrowFixedPoolPrize, MAX_CREATOR_PROFIT_PERCENT } from "@/lib/tournament/creator-economics";
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
       prizePool = 0, poolSource = "entry_fees",
       thumbnailDataUrl = null,
       knockoutFormat = "pure",
+      restMinutes = null,
     } = body;
 
     if (!name || !startsAt) {
@@ -152,6 +154,7 @@ export async function POST(req: NextRequest) {
         prize_distribution: { type: "percentage", payouts },
         min_rating: Number(minRating || 0),
         max_rating: maxRating ? Number(maxRating) : null,
+      rest_minutes: clampRestMinutes(restMinutes),
         thumbnail_url: thumbnailDataUrl || null,
         knockout_format: knockoutFormat,
         created_by: user.id,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateSwissPairings, extractPreviousByes } from "@/lib/tournament/swiss-pairing";
 import { roundAlreadyExists, atomicAdvanceRound } from "@/lib/tournament/guards";
+import { getRestMinutes } from "@/lib/tournament/rest";
 
 // Can be triggered by cron-job.org or Vercel cron (with CRON_SECRET)
 // Finds all active tournaments where the current round is complete and
@@ -131,7 +132,7 @@ async function handleAutoAdvance(req: NextRequest) {
         );
 
         // Calculate when next round games should start (now + rest minutes)
-        const restMinutes = tournament.rest_minutes || 1;
+        const restMinutes = getRestMinutes(tournament);
         const scheduledStart = new Date(Date.now() + restMinutes * 60 * 1000);
 
         // Create round entry with scheduled start time
