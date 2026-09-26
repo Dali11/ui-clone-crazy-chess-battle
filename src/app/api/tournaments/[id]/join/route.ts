@@ -135,6 +135,9 @@ export async function POST(
         return NextResponse.json(
           {
             error: `Insufficient wallet balance. Entry fee is ${await formatMoneyConverted(entryFee, _userProfile?.country)}. You have ${formatMoney(currentBalance, _userProfile?.country)}. Please deposit funds first.`,
+            insufficientFunds: true,
+            requiredAmount: entryFee,
+            balance: currentBalance,
           },
           { status: 402 }
         );
@@ -150,7 +153,12 @@ export async function POST(
         console.error("Entry fee debit failed:", debitErr);
         if (debitErr.message?.includes("Insufficient balance")) {
           return NextResponse.json(
-            { error: "Insufficient wallet balance. Please deposit funds first." },
+            {
+              error: "Insufficient wallet balance. Please deposit funds first.",
+              insufficientFunds: true,
+              requiredAmount: entryFee,
+              balance: currentBalance,
+            },
             { status: 402 }
           );
         }

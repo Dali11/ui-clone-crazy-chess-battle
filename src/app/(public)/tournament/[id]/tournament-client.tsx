@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, use, useRef } from 'react';
+import React, { useState, useEffect, useMemo, use, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useCurrency } from "@/hooks/use-currency";
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -8,9 +8,12 @@ import {
   Trophy, Users, Calendar, Clock, DollarSign, RefreshCw, AlertCircle,
   Crown, Star, Swords, ChevronRight, ArrowLeft, Zap, Award, Medal,
   CheckCircle, XCircle, Play, Settings, Target, Gamepad2, LogIn, UserPlus,
-  Share2, Check, Flame, Eye, History,
+  Share2, Check, Flame, Eye, History, Wallet, Smartphone, Lock, Loader2,
 } from 'lucide-react';
 import { shouldShowPrizeDistribution } from "@/lib/tournament/prize-display";
+import { createClient } from "@/lib/supabase/client";
+import { detectOperator } from "@/lib/operator";
+import { detectPawaPayCorrespondent } from "@/lib/payments/pawapay-operators";
 
 interface TournamentData {
   success: boolean;
@@ -20,6 +23,15 @@ interface TournamentData {
   currentPlayerId: string | null;
   canJoin: boolean;
   joinReason: string | null;
+  /** Current viewer's own wallet/deposit info — null when logged out.
+   *  Drives the inline deposit widget (never leaked for other players). */
+  myWallet: {
+    balance: number;
+    email: string;
+    phone: string;
+    country: string | null;
+    depositPhones: string[];
+  } | null;
   tournament: {
     id: string;
     name: string;
@@ -111,6 +123,12 @@ interface TournamentData {
 
 // Currency formatting via useCurrency hook
 
+interface PawaPayProvider {
+  provider: string;
+  displayName: string;
+  logo: string;
+}
+
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -194,7 +212,211 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { formatMoney: fmtCurrency, currencySymbol: sym } = useCurrency();
+  const supabase = useMemo(() => createClient(), []);
+  // Seed with the player's own country (once loaded) so there's no flash
+  // of the wrong currency — same pattern as the wallet and battle-accept pages.
+  const {
+    formatMoney: fmtCurrency,
+    formatWallet,
+    convert,
+    currencySymbol: sym,
+    currencyCode,
+    rate: fxRate,
+    loaded: fxLoaded,
+  } = useCurrency(data?.myWallet?.country);
+
+  // ─── Inline entry-fee deposit widget (replaces the old alert() popup) ──
+  // Mirrors the wallet page / battle-challenge-accept page exactly: shows
+  // a top-up form right where the Join button is, scoped to the player's
+  // own country/currency, instead of a plain browser alert.
+  const myWallet = data?.myWallet || null;
+  const isMalawi = !myWallet?.country || myWallet.country === "MW";
+  const usePawaPay = !isMalawi;
+  // Balance override: null until something newer arrives (a failed join
+  // attempt or a confirmed deposit) — otherwise fall back to the balance
+  // the server just sent, so there's never a flash of "0" on first render.
+  const [walletBalanceOverride, setWalletBalance] = useState<number | null>(null);
+  const walletBalance = walletBalanceOverride ?? myWallet?.balance ?? 0;
+  const [insufficientFunds, setInsufficientFunds] = useState(false);
+  const [depositConfig, setDepositConfig] = useState<{ min: number; max: number } | null>(null);
+  useEffect(() => {
+    fetch("/api/withdrawals/limits")
+      .then((res) => res.json())
+      .then((d) => {
+        if (d.deposit_min_amount) setDepositConfig({ min: d.deposit_min_amount, max: d.deposit_max_amount });
+      })
+      .catch(() => {});
+  }, []);
+  const depositMinMwk = depositConfig?.min || 1000;
+  const depositMinLocal = isMalawi ? depositMinMwk : (fxLoaded && fxRate && fxRate !== 1 ? convert(depositMinMwk) : depositMinMwk);
+  const entryFeeLocal = data ? convert(data.tournament.entry_fee) : 0;
+  const shortfall = Math.max(0, entryFeeLocal - walletBalance);
+  const canAffordEntry = shortfall === 0;
+  const requiredMin = Math.max(shortfall, depositMinLocal || 0);
+
+  const [depositAmount, setDepositAmount] = useState(500);
+  const [depositTouched, setDepositTouched] = useState(false);
+  useEffect(() => {
+    if (depositTouched) return;
+    if (requiredMin > 0) setDepositAmount(Math.max(1, Math.ceil(requiredMin)));
+  }, [fxLoaded, requiredMin, depositTouched]);
+
+  const [depositPhone, setDepositPhone] = useState("");
+  useEffect(() => {
+    if (myWallet && !depositPhone) {
+      setDepositPhone(myWallet.depositPhones[0] || myWallet.phone || "");
+    }
+  }, [myWallet]);
+  const [depositing, setDepositing] = useState(false);
+  const [pendingChargeId, setPendingChargeId] = useState<string | null>(null);
+  const [depositMsg, setDepositMsg] = useState<string | null>(null);
+  const [depositErr, setDepositErr] = useState<string | null>(null);
+
+  const [pawapayProviders, setPawapayProviders] = useState<PawaPayProvider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState("");
+  const [pawapayLoading, setPawapayLoading] = useState(false);
+  useEffect(() => {
+    if (!usePawaPay || !myWallet?.country) return;
+    setPawapayLoading(true);
+    fetch(`/api/payments/pawapay/active-conf?country=${myWallet.country}&operationType=DEPOSIT`)
+      .then((res) => res.json())
+      .then((d) => {
+        if (d.countries && d.countries.length > 0) {
+          const providers = d.countries[0].providers || [];
+          setPawapayProviders(providers);
+          if (providers.length > 0) setSelectedProvider(providers[0].provider);
+        }
+      })
+      .catch((e) => console.error("Failed to load PawaPay providers:", e))
+      .finally(() => setPawapayLoading(false));
+  }, [usePawaPay, myWallet?.country]);
+
+  useEffect(() => {
+    if (!usePawaPay || !depositPhone || pawapayProviders.length === 0) return;
+    const corr = detectPawaPayCorrespondent(myWallet?.country, depositPhone);
+    if (corr && pawapayProviders.some((p) => p.provider === corr)) {
+      setSelectedProvider((prev) => (prev === corr ? prev : corr));
+    }
+  }, [depositPhone, pawapayProviders, myWallet?.country, usePawaPay]);
+
+  // Once a confirmed deposit brings the balance above the entry fee, the
+  // widget hides itself and the Join button becomes usable again.
+  useEffect(() => {
+    if (canAffordEntry) setInsufficientFunds(false);
+  }, [canAffordEntry]);
+
+  const refreshWalletBalance = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("wallet_balance")
+      .eq("id", user.id)
+      .single();
+    if (profile) setWalletBalance(profile.wallet_balance ?? 0);
+  }, [supabase]);
+
+  // Poll deposit verification once a mobile money payment is initiated
+  useEffect(() => {
+    if (!pendingChargeId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/payments/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chargeId: pendingChargeId }),
+        });
+        const d = await res.json();
+        if (d.status === "success") {
+          clearInterval(interval);
+          setPendingChargeId(null);
+          setDepositMsg("Deposit confirmed! You can now join the tournament.");
+          await refreshWalletBalance();
+        } else if (d.status === "failed") {
+          clearInterval(interval);
+          setPendingChargeId(null);
+          setDepositErr("Deposit failed or timed out. Please try again.");
+        }
+      } catch {}
+    }, 4000);
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      if (pendingChargeId) {
+        setPendingChargeId(null);
+        setDepositErr("Deposit verification timed out. If you completed the payment, your balance will update shortly — try refreshing.");
+      }
+    }, 180000);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [pendingChargeId, refreshWalletBalance]);
+
+  const handlePawaPayDeposit = async () => {
+    if (!selectedProvider) {
+      setDepositErr("Select a mobile money provider");
+      return;
+    }
+    const res = await fetch("/api/payments/pawapay/deposit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: depositAmount,
+        phoneNumber: depositPhone.replace(/\s/g, ""),
+        provider: selectedProvider,
+        currency: currencyCode,
+        country: myWallet?.country || undefined,
+      }),
+    });
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error || "Payment failed. Please try again.");
+    setPendingChargeId(d.chargeId);
+    setDepositMsg("Check your phone to authorize the payment. Waiting for confirmation...");
+  };
+
+  const handlePayChanguDeposit = async () => {
+    const res = await fetch("/api/payments/deposit/mobile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: depositAmount,
+        phone: depositPhone,
+        operatorRefId: detectOperator(depositPhone),
+        email: myWallet?.email || "",
+      }),
+    });
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error || "Payment failed. Please try again.");
+    setPendingChargeId(d.chargeId);
+    setDepositMsg("Check your phone to authorize the payment. Waiting for confirmation...");
+  };
+
+  const handleEntryDeposit = async () => {
+    setDepositing(true);
+    setDepositErr(null);
+    setDepositMsg(null);
+    try {
+      if (!depositPhone) {
+        setDepositErr("Enter a valid phone number (e.g., 0991234567)");
+        setDepositing(false);
+        return;
+      }
+      if (depositAmount < requiredMin) {
+        setDepositErr(`Deposit at least ${formatWallet(Math.ceil(requiredMin))} to cover the entry fee.`);
+        setDepositing(false);
+        return;
+      }
+      if (usePawaPay) {
+        await handlePawaPayDeposit();
+      } else {
+        await handlePayChanguDeposit();
+      }
+    } catch (err: any) {
+      setDepositErr(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setDepositing(false);
+    }
+  };
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -327,10 +549,23 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
   const handleJoin = async () => {
     setActionLoading(true);
+    setDepositErr(null);
     try {
       const res = await fetch(`/api/tournaments/${resolvedParams.id}/join`, { method: 'POST' });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to join');
+      if (!res.ok) {
+        // Insufficient wallet balance — show the inline deposit widget
+        // (same pattern as the wallet and battle-challenge pages) instead
+        // of a plain alert() popup.
+        if (json.insufficientFunds) {
+          setInsufficientFunds(true);
+          if (typeof json.balance === 'number') setWalletBalance(json.balance);
+          setActionLoading(false);
+          return;
+        }
+        throw new Error(json.error || 'Failed to join');
+      }
+      setInsufficientFunds(false);
       await fetchData();
     } catch (err: any) {
       alert(err.message);
@@ -623,6 +858,138 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                           <><Swords className="w-4 h-4" /> Join Tournament</>
                         }
                       </button>
+                      {/* INLINE DEPOSIT WIDGET — shown when the wallet can't
+                          cover the entry fee (same form as the wallet page
+                          and the battle-challenge accept page, scoped to the
+                          player's own country/currency) instead of a popup. */}
+                      {hasEntryFee && !!myWallet && (insufficientFunds || !canAffordEntry) && (
+                        <div className="mt-3 space-y-4 p-4 rounded-xl bg-ccb-primary/5 border border-ccb-primary/20">
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            <Wallet className="w-4 h-4 text-ccb-primary" />
+                            {/* shortfall is already in the player's local
+                                currency — format with formatWallet (no
+                                re-conversion), never fmtCurrency (which
+                                expects raw MWK and would double-convert). */}
+                            <span>You need {formatWallet(shortfall)} more to join</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-ccb-muted px-1">
+                            <span>Your balance</span>
+                            <span className={canAffordEntry ? "font-semibold text-ccb-text" : "font-semibold text-red-400"}>
+                              {formatWallet(walletBalance)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-ccb-muted">Top up now — your balance updates automatically the moment payment confirms, then just tap Join.</p>
+
+                          <div>
+                            <label className="text-xs text-ccb-muted mb-1 block">Amount ({currencyCode})</label>
+                            <input
+                              type="number"
+                              value={depositAmount}
+                              onChange={(e) => {
+                                setDepositTouched(true);
+                                setDepositAmount(Number(e.target.value));
+                              }}
+                              className="input-field w-full"
+                              min={Math.ceil(requiredMin)}
+                            />
+                            <p className="text-xs text-ccb-muted mt-1.5">
+                              Min deposit: {formatWallet(Math.ceil(depositMinLocal))}
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="text-xs text-ccb-muted mb-1 block">
+                              {isMalawi ? "Mobile Money Number (Airtel Money or Mpamba)" : "Mobile Money Number"}
+                            </label>
+                            {myWallet.depositPhones.length === 0 ? (
+                              <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2.5 text-xs text-yellow-600">
+                                <span className="flex items-center gap-1.5 font-medium"><Lock className="w-3.5 h-3.5" /> No deposit number on file</span>
+                                <p className="mt-1 text-yellow-600/90">
+                                  Add a phone number in{" "}
+                                  <Link href="/settings" className="underline underline-offset-2">Settings</Link>{" "}
+                                  before you can deposit.
+                                </p>
+                              </div>
+                            ) : myWallet.depositPhones.length === 1 ? (
+                              <div className="w-full px-4 py-3 rounded-xl bg-ccb-surface border border-ccb-border flex items-center justify-between">
+                                <span className="font-medium text-sm">{myWallet.depositPhones[0]}</span>
+                                <Link href="/settings" className="text-xs text-ccb-muted underline underline-offset-2">Manage</Link>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 gap-2">
+                                {myWallet.depositPhones.map((p) => (
+                                  <button
+                                    key={p}
+                                    onClick={() => setDepositPhone(p)}
+                                    className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                                      depositPhone === p ? "border-ccb-primary bg-ccb-primary/10 text-ccb-text" : "border-ccb-border bg-ccb-surface text-ccb-muted"
+                                    }`}
+                                  >
+                                    <span className="flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5" /> {p}</span>
+                                    {depositPhone === p && <Check className="w-3.5 h-3.5" />}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* PawaPay provider selector — everyone outside Malawi */}
+                          {usePawaPay && (
+                            <div>
+                              <label className="text-xs text-ccb-muted mb-1 block">Mobile Money Provider</label>
+                              {pawapayLoading ? (
+                                <div className="flex items-center gap-2 text-xs text-ccb-muted py-2">
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Loading providers...
+                                </div>
+                              ) : pawapayProviders.length > 0 ? (
+                                <div className="grid grid-cols-2 gap-2">
+                                  {pawapayProviders.map((p) => (
+                                    <button
+                                      key={p.provider}
+                                      onClick={() => setSelectedProvider(p.provider)}
+                                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors text-xs font-medium ${
+                                        selectedProvider === p.provider
+                                          ? "border-ccb-primary bg-ccb-primary/10 text-ccb-text"
+                                          : "border-ccb-border bg-ccb-surface text-ccb-muted"
+                                      }`}
+                                    >
+                                      {p.logo && <img src={p.logo} alt="" className="w-5 h-5 rounded" />}
+                                      <span className="truncate">{p.displayName}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-ccb-muted py-2">
+                                  No mobile money providers available for your region yet. We&apos;re working on adding support.
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {depositMsg && (
+                            <p className="text-xs text-green-400 flex items-center gap-1.5">
+                              <Check className="w-3.5 h-3.5" /> {depositMsg}
+                            </p>
+                          )}
+                          {depositErr && <p className="text-xs text-ccb-danger">{depositErr}</p>}
+
+                          <button
+                            onClick={handleEntryDeposit}
+                            disabled={depositing || !!pendingChargeId || myWallet.depositPhones.length === 0 || !depositPhone}
+                            className="btn-primary w-full flex items-center justify-center gap-2"
+                          >
+                            {depositing || pendingChargeId ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Waiting for payment...</span>
+                              </>
+                            ) : (
+                              <span>Deposit {sym} {depositAmount.toLocaleString()}</span>
+                            )}
+                          </button>
+                        </div>
+                      )}
                       {isLive && (
                         <p className="text-center text-xs text-ccb-muted mt-1">You'll be paired in the next round</p>
                       )}

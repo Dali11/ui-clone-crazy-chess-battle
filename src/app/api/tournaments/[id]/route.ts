@@ -22,7 +22,7 @@ export async function GET(
     if (user) {
       const { data: profileData } = await admin
         .from('profiles')
-        .select('id, username, display_name, avatar_url, rating, is_admin')
+        .select('id, username, display_name, avatar_url, rating, is_admin, wallet_balance, email, phone, country, deposit_phone_numbers')
         .eq('id', user.id)
         .single();
       profile = profileData;
@@ -257,6 +257,19 @@ export async function GET(
         tournament.entry_fee || 0
       );
 
+    // My own wallet/deposit info — only ever the current user's own data,
+    // never leaked for other players. Used by the client to render an
+    // inline deposit widget (same pattern as the wallet page and the
+    // battle-challenge accept page) instead of a plain alert() when the
+    // wallet can't cover the entry fee.
+    const myWallet = user && profile ? {
+      balance: profile.wallet_balance ?? 0,
+      email: profile.email || user.email || '',
+      phone: profile.phone || '',
+      country: profile.country || null,
+      depositPhones: Array.isArray(profile.deposit_phone_numbers) ? profile.deposit_phone_numbers : [],
+    } : null;
+
     return NextResponse.json({
       success: true,
       isAdmin,
@@ -265,6 +278,7 @@ export async function GET(
       currentPlayerId: user?.id || null,
       canJoin,
       joinReason,
+      myWallet,
       tournament: {
         ...tournament,
         actual_prize_pool: actualPrizePool,
