@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getLeagueXpConfig, currentWeekStart, LEAGUE_TIERS } from "@/lib/league-xp";
+import { getLeagueXpConfig, currentMonthStart } from "@/lib/league-xp";
 
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/league/xp/register — join a league (or switch leagues).
+ * POST /api/league/xp/register — join the monthly XP leaderboard.
  *
- * Owner policy 2026-09-11 (revised): all new players join the Open
- * League (tier 1). Higher leagues are reached by promotion only —
- * existing players were seeded once by rating at season start.
+ * Owner redesign 2026-09-26: there are no tiers anymore — joining
+ * simply creates the player's leaderboard row. Everyone competes on
+ * the same monthly board; the only player level (Non-Club / Club
+ * Member) comes from membership, not from where you sit on the board.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -18,86 +19,40 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { tier } = await req.json();
-    const tierNum = Number(tier);
-    if (!Number.isInteger(tierNum) || tierNum < 1 || tierNum > LEAGUE_TIERS.length) {
-      return NextResponse.json({ error: "Invalid league tier" }, { status: 400 });
-    }
-    // Owner policy 2026-09-11: all new players join the Open League —
-    // self-selecting a higher tier is no longer allowed. Existing players
-    // were seeded by rating once at season start; movement is
-    // promotion/demotion only.
-    if (tierNum !== 1) {
-      return NextResponse.json(
-        { error: "New players join the Open League — higher leagues are reached by climbing the ladder" },
-        { status: 403 }
-      );
-    }
-
     const admin = createAdminClient();
     const cfg = await getLeagueXpConfig(admin);
-    if (!cfg.enabled) return NextResponse.json({ error: "Leagues are currently disabled" }, { status: 403 });
+    if (!cfg.enabled) return NextResponse.json({ error: "The XP leaderboard is currently disabled" }, { status: 403 });
     if (cfg.registration_open === false) {
-      return NextResponse.json({ error: "League registration is currently closed" }, { status: 403 });
+      return NextResponse.json({ error: "Registration is currently closed" }, { status: 403 });
     }
 
-    // Tier capacity — leagues above Open hold at most tier_cap players.
-    if (tierNum > 1 && cfg.tier_cap > 0) {
-      const { count, error: capErr } = await admin
-        .from("league_xp_members")
-        .select("user_id", { count: "exact", head: true })
-        .eq("tier", tierNum);
-      if (capErr) {
-        console.error("[league/register] tier cap check failed:", capErr);
-        return NextResponse.json({ error: "Failed to check league capacity" }, { status: 500 });
-      }
-      const isSwitching = (count ?? 0) > 0; // re-check below for own membership
-      const { data: existing } = await admin
-        .from("league_xp_members").select("user_id").eq("user_id", user.id).maybeSingle();
-      const ownSeat = existing ? 1 : 0;
-      if ((count ?? 0) - ownSeat >= cfg.tier_cap) {
-        return NextResponse.json(
-          { error: `${LEAGUE_TIERS[tierNum - 1].name} is full (${cfg.tier_cap} players)` },
-          { status: 409 }
-        );
-      }
-      void isSwitching;
-    }
-
-    const week = currentWeekStart();
-    // AUDIT FIX 2026-09-11: only INSERT when the member row is absent —
-    // the old upsert overwrote tier AND xp for existing members, so any
-    // re-register call would throw a Premier player back into Open with
-    // their weekly XP wiped mid-cycle.
+    const cycle = currentMonthStart();
+    // AUDIT FIX 2026-09-11 (kept): only INSERT when the member row is
+    // absent — a re-register call must never wipe a player's XP.
     const { data: existing } = await admin
       .from("league_xp_members")
-      .select("user_id, tier, xp, week_start")
+      .select("user_id, xp, week_start, lifetime_xp")
       .eq("user_id", user.id)
       .maybeSingle();
-    let member = existing;
-    let upErr: unknown = null;
-    if (!member) {
-      const res = await admin
-        .from("league_xp_members")
-        .insert({ user_id: user.id, tier: tierNum, xp: 0, week_start: week })
-        .select("user_id, tier, xp, week_start")
-        .single();
-      member = res.data;
-      upErr = res.error;
+    if (existing) {
+      return NextResponse.json({ success: true, member: existing, alreadyRegistered: true });
     }
 
-    if (upErr) {
-      console.error("[league/register] upsert failed:", upErr);
+    const { data: member, error } = await admin
+      .from("league_xp_members")
+      .insert({ user_id: user.id, tier: 1, xp: 0, week_start: cycle, lifetime_xp: 0 })
+      .select("user_id, xp, week_start, lifetime_xp")
+      .single();
+    if (error) {
+      // Unique constraint hit by a concurrent insert — already joined.
+      if (String(error.message || "").includes("duplicate key")) {
+        return NextResponse.json({ success: true, member: null, alreadyRegistered: true });
+      }
+      console.error("[league/register] insert failed:", error);
       return NextResponse.json({ error: "Failed to register" }, { status: 500 });
     }
 
-    const tierInfo = LEAGUE_TIERS[tierNum - 1];
-    return NextResponse.json({
-      success: true,
-      member,
-      league: tierInfo,
-      resetWeeklyXp: true,
-    });
+    return NextResponse.json({ success: true, member, alreadyRegistered: false });
   } catch (err: any) {
     console.error("[league/register] unexpected error:", err?.message);
     return NextResponse.json({ error: "Failed to register" }, { status: 500 });

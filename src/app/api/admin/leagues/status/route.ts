@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getLeagueXpConfig, currentWeekStart, nextWeekStart, LEAGUE_TIERS } from "@/lib/league-xp";
+import { getLeagueXpConfig, currentMonthStart, nextMonthStart, levelFor } from "@/lib/league-xp";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/admin/leagues/status — one-shot snapshot for the Leagues
- * admin panel: per-tier roster vs fair-share target, current week
- * boundaries, and the management toggles. Admin-only.
+ * admin panel (owner redesign 2026-09-26): the single monthly
+ * leaderboard's roster, club/non-club split, current cycle boundaries,
+ * and the management toggles. Admin-only.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -21,45 +22,35 @@ export async function GET(req: NextRequest) {
     if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const cfg = await getLeagueXpConfig(admin);
-    const { data: rows } = await admin.from("league_xp_members").select("tier");
-    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    for (const r of rows ?? []) counts[r.tier] = (counts[r.tier] ?? 0) + 1;
+    const month = currentMonthStart();
+    const { data: rows } = await admin
+      .from("league_xp_members")
+      .select("user_id, xp, week_start, lifetime_xp, profiles!inner(membership_until)");
     const total = rows?.length ?? 0;
-    const fair = Math.floor(total / 5);
-    const rem = total % 5;
-    // Same top-heavy fair-share split the settle rebalance uses.
-    const target = (t: number) => fair + (rem > 5 - t ? 1 : 0);
+    const activeThisMonth = (rows ?? []).filter((r: any) => r.week_start === month).length;
+    const clubPlayers = (rows ?? []).filter((r: any) =>
+      levelFor(r.profiles?.membership_until) === "club").length;
 
     return NextResponse.json({
-      tiers: [1, 2, 3, 4, 5].map((t) => ({
-        tier: t,
-        name: LEAGUE_TIERS[t - 1]?.name ?? `Tier ${t}`,
-        count: counts[t] ?? 0,
-        target: target(t),
-      })),
-      total,
-      weekStart: currentWeekStart(),
-      weekEnd: nextWeekStart(),
+      monthStart: month,
+      monthEnd: nextMonthStart(),
       seasonStart: cfg.season_start ?? null,
+      roster: {
+        total,
+        activeThisMonth,
+        clubPlayers,
+        nonClubPlayers: total - clubPlayers,
+      },
       flags: {
-        // Effective payout state for the week that closes next (what the
-        // next settle actually does): rewards + admin toggle + the
+        // Effective payout state for the month that closes next (what
+        // the next settle actually does): rewards + admin toggle + the
         // payouts_start date gate built into the settle code.
-        weeklyPayouts:
+        monthlyPayouts:
           cfg.rewards_enabled &&
-          cfg.weekly_payouts_enabled !== false &&
-          (!cfg.payouts_start || currentWeekStart() >= cfg.payouts_start),
-        // Date gate: the settle pays only for weeks starting on/after
-        // this date ("automation in code" — no external scheduler).
+          cfg.monthly_rewards_enabled !== false &&
+          (!cfg.payouts_start || month >= cfg.payouts_start),
         payoutsStart: cfg.payouts_start ?? null,
-        firstPaidSettle: cfg.payouts_start
-          ? nextWeekStart(new Date(cfg.payouts_start + "T00:00:00+02:00"))
-          : null,
-        // Raw switches:
         rewardsEnabled: cfg.rewards_enabled,
-        weeklyPayoutsEnabled: cfg.weekly_payouts_enabled !== false,
-        tierMoves: cfg.tier_moves_enabled === true,
-        monthlyPayouts: cfg.monthly_rewards_enabled === true,
         registrationOpen: cfg.registration_open !== false,
       },
     });

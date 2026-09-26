@@ -1,12 +1,20 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { effectiveXpMultiplier, applyXpMultiplier } from "./boost";
-import { currentWeekStart, getLeagueXpConfig, ENTRY_TIER, BATTLE_XP } from "./index";
+import {
+  currentCycleStart,
+  getLeagueXpConfig,
+  levelFor,
+  xpFor,
+  type XpGameType,
+  type XpResult,
+} from "./index";
 
 /**
- * Idempotent XP award for a finished PvP game. Safe to call from every
- * game-ending path (move / resign / draw / timeout / abandonment) and safe
- * to call twice — the unique (user, game_kind, game_id) constraint makes
- * re-processing a no-op.
+ * Idempotent XP award for a finished PvP game, using the owner's
+ * monthly allocation table (2026-09-26). Safe to call from every
+ * game-ending path (move / resign / draw / timeout) and safe to call
+ * twice — the unique (user, game_kind, game_id) constraint makes
+ * re-processing a no-op. Abandoned/cancelled games never reach here,
+ * so they never award XP.
  *
  * Never throws: XP problems must not break game settlement.
  */
@@ -53,52 +61,36 @@ export async function awardGameXp(opts: {
     if (!white || !black) return;
     if ((white.email || "").endsWith("@ccb.internal") || (black.email || "").endsWith("@ccb.internal")) return;
 
-    const week = currentWeekStart();
+    const cycle = currentCycleStart();
     const whiteWon = g.winner === "white";
     const blackWon = g.winner === "black";
     const draw = !g.winner;
     if (!whiteWon && !blackWon && !draw) return;
 
-    const whiteRating = g.white_rating ?? white.rating ?? 400;
-    const blackRating = g.black_rating ?? black.rating ?? 400;
-
-    // Staked battle games (incl. armageddon deciders) earn the flat
-    // BATTLE_XP rate instead of the normal PvP ladder rates.
+    // Cash game = staked battle (incl. its Armageddon decider).
+    // Everything else is a free game.
     const { data: battleRow } = await admin
       .from("battles")
       .select("id")
       .or(`game_id.eq.${opts.gameId},armageddon_game_id.eq.${opts.gameId}`)
       .limit(1);
-    const isBattle = !!battleRow?.length;
+    const gameType: XpGameType = battleRow?.length ? "cash" : "free";
 
-    const amountFor = (won: boolean, lostTo: boolean, oppRating: number, myRating: number) => {
-      if (isBattle) return draw ? BATTLE_XP.draw : won ? BATTLE_XP.win : BATTLE_XP.loss;
-      let xp = draw ? cfg.xp_draw : won ? cfg.xp_win : cfg.xp_loss;
-      if (won && lostTo && oppRating > myRating) xp += cfg.xp_upset_bonus;
-      return xp;
-    };
+    // Player level (owner spec 2026-09-26): Club Member = active paid
+    // membership. The allocation table carries the whole rate — no
+    // upset bonuses, no boost multipliers, exact values only.
+    const amountFor = (membershipUntil: string | null, result: XpResult) =>
+      xpFor(gameType, result, levelFor(membershipUntil));
 
-    // ── XP multipliers (owner decision 2026-09-15) ──────────────────────
-    // Referral boost (2x/1.5x/1.25x for 1 week, from activated referrals)
-    // and member 1.5x (while subscribed) — never stacked, higher wins.
-    // Boosts apply to POSITIVE XP only; the daily cap counts boosted
-    // credit, so a multiplier reaches the cap faster, never beyond it.
-    const { data: boostRows } = await admin
-      .from("league_xp_members")
-      .select("user_id, xp_boost_multiplier, xp_boost_until")
-      .in("user_id", [g.white_player_id, g.black_player_id]);
-    const boostByUser = new Map((boostRows ?? []).map((b) => [b.user_id, b]));
-    const multFor = (userId: string) =>
-      effectiveXpMultiplier({
-        boostMultiplier: boostByUser.get(userId)?.xp_boost_multiplier ?? null,
-        boostUntil: boostByUser.get(userId)?.xp_boost_until ?? null,
-        membershipUntil: byId.get(userId)?.membership_until ?? null,
-      });
+    const whiteResult: XpResult = draw ? "draw" : whiteWon ? "win" : "loss";
+    const blackResult: XpResult = draw ? "draw" : blackWon ? "win" : "loss";
+    const whiteXp = amountFor(white.membership_until ?? null, whiteResult);
+    const blackXp = amountFor(black.membership_until ?? null, blackResult);
 
-    const whiteXp = applyXpMultiplier(amountFor(whiteWon, blackWon, blackRating, whiteRating), multFor(g.white_player_id));
-    const blackXp = applyXpMultiplier(amountFor(blackWon, whiteWon, whiteRating, blackRating), multFor(g.black_player_id));
-
-    // Daily cap per player (anti-farming): count today's events first.
+    // Daily earn cap per player (anti-farming): count today's events
+    // first. Grants may be negative (a free-game loss costs XP); the cap
+    // only limits EARNING — a loss always deducts so players can never
+    // farm their way around it.
     const todayStart = new Date(new Date().getTime() + 2 * 3600_000).toISOString().slice(0, 10) + "T00:00:00.000Z";
     const { data: todayEvents } = await admin
       .from("league_xp_events")
@@ -108,9 +100,6 @@ export async function awardGameXp(opts: {
     const spent = new Map<string, number>();
     for (const e of todayEvents ?? []) spent.set(e.user_id, (spent.get(e.user_id) ?? 0) + e.amount);
 
-    // Grants may be negative (owner policy 2026-09-11: a loss costs XP).
-    // The daily anti-farming cap only limits EARNING — a loss always
-    // deducts so players can never farm their way around it.
     const grants: { userId: string; amount: number; reason: string }[] = [];
     const grantFor = (userId: string, xp: number, reason: string) => {
       if (xp === 0) return;
@@ -122,11 +111,12 @@ export async function awardGameXp(opts: {
       const amt = Math.min(xp, room);
       if (amt > 0) grants.push({ userId, amount: amt, reason });
     };
-    grantFor(g.white_player_id, whiteXp, draw ? "draw" : whiteWon ? "win" : "loss");
-    grantFor(g.black_player_id, blackXp, draw ? "draw" : blackWon ? "win" : "loss");
+    grantFor(g.white_player_id, whiteXp, `${gameType}_${whiteResult}`);
+    grantFor(g.black_player_id, blackXp, `${gameType}_${blackResult}`);
     if (grants.length === 0) return;
 
-    // Insert events; unique(user, kind, game) makes this idempotent.
+    // Insert events; unique(user, kind, game) makes this idempotent —
+    // XP is awarded exactly once per completed game.
     const { data: inserted, error: insertError } = await admin
       .from("league_xp_events")
       .insert(
@@ -136,7 +126,7 @@ export async function awardGameXp(opts: {
           game_id: opts.gameId,
           amount: gr.amount,
           reason: gr.reason,
-          week_start: week,
+          week_start: cycle, // month key (yyyy-mm-01) — column predates the monthly cycle
         }))
       )
       .select("user_id, amount");
@@ -153,44 +143,46 @@ export async function awardGameXp(opts: {
       try {
         await admin.rpc("check_referral_activation", {
           p_user_id: p,
-          p_action: isBattle ? "battle" : "game",
+          p_action: gameType === "cash" ? "battle" : "game",
         });
       } catch (actErr) {
         console.error("referral activation check failed:", actErr);
       }
     }
 
-    // Upsert memberships + add XP.
+    // Upsert memberships: monthly xp + lifetime_xp (never resets).
     for (const p of playerRows) {
       const grant = inserted.find((e) => e.user_id === p);
       if (!grant) continue;
       const { data: member } = await admin.from("league_xp_members").select("*").eq("user_id", p).maybeSingle();
-      // AUDIT FIX 2026-09-11 (owner reversal): weekly XP is NO LONGER
-      // floored at 0. A loss when you're already at 0 used to clamp back
-      // to 0 — indistinguishable on the leaderboard from a player who
-      // never played. Losses now genuinely go negative so the standings
-      // reflect what actually happened.
       if (!member) {
-        // Owner policy 2026-09-11 (reaffirmed): ALL new players join the
-        // Open League and climb through weekly promotion only. The weekly
-        // fair-share rebalance in the settle route absorbs Open's surplus
-        // upward, so Open stays the lobby without permanently overfilling.
         await admin.from("league_xp_members").insert({
           user_id: p,
-          tier: ENTRY_TIER,
+          tier: 1, // single leaderboard — column kept for history
           xp: grant.amount,
-          week_start: week,
+          week_start: cycle, // month key
+          lifetime_xp: grant.amount,
         });
-      } else if (member.week_start === week) {
+      } else if (member.week_start === cycle) {
         await admin
           .from("league_xp_members")
-          .update({ xp: (member.xp ?? 0) + grant.amount, updated_at: new Date().toISOString() })
+          .update({
+            xp: (member.xp ?? 0) + grant.amount,
+            lifetime_xp: (member.lifetime_xp ?? 0) + grant.amount,
+            updated_at: new Date().toISOString(),
+          })
           .eq("user_id", p);
       } else {
-        // Stale week (user played before this week's cron reset ran) — fresh cycle.
+        // Stale cycle (user played before this month's cron reset ran) —
+        // fresh monthly cycle; lifetime keeps accumulating.
         await admin
           .from("league_xp_members")
-          .update({ xp: grant.amount, week_start: week, updated_at: new Date().toISOString() })
+          .update({
+            xp: grant.amount,
+            week_start: cycle,
+            lifetime_xp: (member.lifetime_xp ?? 0) + grant.amount,
+            updated_at: new Date().toISOString(),
+          })
           .eq("user_id", p);
       }
     }
