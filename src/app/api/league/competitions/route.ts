@@ -65,11 +65,13 @@ export async function GET(_request: NextRequest) {
       const isCreator = user ? tournament.created_by === user.id : false;
 
       // Registered-player counts are hidden until it's time to start
-      // (owner decision 2026-09-25). Admins always see real counts.
+      // (owner decision 2026-09-25). Admins and the tournament creator
+      // always see real counts (owner rule 2026-09-26) — same policy as
+      // the tournament detail page.
       const started =
         ["active", "completed", "finished"].includes(tournament.status) ||
         (tournament.starts_at ? new Date(tournament.starts_at).getTime() <= Date.now() : false);
-      const showCount = started || isAdmin;
+      const showCount = started || isAdmin || isCreator;
 
       let canJoin = true;
       let reason: string | null = null;
