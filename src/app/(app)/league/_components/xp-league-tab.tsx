@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Swords, ChevronDown, Gift, Info, Crown, Trophy, CalendarClock } from "lucide-react";
+import { PauseCircle, Loader2, Swords, ChevronDown, Zap, Gift, ArrowDownCircle, TrendingUp, Trophy, Info, Crown, CalendarClock } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
 import { countryFlag } from "@/lib/geo/flags";
 import AdSlot from "@/components/ads/ad-slot";
@@ -33,9 +33,13 @@ interface StandingsResponse {
   enabled: boolean;
   level: "club" | "non_club";
   levelName: string;
+  tier?: { tier: number; name: string; emoji: string };
   myXp?: number;
   myRank?: number | null;
   lifetimeXp?: number;
+  promoteCount?: number;
+  demoteCount?: number;
+  tierCap?: number;
   cycleStart?: string;
   cycleEnd?: string;
   standings?: Standing[];
@@ -43,6 +47,8 @@ interface StandingsResponse {
   rewards?: number[];
   rewardsPaused?: boolean;
   topCount?: number;
+  tiers?: { tier: number; name: string; emoji: string }[];
+  tierRewards?: Record<number, number[]>;
 }
 
 /** XP display: whole numbers plain, halves keep one decimal (2.5). */
@@ -132,7 +138,7 @@ export default function XpLeagueTab() {
   if (!data) {
     return (
       <div className="card p-6 text-center">
-        <p className="text-sm text-ccb-muted">Sign in to see the XP leaderboard.</p>
+        <p className="text-sm text-ccb-muted">Sign in to see your league.</p>
       </div>
     );
   }
@@ -141,31 +147,31 @@ export default function XpLeagueTab() {
   const rewards = data.rewards ?? [];
   const topCount = data.topCount ?? 5;
   const isClub = data.level === "club";
-  const standings = data.standings ?? [];
 
-  // ── Not seeded yet: explainer ──────────────────────────────────────
+  // ── Not seeded yet: auto-entry explainer ────────────────────────────
   if (!data.seeded) {
     return (
       <div className="space-y-4">
         <div className="card p-6">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-ccb-primary/15 flex items-center justify-center shrink-0">
-              <Swords className="w-5 h-5 text-ccb-primary" />
+              <Zap className="w-5 h-5 text-ccb-primary" />
             </div>
             <div>
-              <h2 className="font-bold">Earn XP on the monthly leaderboard</h2>
+              <h2 className="font-bold">Earn your place in the XP Leagues</h2>
               <p className="text-xs text-ccb-muted mt-0.5">Free entry · fresh board every month · lifetime XP kept forever</p>
             </div>
           </div>
           <p className="text-sm text-ccb-muted mt-4 leading-relaxed">
-            Play any game — chess or draughts, free or cash — and you&apos;re on the monthly XP
-            leaderboard. Wins, draws and even cash-game losses all earn XP, and Club members
-            earn up to <b className="text-ccb-text">2x XP</b> on every result.
+            Play any game — chess or draughts, free or cash — and you start in the Open League.
+            Every game you finish earns XP, and Club members earn up to <b className="text-ccb-text">2x XP</b> on
+            every result. Climb the ladder all the way to the Premier League — rosters rebalance on the 1st of each month.
           </p>
           <Link href="/play" className="btn-primary w-full flex items-center justify-center gap-2 mt-5 py-3 rounded-xl text-sm font-bold">
             <Swords className="w-4 h-4" /> Play your first game
           </Link>
         </div>
+
         {rules && (
           <div className="card p-4">
             <h3 className="text-sm font-semibold mb-3">How much XP you&apos;ll earn</h3>
@@ -176,22 +182,75 @@ export default function XpLeagueTab() {
             </p>
           </div>
         )}
+
+        {data.tiers && (
+          <div className="card p-4">
+            <h3 className="text-sm font-semibold mb-3">The five leagues</h3>
+            <div className="space-y-2">
+              {data.tiers.map((t, i) => {
+                const payout = data.tierRewards?.[t.tier]?.[0] ?? 0;
+                return (
+                  <div key={t.tier} className={`flex items-center gap-3 p-2.5 rounded-lg ${i === data.tiers!.length - 1 ? "bg-ccb-primary/10" : "bg-ccb-muted/5"}`}>
+                    <span className="text-xl">{t.emoji}</span>
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold">{t.name}</div>
+                      <div className="text-[11px] text-ccb-muted">
+                        {["Everyone starts here", "Developing players", "Intermediate players", "Advanced players", "The platform's best"][i]}
+                      </div>
+                    </div>
+                    {payout > 0 && (
+                      <div className="text-right shrink-0">
+                        <div className="text-[9px] text-ccb-muted font-semibold uppercase tracking-wide">1st wins</div>
+                        <div className="text-[11px] font-bold text-ccb-primary">{currency.formatRewardMoney(payout)}</div>
+                      </div>
+                    )}
+                    {i < (data.tiers?.length ?? 5) - 1 && <TrendingUp className="w-3.5 h-3.5 text-ccb-muted/50" />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // ── Seeded: the monthly board ─────────────────────────────────────
+  // ── Seeded: my tier's monthly standings ────────────────────────────
+  const standings = data.standings ?? [];
+  const promote = data.promoteCount ?? 3;
+  const demote = data.demoteCount ?? 5;
+  const tierCap = data.tierCap ?? 1000;
+  const n = standings.length;
+  const demoteStart = demote > 0 && n > promote + demote ? n - demote + 1 : Infinity;
+
   return (
     <div className="space-y-4">
-      {/* Header: level + rank + monthly & lifetime XP + countdown */}
+      {/* Cash-rewards pause (owner 2026-09-24): replaces the figures
+          while the payout kill-switch is on; disappears automatically
+          the moment admin re-enables payouts. */}
+      {data.rewardsPaused && (
+        <div className="card p-4 border-amber-400/40">
+          <div className="flex items-start gap-3">
+            <PauseCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold">Cash rewards paused for now</h3>
+              <p className="text-xs text-ccb-muted mt-1 leading-relaxed">
+                Real cash rewards on the XP Leagues are on hold — we&apos;ll bring them back once things are stable.
+                Nothing else changes: every game still earns XP, and the leagues, rankings and monthly
+                rebalance keep running exactly as they are.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header: tier + my rank + monthly & lifetime XP + countdown */}
       <div className="card p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${isClub ? "bg-ccb-accent/15" : "bg-ccb-muted/10"}`}>
-              <Crown className={`w-5 h-5 ${isClub ? "text-ccb-accent" : "text-ccb-muted"}`} />
-            </span>
+            <span className="text-3xl shrink-0">{data.tier?.emoji}</span>
             <div className="min-w-0">
-              <h2 className="text-lg font-bold truncate">Monthly XP Leaderboard</h2>
+              <h2 className="text-lg font-bold truncate">{data.tier?.name}</h2>
               <p className="text-xs text-ccb-muted">
                 <span className={`font-semibold ${isClub ? "text-ccb-accent" : ""}`}>{data.levelName}</span>
                 {" · "}Rank: {data.myRank ? `#${data.myRank}` : "—"} ·{" "}
@@ -227,7 +286,9 @@ export default function XpLeagueTab() {
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-2.5">
             <Gift className="w-4 h-4 text-ccb-primary" />
-            <h3 className="text-sm font-semibold">Monthly rewards — top {topCount} of the month</h3>
+            <h3 className="text-sm font-semibold">
+              Monthly rewards — top {topCount} in the {data.tier?.name ?? "league"}
+            </h3>
           </div>
           <div className="grid grid-cols-5 gap-2">
             {rewards.map((r, i) => (
@@ -239,21 +300,6 @@ export default function XpLeagueTab() {
           </div>
         </div>
       )}
-      {data.rewardsPaused && (
-        <div className="card p-4 border-amber-400/40">
-          <div className="flex items-start gap-3">
-            <Trophy className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold">Cash rewards paused for now</h3>
-              <p className="text-xs text-ccb-muted mt-1 leading-relaxed">
-                Real cash rewards are on hold — we&apos;ll bring them back once things are stable.
-                Nothing else changes: every completed game still earns XP, the board still resets
-                on the 1st, and lifetime XP still accumulates.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Mid-feed inline ad */}
       <AdSlot placement="leagues_inline" />
@@ -262,10 +308,10 @@ export default function XpLeagueTab() {
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-ccb-muted/10">
           <h3 className="text-sm font-semibold">This month&apos;s standings</h3>
-          <div className="flex items-center gap-2 text-[10px] text-ccb-muted">
+          <div className="flex items-center gap-3 text-[10px] text-ccb-muted">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Reward zone</span>
             <span className="flex items-center gap-1"><Crown className="w-2.5 h-2.5 text-ccb-accent" /> Club member</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Reward zone
-            </span>
+            {demoteStart !== Infinity && <span className="flex items-center gap-1"><ArrowDownCircle className="w-2.5 h-2.5 text-red-400" /> Demotion</span>}
           </div>
         </div>
         {standings.length === 0 ? (
@@ -279,10 +325,11 @@ export default function XpLeagueTab() {
           <div className="divide-y divide-ccb-muted/5">
             {standings.map((s) => {
               const inReward = s.rank <= topCount;
+              const inDemotion = s.rank >= demoteStart;
               return (
                 <div
                   key={s.userId}
-                  className={`flex items-center gap-3 px-4 py-2.5 ${s.isMe ? "bg-ccb-primary/10" : ""} ${inReward ? "border-l-[3px] border-l-emerald-500" : ""}`}
+                  className={`flex items-center gap-3 px-4 py-2.5 ${s.isMe ? "bg-ccb-primary/10" : ""} ${inReward ? "border-l-[3px] border-l-emerald-500" : inDemotion ? "border-l-[3px] border-l-red-400" : ""}`}
                 >
                   <div className={`w-7 text-center text-sm font-bold ${s.rank === 1 ? "text-amber-400" : s.rank <= 3 ? "text-ccb-muted" : "text-ccb-muted/70"}`}>
                     {s.rank}
@@ -316,7 +363,7 @@ export default function XpLeagueTab() {
           className="w-full flex items-center justify-between px-4 py-3"
         >
           <span className="flex items-center gap-2 text-sm font-semibold">
-            <Info className="w-4 h-4 text-ccb-muted" /> How XP works
+            <Info className="w-4 h-4 text-ccb-muted" /> How the XP Leagues work
           </span>
           <ChevronDown className={`w-4 h-4 text-ccb-muted transition-transform ${showHow ? "rotate-180" : ""}`} />
         </button>
@@ -326,18 +373,20 @@ export default function XpLeagueTab() {
             <p>
               XP is awarded automatically when a game completes — exactly once per game, never for
               abandoned or cancelled games. Cash games are staked battles; even a cash-game loss
-              earns a little XP because you showed up.
+              earns a little XP because you showed up. Games against the computer never count.
             </p>
             <p>
               As a <b className="text-ccb-text">{data.levelName}</b> you earn the{" "}
               {isClub ? "Club" : "Non-Club"} rates above.
               {!isClub && <> Club members earn up to 2x XP — <Link href="/membership" className="text-ccb-primary font-semibold underline underline-offset-2">join the Club</Link> to level up your XP.</>}
+              To keep it fair you can earn at most <b className="text-ccb-text">{rules.dailyCap} XP per day</b>.
             </p>
             <p>
-              XP accumulates all month, the leaderboard resets on the 1st, and your{" "}
-              <b className="text-ccb-text">lifetime XP</b> is kept forever. To keep it fair you can
-              earn at most <b className="text-ccb-text">{rules.dailyCap} XP per day</b>, and games
-              against the computer never count.
+              The cycle is the calendar month: XP accumulates all month, the leaderboard resets on
+              the 1st, and your <b className="text-ccb-text">lifetime XP</b> is kept forever. Everyone joins the
+              Open League and climbs — Open → Amateur → Bronze → Knights Championship → Premier League.
+              Rosters <b className="text-ccb-text">auto-rebalance</b> at the monthly settle: when one league runs
+              short or overfull, players move in one wave so all five stay evenly filled.
             </p>
           </div>
         )}

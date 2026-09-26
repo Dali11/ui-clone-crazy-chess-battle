@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getLeagueXpConfig, currentMonthStart } from "@/lib/league-xp";
+import { getLeagueXpConfig, currentMonthStart, LEAGUE_TIERS } from "@/lib/league-xp";
 
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/league/xp/register — join the monthly XP leaderboard.
+ * POST /api/league/xp/register — join a league (or re-confirm your seat).
  *
- * Owner redesign 2026-09-26: there are no tiers anymore — joining
- * simply creates the player's leaderboard row. Everyone competes on
- * the same monthly board; the only player level (Non-Club / Club
- * Member) comes from membership, not from where you sit on the board.
+ * Owner policy 2026-09-11 (kept): all new players join the Open League
+ * (tier 1). Higher leagues are reached by promotion only. The ladder
+ * and fair-share rebalance are maintained — they now ride the monthly
+ * cycle (owner correction 2026-09-26).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -28,20 +28,21 @@ export async function POST(req: NextRequest) {
 
     const cycle = currentMonthStart();
     // AUDIT FIX 2026-09-11 (kept): only INSERT when the member row is
-    // absent — a re-register call must never wipe a player's XP.
+    // absent — a re-register call must never wipe a player's XP or tier.
     const { data: existing } = await admin
       .from("league_xp_members")
-      .select("user_id, xp, week_start, lifetime_xp")
+      .select("user_id, tier, xp, week_start, lifetime_xp")
       .eq("user_id", user.id)
       .maybeSingle();
     if (existing) {
-      return NextResponse.json({ success: true, member: existing, alreadyRegistered: true });
+      const info = LEAGUE_TIERS.find((t) => t.tier === existing.tier) ?? LEAGUE_TIERS[0];
+      return NextResponse.json({ success: true, member: existing, league: info, alreadyRegistered: true });
     }
 
     const { data: member, error } = await admin
       .from("league_xp_members")
       .insert({ user_id: user.id, tier: 1, xp: 0, week_start: cycle, lifetime_xp: 0 })
-      .select("user_id, xp, week_start, lifetime_xp")
+      .select("user_id, tier, xp, week_start, lifetime_xp")
       .single();
     if (error) {
       // Unique constraint hit by a concurrent insert — already joined.
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to register" }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, member, alreadyRegistered: false });
+    return NextResponse.json({ success: true, member, league: LEAGUE_TIERS[0], alreadyRegistered: false });
   } catch (err: any) {
     console.error("[league/register] unexpected error:", err?.message);
     return NextResponse.json({ error: "Failed to register" }, { status: 500 });

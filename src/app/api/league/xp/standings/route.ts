@@ -5,21 +5,23 @@ import {
   getLeagueXpConfig,
   currentMonthStart,
   nextMonthStart,
-  monthlyRewardArray,
+  monthlyRewardsForTier,
+  allMonthlyTierRewards,
   levelFor,
   XP_ALLOCATION,
-  PLAYER_LEVELS,
-  type PlayerLevel,
+  LEAGUE_TIERS,
 } from "@/lib/league-xp";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/league/xp/standings — the single monthly XP leaderboard
- * (owner redesign 2026-09-26). One cycle: the calendar month. The only
- * player level is Club membership, which changes the XP rates — there
- * are no tiers, no promotion/demotion zone. Lifetime XP is maintained
- * forever alongside the resetting monthly total.
+ * GET /api/league/xp/standings — the monthly XP leaderboard (owner
+ * redesign 2026-09-26, corrected same day: the five-tier ladder is
+ * MAINTAINED on the monthly cycle). The player sees their OWN tier's
+ * monthly board: standings, promotion/demotion zones, tier rewards.
+ * Club membership (Non-Club vs Club Member) sets the XP rates — shown
+ * in the allocation table and as crowns on the board. Lifetime XP is
+ * maintained forever alongside the resetting monthly total.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -30,41 +32,44 @@ export async function GET(req: NextRequest) {
     const admin = createAdminClient();
     const cfg = await getLeagueXpConfig(admin);
 
-    const { data: member } = await admin
-      .from("league_xp_members")
-      .select("user_id, xp, week_start, lifetime_xp")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
     const { data: profile } = await admin
       .from("profiles")
       .select("membership_until")
       .eq("id", user.id)
       .single();
+    const myLevel = levelFor(profile?.membership_until);
 
     const cycleStart = currentMonthStart();
     const cycleEnd = nextMonthStart();
     const rewardsOn = cfg.rewards_enabled && cfg.monthly_rewards_enabled !== false;
     const monthlyPaused = cfg.monthly_rewards_enabled === false;
+    const common = {
+      enabled: cfg.enabled,
+      level: myLevel,
+      levelName: myLevel === "club" ? "Club Member" : "Non-Club Member",
+      cycleStart,
+      cycleEnd,
+      xpRules: { allocation: XP_ALLOCATION, dailyCap: cfg.daily_xp_cap },
+      rewardsPaused: monthlyPaused,
+      topCount: cfg.monthly_top_count ?? 5,
+      tiers: LEAGUE_TIERS,
+    };
 
-    const levelOf = (membershipUntil?: string | null): PlayerLevel =>
-      levelFor(membershipUntil);
+    const { data: member } = await admin
+      .from("league_xp_members")
+      .select("user_id, tier, xp, week_start, lifetime_xp")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-    // Not seeded yet — player has never finished a PvP game.
+    // Not seeded yet — player has never joined / finished a PvP game.
     if (!member) {
       return NextResponse.json({
+        ...common,
         seeded: false,
-        enabled: cfg.enabled,
-        level: levelOf(profile?.membership_until),
-        levelName: levelOf(profile?.membership_until) === "club" ? PLAYER_LEVELS[1].name : PLAYER_LEVELS[0].name,
-        cycleStart,
-        cycleEnd,
-        xpRules: { allocation: XP_ALLOCATION, dailyCap: cfg.daily_xp_cap },
-        rewards: rewardsOn ? monthlyRewardArray(cfg) : [],
-        rewardsPaused: monthlyPaused,
-        topCount: cfg.monthly_top_count ?? 5,
       });
     }
+
+    const tierInfo = LEAGUE_TIERS.find((t) => t.tier === member.tier) ?? LEAGUE_TIERS[0];
 
     /**
      * Games finished inside the month, per user, PvP only (bots
@@ -104,10 +109,11 @@ export async function GET(req: NextRequest) {
     tally(chess);
     tally(draughts);
 
-    // Leaderboard = current cycle rows only (single board, all players).
+    // Leaderboard = my tier's current-cycle rows only.
     const { data: rows } = await admin
       .from("league_xp_members")
       .select("user_id, xp, lifetime_xp, profiles!inner(display_name, username, rating, country, membership_until)")
+      .eq("tier", member.tier)
       .eq("week_start", cycleStart)
       .order("xp", { ascending: false })
       .order("updated_at", { ascending: true })
@@ -117,7 +123,7 @@ export async function GET(req: NextRequest) {
       name: r.profiles?.display_name || r.profiles?.username || "Player",
       rating: r.profiles?.rating ?? 400,
       country: r.profiles?.country ?? null,
-      isClub: levelOf(r.profiles?.membership_until) === "club",
+      isClub: levelFor(r.profiles?.membership_until) === "club",
       games: counts.get(r.user_id) ?? 0,
       xp: Number(r.xp ?? 0),
       lifetimeXp: Number(r.lifetime_xp ?? 0),
@@ -126,23 +132,22 @@ export async function GET(req: NextRequest) {
     }));
 
     const myRow = standings.find((s: any) => s.isMe);
-    const myLevel = levelOf(profile?.membership_until);
 
     return NextResponse.json({
+      ...common,
       seeded: true,
-      enabled: cfg.enabled,
-      level: myLevel,
-      levelName: myLevel === "club" ? PLAYER_LEVELS[1].name : PLAYER_LEVELS[0].name,
+      tier: tierInfo,
       myXp: myRow ? myRow.xp : 0,
       myRank: myRow?.rank ?? null,
       lifetimeXp: Number(member.lifetime_xp ?? 0),
-      cycleStart,
-      cycleEnd,
+      promoteCount: cfg.promote_count,
+      demoteCount: cfg.demote_count,
+      tierCap: cfg.tier_cap ?? 1000,
+      registrationOpen: cfg.registration_open !== false,
       standings,
-      xpRules: { allocation: XP_ALLOCATION, dailyCap: cfg.daily_xp_cap },
-      rewards: rewardsOn ? monthlyRewardArray(cfg) : [],
-      rewardsPaused: monthlyPaused,
-      topCount: cfg.monthly_top_count ?? 5,
+      // My tier's monthly payout array; tierRewards covers all tiers.
+      rewards: rewardsOn ? monthlyRewardsForTier(cfg, member.tier) : [],
+      tierRewards: rewardsOn ? allMonthlyTierRewards(cfg) : {},
     });
   } catch (err) {
     console.error("league xp standings error:", err);

@@ -6,9 +6,12 @@ import { DEFAULT_CONFIGS } from "@/lib/platform-config";
  *
  * ONE cycle: the calendar month (CAT). XP accumulates all month long,
  * the leaderboard resets on the 1st, and a lifetime XP total is kept
- * forever. There are no league tiers anymore — the only player LEVEL
- * is Club membership (Non-Club Member vs Club Member, i.e. an active
- * paid membership), which sets the XP rates:
+ * forever. The five-tier league ladder (Open -> Premier) and the
+ * fair-share rebalance are MAINTAINED — they now ride the monthly
+ * cycle: per-tier monthly leaderboards, monthly payouts, promotion /
+ * demotion and rebalance at the monthly settle. Club membership
+ * (Non-Club Member vs Club Member, i.e. an active paid membership)
+ * sets the XP rates:
  *
  *   Result | Free game (non-club / club) | Cash game (non-club / club)
  *   Win    |  +3 / +6                    |  +5 / +10
@@ -114,20 +117,42 @@ export interface LeagueXpConfig {
   [key: string]: unknown;
 }
 
-export function rewardsArray(c: LeagueXpConfig): number[] {
-  return [c.reward_1_mwk, c.reward_2_mwk, c.reward_3_mwk, c.reward_4_mwk, c.reward_5_mwk];
-}
+/**
+ * The five-tier league ladder (maintained, owner correction 2026-09-26:
+ * tiers + rebalance stay; only the CYCLE moved from weekly to monthly).
+ * Placement is by the settle's promote/demote + fair-share rebalance.
+ */
+export const LEAGUE_TIERS = [
+  { tier: 1, name: "Open League", emoji: "🌱", ratingBand: "Everyone starts here" },
+  { tier: 2, name: "Amateur League", emoji: "🥉", ratingBand: "Developing players" },
+  { tier: 3, name: "Bronze League", emoji: "🎯", ratingBand: "Intermediate players" },
+  { tier: 4, name: "Knights Championship", emoji: "⚔️", ratingBand: "Advanced players" },
+  { tier: 5, name: "Premier League", emoji: "👑", ratingBand: "The platform's best" },
+] as const;
 
 /**
- * Monthly top-N payout array (MWK) for the single monthly leaderboard.
- * Falls back to the legacy flat rewards when no monthly array is set.
+ * Monthly top-N payout array (MWK) for a tier's monthly leaderboard.
+ * Falls back per-index to the legacy flat rewards when a tier's
+ * monthly array isn't configured.
  */
-export function monthlyRewardArray(c: LeagueXpConfig): number[] {
-  const arr = c.monthly_rewards_t1_mwk;
+export function monthlyRewardsForTier(c: LeagueXpConfig, tier: number): number[] {
+  const base = rewardsArray(c);
+  const arr = (c as Record<string, unknown>)[`monthly_rewards_t${tier}_mwk`];
   if (Array.isArray(arr) && arr.length > 0 && arr.every((v: unknown) => typeof v === "number" && v >= 0)) {
-    return arr as number[];
+    return (arr as number[]).map((v, i) => (typeof v === "number" && v >= 0 ? v : base[i] ?? 0));
   }
-  return rewardsArray(c);
+  return base;
+}
+
+/** Monthly rewards for every tier — keys are tier numbers. */
+export function allMonthlyTierRewards(c: LeagueXpConfig): Record<number, number[]> {
+  const out: Record<number, number[]> = {};
+  for (const t of LEAGUE_TIERS) out[t.tier] = monthlyRewardsForTier(c, t.tier);
+  return out;
+}
+
+export function rewardsArray(c: LeagueXpConfig): number[] {
+  return [c.reward_1_mwk, c.reward_2_mwk, c.reward_3_mwk, c.reward_4_mwk, c.reward_5_mwk];
 }
 
 let cachedConfig: { at: number; cfg: LeagueXpConfig } | null = null;

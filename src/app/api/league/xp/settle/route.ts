@@ -16,9 +16,9 @@ export const maxDuration = 60;
  * still in the closing month (owner redesign 2026-09-26: ONE cycle,
  * the calendar month).
  *
- * For the closing month, ranked by monthly XP desc:
- *   - top `monthly_top_count` (default 5) active players are credited
- *     their rank reward to the wallet (credit_wallet RPC, same path as
+ * For the closing month, per tier, ranked by monthly XP desc:
+ *   - top `monthly_top_count` (default 5) active players of each tier
+ *     are credited their tier's rank reward to the wallet (credit_wallet RPC, same path as
  *     battle payouts), in MWK from the monthly reward array
  *   - every player's monthly XP resets for the new cycle and a history
  *     snapshot is written (league_xp_monthly_history) with their
@@ -68,7 +68,7 @@ async function runSettlement() {
 
   const { data: members, error } = await admin
     .from("league_xp_members")
-    .select("user_id, xp, week_start, lifetime_xp, profiles!inner(display_name, username)")
+    .select("user_id, tier, xp, week_start, lifetime_xp, profiles!inner(display_name, username)")
     .order("xp", { ascending: false })
     .order("updated_at", { ascending: true })
     .limit(5000);
@@ -81,6 +81,7 @@ async function runSettlement() {
   const plan = planMonthlySettlement({
     members: (members ?? []).map((m: any) => ({
       user_id: m.user_id as string,
+      tier: m.tier as number,
       xp: Number(m.xp ?? 0),
       cycle_start: m.week_start as string,
       lifetime_xp: Number(m.lifetime_xp ?? 0),
@@ -168,7 +169,7 @@ async function runSettlement() {
   let snapshots = 0;
   const snapRows = plan.snapshots.map((s) => ({
     month: s.month,
-    tier: 1, // single leaderboard — column kept for history
+    tier: s.tier,
     user_id: s.user_id,
     display_name: s.display_name,
     final_rank: s.final_rank,
@@ -179,22 +180,43 @@ async function runSettlement() {
   for (let i = 0; i < snapRows.length; i += 500) {
     const { data: inserted, error: histErr } = await admin
       .from("league_xp_monthly_history")
-      .upsert(snapRows.slice(i, i + 500), { onConflict: "month,user_id", ignoreDuplicates: true })
+      .upsert(snapRows.slice(i, i + 500), { onConflict: "month,tier,user_id", ignoreDuplicates: true })
       .select("id");
     if (histErr) console.error("[league] monthly history bulk insert failed:", histErr.message);
     else snapshots += inserted?.length ?? 0;
   }
 
-  // ── 3) Reset every member for the new cycle (chunked bulk updates,
-  //       idempotent via the month-key guard). Lifetime XP untouched. ──
+  // ── 3) Reset every member for the new cycle with their POST-MOVE
+  //       tier (chunked bulk updates, idempotent via the month-key
+  //       guard). Lifetime XP untouched.
   const resetIso = new Date().toISOString();
-  const allIds = plan.resetUserIds;
-  for (let i = 0; i < allIds.length; i += 100) {
-    await admin
-      .from("league_xp_members")
-      .update({ xp: 0, week_start: newMonth, updated_at: resetIso })
-      .in("user_id", allIds.slice(i, i + 100))
-      .neq("week_start", newMonth);
+  for (const [groupTier, ids] of Object.entries(plan.updateGroups)) {
+    for (let i = 0; i < ids.length; i += 100) {
+      await admin
+        .from("league_xp_members")
+        .update({ xp: 0, week_start: newMonth, tier: Number(groupTier), updated_at: resetIso })
+        .in("user_id", ids.slice(i, i + 100))
+        .neq("week_start", newMonth);
+    }
+  }
+
+  // ── 4) Fair-share rebalance moves (tier only; XP/cycle untouched).
+  const rebalanceByDest = new Map<number, string[]>();
+  for (const mv of [...plan.rebalanceDown, ...plan.rebalanceUp]) {
+    const g = rebalanceByDest.get(mv.toTier) ?? [];
+    g.push(mv.userId);
+    rebalanceByDest.set(mv.toTier, g);
+  }
+  for (const [destTier, ids] of rebalanceByDest) {
+    for (let i = 0; i < ids.length; i += 100) {
+      await admin
+        .from("league_xp_members")
+        .update({ tier: destTier, updated_at: resetIso })
+        .in("user_id", ids.slice(i, i + 100));
+    }
+  }
+  if (plan.rebalanceUp.length || plan.rebalanceDown.length) {
+    console.log(`[league] fair-share rebalance: ${plan.rebalanceUp.length} up, ${plan.rebalanceDown.length} down`);
   }
 
   return NextResponse.json({
@@ -202,8 +224,10 @@ async function runSettlement() {
     closingMonth,
     newMonth,
     paid,
-    ranked: plan.totals.ranked,
-    activePlayers: plan.totals.activePlayers,
+    ranked: plan.snapshots.length,
+    moves: plan.totals.moves,
+    movesAuto: plan.movesAuto,
+    rebalance: { up: plan.rebalanceUp.length, down: plan.rebalanceDown.length },
     snapshots,
     payoutGate: plan.payOn ? "open" : (plan.unpaidReason ?? "closed"),
     heldForIntegrity: held,

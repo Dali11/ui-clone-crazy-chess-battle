@@ -1,37 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Crown, RefreshCw, Users, CalendarRange, Coins, UserPlus } from "lucide-react";
+import { Crown, RefreshCw, Users, CalendarRange, Coins, TrendingUp, UserPlus } from "lucide-react";
 
 /**
- * Leagues admin panel (owner redesign 2026-09-26): manage the monthly XP
- * championship from the admin menu. Shows the single leaderboard's
- * roster + club split, the current cycle window, and the management
- * toggles. Players never see this panel — switching payouts off only
- * stops wallet credits; the board, XP and rankings keep running.
+ * Leagues admin panel — manage the tiered monthly XP championship from
+ * the admin menu (owner correction 2026-09-26: the five-tier ladder and
+ * fair-share rebalance are maintained on the monthly cycle). Shows
+ * live roster vs fair-share targets and the management toggles
+ * (monthly payouts, promotion/relegation, registration). Players never
+ * see this panel — the league UI always displays configured reward
+ * amounts, so switching payouts off is invisible to players.
  */
 
 type Status = {
+  tiers: { tier: number; name: string; count: number; active: number; target: number }[];
+  total: number;
   monthStart: string;
   monthEnd: string;
   seasonStart: string | null;
-  roster: {
-    total: number;
-    activeThisMonth: number;
-    clubPlayers: number;
-    nonClubPlayers: number;
-  };
   flags: {
     monthlyPayouts: boolean;
     payoutsStart: string | null;
     rewardsEnabled: boolean;
+    monthlyPayoutsEnabled: boolean;
+    tierMoves: boolean;
     registrationOpen: boolean;
   };
 };
 
 type ToggleDef = {
   key: string;
-  flag: "monthlyPayouts" | "registrationOpen";
+  flag: "monthlyPayoutsEnabled" | "tierMoves" | "registrationOpen";
   icon: typeof Coins;
   title: string;
   help: string;
@@ -40,17 +40,24 @@ type ToggleDef = {
 const TOGGLES: ToggleDef[] = [
   {
     key: "monthly_rewards_enabled",
-    flag: "monthlyPayouts",
+    flag: "monthlyPayoutsEnabled",
     icon: Coins,
     title: "Monthly Cash Payouts",
-    help: "Pays the top monthly_top_count players of the month on the 1st, when the cycle closes. OFF = the leaderboard, XP and rankings keep running and reward amounts stay displayed to players — only wallet credits stop. Use to skip a partial month.",
+    help: "Pays each tier's top monthly_top_count players of the month when the cycle closes on the 1st. OFF = the leagues, XP and leaderboards keep running and reward amounts stay displayed to players — only wallet credits stop. Use to skip a partial month.",
+  },
+  {
+    key: "tier_moves_enabled",
+    flag: "tierMoves",
+    icon: TrendingUp,
+    title: "Standard Promotion / Relegation",
+    help: "Top N promote / bottom N demote at each monthly settle. OFF while building the player base — the fair-share rebalance is the only thing that moves players. Flip ON once Premier approaches the tier cap.",
   },
   {
     key: "registration_open",
     flag: "registrationOpen",
     icon: UserPlus,
     title: "Registration Open",
-    help: "Whether players can join the XP leaderboard. OFF blocks new joins; existing players are unaffected.",
+    help: "Whether players can join the leagues. OFF blocks new joins; existing players are unaffected.",
   },
 ];
 
@@ -89,7 +96,7 @@ export default function LeaguesAdminPanel() {
     }
   }, [status?.flags.payoutsStart]);
 
-  const saveConfigPatch = async (patch: Record<string, unknown>): Promise<boolean> => {
+  const saveConfigPatch = async (patch: Record<string, unknown>) => {
     const cfgRes = await fetch("/api/admin/platform-settings?section=leagues_xp", { cache: "no-store" });
     if (!cfgRes.ok) throw new Error("config fetch failed");
     const { config } = await cfgRes.json();
@@ -101,7 +108,6 @@ export default function LeaguesAdminPanel() {
     });
     if (!res.ok) throw new Error("save failed");
     await fetchStatus();
-    return true;
   };
 
   const toggle = async (key: string, value: boolean) => {
@@ -143,7 +149,7 @@ export default function LeaguesAdminPanel() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Crown className="w-5 h-5 text-ccb-primary" />
-          <h2 className="text-lg font-semibold text-ccb-text">Monthly XP Management</h2>
+          <h2 className="text-lg font-semibold text-ccb-text">League Management</h2>
           {toast && (
             <span className={`text-xs font-medium ${toast.ok ? "text-ccb-success" : "text-red-400"}`}>{toast.msg}</span>
           )}
@@ -159,19 +165,17 @@ export default function LeaguesAdminPanel() {
       {/* Status cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-xl border border-ccb-border bg-ccb-surface/40 p-3">
-          <p className="text-[10px] uppercase tracking-wide font-semibold text-ccb-muted flex items-center gap-1"><Users className="w-3 h-3" /> Leaderboard players</p>
-          <p className="text-xl font-bold text-ccb-text mt-1">{status?.roster.total ?? "—"}</p>
-          <p className="text-[10px] text-ccb-muted mt-0.5">{status?.roster.activeThisMonth ?? 0} active this month</p>
-        </div>
-        <div className="rounded-xl border border-ccb-border bg-ccb-surface/40 p-3">
-          <p className="text-[10px] uppercase tracking-wide font-semibold text-ccb-muted flex items-center gap-1"><Crown className="w-3 h-3" /> Club members</p>
-          <p className="text-xl font-bold text-ccb-text mt-1">{status?.roster.clubPlayers ?? "—"}</p>
-          <p className="text-[10px] text-ccb-muted mt-0.5">{status ? `${status.roster.nonClubPlayers} non-club` : "—"}</p>
+          <p className="text-[10px] uppercase tracking-wide font-semibold text-ccb-muted flex items-center gap-1"><Users className="w-3 h-3" /> Players in leagues</p>
+          <p className="text-xl font-bold text-ccb-text mt-1">{status?.total ?? "—"}</p>
         </div>
         <div className="rounded-xl border border-ccb-border bg-ccb-surface/40 p-3">
           <p className="text-[10px] uppercase tracking-wide font-semibold text-ccb-muted flex items-center gap-1"><CalendarRange className="w-3 h-3" /> Current cycle</p>
           <p className="text-sm font-bold text-ccb-text mt-1.5">{status ? `${fmtDate(status.monthStart)} → ${fmtDate(status.monthEnd)}` : "—"}</p>
           <p className="text-[10px] text-ccb-muted mt-0.5">Settle + reset on the 1st</p>
+        </div>
+        <div className="rounded-xl border border-ccb-border bg-ccb-surface/40 p-3">
+          <p className="text-[10px] uppercase tracking-wide font-semibold text-ccb-muted">Season start</p>
+          <p className="text-sm font-bold text-ccb-text mt-1.5">{fmtDate(status?.seasonStart ?? null)}</p>
         </div>
         <div className="rounded-xl border border-ccb-border bg-ccb-surface/40 p-3">
           <p className="text-[10px] uppercase tracking-wide font-semibold text-ccb-muted">Monthly payouts</p>
@@ -180,6 +184,36 @@ export default function LeaguesAdminPanel() {
           </p>
           {status?.flags.payoutsStart && (
             <p className="text-[10px] text-ccb-muted mt-0.5">Date gate {fmtDate(status.flags.payoutsStart)}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Roster table */}
+      <div className="rounded-xl border border-ccb-border bg-ccb-surface/40 overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-ccb-border bg-ccb-surface/60 text-[11px] uppercase tracking-wide font-semibold text-ccb-muted">
+          Rosters vs fair share
+        </div>
+        <div className="divide-y divide-ccb-border">
+          {(status?.tiers ?? []).map((t) => {
+            const drift = t.count - t.target;
+            return (
+              <div key={t.tier} className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-sm font-medium text-ccb-text">Tier {t.tier} · {t.name}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold tabular-nums text-ccb-text">{t.count}</span>
+                  <span className="text-[10px] text-ccb-muted">/ {t.target}</span>
+                  <span className={`text-[10px] font-medium ${Math.abs(drift) < 5 ? "text-ccb-success" : "text-amber-400"}`}>
+                    {drift === 0 ? "even" : drift > 0 ? `+${drift} over` : `${drift} short`}
+                  </span>
+                  <span className="text-[10px] text-ccb-muted">{t.active} active this month</span>
+                </div>
+              </div>
+            );
+          })}
+          {status && (
+            <div className="px-4 py-2 text-[10px] text-ccb-muted">
+              Rebalance fires at the monthly settle when any league drifts 5+ from its fair share (total ÷ 5).
+            </div>
           )}
         </div>
       </div>
@@ -219,9 +253,9 @@ export default function LeaguesAdminPanel() {
         </div>
       </div>
 
-      {/* Payouts start gate — editable (owner request: manageable from
-          this panel, not hardcoded). Now month-granular: payouts begin
-          with the first cycle STARTING on/after this date. */}
+      {/* Payouts start gate — EDITABLE (owner request: the date must be
+          manageable from this panel, not hardcoded). Month-granular now:
+          payouts begin with the first cycle STARTING on/after this date. */}
       <div className="rounded-xl border border-ccb-border bg-ccb-surface/40 overflow-hidden">
         <div className="px-4 py-2.5 border-b border-ccb-border bg-ccb-surface/60 text-[11px] uppercase tracking-wide font-semibold text-ccb-muted">
           Payouts start gate
@@ -230,10 +264,9 @@ export default function LeaguesAdminPanel() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-ccb-text">First month that pays out</p>
             <p className="text-[10px] text-ccb-muted mt-0.5 leading-relaxed">
-              Payouts begin with the first cycle <b>starting</b> on or after this date — earlier
-              months settle invisibly (leaderboard, XP and rankings keep running; players keep
-              seeing reward amounts, nothing is paid). Clear it and every closed month pays, as
-              long as the Monthly Cash Payouts switch above is ON.
+              Payouts begin with the first cycle <b>starting</b> on or after this date — earlier months settle
+              invisibly (leagues, XP and leaderboards keep running; players keep seeing reward amounts, nothing is paid).
+              Clear it and every closed month pays, as long as the Monthly Cash Payouts switch above is ON.
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">

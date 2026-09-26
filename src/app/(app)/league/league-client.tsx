@@ -7,11 +7,12 @@ import LeagueOverviewTab from './_components/league-overview-tab';
 import AdSlot from '@/components/ads/ad-slot';
 
 /**
- * Leagues — the monthly XP championship is the one and only league
- * system (owner redesign 2026-09-26): ONE cycle, the calendar month.
- * XP accumulates all month, the board resets on the 1st, and lifetime
- * XP is kept forever. The only player level is Club membership
- * (Non-Club vs Club Member), which sets the XP rates.
+ * Leagues — the tiered XP championship is the one and only league
+ * system (owner redesign 2026-09-26, corrected same day): the
+ * five-tier ladder and fair-share rebalance are MAINTAINED, now on
+ * the monthly cycle. XP accumulates all month, boards reset on the
+ * 1st, lifetime XP is kept forever, and Club membership sets the
+ * XP rates.
  */
 export default function CompetePage() {
   const [tab, setTab] = useState<"mine" | "overview">("mine");
@@ -22,7 +23,7 @@ export default function CompetePage() {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold">Leagues</h1>
         <p className="text-sm text-ccb-muted mt-1">
-          Play games, earn XP — monthly leaderboard, lifetime XP kept
+          Play games, earn XP, climb your league — monthly cycle, lifetime XP kept
         </p>
       </div>
 
@@ -34,7 +35,7 @@ export default function CompetePage() {
             tab === "mine" ? "bg-ccb-primary text-ccb-primary-foreground" : "text-ccb-muted hover:text-ccb-text"
           }`}
         >
-          <Zap className="w-4 h-4" /> Leaderboard
+          <Zap className="w-4 h-4" /> My League
         </button>
         <button
           onClick={() => setTab("overview")}
