@@ -1493,7 +1493,7 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
       <>
         {/* Owner rule (2026-09-25): screenshots / screen recording not
             allowed on the game page — spectators too. */}
-        <ScreenshotGuard />
+        <ScreenshotGuard watermark={`Spectator · ID ${(currentUserId || '').slice(0, 8)} · G${gameId.slice(0, 8)}`} />
         <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 lg:-mx-8 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
           {boardColumn(topPlayer, bottomPlayer, false)}
           {renderDesktopSidebar()}
@@ -1568,8 +1568,10 @@ export default function GameClient({ gameId, initialGame, currentUserId, isSpect
     <>
       {/* Owner rule (2026-09-25): screenshots / screen recording not
           allowed on the game page — hides the game when the page loses
-          focus or visibility, blocks context menus and print. */}
-      <ScreenshotGuard />
+          focus or visibility, blocks context menus and print, and
+          watermarks the screen with the viewer's identity so any capture
+          identifies the account that took it. */}
+      <ScreenshotGuard watermark={`${myData.name} · ID ${(currentUserId || '').slice(0, 8)} · G${gameId.slice(0, 8)}`} />
       <div className="game-viewport -my-4 sm:-my-6 -mx-4 sm:-mx-6 lg:-mx-8 flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-4">
         {boardColumn(playerData, myData, true)}
         {renderDesktopSidebar()}
