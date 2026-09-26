@@ -541,6 +541,19 @@ async function handleTournamentCron(req: NextRequest) {
 
               const advancers = getGroupAdvancers(standings as any, 2);
 
+              // Group stage is over: non-advancers are eliminated — releases
+              // them from the app-wide active-tournament redirect (093).
+              const nonAdvancers = (allParts || [])
+                .map((p: any) => p.player_id as string)
+                .filter((id: string) => !advancers.includes(id));
+              if (nonAdvancers.length > 0) {
+                await admin
+                  .from("tournament_participants")
+                  .update({ eliminated: true })
+                  .eq("tournament_id", tournament.id)
+                  .in("player_id", nonAdvancers);
+              }
+
               // Fetch ratings for the advancers
               const { data: advancerProfiles } = await admin
                 .from("profiles")
@@ -599,6 +612,18 @@ async function handleTournamentCron(req: NextRequest) {
                 thirdPlaceIndex = koPairings.length;
                 koPairings.push({ white: losers[0], black: losers[1] } as any);
               }
+
+              // Knockout losses eliminate: releases losers from the
+              // app-wide active-tournament redirect (migration 093).
+              // 3rd-place players still get pulled to their game — the
+              // redirect's game lookup ignores this flag.
+              if (losers.length > 0) {
+                await admin
+                  .from("tournament_participants")
+                  .update({ eliminated: true })
+                  .eq("tournament_id", tournament.id)
+                  .in("player_id", losers);
+              }
             }
           } else {
             // ── Pure knockout advancement ──
@@ -650,6 +675,18 @@ async function handleTournamentCron(req: NextRequest) {
             if (winners.length + byes.length === 2 && losers.length === 2) {
               thirdPlaceIndex = koPairings.length;
               koPairings.push({ white: losers[0], black: losers[1] } as any);
+            }
+
+            // Knockout losses eliminate: releases losers from the
+            // app-wide active-tournament redirect (migration 093).
+            // 3rd-place players still get pulled to their game — the
+            // redirect's game lookup ignores this flag.
+            if (losers.length > 0) {
+              await admin
+                .from("tournament_participants")
+                .update({ eliminated: true })
+                .eq("tournament_id", tournament.id)
+                .in("player_id", losers);
             }
           }
 

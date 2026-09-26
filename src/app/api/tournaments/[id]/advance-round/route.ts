@@ -138,8 +138,28 @@ export async function POST(
         }
       }
 
-      // Check if we're transitioning from group stage to knockout
+      // Mark knockout losers as eliminated (column added 2026-09-26,
+      // migration 093). This is what releases them from the app-wide
+      // active-tournament redirect once their run ends — and 3rd-place
+      // match players are unaffected: the redirect's game lookup finds
+      // their waiting/playing game regardless of this flag.
+      // Group-stage losses do NOT eliminate (players keep playing
+      // other group games) — only losses in true knockout rounds do.
       const groupSchedule = tournament.group_schedule;
+      const isGroupStageRound = !!(
+        groupSchedule &&
+        Array.isArray(groupSchedule) &&
+        tournament.current_round <= groupSchedule.length
+      );
+      if (losers.length > 0 && !isGroupStageRound) {
+        await admin
+          .from("tournament_participants")
+          .update({ eliminated: true })
+          .eq("tournament_id", tournamentId)
+          .in("player_id", losers);
+      }
+
+      // Check if we're transitioning from group stage to knockout
       if (groupSchedule && Array.isArray(groupSchedule)) {
         const numGroupRounds = groupSchedule.length;
 
@@ -232,6 +252,20 @@ export async function POST(
             }));
 
             const advancers = getGroupAdvancers(standings as any, 2);
+
+            // Group stage is over: non-advancers are eliminated — this
+            // releases them from the app-wide active-tournament redirect.
+            const nonAdvancers = (allParticipants || [])
+              .map((p: any) => p.player_id as string)
+              .filter((id: string) => !advancers.includes(id));
+            if (nonAdvancers.length > 0) {
+              await admin
+                .from("tournament_participants")
+                .update({ eliminated: true })
+                .eq("tournament_id", tournamentId)
+                .in("player_id", nonAdvancers);
+            }
+
             const seedPlayers = advancers.map((id, i) => {
               const p = allParticipants?.find((pp) => pp.player_id === id);
               return { player_id: id, rating: 1200, seed: i + 1 };

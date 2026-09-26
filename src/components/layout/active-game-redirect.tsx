@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Swords, Trophy, Zap, Users } from "lucide-react";
+import { battleHasPriority } from "@/lib/active-event-priority";
 
 /**
  * Mounted globally in the app layout. If the user has ANY active game
@@ -11,9 +12,11 @@ import { Swords, Trophy, Zap, Users } from "lucide-react";
  *
  * Like chess.com: the only way to leave the game is to resign or let it
  * end naturally (checkmate, timeout, draw). Simply navigating away won't
- * free you — you'll be pulled right back.
+ * free you — you'll be pulled right back, on every poll.
  *
- * Skip on /game/ pages (they're already at the board).
+ * YIELDS to live tournaments and battles (owner rule 2026-09-26): while
+ * a higher-priority watcher has the player bound, this one stays quiet
+ * so the two never fight over navigation.
  */
 export default function ActiveGameRedirect() {
   const pathname = usePathname();
@@ -21,7 +24,7 @@ export default function ActiveGameRedirect() {
   const [redirecting, setRedirecting] = useState(false);
   const [gameType, setGameType] = useState<string>("free");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastRedirectedGameId = useRef<string | null>(null);
+  const lastPushRef = useRef(0);
 
   // Skip on game pages and the live/spectator pages — they're already at the board
   const skip = pathname.startsWith("/game/") || pathname.startsWith("/live/");
@@ -33,25 +36,48 @@ export default function ActiveGameRedirect() {
     }
 
     const check = async () => {
+      let target: string | null = null;
       try {
         const res = await fetch("/api/game/active");
         if (!res.ok) return;
         const data = await res.json();
 
-        if (
-          data.active &&
-          data.gameId &&
-          lastRedirectedGameId.current !== data.gameId
-        ) {
-          lastRedirectedGameId.current = data.gameId;
+        if (data.active && data.gameId) {
           setGameType(data.gameType || "free");
-          setRedirecting(true);
-          router.push(`/game/${data.gameId}`);
+          target = `/game/${data.gameId}`;
         }
       } catch {}
+
+      if (!target) {
+        setRedirecting(false);
+        return;
+      }
+
+      // Already at the game — quiet.
+      if (pathname === target) {
+        setRedirecting(false);
+        return;
+      }
+
+      // Live tournament or staked battle wins — this watcher yields.
+      if (battleHasPriority()) {
+        setRedirecting(false);
+        return;
+      }
+
+      // Somewhere they shouldn't be — pull them back. Re-asserts on
+      // every poll; short settle window avoids double-pushes.
+      setRedirecting(true);
+      const now = Date.now();
+      if (now - lastPushRef.current > 2500) {
+        lastPushRef.current = now;
+        router.push(target);
+      }
     };
 
-    // Initial check after 1.5s (lets the page settle), then poll every 5s
+    // Initial check after 1.5s (lets the page settle), then poll every 5s.
+    // The effect re-runs on navigation, so leaving the board page to
+    // anywhere else re-triggers the check immediately.
     const initialTimer = setTimeout(check, 1500);
     intervalRef.current = setInterval(check, 5000);
 
@@ -60,13 +86,6 @@ export default function ActiveGameRedirect() {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [pathname, skip, router]);
-
-  // Reset the redirected game ID when we leave a game page (so we can redirect again)
-  useEffect(() => {
-    if (skip) {
-      lastRedirectedGameId.current = null;
-    }
-  }, [skip]);
 
   // Render-time guard (not just the effect): as soon as the pathname is
   // actually on the game page, hide immediately — don't wait for a state
