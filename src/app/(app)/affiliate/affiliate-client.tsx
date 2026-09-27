@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Gift, Users, CheckCircle, Clock, Copy, Check, Share2, Send,
   Wallet, ChevronRight, TrendingUp, Crown, UserPlus, Coins, Sparkles,
+  ChevronDown, Calculator as CalcIcon,
 } from "lucide-react";
 import { formatUsd } from "@/lib/geo/format";
 import { useCurrency } from "@/hooks/use-currency";
@@ -66,11 +67,15 @@ export default function AffiliateClient({
   referrals,
 }: AffiliateClientProps) {
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  const [activeFriends, setActiveFriends] = useState(10);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
   const { formatWallet, formatMoney: fmtCurrency } = useCurrency();
 
   const referralLink = `${baseUrl}/signup?ref=${refCode}`;
   const commissionPct = Math.round(commissionRate * 100);
   const membershipEarn = formatUsd(membershipPriceUsd * commissionRate);
+  const perFriendMonthly = membershipPriceUsd * commissionRate;
+  const estimateMonthly = formatUsd(activeFriends * perFriendMonthly);
 
   const copy = (what: "code" | "link") => {
     navigator.clipboard.writeText(what === "code" ? refCode : referralLink);
@@ -80,6 +85,7 @@ export default function AffiliateClient({
 
   const shareText = `Join me on Crazy Chess Battles — play chess, compete in leagues & tournaments, and battle for cash!`;
   const waShare = `https://wa.me/?text=${encodeURIComponent(`${shareText} ${referralLink}`)}`;
+  const nudgeShare = `https://wa.me/?text=${encodeURIComponent(`Come play your first cash battle on Crazy Chess Battles 🏆 Grab a membership and let\u2019s go! ${referralLink}`)}`;
 
   const handleShare = async () => {
     if (navigator.share) {
@@ -189,7 +195,7 @@ export default function AffiliateClient({
                 onClick={handleShare}
                 className="flex-1 h-11 rounded-xl bg-ccb-surface border border-ccb-border text-sm font-semibold active:scale-95 transition-transform flex items-center justify-center gap-2"
               >
-                <Share2 className="w-4 h-4" /> More options
+                <Share2 className="w-4 h-4" /> Share link
               </button>
               <button
                 onClick={() => copy("code")}
@@ -209,6 +215,34 @@ export default function AffiliateClient({
             </div>
             <p className="text-[11px] text-ccb-muted">
               Tip: friends must sign up through your link — their account is linked to you automatically, once.
+            </p>
+          </div>
+
+          {/* EARNINGS CALCULATOR */}
+          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted flex items-center gap-1.5">
+                <CalcIcon className="w-3.5 h-3.5" /> Earnings calculator
+              </label>
+              <span className="text-[10px] text-ccb-muted">memberships alone</span>
+            </div>
+            <div className="flex items-baseline justify-between mb-1">
+              <p className="text-sm font-semibold">
+                {activeFriends} active {activeFriends === 1 ? "friend" : "friends"}
+              </p>
+              <p className="text-xl sm:text-2xl font-extrabold text-ccb-success">≈ {estimateMonthly}/mo</p>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={50}
+              value={activeFriends}
+              onChange={(e) => setActiveFriends(Number(e.target.value))}
+              className="w-full accent-ccb-primary cursor-pointer"
+              aria-label="Number of active friends"
+            />
+            <p className="text-[11px] text-ccb-muted mt-2">
+              Every friend pays you {membershipEarn} per month they hold a membership — plus {commissionPct}% of every battle fee, tournament entry and ad they buy.
             </p>
           </div>
         </div>
@@ -312,6 +346,23 @@ export default function AffiliateClient({
             <p className="text-xs text-ccb-muted mt-1 max-w-xs mx-auto">
               Share your link — every friend who joins earns you {commissionPct}% of their fees, forever.
             </p>
+            <div className="flex flex-wrap justify-center gap-2 mt-4">
+              <a
+                href={waShare}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-9 px-4 rounded-xl bg-[#25D366]/15 border border-[#25D366]/40 text-[#25D366] text-xs font-bold flex items-center gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" /> WhatsApp
+              </a>
+              <button
+                onClick={() => copy("link")}
+                className="h-9 px-4 rounded-xl bg-ccb-primary text-white text-xs font-bold flex items-center gap-1.5"
+              >
+                {copied === "link" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied === "link" ? "Copied" : "Copy link"}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 gap-2">
@@ -334,9 +385,9 @@ export default function AffiliateClient({
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold truncate">{name}</p>
                       {isActive ? (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-ccb-success/15 text-ccb-success shrink-0">ACTIVE</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-success/15 text-ccb-success shrink-0">ACTIVE</span>
                       ) : (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-ccb-muted/10 text-ccb-muted shrink-0">PENDING</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ccb-muted/10 text-ccb-muted shrink-0">PENDING</span>
                       )}
                     </div>
                     <p className="text-[10px] text-ccb-muted mt-0.5 flex items-center gap-1">
@@ -358,17 +409,68 @@ export default function AffiliateClient({
                     </p>
                   </div>
 
-                  {isActive && ref.commission_amount > 0 && (
+                  {isActive && ref.commission_amount > 0 ? (
                     <div className="text-right shrink-0">
                       <p className="text-xs font-bold text-ccb-success">+{fmtCurrency(ref.commission_amount)}</p>
-                      <p className="text-[9px] text-ccb-muted">commission</p>
+                      <p className="text-[10px] text-ccb-muted">commission</p>
                     </div>
-                  )}
+                  ) : !isActive ? (
+                    <a
+                      href={nudgeShare}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-ccb-primary/15 border border-ccb-primary/30 text-ccb-primary flex items-center gap-1 active:scale-95 transition-transform"
+                    >
+                      <Send className="w-3 h-3" /> Nudge
+                    </a>
+                  ) : null}
                 </div>
               );
             })}
           </div>
         )}
+      </div>
+
+      {/* FAQ */}
+      <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 sm:p-6">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-4">Questions, answered</h3>
+        <div className="divide-y divide-ccb-border">
+          {[
+            {
+              q: "When do I get paid?",
+              a: "The moment your friend pays — commission lands in your wallet automatically, every time. Withdraw from your wallet anytime.",
+            },
+            {
+              q: "Why is my friend still pending?",
+              a: "A referral activates once your friend makes their first paid move — buying a membership. Until then they show as pending, and a quick nudge helps.",
+            },
+            {
+              q: "What if my friend already has an account?",
+              a: "Referral links only work for brand-new signups. Each player can only ever be linked to one referrer.",
+            },
+            {
+              q: "Does my friend pay more through my link?",
+              a: `No — the price is exactly the same. Your ${commissionPct}% comes out of the platform's share, never theirs.`,
+            },
+            {
+              q: "Can I refer myself?",
+              a: "No — self-referrals are blocked, and every commission is tied to a real payment.",
+            },
+          ].map((item, i) => (
+            <div key={i}>
+              <button
+                onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                className="w-full flex items-center justify-between gap-3 py-3 text-left"
+              >
+                <span className="text-sm font-semibold">{item.q}</span>
+                <ChevronDown
+                  className={"w-4 h-4 text-ccb-muted shrink-0 transition-transform " + (openFaq === i ? "rotate-180" : "")}
+                />
+              </button>
+              {openFaq === i && <p className="text-xs text-ccb-muted pb-3 pr-6">{item.a}</p>}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

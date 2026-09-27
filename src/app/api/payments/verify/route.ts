@@ -7,6 +7,7 @@ import { notifyAdminsMoneyEvent } from "@/lib/admin-alerts";
 import { checkDepositStatus, mapPawaPayStatus } from "@/lib/payments/pawapay";
 import { describeDepositFailure } from "@/lib/payments/failure-reasons";
 
+import { processAffiliateCommission } from "@/lib/affiliate/commission";
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -150,10 +151,7 @@ export async function POST(req: NextRequest) {
         try {
           const affCfg = await getPlatformConfig(admin, "affiliate");
           if (affCfg.enabled) {
-            await admin.rpc("process_affiliate_commission", {
-              p_user_id: deposit.user_id,
-              p_amount: Math.round(deposit.amount),
-            });
+            await processAffiliateCommission(admin, deposit.user_id, deposit.amount);
           }
         } catch (affErr) {
           console.error("affiliate commission failed:", affErr);
@@ -299,10 +297,7 @@ export async function POST(req: NextRequest) {
           const { getPlatformConfig } = await import("@/lib/platform-config");
           const affCfg = await getPlatformConfig(admin, "affiliate");
           if (affCfg.enabled) {
-            await admin.rpc("process_affiliate_commission", {
-              p_user_id: deposit.user_id,
-              p_amount: Math.round(deposit.amount),
-            });
+            await processAffiliateCommission(admin, deposit.user_id, deposit.amount);
           }
         } catch (affErr) {
           console.error("affiliate commission failed:", affErr);

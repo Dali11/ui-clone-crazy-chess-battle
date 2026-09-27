@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyAdminsMoneyEvent } from "@/lib/admin-alerts";
 
+import { processAffiliateCommission } from "@/lib/affiliate/commission";
 // PayChangu signs webhooks with HMAC-SHA256 of the raw JSON body, using the
 // webhook secret from the dashboard. The digest is sent in the "Signature" header.
 function isValidSignature(rawBody: string, signatureHeader: string | null, secret: string): boolean {
@@ -141,10 +142,7 @@ export async function POST(req: NextRequest) {
         try {
           const affCfg = await getPlatformConfig(admin, "affiliate");
           if (affCfg.enabled) {
-            await admin.rpc("process_affiliate_commission", {
-              p_user_id: deposit.user_id,
-              p_amount: Math.round(deposit.amount),
-            });
+            await processAffiliateCommission(admin, deposit.user_id, deposit.amount);
           }
         } catch (affErr) {
           console.error("affiliate commission failed:", affErr);

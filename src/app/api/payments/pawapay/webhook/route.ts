@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { mapPawaPayStatus, type PawaPayCallback } from "@/lib/payments/pawapay";
 import { notifyAdminsMoneyEvent } from "@/lib/admin-alerts";
 
+import { processAffiliateCommission } from "@/lib/affiliate/commission";
 /**
  * PawaPay callback handler.
  * PawaPay sends POST requests to this endpoint when a deposit or payout
@@ -136,10 +137,7 @@ export async function POST(req: NextRequest) {
           try {
             const affCfg = await getPlatformConfig(admin, "affiliate");
             if (affCfg.enabled) {
-              await admin.rpc("process_affiliate_commission", {
-                p_user_id: deposit.user_id,
-                p_amount: Math.round(deposit.amount),
-              });
+              await processAffiliateCommission(admin, deposit.user_id, deposit.amount);
             }
           } catch (affErr) {
             console.error("affiliate commission failed:", affErr);
