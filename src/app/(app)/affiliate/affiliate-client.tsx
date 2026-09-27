@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import {
-  Gift, Users, CheckCircle, Clock, Copy, Check, Share2,
-  Wallet, ChevronRight, Info, TrendingUp, Crown,
+  Gift, Users, CheckCircle, Clock, Copy, Check, Share2, Send,
+  Wallet, ChevronRight, TrendingUp, Crown, UserPlus, Coins, Sparkles,
 } from "lucide-react";
 import { formatUsd } from "@/lib/geo/format";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Referral {
   id: string;
@@ -44,8 +45,15 @@ const ACTIVATION_LABELS: Record<string, string> = {
   fee_share: "Generating platform fees",
 };
 
-import { useCurrency } from "@/hooks/use-currency";
-
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+/** Deterministic "19 Sep" formatting (UTC, fixed month names) — no hydration drift. */
+function shortDate(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
+  const day = d.getUTCDate();
+  const month = MONTHS[d.getUTCMonth()] || "";
+  return `${day} ${month}`;
+}
 
 export default function AffiliateClient({
   affiliateEnabled,
@@ -57,47 +65,41 @@ export default function AffiliateClient({
   commissionRate,
   referrals,
 }: AffiliateClientProps) {
-  const [copied, setCopied] = useState(false);
-  const [copyLink, setCopyLink] = useState(false);
+  const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const { formatWallet, formatMoney: fmtCurrency } = useCurrency();
 
   const referralLink = `${baseUrl}/signup?ref=${refCode}`;
   const commissionPct = Math.round(commissionRate * 100);
+  const membershipEarn = formatUsd(membershipPriceUsd * commissionRate);
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(refCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copy = (what: "code" | "link") => {
+    navigator.clipboard.writeText(what === "code" ? refCode : referralLink);
+    setCopied(what);
+    setTimeout(() => setCopied(null), 2000);
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(referralLink);
-    setCopyLink(true);
-    setTimeout(() => setCopyLink(false), 2000);
-  };
+  const shareText = `Join me on Crazy Chess Battles — play chess, compete in leagues & tournaments, and battle for cash!`;
+  const waShare = `https://wa.me/?text=${encodeURIComponent(`${shareText} ${referralLink}`)}`;
 
   const handleShare = async () => {
-    const shareText = "Join me on Crazy Chess Battles — play chess, compete in leagues & tournaments, and battle for cash!";
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: "Crazy Chess Battles",
-          text: shareText,
-          url: referralLink,
-        });
+        await navigator.share({ title: "Crazy Chess Battles", text: shareText, url: referralLink });
+        return;
       } catch {}
-    } else {
-      handleCopyLink();
     }
+    copy("link");
   };
 
   // Stats
   const totalRefs = referrals.length;
-  const activatedRefs = referrals.filter(r => r.status === "activated" || r.status === "rewarded" || !!r.activated_at).length;
+  const activatedRefs = referrals.filter(
+    (r) => r.status === "activated" || r.status === "rewarded" || !!r.activated_at
+  ).length;
   const pendingRefs = totalRefs - activatedRefs;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 max-w-2xl lg:max-w-5xl mx-auto space-y-4 pb-8">
+    <div className="px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-4 sm:space-y-6 pb-10 animate-fade-in">
       {/* Paused notice — tracking still works, payouts wait for the switch */}
       {!affiliateEnabled && (
         <div className="rounded-xl border border-ccb-accent/30 bg-ccb-accent/10 p-4 text-center">
@@ -108,221 +110,265 @@ export default function AffiliateClient({
         </div>
       )}
 
-      {/* HERO — compact for mobile */}
-      <div className="bg-gradient-to-br from-ccb-primary/15 via-ccb-card to-ccb-card border border-ccb-primary/20 rounded-2xl p-5">
-        <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-10 h-10 rounded-xl bg-ccb-primary/20 border border-ccb-primary/30 flex items-center justify-center shrink-0">
-            <Gift className="w-5 h-5 text-ccb-primary" />
+      {/* DESKTOP: two-column. Left = hero + link. Right = stats. Mobile: stacked. */}
+      <div className="grid lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+        {/* ================= LEFT COLUMN ================= */}
+        <div className="lg:col-span-7 space-y-4 sm:space-y-6">
+          {/* HERO */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-ccb-primary/25 via-ccb-card to-ccb-card border border-ccb-primary/30 rounded-2xl p-5 sm:p-7">
+            <div className="absolute -right-10 -top-10 w-40 h-40 bg-ccb-primary/20 rounded-full blur-3xl" aria-hidden />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-ccb-primary/25 border border-ccb-primary/40 flex items-center justify-center shrink-0">
+                  <Gift className="w-4 h-4 text-ccb-primary" />
+                </div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-ccb-muted">Affiliate Program</p>
+              </div>
+
+              <h1 className="text-2xl sm:text-4xl font-extrabold leading-tight">
+                Earn <span className="text-ccb-primary">{commissionPct}%</span> of every fee<br className="hidden sm:block" /> your friends generate
+              </h1>
+              <p className="text-sm sm:text-base text-ccb-muted mt-2 max-w-lg">
+                Every cash battle they play, every paid tournament they enter, every membership renewal — paid to your wallet, forever. No limit.
+              </p>
+
+              {/* Commission showcase — membership is a single $10/mo USD plan
+                  (owner decision 2026-09-15), no yearly tier. Fixed dollar
+                  price shown to every player, same as the league ladder. */}
+              <div className="mt-5 grid sm:grid-cols-[1fr_auto] gap-2 items-stretch">
+                <div className="bg-ccb-surface/70 rounded-xl p-3.5 border border-ccb-border/70 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-ccb-accent/15 border border-ccb-accent/30 flex items-center justify-center shrink-0">
+                    <Crown className="w-4 h-4 text-ccb-accent" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Membership (per friend, per month)</p>
+                    <p className="text-sm font-bold">
+                      {formatUsd(membershipPriceUsd)}<span className="text-xs text-ccb-muted font-medium">/mo</span>
+                      <span className="text-ccb-muted mx-1.5">×</span>
+                      <span className="text-ccb-muted font-medium">{commissionPct}%</span>
+                      <span className="text-ccb-muted mx-1.5">=</span>
+                      <span className="text-ccb-success">{membershipEarn}</span>
+                      <span className="text-ccb-muted"> to you</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-ccb-success/10 border border-ccb-success/25 rounded-xl px-4 py-3 flex items-center gap-2 justify-center">
+                  <TrendingUp className="w-4 h-4 text-ccb-success shrink-0" />
+                  <p className="text-xs font-semibold text-ccb-success">Recurring &amp; unlimited</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex-1">
-            <h1 className="font-bold text-base sm:text-lg leading-tight">Affiliate Program</h1>
-            <p className="text-xs text-ccb-muted mt-0.5">
-              Earn <span className="font-bold text-ccb-primary">{commissionPct}%</span> of every fee your referrals generate — battles, tournaments &amp; membership. Plus up to {commissionPct}% of their ad spend.
+
+          {/* REFERRAL LINK CARD */}
+          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 sm:p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Your referral link</label>
+              <span className="text-[10px] font-mono text-ccb-muted hidden sm:inline">{refCode}</span>
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                readOnly
+                value={referralLink}
+                className="flex-1 min-w-0 bg-ccb-surface border border-ccb-border rounded-xl px-3.5 py-3 text-xs sm:text-sm text-ccb-muted truncate font-mono"
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+              />
+              <button
+                onClick={() => copy("link")}
+                className="shrink-0 px-4 rounded-xl bg-ccb-primary text-white font-semibold text-sm active:scale-95 transition-transform flex items-center gap-2"
+                aria-label="Copy link"
+              >
+                {copied === "link" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                <span className="hidden sm:inline">{copied === "link" ? "Copied" : "Copy"}</span>
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={handleShare}
+                className="flex-1 h-11 rounded-xl bg-ccb-surface border border-ccb-border text-sm font-semibold active:scale-95 transition-transform flex items-center justify-center gap-2"
+              >
+                <Share2 className="w-4 h-4" /> More options
+              </button>
+              <button
+                onClick={() => copy("code")}
+                className="flex-1 h-11 rounded-xl bg-ccb-surface border border-ccb-border text-sm font-semibold active:scale-95 transition-transform flex items-center justify-center gap-2"
+              >
+                {copied === "code" ? <Check className="w-4 h-4 text-ccb-success" /> : <Coins className="w-4 h-4" />}
+                {copied === "code" ? "Code copied" : "Copy code only"}
+              </button>
+              <a
+                href={waShare}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 h-11 rounded-xl bg-[#25D366]/15 border border-[#25D366]/40 text-[#25D366] text-sm font-bold active:scale-95 transition-transform flex items-center justify-center gap-2"
+              >
+                <Send className="w-4 h-4" /> WhatsApp
+              </a>
+            </div>
+            <p className="text-[11px] text-ccb-muted">
+              Tip: friends must sign up through your link — their account is linked to you automatically, once.
             </p>
           </div>
         </div>
 
-        {/* Commission showcase — membership is a single $10/mo USD plan
-           (owner decision 2026-09-15), no yearly tier. Shown as the fixed
-           dollar price to every player, same as the league reward ladder. */}
-        <div className="bg-ccb-surface/50 rounded-xl p-3 border border-ccb-border/50 mt-3">
-          <div className="flex items-center gap-1 mb-1">
-            <Crown className="w-3 h-3 text-ccb-accent" />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Membership</span>
-          </div>
-          <div className="flex items-end justify-between">
-            <p className="text-lg font-bold">{formatUsd(membershipPriceUsd)}<span className="text-xs text-ccb-muted font-medium">/mo</span></p>
-            <p className="text-sm text-ccb-success font-semibold">You earn {formatUsd(membershipPriceUsd * commissionRate)}</p>
-          </div>
-        </div>
-
-        {/* Ongoing badge */}
-        <div className="flex items-center gap-1.5 mt-3 text-[11px] text-ccb-muted">
-          <TrendingUp className="w-3.5 h-3.5 text-ccb-success" />
-          <span>Ongoing — every cash battle they play, every paid tournament they enter, every renewal, every ad campaign they buy. No limit.</span>
-        </div>
-      </div>
-
-      {/* REFERRAL LINK — touch-friendly for mobile */}
-      <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 space-y-3">
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted mb-1.5 block">Your Referral Link</label>
-          <div className="flex items-center gap-2">
-            <input
-              readOnly
-              value={referralLink}
-              className="flex-1 min-w-0 bg-ccb-surface border border-ccb-border rounded-lg px-3 py-2.5 text-xs text-ccb-muted truncate"
-              onClick={(e) => (e.target as HTMLInputElement).select()}
-            />
-            <button
-              onClick={handleCopyLink}
-              className="shrink-0 p-2.5 rounded-lg bg-ccb-primary text-white active:scale-95 transition-transform"
-              aria-label="Copy link"
-            >
-              {copyLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            </button>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted mb-1.5 block">Referral Code</label>
-            <div className="flex items-center gap-2">
-              <input
-                readOnly
-                value={refCode}
-                className="flex-1 min-w-0 bg-ccb-surface border border-ccb-border rounded-lg px-3 py-2.5 text-xs font-mono text-ccb-muted"
-                onClick={(e) => (e.target as HTMLInputElement).select()}
-              />
-              <button
-                onClick={handleCopyCode}
-                className="shrink-0 p-2.5 rounded-lg bg-ccb-surface border border-ccb-border text-ccb-muted active:scale-95 transition-transform"
-                aria-label="Copy code"
-              >
-                {copied ? <Check className="w-4 h-4 text-ccb-success" /> : <Copy className="w-4 h-4" />}
-              </button>
+        {/* ================= RIGHT COLUMN ================= */}
+        <div className="lg:col-span-5 space-y-4 sm:space-y-6">
+          {/* STATS */}
+          <div className="grid grid-cols-3 lg:grid-cols-1 gap-2 sm:gap-4">
+            <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-ccb-primary/15 border border-ccb-primary/25 flex items-center justify-center shrink-0">
+                <UserPlus className="w-5 h-5 text-ccb-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-extrabold leading-none">{totalRefs}</p>
+                <p className="text-[10px] text-ccb-muted uppercase tracking-wider mt-1">Invited</p>
+              </div>
+            </div>
+            <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-ccb-success/15 border border-ccb-success/25 flex items-center justify-center shrink-0">
+                <CheckCircle className="w-5 h-5 text-ccb-success" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-extrabold leading-none text-ccb-success">{activatedRefs}</p>
+                <p className="text-[10px] text-ccb-muted uppercase tracking-wider mt-1">
+                  Active{totalRefs > 0 && pendingRefs > 0 ? ` · ${pendingRefs} pending` : ""}
+                </p>
+              </div>
+            </div>
+            <div className="bg-ccb-card border border-ccb-primary/30 rounded-2xl p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-ccb-primary/15 border border-ccb-primary/30 flex items-center justify-center shrink-0">
+                <Wallet className="w-5 h-5 text-ccb-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-extrabold leading-none text-ccb-primary">{fmtCurrency(totalCommissionEarned)}</p>
+                <p className="text-[10px] text-ccb-muted uppercase tracking-wider mt-1">Earned</p>
+              </div>
             </div>
           </div>
-          <button
-            onClick={handleShare}
-            className="self-end px-4 py-2.5 rounded-lg bg-ccb-surface border border-ccb-border text-sm font-medium active:scale-95 transition-transform flex items-center gap-1.5 shrink-0"
+
+          {/* WALLET */}
+          <a
+            href="/wallet"
+            className="bg-ccb-card border border-ccb-border rounded-2xl p-4 flex items-center justify-between hover:border-ccb-primary/40 transition-colors group"
           >
-            <Share2 className="w-4 h-4" /> Share
-          </button>
-        </div>
-      </div>
-
-      {/* STATS — 3 columns, compact on mobile */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-ccb-card border border-ccb-border rounded-xl p-3 text-center">
-          <Users className="w-4 h-4 text-ccb-muted mx-auto mb-1" />
-          <p className="text-lg font-bold">{totalRefs}</p>
-          <p className="text-[10px] text-ccb-muted uppercase tracking-wider">Invited</p>
-        </div>
-        <div className="bg-ccb-card border border-ccb-border rounded-xl p-3 text-center">
-          <CheckCircle className="w-4 h-4 text-ccb-success mx-auto mb-1" />
-          <p className="text-lg font-bold text-ccb-success">{activatedRefs}</p>
-          <p className="text-[10px] text-ccb-muted uppercase tracking-wider">Active</p>
-        </div>
-        <div className="bg-ccb-card border border-ccb-primary/30 rounded-xl p-3 text-center">
-          <Wallet className="w-4 h-4 text-ccb-primary mx-auto mb-1" />
-          <p className="text-base font-bold text-ccb-primary leading-tight">{fmtCurrency(totalCommissionEarned)}</p>
-          <p className="text-[10px] text-ccb-muted uppercase tracking-wider">Earned</p>
-        </div>
-      </div>
-
-      {/* HOW IT WORKS — mobile-optimized */}
-      <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-ccb-muted mb-3 flex items-center gap-1.5">
-          <Info className="w-3.5 h-3.5" /> How It Works
-        </h3>
-        <div className="space-y-3">
-          <div className="flex items-start gap-2.5">
-            <div className="w-6 h-6 rounded-full bg-ccb-primary/20 text-ccb-primary text-[11px] font-bold flex items-center justify-center shrink-0">1</div>
             <div>
-              <p className="text-sm font-medium">Share your link</p>
-              <p className="text-xs text-ccb-muted mt-0.5">Send your referral link to friends via WhatsApp or social media.</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Wallet balance</p>
+              <p className="text-xl font-extrabold mt-1">{formatWallet(walletBalance)}</p>
             </div>
-          </div>
-          <div className="flex items-start gap-2.5">
-            <div className="w-6 h-6 rounded-full bg-ccb-primary/20 text-ccb-primary text-[11px] font-bold flex items-center justify-center shrink-0">2</div>
-            <div>
-              <p className="text-sm font-medium">Friend signs up &amp; verifies their ID</p>
-              <p className="text-xs text-ccb-muted mt-0.5">Your friend registers using your link and verifies their identity — that unlocks your earnings.</p>
+            <div className="w-9 h-9 rounded-xl bg-ccb-surface border border-ccb-border flex items-center justify-center group-hover:border-ccb-primary/40 transition-colors">
+              <ChevronRight className="w-4 h-4 text-ccb-muted" />
             </div>
-          </div>
-          <div className="flex items-start gap-2.5">
-            <div className="w-6 h-6 rounded-full bg-ccb-success/20 text-ccb-success text-[11px] font-bold flex items-center justify-center shrink-0">3</div>
-            <div>
-              <p className="text-sm font-medium">You earn {commissionPct}% of their fees — forever</p>
-              <p className="text-xs text-ccb-muted mt-0.5">
-                Every cash battle they play and every paid tournament they enter pays you {commissionPct}% of the platform fee, plus {formatUsd(membershipPriceUsd * commissionRate)} per membership renewal. When they advertise on the platform you earn {commissionPct}% of their first ad campaign and 10% of every one after. Credited automatically.
-              </p>
+          </a>
+
+          {/* HOW IT WORKS — horizontal 3 steps on desktop, vertical on mobile */}
+          <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 sm:p-6">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted mb-4">How it works</h3>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-ccb-primary/20 text-ccb-primary text-xs font-bold flex items-center justify-center shrink-0">1</div>
+                <div>
+                  <p className="text-sm font-semibold">Share your link</p>
+                  <p className="text-xs text-ccb-muted mt-0.5">Send it to friends on WhatsApp or social media.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-ccb-primary/20 text-ccb-primary text-xs font-bold flex items-center justify-center shrink-0">2</div>
+                <div>
+                  <p className="text-sm font-semibold">Friend signs up &amp; verifies</p>
+                  <p className="text-xs text-ccb-muted mt-0.5">They register through your link and verify their identity — that unlocks your earnings.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-ccb-success/20 text-ccb-success text-xs font-bold flex items-center justify-center shrink-0">3</div>
+                <div>
+                  <p className="text-sm font-semibold">You earn {commissionPct}% of their fees — forever</p>
+                  <p className="text-xs text-ccb-muted mt-0.5">
+                    Every cash battle, paid tournament, and {membershipEarn} per membership renewal. Ads they buy pay you {commissionPct}% of their first campaign and 10% after. Credited automatically.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* REFERRALS LIST — mobile cards */}
-      <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-ccb-muted">Your Referrals</h3>
+      {/* REFERRALS LIST */}
+      <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ccb-muted flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5" /> Your referrals
+          </h3>
           <span className="text-[10px] text-ccb-muted">{totalRefs} total</span>
         </div>
 
         {referrals.length === 0 ? (
-          <div className="text-center py-8">
-            <Users className="w-8 h-8 text-ccb-muted/50 mx-auto mb-2" />
-            <p className="text-sm text-ccb-muted">No referrals yet — share your link to start earning!</p>
+          <div className="text-center py-10 px-4 rounded-xl border border-dashed border-ccb-border">
+            <div className="w-12 h-12 rounded-2xl bg-ccb-primary/10 border border-ccb-primary/20 flex items-center justify-center mx-auto mb-3">
+              <Sparkles className="w-5 h-5 text-ccb-primary" />
+            </div>
+            <p className="text-sm font-semibold">No referrals yet</p>
+            <p className="text-xs text-ccb-muted mt-1 max-w-xs mx-auto">
+              Share your link — every friend who joins earns you {commissionPct}% of their fees, forever.
+            </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="grid sm:grid-cols-2 gap-2">
             {referrals.map((ref) => {
               const isActive = ref.status === "activated" || ref.status === "rewarded" || !!ref.activated_at;
+              const name = ref.referred?.display_name || ref.referred?.username || "Pending registration";
+              const initials = name.charAt(0).toUpperCase();
               return (
-                <div key={ref.id} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-ccb-surface">
-                  {/* Avatar */}
+                <div key={ref.id} className="flex items-center gap-3 px-3 py-3 rounded-xl bg-ccb-surface border border-ccb-border/50">
                   {ref.referred?.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={ref.referred.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                    <img src={ref.referred.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
                   ) : (
-                    <div className="w-9 h-9 rounded-full bg-ccb-primary/10 border border-ccb-border flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-ccb-primary">
-                        {(ref.referred?.display_name || ref.referred?.username || "?").charAt(0).toUpperCase()}
-                      </span>
+                    <div className="w-10 h-10 rounded-full bg-ccb-primary/10 border border-ccb-border flex items-center justify-center shrink-0">
+                      <span className="text-sm font-bold text-ccb-primary">{initials}</span>
                     </div>
                   )}
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {ref.referred?.display_name || ref.referred?.username || "Pending registration"}
-                    </p>
-                    <p className="text-[10px] text-ccb-muted">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold truncate">{name}</p>
                       {isActive ? (
-                        <span className="flex items-center gap-1">
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-ccb-success/15 text-ccb-success shrink-0">ACTIVE</span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-ccb-muted/10 text-ccb-muted shrink-0">PENDING</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-ccb-muted mt-0.5 flex items-center gap-1">
+                      {isActive ? (
+                        <>
                           <CheckCircle className="w-3 h-3 text-ccb-success" />
                           {ref.activation_condition ? ACTIVATION_LABELS[ref.activation_condition] || "Activated" : "Activated"}
-                        </span>
+                        </>
                       ) : (
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-ccb-muted" />
-                          Pending — earnings unlock once they verify ID &amp; play
-                        </span>
+                        <>
+                          <Clock className="w-3 h-3" />
+                          {ref.activation_condition
+                            ? `Unlocks: ${ACTIVATION_LABELS[ref.activation_condition] || "first paid activity"}`
+                            : "Joined — awaiting first paid activity"}
+                        </>
                       )}
+                      <span className="text-ccb-border">|</span>
+                      <span>{shortDate(ref.created_at)}</span>
                     </p>
                   </div>
 
-                  {/* Commission badge or pending */}
-                  {isActive && ref.commission_amount > 0 ? (
+                  {isActive && ref.commission_amount > 0 && (
                     <div className="text-right shrink-0">
                       <p className="text-xs font-bold text-ccb-success">+{fmtCurrency(ref.commission_amount)}</p>
                       <p className="text-[9px] text-ccb-muted">commission</p>
                     </div>
-                  ) : isActive ? (
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-success/10 text-ccb-success shrink-0">
-                      Active
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-ccb-muted/10 text-ccb-muted shrink-0">
-                      Pending
-                    </span>
                   )}
                 </div>
               );
             })}
           </div>
         )}
-      </div>
-
-      {/* WALLET BALANCE FOOTER */}
-      <div className="bg-ccb-surface border border-ccb-border rounded-xl p-4 flex items-center justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">Current Wallet Balance</p>
-          <p className="text-lg font-bold mt-0.5">{formatWallet(walletBalance)}</p>
-        </div>
-        <a href="/wallet" className="text-xs font-bold text-ccb-primary hover:underline flex items-center gap-1">
-          View Wallet <ChevronRight className="w-3.5 h-3.5" />
-        </a>
       </div>
     </div>
   );
