@@ -146,6 +146,11 @@ export async function GET(req: NextRequest) {
         totalFeesMwk += fee;
       } else if (w.status === "pending" || w.status === "approved") {
         pendingWithdrawalsMwk += gross;
+        // request_withdrawal debits the wallet the moment the request is
+        // created — in-flight withdrawals are already out of the stored
+        // balance, so the derived balance must subtract them too or every
+        // player with a pending payout shows a false discrepancy.
+        derivedMwk -= gross;
       }
     }
 
