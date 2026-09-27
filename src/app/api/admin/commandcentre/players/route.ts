@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getExchangeRate } from "@/lib/geo/fx";
 import { loadUsdConverter, roundUsd } from "@/lib/finance/usd";
 import { COUNTRY_CURRENCY } from "@/lib/geo/currency-map";
-import { buildWalletHistory, walletImpactAmount } from "@/lib/finance/phase2";
+import { buildWalletHistory, walletReconcileImpact } from "@/lib/finance/phase2";
 
 export const dynamic = "force-dynamic";
 
@@ -122,7 +122,9 @@ export async function GET(req: NextRequest) {
     for (const d of deposits || []) {
       // Wallet-impact sign: escrow rows are stored positive but lock the
       // stake away from the player's wallet.
-      const amt = walletImpactAmount(d.method, Number(d.amount || 0));
+      // Reconciliation impact: 0 for external payments (membership) —
+      // the wallet-derived balance must only count real wallet movements.
+      const amt = walletReconcileImpact(d.method, Number(d.amount || 0));
       const mag = Math.abs(amt);
       if (d.status === "success") {
         derivedMwk += amt;

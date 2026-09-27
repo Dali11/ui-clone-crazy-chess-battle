@@ -11,6 +11,7 @@ import {
   amountMismatchTolerance,
   buildWalletHistory,
   walletImpactAmount,
+  walletReconcileImpact,
   ledgerTypeForMethod,
   type ReconInternalRow,
   type ReconProviderRow,
@@ -247,6 +248,26 @@ describe("buildWalletHistory", () => {
     expect(walletImpactAmount("battle_refund", 500)).toBe(500);
     expect(walletImpactAmount("tournament_entry", -500)).toBe(-500);
     expect(walletImpactAmount("mobile_money", 500)).toBe(500);
+  });
+
+  describe("walletReconcileImpact (dossier derived-balance math)", () => {
+    it("external payments never count toward the wallet-derived balance", () => {
+      // Membership is paid directly via PawaPay/PayChangu mobile money —
+      // the deposits row tracks platform revenue, the wallet never moves.
+      expect(walletReconcileImpact("membership_purchase", 5_000)).toBe(0);
+    });
+
+    it("passes real wallet movements through unchanged", () => {
+      expect(walletReconcileImpact("battle_escrow", 500)).toBe(-500);
+      expect(walletReconcileImpact("battle_payout", 900)).toBe(900);
+      expect(walletReconcileImpact("tournament_entry", -500)).toBe(-500);
+      expect(walletReconcileImpact("admin_adjustment", -500)).toBe(-500);
+      expect(walletReconcileImpact("withdrawal_refund", 500)).toBe(500);
+    });
+  });
+
+  it("walletImpactAmount still shows real amounts for display (legacy)", () => {
+    expect(walletImpactAmount("membership_purchase", 5_000)).toBe(5_000);
   });
 
   it("maps ledger types for all production methods", () => {

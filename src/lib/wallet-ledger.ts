@@ -50,6 +50,7 @@ export const LEDGER_METHOD_META: Record<string, LedgerMeta> = {
   // Platform accounting
   platform_revenue_sweep: { label: "Platform Revenue Sweep", direction: "in" },
   withdrawal_failed_refund: { label: "Withdrawal Failed — Refunded", direction: "in" },
+  withdrawal_refund: { label: "Withdrawal Refund", direction: "in" },
   tournament_payout: { label: "Tournament Prize", direction: "in" },
   tournament_creator_profit: { label: "Tournament Creator Earnings", direction: "in" },
   tournament_payout_reversal: { label: "Admin Correction — Prize Reversed", direction: "out" },

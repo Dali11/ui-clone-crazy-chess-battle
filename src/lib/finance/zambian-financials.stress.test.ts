@@ -246,7 +246,7 @@ describe("Zambian financials — ledger classification coverage", () => {
     "membership_purchase", "mobile_money", "pawapay", "platform_revenue_sweep",
     "tournament_clawback", "tournament_creator_profit", "tournament_entry",
     "tournament_escrow", "tournament_escrow_refund", "tournament_payout",
-    "tournament_payout_reversal", "tournament_refund", "withdrawal_failed_refund",
+    "tournament_payout_reversal", "tournament_refund", "withdrawal_failed_refund", "withdrawal_refund",
     "admin_adjustment",
   ];
 

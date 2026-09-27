@@ -68,6 +68,7 @@ export const METHOD_LEDGER_TYPE: Record<string, LedgerType> = {
   ad_purchase: "ad_payment",
   // Refunds / corrections
   battle_refund: "refund",
+  withdrawal_refund: "refund",
   battle_challenge_cancel: "refund",
   battle_cancel: "refund",
   battle_queue_refund: "refund",
@@ -103,6 +104,26 @@ const WALLET_IMPACT_FLIP_METHODS = new Set(["battle_escrow", "battle_challenge_e
 /** Wallet-impact signed amount (MWK-normalized) for one deposits row. */
 export function walletImpactAmount(method: string, amount: number): number {
   return WALLET_IMPACT_FLIP_METHODS.has(method) ? -Math.abs(amount) : amount;
+}
+
+/**
+ * deposits rows that record an EXTERNAL payment and NEVER move the wallet.
+ * Membership is paid directly via PawaPay/PayChangu mobile money — the row
+ * tracks platform revenue, but the wallet balance is untouched. Counting
+ * it into a wallet-derived balance inflates the derived figure by every
+ * membership the player ever bought, flagging a false discrepancy in the
+ * Player Dossier reconciliation.
+ */
+export const WALLET_IMPACT_ZERO_METHODS = new Set(["membership_purchase"]);
+
+/**
+ * Signed wallet impact for LEDGER RECONCILIATION — use this (not
+ * walletImpactAmount) whenever the result is compared against the stored
+ * wallet_balance. Returns 0 for external-payment rows. Display surfaces
+ * keep using walletImpactAmount so history rows still show real amounts.
+ */
+export function walletReconcileImpact(method: string, amount: number): number {
+  return WALLET_IMPACT_ZERO_METHODS.has(method) ? 0 : walletImpactAmount(method, amount);
 }
 
 // ── CSV helpers ────────────────────────────────────────────────────────
