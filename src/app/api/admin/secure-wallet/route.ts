@@ -7,44 +7,61 @@ import { NextRequest, NextResponse } from "next/server";
  */
 
 const MIGRATION_SQL = `
--- 1. credit_wallet — returns affected count, raises if user not found, validates amount
+-- 1. credit_wallet — hardened + FX-aware (matches migration 080).
+-- Takes a MWK amount, credits the player's wallet in THEIR OWN currency
+-- (round(amount * mwk_rate(user))). MWK wallets skip conversion (rate = 1).
+-- Raises if user not found; validates amount.
+-- DO NOT deploy a raw 'wallet_balance + p_amount' version here: wallets
+-- are LOCAL-currency since migration 080 — raw MWK numerals would
+-- corrupt every non-Malawi player's balance by the FX factor (~75x).
 CREATE OR REPLACE FUNCTION public.credit_wallet(p_user_id UUID, p_amount INT)
-RETURNS INT AS $$
+RETURNS VOID AS $$
 DECLARE
-  affected INT;
+  v_rate NUMERIC;
+  v_local INT;
 BEGIN
   IF p_amount IS NULL OR p_amount <= 0 THEN
     RAISE EXCEPTION 'credit_wallet: amount must be positive, got %', p_amount;
   END IF;
-  UPDATE profiles SET wallet_balance = wallet_balance + p_amount WHERE id = p_user_id;
-  GET DIAGNOSTICS affected = ROW_COUNT;
-  IF affected = 0 THEN
+  v_rate := public.mwk_rate(p_user_id);
+  IF v_rate < 0 THEN
+    RAISE EXCEPTION 'credit_wallet: FX rate unavailable for this wallet currency';
+  END IF;
+  v_local := round(p_amount * v_rate)::INT;
+  UPDATE profiles
+  SET wallet_balance = wallet_balance + v_local, updated_at = now()
+  WHERE id = p_user_id;
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'credit_wallet: user % not found', p_user_id;
   END IF;
-  RETURN affected;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 2. debit_wallet — single atomic UPDATE with WHERE clause (eliminates TOCTOU race)
+-- 2. debit_wallet — single atomic UPDATE with WHERE clause (eliminates
+-- TOCTOU race). Same FX conversion as credit_wallet so refunds return
+-- exactly what was charged while the rate is unchanged.
 CREATE OR REPLACE FUNCTION public.debit_wallet(p_user_id UUID, p_amount INT)
-RETURNS INT AS $$
+RETURNS VOID AS $$
 DECLARE
-  affected INT;
+  v_rate NUMERIC;
+  v_local INT;
 BEGIN
   IF p_amount IS NULL OR p_amount <= 0 THEN
     RAISE EXCEPTION 'debit_wallet: amount must be positive, got %', p_amount;
   END IF;
-  UPDATE profiles SET wallet_balance = wallet_balance - p_amount
-  WHERE id = p_user_id AND wallet_balance >= p_amount;
-  GET DIAGNOSTICS affected = ROW_COUNT;
-  IF affected = 0 THEN
-    PERFORM 1 FROM profiles WHERE id = p_user_id;
-    IF NOT FOUND THEN
+  v_rate := public.mwk_rate(p_user_id);
+  IF v_rate < 0 THEN
+    RAISE EXCEPTION 'debit_wallet: FX rate unavailable for this wallet currency';
+  END IF;
+  v_local := round(p_amount * v_rate)::INT;
+  UPDATE profiles SET wallet_balance = wallet_balance - v_local, updated_at = now()
+  WHERE id = p_user_id AND wallet_balance >= v_local;
+  IF NOT FOUND THEN
+    IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id) THEN
       RAISE EXCEPTION 'debit_wallet: user % not found', p_user_id;
     END IF;
     RAISE EXCEPTION 'Insufficient balance';
   END IF;
-  RETURN affected;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

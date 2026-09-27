@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
         .order("created_at", { ascending: false })
         .limit(limit);
       for (const r of rows || []) {
-        const meta = getLedgerMeta(r.method);
+        const meta = getLedgerMeta(r.method, r.amount);
         transactions.push({
           id: r.id,
           direction: meta.direction,

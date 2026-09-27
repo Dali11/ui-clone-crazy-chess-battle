@@ -264,7 +264,12 @@ export default function UserDetailModal({ userId, onClose, onAction, onDelete, a
                   <div className="text-xs text-ccb-muted">CURRENT BALANCE</div>
                   <div className="text-2xl font-bold text-ccb-primary mt-1">{fmtLocal(p.wallet_balance || 0)}</div>
                   {localRate && (
-                    <div className="text-[10px] text-ccb-muted mt-0.5">Ledger: {formatMWK(p.wallet_balance || 0)}</div>
+                    <div className="text-[10px] text-ccb-muted mt-0.5">
+                      {/* wallet_balance is LOCAL currency — convert back to the
+                          internal MWK ledger unit before labelling it MWK,
+                          otherwise a ZK 65 balance renders as "Ledger: MK 65". */}
+                      Ledger: {formatMWK(Math.round((p.wallet_balance || 0) / localRate.rate))}
+                    </div>
                   )}
                 </div>
                 <div className="card p-4">

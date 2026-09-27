@@ -30,6 +30,21 @@ describe("Wallet Ledger — classification", () => {
     expect(LEDGER_METHOD_META.tournament_creator_profit.direction).toBe("in");
   });
 
+  it("classifies tournament refunds and escrow correctly (2026-09-27 refund incident)", () => {
+    expect(LEDGER_METHOD_META.tournament_refund.direction).toBe("in");
+    expect(LEDGER_METHOD_META.tournament_refund.label).toBe("Tournament Entry Refund");
+    expect(LEDGER_METHOD_META.tournament_escrow_refund.direction).toBe("in");
+    expect(LEDGER_METHOD_META.tournament_escrow.direction).toBe("out");
+    expect(LEDGER_METHOD_META.tournament_clawback.direction).toBe("out");
+  });
+
+  it("classifies league rewards, memberships and pawapay deposits correctly", () => {
+    expect(LEDGER_METHOD_META.league_reward.direction).toBe("in");
+    expect(LEDGER_METHOD_META.membership_purchase.direction).toBe("out");
+    expect(LEDGER_METHOD_META.pawapay.direction).toBe("in");
+    expect(LEDGER_METHOD_META.platform_revenue_sweep.direction).toBe("in");
+  });
+
   it("classifies admin corrections as outflow", () => {
     expect(LEDGER_METHOD_META.clawback_duplicate_refund.direction).toBe("out");
     expect(LEDGER_METHOD_META.duplicate_payout_removal.direction).toBe("out");

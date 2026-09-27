@@ -81,7 +81,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .limit(30);
 
     const deposits = (rawDeposits || []).map((d) => {
-      const meta = getLedgerMeta(d.method);
+      const meta = getLedgerMeta(d.method, d.amount);
       return {
         ...d,
         label: meta.label,
