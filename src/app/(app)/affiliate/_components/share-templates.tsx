@@ -39,18 +39,18 @@ export default function ShareTemplates({ referralLink }: { referralLink: string 
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => copy(i, t.text)}
-                  className="text-[10px] font-bold px-2 py-1 rounded-md bg-ccb-card border border-ccb-border flex items-center gap-1 active:scale-95 transition-transform"
+                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-ccb-card border border-ccb-border flex items-center gap-1.5 active:scale-95 transition-transform"
                 >
-                  {copied === i ? <Check className="w-3 h-3 text-ccb-success" /> : <Copy className="w-3 h-3" />}
+                  {copied === i ? <Check className="w-3.5 h-3.5 text-ccb-success" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied === i ? "Copied" : "Copy"}
                 </button>
                 <a
                   href={wa}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[10px] font-bold px-2 py-1 rounded-md bg-[#25D366]/15 border border-[#25D366]/40 text-[#25D366] flex items-center gap-1 active:scale-95 transition-transform"
+                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-[#25D366]/15 border border-[#25D366]/40 text-[#25D366] flex items-center gap-1.5 active:scale-95 transition-transform"
                 >
-                  <Send className="w-3 h-3" /> Send
+                  <Send className="w-3.5 h-3.5" /> Send
                 </a>
               </div>
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, Send, Users, UserCheck } from "lucide-react";
+import { Search, Send } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
 import { shortDate, referralLink } from "@/lib/affiliate/labels";
 
@@ -70,26 +70,17 @@ export default function TeamClient({ referrals, baseUrl, refCode, initialFilter 
     <div className="space-y-4 sm:space-y-6">
       {/* Summary strip */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 flex items-center gap-3">
-          <Users className="w-5 h-5 text-ccb-primary shrink-0" />
-          <div>
-            <p className="text-xl font-extrabold leading-none">{counts.all}</p>
-            <p className="text-[10px] text-ccb-muted uppercase tracking-wider mt-1">Invited</p>
-          </div>
+        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5 sm:p-6 flex flex-col justify-center min-h-[92px] sm:min-h-[110px]">
+          <p className="text-2xl sm:text-3xl font-extrabold leading-none">{counts.all}</p>
+          <p className="text-[11px] text-ccb-muted uppercase tracking-wider mt-2">Invited</p>
         </div>
-        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 flex items-center gap-3">
-          <UserCheck className="w-5 h-5 text-ccb-success shrink-0" />
-          <div>
-            <p className="text-xl font-extrabold leading-none text-ccb-success">{counts.active}</p>
-            <p className="text-[10px] text-ccb-muted uppercase tracking-wider mt-1">Active</p>
-          </div>
+        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5 sm:p-6 flex flex-col justify-center min-h-[92px] sm:min-h-[110px]">
+          <p className="text-2xl sm:text-3xl font-extrabold leading-none text-ccb-success">{counts.active}</p>
+          <p className="text-[11px] text-ccb-muted uppercase tracking-wider mt-2">Active</p>
         </div>
-        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 flex items-center gap-3">
-          <Send className="w-5 h-5 text-ccb-accent shrink-0" />
-          <div>
-            <p className="text-xl font-extrabold leading-none text-ccb-accent">{counts.pending}</p>
-            <p className="text-[10px] text-ccb-muted uppercase tracking-wider mt-1">To nudge</p>
-          </div>
+        <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5 sm:p-6 flex flex-col justify-center min-h-[92px] sm:min-h-[110px]">
+          <p className="text-2xl sm:text-3xl font-extrabold leading-none text-ccb-accent">{counts.pending}</p>
+          <p className="text-[11px] text-ccb-muted uppercase tracking-wider mt-2">To nudge</p>
         </div>
       </div>
 

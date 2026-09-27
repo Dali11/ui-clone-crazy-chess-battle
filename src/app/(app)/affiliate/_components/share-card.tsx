@@ -46,16 +46,16 @@ export default function ShareCard({ refCode, referralLink, compact }: ShareCardP
         <input
           readOnly
           value={referralLink}
-          className="flex-1 min-w-0 bg-ccb-surface border border-ccb-border rounded-xl px-3.5 py-3 text-xs sm:text-sm text-ccb-muted truncate font-mono"
+          className="flex-1 min-w-0 bg-ccb-surface border border-ccb-border rounded-xl px-4 py-3.5 text-sm text-ccb-muted truncate font-mono"
           onClick={(e) => (e.target as HTMLInputElement).select()}
           aria-label="Referral link"
         />
         <button
           onClick={() => copy("link")}
-          className="shrink-0 px-4 rounded-xl bg-ccb-primary text-white font-semibold text-sm active:scale-95 transition-transform flex items-center gap-2"
+          className="shrink-0 px-5 rounded-xl bg-ccb-primary text-white font-bold text-sm sm:text-base active:scale-95 transition-transform flex items-center gap-2"
           aria-label="Copy link"
         >
-          {copied === "link" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+          {copied === "link" ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
           <span className="hidden sm:inline">{copied === "link" ? "Copied" : "Copy"}</span>
         </button>
       </div>
@@ -70,9 +70,9 @@ export default function ShareCard({ refCode, referralLink, compact }: ShareCardP
         {!compact && (
           <button
             onClick={() => copy("code")}
-            className="flex-1 h-11 rounded-xl bg-ccb-surface border border-ccb-border text-sm font-semibold active:scale-95 transition-transform flex items-center justify-center gap-2"
+            className="flex-1 h-12 sm:h-14 rounded-xl bg-ccb-surface border border-ccb-border text-sm sm:text-base font-bold active:scale-95 transition-transform flex items-center justify-center gap-2"
           >
-            {copied === "code" ? <Check className="w-4 h-4 text-ccb-success" /> : <Coins className="w-4 h-4" />}
+            {copied === "code" ? <Check className="w-5 h-5 text-ccb-success" /> : <Coins className="w-5 h-5" />}
             {copied === "code" ? "Code copied" : "Copy code only"}
           </button>
         )}
@@ -80,9 +80,9 @@ export default function ShareCard({ refCode, referralLink, compact }: ShareCardP
           href={waShare}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 h-11 rounded-xl bg-[#25D366]/15 border border-[#25D366]/40 text-[#25D366] text-sm font-bold active:scale-95 transition-transform flex items-center justify-center gap-2"
+          className="flex-1 h-12 sm:h-14 rounded-xl bg-[#25D366]/15 border border-[#25D366]/40 text-[#25D366] text-sm sm:text-base font-bold active:scale-95 transition-transform flex items-center justify-center gap-2"
         >
-          <Send className="w-4 h-4" /> WhatsApp
+          <Send className="w-5 h-5" /> WhatsApp
         </a>
       </div>
       {!compact && (

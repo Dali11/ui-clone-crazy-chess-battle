@@ -122,11 +122,11 @@ export default async function AffiliatePage() {
           { value: stats.active, label: "Active" },
           { value: stats.lifetimeEarned, label: "Earned", money: true },
         ].map((s) => (
-          <div key={s.label} className="bg-ccb-card border border-ccb-border rounded-2xl p-4">
-            <p className={"text-xl sm:text-2xl font-extrabold leading-none " + (s.label === "Active" ? "text-ccb-success" : s.label === "Earned" ? "text-ccb-primary" : "")}>
+          <div key={s.label} className="bg-ccb-card border border-ccb-border rounded-2xl p-5 sm:p-6 flex flex-col justify-center min-h-[92px] sm:min-h-[110px]">
+            <p className={"text-2xl sm:text-4xl font-extrabold leading-none truncate " + (s.label === "Active" ? "text-ccb-success" : s.label === "Earned" ? "text-ccb-primary" : "")}>
               {s.money ? <MoneyValueClient amount={s.value} /> : s.value}
             </p>
-            <p className="text-[10px] text-ccb-muted uppercase tracking-wider mt-1">{s.label}</p>
+            <p className="text-[11px] text-ccb-muted uppercase tracking-wider mt-2">{s.label}</p>
           </div>
         ))}
       </div>

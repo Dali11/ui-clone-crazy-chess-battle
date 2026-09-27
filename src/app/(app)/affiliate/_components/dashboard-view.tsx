@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, CheckCircle, Clock, Wallet, TrendingUp, Gift } from "lucide-react";
+import { Clock, Gift } from "lucide-react";
 import Link from "next/link";
 import { useCurrency } from "@/hooks/use-currency";
 import { shortDate, monthHeading } from "@/lib/affiliate/labels";
@@ -40,33 +40,28 @@ interface DashboardViewProps {
 }
 
 const Tile = ({
-  icon: Icon,
   value,
   label,
   accent,
 }: {
-  icon: typeof Users;
   value: string;
   label: string;
   accent?: "success" | "primary";
 }) => (
-  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 flex items-center gap-3">
-    <div
+  <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5 sm:p-6 flex flex-col justify-center min-h-[92px] sm:min-h-[110px]">
+    <p
       className={
-        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border " +
+        "text-2xl sm:text-3xl font-extrabold leading-none truncate " +
         (accent === "success"
-          ? "bg-ccb-success/15 border-ccb-success/25 text-ccb-success"
+          ? "text-ccb-success"
           : accent === "primary"
-            ? "bg-ccb-primary/15 border-ccb-primary/25 text-ccb-primary"
-            : "bg-ccb-muted/15 border-ccb-border text-ccb-muted")
+            ? "text-ccb-primary"
+            : "")
       }
     >
-      <Icon className="w-5 h-5" />
-    </div>
-    <div className="min-w-0">
-      <p className="text-xl font-extrabold leading-none truncate">{value}</p>
-      <p className="text-[10px] text-ccb-muted uppercase tracking-wider mt-1">{label}</p>
-    </div>
+      {value}
+    </p>
+    <p className="text-[11px] text-ccb-muted uppercase tracking-wider mt-2">{label}</p>
   </div>
 );
 
@@ -95,10 +90,10 @@ export default function DashboardView({
 
       {/* Headline tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-        <Tile icon={Users} value={String(stats.total)} label="Invited" />
-        <Tile icon={CheckCircle} value={String(stats.active)} label="Active" accent="success" />
-        <Tile icon={Wallet} value={formatWallet(stats.lifetimeEarned)} label="Earned" accent="primary" />
-        <Tile icon={TrendingUp} value={formatWallet(stats.earnedThisMonth)} label="This month" accent="success" />
+        <Tile value={String(stats.total)} label="Invited" />
+        <Tile value={String(stats.active)} label="Active" accent="success" />
+        <Tile value={formatWallet(stats.lifetimeEarned)} label="Earned" accent="primary" />
+        <Tile value={formatWallet(stats.earnedThisMonth)} label="This month" accent="success" />
       </div>
 
       {stats.pending > 0 && (
