@@ -26,17 +26,33 @@ export async function POST(req: NextRequest) {
 
     // Resolve referrer by referral code, falling back to username (links may
     // be built from either — profiles.referral_code falls back to username).
-    const { data: referrer } = await admin
+    // Usernames/codes can contain uppercase letters, so match case-
+    // insensitively (same convention as /api/auth/login and
+    // /api/auth/forgot-password), preferring an exact-case hit if two rows
+    // differ only by case.
+    let ref: { id: string } | null = null;
+
+    const { data: byCode } = await admin
       .from("profiles")
       .select("id, referral_code, username")
-      .or(`referral_code.eq.${code},username.eq.${code}`)
-      .limit(1);
+      .ilike("referral_code", code)
+      .limit(5);
+    ref = (byCode?.find((c: any) => c.referral_code === code) ?? byCode?.[0]) || null;
 
-    const ref = referrer?.[0];
+    if (!ref) {
+      const { data: byUsername } = await admin
+        .from("profiles")
+        .select("id, referral_code, username")
+        .ilike("username", code)
+        .limit(5);
+      ref = (byUsername?.find((c: any) => c.username === code) ?? byUsername?.[0]) || null;
+    }
+
     if (!ref) return NextResponse.json({ error: "Unknown referral code" }, { status: 400 });
     if (ref.id === user.id) return NextResponse.json({ error: "Self-referral" }, { status: 400 });
 
     // One referral per referred player — a second signup link changes nothing.
+    // (Also enforced at the DB level by a unique index on referred_id.)
     const { data: existing } = await admin
       .from("referrals")
       .select("id")
@@ -46,13 +62,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ tracked: false, reason: "already_referred" });
     }
 
-    await admin.from("referrals").insert({
+    const { error: insertError } = await admin.from("referrals").insert({
       referrer_id: ref.id,
       referred_id: user.id,
       referral_code: code,
       status: "pending",
       berries_awarded: 0,
     });
+    if (insertError) {
+      // Race: another request for the same referred_id won by a hair.
+      if (insertError.code === "23505") {
+        return NextResponse.json({ tracked: false, reason: "already_referred" });
+      }
+      console.error("affiliate track insert error", insertError);
+      return NextResponse.json({ error: "Tracking failed" }, { status: 500 });
+    }
 
     return NextResponse.json({ tracked: true });
   } catch (e) {
