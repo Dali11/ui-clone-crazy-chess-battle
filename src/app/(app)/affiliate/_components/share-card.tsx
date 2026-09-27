@@ -1,27 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, Share2, Send, Coins } from "lucide-react";
+import { Copy, Check, Share2 } from "lucide-react";
 
 interface ShareCardProps {
   refCode: string;
   referralLink: string;
-  /** compact: tighter padding, no code-only button (dashboard embed) */
+  /** compact: tighter padding + smaller tip (dashboard embed) */
   compact?: boolean;
 }
 
-export default function ShareCard({ refCode, referralLink, compact }: ShareCardProps) {
-  const [copied, setCopied] = useState<"code" | "link" | null>(null);
-
-  const copy = (what: "code" | "link") => {
-    navigator.clipboard.writeText(what === "code" ? refCode : referralLink);
-    setCopied(what);
-    setTimeout(() => setCopied(null), 2000);
-  };
+export default function ShareCard({ referralLink, compact }: ShareCardProps) {
+  const [copied, setCopied] = useState(false);
 
   const shareText =
     "Join me on Crazy Chess Battles — play chess, compete in leagues & tournaments, and battle for cash!";
-  const waShare = `https://wa.me/?text=${encodeURIComponent(`${shareText} ${referralLink}`)}`;
 
   const handleShare = async () => {
     if (navigator.share) {
@@ -30,66 +23,37 @@ export default function ShareCard({ refCode, referralLink, compact }: ShareCardP
         return;
       } catch {}
     }
-    copy("link");
+    // Desktop fallback: copy the link to the clipboard
+    navigator.clipboard.writeText(referralLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 sm:p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <label className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">
-          Your referral link
-        </label>
-        <span className="text-[10px] font-mono text-ccb-muted hidden sm:inline">{refCode}</span>
-      </div>
+    <div className="bg-ccb-card border border-ccb-border rounded-2xl p-5 sm:p-7 space-y-4">
+      <label className="text-[10px] font-bold uppercase tracking-wider text-ccb-muted">
+        Your referral link
+      </label>
 
-      <div className="flex gap-2">
-        <input
-          readOnly
-          value={referralLink}
-          className="flex-1 min-w-0 bg-ccb-surface border border-ccb-border rounded-xl px-4 py-3.5 text-sm text-ccb-muted truncate font-mono"
-          onClick={(e) => (e.target as HTMLInputElement).select()}
-          aria-label="Referral link"
-        />
-        <button
-          onClick={() => copy("link")}
-          className="shrink-0 px-5 rounded-xl bg-ccb-primary text-white font-bold text-sm sm:text-base active:scale-95 transition-transform flex items-center gap-2"
-          aria-label="Copy link"
-        >
-          {copied === "link" ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-          <span className="hidden sm:inline">{copied === "link" ? "Copied" : "Copy"}</span>
-        </button>
-      </div>
+      <input
+        readOnly
+        value={referralLink}
+        className="w-full bg-ccb-surface border border-ccb-border rounded-xl px-4 py-3.5 text-sm text-ccb-muted truncate font-mono"
+        onClick={(e) => (e.target as HTMLInputElement).select()}
+        aria-label="Referral link"
+      />
 
-      <div className="flex flex-col sm:flex-row gap-2">
-        <button
-          onClick={handleShare}
-          className="flex-1 h-11 rounded-xl bg-ccb-surface border border-ccb-border text-sm font-semibold active:scale-95 transition-transform flex items-center justify-center gap-2"
-        >
-          <Share2 className="w-4 h-4" /> Share link
-        </button>
-        {!compact && (
-          <button
-            onClick={() => copy("code")}
-            className="flex-1 h-12 sm:h-14 rounded-xl bg-ccb-surface border border-ccb-border text-sm sm:text-base font-bold active:scale-95 transition-transform flex items-center justify-center gap-2"
-          >
-            {copied === "code" ? <Check className="w-5 h-5 text-ccb-success" /> : <Coins className="w-5 h-5" />}
-            {copied === "code" ? "Code copied" : "Copy code only"}
-          </button>
-        )}
-        <a
-          href={waShare}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 h-12 sm:h-14 rounded-xl bg-[#25D366]/15 border border-[#25D366]/40 text-[#25D366] text-sm sm:text-base font-bold active:scale-95 transition-transform flex items-center justify-center gap-2"
-        >
-          <Send className="w-5 h-5" /> WhatsApp
-        </a>
-      </div>
-      {!compact && (
-        <p className="text-[11px] text-ccb-muted">
-          Tip: friends must sign up through your link — their account is linked to you automatically, once.
-        </p>
-      )}
+      <button
+        onClick={handleShare}
+        className="w-full h-14 rounded-xl bg-ccb-primary text-white text-base font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-2.5"
+      >
+        {copied ? <Check className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
+        {copied ? "Link copied" : "Share link"}
+      </button>
+
+      <p className={"text-ccb-muted text-center " + (compact ? "text-[11px]" : "text-xs")}>
+        Friends must sign up through your link — their account is linked to you automatically, once.
+      </p>
     </div>
   );
 }

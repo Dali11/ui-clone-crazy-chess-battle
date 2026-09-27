@@ -3,16 +3,13 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { Gift, LayoutDashboard, Users, BookOpen, ArrowRight, Crown, TrendingUp } from "lucide-react";
-import { getReferrals, getCommissionLedger, computeStats } from "@/lib/affiliate/data";
+import { Gift, Crown, TrendingUp } from "lucide-react";
 import { referralLink } from "@/lib/affiliate/labels";
 import { formatUsd } from "@/lib/geo/format";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { pageMetadata } from "@/lib/seo/metadata";
 import ShareCard from "./_components/share-card";
 import EarningsCalculator from "./_components/earnings-calculator";
-import MoneyValueClient from "./_components/money-value";
 
 export const metadata = pageMetadata({
   title: "Affiliate Program — Earn 25% Commission",
@@ -31,15 +28,9 @@ export default async function AffiliatePage() {
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("id, username, referral_code, wallet_balance")
+    .select("id, username, referral_code")
     .eq("id", user.id)
     .single();
-
-  const [referrals, ledger] = await Promise.all([
-    getReferrals(admin, user.id),
-    getCommissionLedger(admin, user.id),
-  ]);
-  const stats = computeStats(referrals, ledger);
 
   // Membership is a single USD-priced plan (owner decision 2026-09-15) —
   // price_usd comes from platform settings, not hardcoded.
@@ -115,77 +106,11 @@ export default async function AffiliatePage() {
         </div>
       </div>
 
-      {/* Quick stats row */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        {[
-          { value: stats.total, label: "Invited" },
-          { value: stats.active, label: "Active" },
-          { value: stats.lifetimeEarned, label: "Earned", money: true },
-        ].map((s) => (
-          <div key={s.label} className="bg-ccb-card border border-ccb-border rounded-2xl p-5 sm:p-6 flex flex-col justify-center min-h-[92px] sm:min-h-[110px]">
-            <p className={"text-2xl sm:text-4xl font-extrabold leading-none truncate " + (s.label === "Active" ? "text-ccb-success" : s.label === "Earned" ? "text-ccb-primary" : "")}>
-              {s.money ? <MoneyValueClient amount={s.value} /> : s.value}
-            </p>
-            <p className="text-[11px] text-ccb-muted uppercase tracking-wider mt-2">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Share + calculator */}
+      {/* Referral link + calculator */}
       <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 items-start">
         <ShareCard refCode={refCode} referralLink={link} />
         <EarningsCalculator membershipPriceUsd={membershipPriceUsd} commissionRate={commissionRate} />
       </div>
-
-      {/* How it works teaser */}
-      <div className="bg-ccb-card border border-ccb-border rounded-2xl p-4 sm:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-ccb-muted">How it works</h3>
-          <Link href="/affiliate/how-it-works" className="text-[10px] font-bold uppercase tracking-wider text-ccb-primary flex items-center gap-1">
-            Full guide <ArrowRight className="w-3 h-3" />
-          </Link>
-        </div>
-        <div className="grid sm:grid-cols-3 gap-3">
-          {[
-            { n: 1, t: "Share your link", d: "Send it to friends, groups, anyone who plays chess." },
-            { n: 2, t: "They join & play", d: "Sign-up is linked to you automatically — once, forever." },
-            { n: 3, t: "You earn 25%", d: "Every fee they generate lands in your wallet instantly." },
-          ].map((s) => (
-            <div key={s.n} className="bg-ccb-surface/70 border border-ccb-border/70 rounded-xl p-3.5">
-              <div className="w-6 h-6 rounded-full bg-ccb-primary/15 border border-ccb-primary/30 flex items-center justify-center text-[11px] font-extrabold text-ccb-primary mb-2">
-                {s.n}
-              </div>
-              <p className="text-sm font-semibold">{s.t}</p>
-              <p className="text-[11px] text-ccb-muted mt-1">{s.d}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Subpage shortcuts */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {[
-          { href: "/affiliate/dashboard", icon: LayoutDashboard, t: "Dashboard", d: "Charts, stats & activity" },
-          { href: "/affiliate/team", icon: Users, t: "My Team", d: "Every friend & their status" },
-          { href: "/affiliate/how-it-works", icon: BookOpen, t: "Guide", d: "Tips, templates & FAQ" },
-        ].map(({ href, icon: Icon, t, d }) => (
-          <Link
-            key={href}
-            href={href}
-            className="bg-ccb-card border border-ccb-border rounded-2xl p-4 flex items-center gap-3 hover:border-ccb-primary/40 transition-colors group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-ccb-primary/15 border border-ccb-primary/25 flex items-center justify-center shrink-0">
-              <Icon className="w-5 h-5 text-ccb-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold">{t}</p>
-              <p className="text-[11px] text-ccb-muted truncate">{d}</p>
-            </div>
-            <ArrowRight className="w-4 h-4 text-ccb-muted group-hover:text-ccb-primary transition-colors shrink-0" />
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }
-
