@@ -71,7 +71,6 @@ export async function updateSession(request: NextRequest) {
   // Static assets (_next/static, images) are already excluded by the matcher below.
   supabaseResponse.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
   supabaseResponse.headers.set("CDN-Cache-Control", "no-store");
-  supabaseResponse.headers.set("Vercel-CDN-Cache-Control", "no-store");
   supabaseResponse.headers.set("Pragma", "no-cache");
 
   return supabaseResponse;
