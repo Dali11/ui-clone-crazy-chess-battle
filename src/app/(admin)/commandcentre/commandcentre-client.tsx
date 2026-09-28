@@ -320,17 +320,20 @@ export default function CommandCentreClient() {
     );
   };
 
+  const brandBlock = (
+    <div className="mb-6 px-2">
+      <div className="flex items-center gap-2">
+        <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="h-6 w-6 shrink-0 rounded-full" />
+        <p className="text-sm font-bold tracking-tight text-white">Crazy Chess</p>
+      </div>
+      <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-ccb-muted">
+        Command Centre
+      </p>
+    </div>
+  );
+
   const sidebarNav = (
     <>
-      <div className="mb-6 px-2">
-        <p className="text-sm font-bold tracking-tight text-white">
-          <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="h-6 w-6 shrink-0 rounded-full" /> CrazyChess
-        </p>
-        <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-ccb-muted">
-          Command Centre
-        </p>
-      </div>
-
       {navItem("dashboard", "Dashboard")}
       {navGroup("Finance", "finance",
         <>
@@ -388,26 +391,29 @@ export default function CommandCentreClient() {
     <>
       {/* ── Mobile top bar ──────────────────────────────────────────── */}
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-ccb-border bg-ccb-surface/90 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="flex min-w-0 items-center gap-2">
+          <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={28} height={28} className="h-7 w-7 shrink-0 rounded-full" />
+          <p className="flex min-w-0 items-baseline gap-1.5 text-sm font-bold tracking-tight text-white">
+            <span className="whitespace-nowrap">Crazy Chess</span>
+            <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.16em] text-ccb-muted">
+              Command Centre
+            </span>
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => setMobileNavOpen(true)}
           aria-label="Open navigation menu"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-ccb-border text-ccb-muted hover:bg-ccb-surface hover:text-white"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-ccb-border text-ccb-muted hover:bg-ccb-surface hover:text-white"
         >
           <Menu className="h-5 w-5" />
         </button>
-        <p className="text-sm font-bold tracking-tight text-white">
-          <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="h-6 w-6 shrink-0 rounded-full" /> CrazyChess
-          <span className="ml-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-ccb-muted">
-            Command Centre
-          </span>
-        </p>
-        <span className="w-9" aria-hidden />
       </div>
 
       <div className="flex min-h-screen">
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-ccb-border bg-ccb-surface/60 px-3 py-5 lg:flex">
+        {brandBlock}
         {sidebarNav}
       </aside>
 
@@ -687,10 +693,11 @@ export default function CommandCentreClient() {
             aria-hidden
           />
           <aside className="absolute left-0 top-0 h-full w-72 max-w-[85vw] overflow-y-auto border-r border-ccb-border bg-ccb-surface px-3 py-5 shadow-2xl">
-            <div className="mb-6 flex items-start justify-between px-2">
-              <p className="text-sm font-bold tracking-tight text-white">
-                <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="h-6 w-6 shrink-0 rounded-full" /> CrazyChess
-              </p>
+            <div className="mb-6 flex items-center justify-between gap-2 px-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="h-6 w-6 shrink-0 rounded-full" />
+                <p className="text-sm font-bold tracking-tight text-white">Crazy Chess</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setMobileNavOpen(false)}
