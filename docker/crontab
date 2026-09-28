@@ -2,9 +2,10 @@
 */5 * * * * /app/cron-runner.sh /api/tournaments/cron
 */2 * * * * /app/cron-runner.sh /api/battles/heal-stuck
 * * * * * /app/cron-runner.sh /api/game/timeout
-0 0 * * * /app/cron-runner.sh /api/battles/challenge/cleanup-expired
+*/10 * * * * /app/cron-runner.sh /api/battles/challenge/cleanup-expired
 30 13 * * * /app/cron-runner.sh /api/tournaments/reminder-check
 0 0 * * 1 /app/cron-runner.sh /api/tournaments/daily-create
 0 3 * * * /app/cron-runner.sh /api/cron/refresh-fx
 5 22 * * * /app/cron-runner.sh /api/league/xp/settle
 15 22 * * 0 /app/cron-runner.sh /api/cron/revenue-sweep
+*/15 * * * * /app/cron-runner.sh /api/cron/reconcile-payouts
