@@ -1405,14 +1405,7 @@ export function WithdrawalsView() {
               {queue.length}
             </span>
           </div>
-          <a
-            href="/admin"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-ccb-muted hover:text-white transition-colors"
-          >
-            Legacy panel →
-          </a>
+
         </div>
 
         {queue.length === 0 ? (

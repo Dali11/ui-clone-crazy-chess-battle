@@ -71,7 +71,7 @@ const navGroups = [
 
 const adminGroup = {
   title: "Admin",
-  items: [{ href: "/admin", label: "Admin Panel", icon: Shield }],
+  items: [{ href: "/commandcentre", label: "Command Centre", icon: Shield }],
 };
 
 // Tablet top bar (sm–lg). On lg+ the persistent sidebar takes over.

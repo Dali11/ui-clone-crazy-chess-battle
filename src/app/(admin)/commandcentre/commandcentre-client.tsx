@@ -245,12 +245,13 @@ export default function CommandCentreClient() {
 
   const onReview = (item: AttentionItem) => {
     if (item.action === "withdrawals") {
-      window.open("/admin", "_blank"); // approvals live in the legacy panel (no duplicate controls)
+      setView("withdrawals");
     } else if (item.action === "transactions") {
       setView("finance-transactions");
       setTxType("all");
     } else {
-      window.open("/admin", "_blank");
+      // integrity flags
+      setView("integrity");
     }
   };
 
@@ -375,12 +376,6 @@ export default function CommandCentreClient() {
         </>
       )}
       <div className="mt-auto space-y-1 border-t border-ccb-border pt-3">
-        <Link
-          href="/admin"
-          className="block rounded-lg px-3 py-1.5 text-[13px] text-ccb-muted hover:bg-ccb-surface hover:text-white"
-        >
-          Legacy Admin Panel →
-        </Link>
         <p className="px-3 pt-1 text-[10px] text-ccb-muted/60">
           Reporting currency: USD · Phase 1 read-only + Phase 2 finance ops
         </p>
