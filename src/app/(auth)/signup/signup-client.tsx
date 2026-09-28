@@ -226,8 +226,22 @@ export default function SignupPage() {
         return;
       }
 
+      // ── Post-signup: rating setup + referral attribution (2026-09-28
+      // hardening). Attribution now happens SERVER-SIDE in set-rating (the
+      // first credit-able moment), with the direct track call kept as a
+      // fallback. The stored code is only cleared on a definitive outcome —
+      // a transient failure leaves it bound to THIS account so the next
+      // login retries it (see login-client).
+      let refSettled = false;
+      const ref = refCode || localStorage.getItem("ccb_ref_code");
+      if (ref) {
+        // Bind the pending attribution to this account BEFORE any network
+        // call — only this user's login will retry it, never another account.
+        localStorage.setItem("ccb_ref_user", data.user.id);
+      }
+
       try {
-        await fetch("/api/auth/set-rating", {
+        const srRes = await fetch("/api/auth/set-rating", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -236,26 +250,45 @@ export default function SignupPage() {
             chesscomRating: chesscomVerified?.rating || null,
             chesscomUsername: chesscomVerified?.username || null,
             country,
+            refCode: ref || undefined,
           }),
         });
-
-        const ref = refCode || localStorage.getItem("ccb_ref_code");
-        if (ref) {
-          try {
-            await fetch("/api/affiliate/track", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ referrerCode: ref, referredId: data.user.id }),
-            });
-          } catch (refErr) {
-            console.error("Referral tracking failed:", refErr);
-          }
-          localStorage.removeItem("ccb_ref_code");
+        if (srRes.ok) {
+          const srData = await srRes.json();
+          if (srData?.refTracked) refSettled = true;
         }
+      } catch (srErr: any) {
+        console.error("Post-signup rating error:", srErr);
+      }
 
-        
-      } catch (postErr: any) {
-        console.error("Post-signup error:", postErr);
+      // Fallback (also settles a server-side track that the block above
+      // missed, e.g. when set-rating hit its signup window limit):
+      if (ref && !refSettled) {
+        try {
+          const trRes = await fetch("/api/affiliate/track", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ referrerCode: ref, referredId: data.user.id }),
+          });
+          if (trRes.ok) {
+            const trData = await trRes.json();
+            if (trData?.tracked || trData?.reason === "already_referred") {
+              refSettled = true;
+            }
+          } else if (trRes.status >= 400 && trRes.status < 500) {
+            // Definitive rejection (unknown code / self-referral) — stop retrying.
+            refSettled = true;
+          }
+        } catch (refErr) {
+          console.error("Referral tracking failed:", refErr);
+        }
+        // 5xx or network error: keep the stored code + binding for the
+        // login-time retry. Never clear on a maybe-transient failure.
+      }
+
+      if (ref && refSettled) {
+        localStorage.removeItem("ccb_ref_code");
+        localStorage.removeItem("ccb_ref_user");
       }
 
       const fullRedirect = actionParam

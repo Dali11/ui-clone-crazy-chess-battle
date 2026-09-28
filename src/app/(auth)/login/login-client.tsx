@@ -41,7 +41,44 @@ export default function LoginPage() {
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
         });
-        if (sessionErr) errorMessage = "Login failed — please try again";
+        if (sessionErr) { errorMessage = "Login failed — please try again";
+        } else {
+          // Affiliate attribution retry (2026-09-28): if THIS account's
+          // signup attribution failed (blocker / network / 5xx), settle it
+          // now. Only fires when the stored code is bound to this exact
+          // account (see signup-client) - an existing user who merely clicked
+          // a partner link is never attributed. Server-side idempotent.
+          try {
+            const ref = localStorage.getItem("ccb_ref_code");
+            const boundUser = localStorage.getItem("ccb_ref_user");
+            if (ref && boundUser) {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user && user.id === boundUser) {
+                const trRes = await fetch("/api/affiliate/track", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ referrerCode: ref, referredId: user.id }),
+                });
+                if (trRes.ok) {
+                  const trData = await trRes.json();
+                  if (trData?.tracked || trData?.reason === "already_referred") {
+                    localStorage.removeItem("ccb_ref_code");
+                    localStorage.removeItem("ccb_ref_user");
+                  }
+                } else if (trRes.status >= 400 && trRes.status < 500) {
+                  // Definitive rejection - stop retrying on every login.
+                  localStorage.removeItem("ccb_ref_code");
+                  localStorage.removeItem("ccb_ref_user");
+                }
+                // 5xx / network: keep both keys - retry on the next login.
+              }
+              // Different account: leave the keys untouched - the binding
+              // stays inert until the bound account logs in.
+            }
+          } catch {
+            // Attribution retry must never block login.
+          }
+        }
       }
     } catch {
       errorMessage = "Login failed — please try again";

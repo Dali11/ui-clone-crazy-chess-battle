@@ -1,15 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { normalizeRefCode, validateTrackRequest } from "@/lib/affiliate/track";
+import {
+  normalizeRefCode,
+  validateTrackRequest,
+  attributeReferral,
+} from "@/lib/affiliate/track";
 
 /**
  * POST /api/affiliate/track  { referrerCode, referredId }
  *
- * Called right after signup: records ONE referral row linking the new
- * player to the person whose link they used. Never credits anything —
- * commissions only fire later, when the referred player buys membership
- * (and only while the affiliate switch is ON).
+ * Called right after signup (and as a login-time retry — see login-client):
+ * records ONE referral row linking the new player to the person whose link
+ * they used. Never credits anything — commissions only fire later, when the
+ * referred player buys membership (and only while the affiliate switch is ON).
+ *
+ * Attribution logic lives in the shared attributeReferral() helper, which the
+ * signup-completion route (/api/auth/set-rating) also calls server-side, so
+ * tracking survives client-side blockers and network hiccups.
+ *
+ * Response contract (relied on by signup/login clients):
+ *   200 {tracked: true}                      — referral recorded
+ *   200 {tracked: false, reason: already_referred} — nothing to do, settled
+ *   400 {error}                              — definitive rejection (unknown
+ *                                             code / self-referral): caller
+ *                                             should stop retrying
+ *   500 {error}                              — transient: caller may retry
  */
 export async function POST(req: NextRequest) {
   try {
@@ -21,63 +37,26 @@ export async function POST(req: NextRequest) {
     const check = validateTrackRequest(referrerCode, referredId, user.id);
     if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
-    const code = normalizeRefCode(referrerCode);
+    // Keep the code as typed by the referrer (exact case stored in the row),
+    // while lookup stays case-insensitive inside attributeReferral.
+    const rawCode = (referrerCode || "").trim();
+    void normalizeRefCode(rawCode);
+
     const admin = createAdminClient();
+    const result = await attributeReferral(admin, rawCode, user.id);
 
-    // Resolve referrer by referral code, falling back to username (links may
-    // be built from either — profiles.referral_code falls back to username).
-    // Usernames/codes can contain uppercase letters, so match case-
-    // insensitively (same convention as /api/auth/login and
-    // /api/auth/forgot-password), preferring an exact-case hit if two rows
-    // differ only by case.
-    let ref: { id: string } | null = null;
-
-    const { data: byCode } = await admin
-      .from("profiles")
-      .select("id, referral_code, username")
-      .ilike("referral_code", code)
-      .limit(5);
-    ref = (byCode?.find((c: any) => c.referral_code === code) ?? byCode?.[0]) || null;
-
-    if (!ref) {
-      const { data: byUsername } = await admin
-        .from("profiles")
-        .select("id, referral_code, username")
-        .ilike("username", code)
-        .limit(5);
-      ref = (byUsername?.find((c: any) => c.username === code) ?? byUsername?.[0]) || null;
-    }
-
-    if (!ref) return NextResponse.json({ error: "Unknown referral code" }, { status: 400 });
-    if (ref.id === user.id) return NextResponse.json({ error: "Self-referral" }, { status: 400 });
-
-    // One referral per referred player — a second signup link changes nothing.
-    // (Also enforced at the DB level by a unique index on referred_id.)
-    const { data: existing } = await admin
-      .from("referrals")
-      .select("id")
-      .eq("referred_id", user.id)
-      .limit(1);
-    if (existing && existing.length > 0) {
-      return NextResponse.json({ tracked: false, reason: "already_referred" });
-    }
-
-    const { error: insertError } = await admin.from("referrals").insert({
-      referrer_id: ref.id,
-      referred_id: user.id,
-      referral_code: code,
-      status: "pending",
-      berries_awarded: 0,
-    });
-    if (insertError) {
-      // Race: another request for the same referred_id won by a hair.
-      if (insertError.code === "23505") {
-        return NextResponse.json({ tracked: false, reason: "already_referred" });
-      }
-      console.error("affiliate track insert error", insertError);
+    if (!result.settled) {
       return NextResponse.json({ error: "Tracking failed" }, { status: 500 });
     }
-
+    if (result.status === "unknown") {
+      return NextResponse.json({ error: "Unknown referral code" }, { status: 400 });
+    }
+    if (result.status === "self") {
+      return NextResponse.json({ error: "Self-referral" }, { status: 400 });
+    }
+    if (result.status === "already") {
+      return NextResponse.json({ tracked: false, reason: "already_referred" });
+    }
     return NextResponse.json({ tracked: true });
   } catch (e) {
     console.error("affiliate track error", e);

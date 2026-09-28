@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
+import { attributeReferral } from "@/lib/affiliate/track";
 
 /**
  * SECURITY FIX 2026-09-16 (CRITICAL): this route was previously completely
@@ -108,6 +109,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to set rating" }, { status: 500 });
     }
 
+    // Affiliate attribution (2026-09-28 hardening): the signup-completion
+    // call is the first credit-able moment with a verified session user, so
+    // the referral is recorded server-side here — attribution no longer
+    // depends on the client's follow-up /api/affiliate/track call (which
+    // privacy blockers or a network blip could swallow). Idempotent: one
+    // referral per referred player. Failure must never block signup.
+    let refTracked = false;
+    const refCode: string | null | undefined = body?.refCode;
+    if (refCode) {
+      try {
+        const attr = await attributeReferral(admin, refCode, user.id);
+        refTracked = attr.attributed; // true for inserted AND already-referred
+        if (!attr.settled) {
+          console.error(`[affiliate] set-rating attribution transient failure user=${user.id}`);
+        }
+      } catch (e) {
+        console.error("[affiliate] set-rating attribution error:", e);
+      }
+    }
+
     // Send welcome email (same template as before)
     const { data: userData } = await admin.auth.admin.getUserById(user.id);
     const username = userData?.user?.user_metadata?.username || "Player";
@@ -130,6 +151,9 @@ export async function POST(req: NextRequest) {
       rating: targetRating,
       source: chesscomRating ? "chesscom" : "level",
       chessLevel: chessLevel || "beginner",
+      // True when the referral (if any) was recorded server-side — the client
+      // uses it to decide whether the follow-up track call / retry is needed.
+      refTracked,
     });
   } catch (e: any) {
     console.error("set-rating error:", e);
