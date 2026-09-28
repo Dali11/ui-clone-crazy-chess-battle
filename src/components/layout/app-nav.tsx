@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import {
   Home, Swords, User, Wallet, Shield, Coins,
   Crown, Menu, X, Trophy, Radio, Settings, MessageCircle,
-  Megaphone,
+  Megaphone, Gift, BadgeCheck,
 } from "lucide-react";
 import NotificationBell from "./notification-bell";
 import { useCurrency } from "@/hooks/use-currency";
@@ -36,7 +36,7 @@ function isPathActive(pathname: string, href: string): boolean {
 // ─── Navigation model ─────────────────────────────────────────────────────
 // The menu is deliberately short: pages absorb their sub-features —
 //   · /play offers vs Player / vs Computer / Draughts
-//   · /wallet links Membership + Affiliate
+//   · Membership & Affiliate are top-level menu entries (2026-09-28)
 //   · /settings links Academy + Game History
 // The same groups drive the desktop sidebar (lg+) and the menu overlay.
 const navGroups = [
@@ -62,6 +62,8 @@ const navGroups = [
       { href: "/wallet", label: "Wallet", icon: Wallet },
       { href: "/chats", label: "Chats", icon: MessageCircle },
       { href: "/friends", label: "Friends", icon: Users },
+      { href: "/membership", label: "Membership", icon: BadgeCheck },
+      { href: "/affiliate", label: "Affiliate & Referrals", icon: Gift },
       { href: "/advertise", label: "Advertise", icon: Megaphone },
     ],
   },
@@ -364,7 +366,8 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
       )}
 
       {/* === MOBILE BOTTOM NAV — redesign C (owner-approved 2026-09-26):
-            dark bar · Battles · Advertise · [raised Play FAB] · Tournaments · Leagues === */}
+            dark bar · Battles · Referrals · [raised Play FAB] · Tournaments · Leagues
+            (2026-09-28: Advertise → Referrals, owner request) === */}
       {!isGameRoute && (
         <nav
           className="fixed bottom-0 left-0 right-0 z-[100] border-t border-ccb-border bg-ccb-dark sm:hidden"
@@ -374,7 +377,7 @@ export default function AppNav({ profile }: { profile: Profile | null }) {
             {/* Left pair */}
             {[
               { href: "/battles", label: "Battles", icon: Coins },
-              { href: "/advertise", label: "Advertise", icon: Megaphone },
+              { href: "/affiliate", label: "Referrals", icon: Gift },
             ].map((item) => {
               const Icon = item.icon;
               const active = isPathActive(pathname, item.href);
