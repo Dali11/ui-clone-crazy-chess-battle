@@ -258,11 +258,13 @@ export async function GET(req: NextRequest) {
     const battleRakeUsd = (b: any): number => {
       const rakeUnits = battleRakeUnits(b);
       if (rakeUnits <= 0) return 0;
-      // Stake is denominated in the challenge creator's wallet currency;
-      // white player is a stable per-row anchor for Phase 1 conversion.
-      const country = countryOf(b.white_player_id);
-      const currency = COUNTRY_CURRENCY[country || ""] || "MWK";
-      return roundUsd(fx.toUsdOrZero(rakeUnits, currency));
+      // BUG FIX 2026-09-29: stake/pot/winner_payout on `battles` are always
+      // stored in MWK — the platform's internal ledger unit — regardless
+      // of either player's country (see api/battles/challenge/create).
+      // The previous code re-converted the MWK amount as if it were the
+      // white player's LOCAL wallet currency, inflating reported battle
+      // revenue for every non-Malawi country by ~70-100x.
+      return roundUsd(fx.usdFromMwk(rakeUnits) ?? 0);
     };
 
     const revenueFromDeposits = (rows: any[]) => {

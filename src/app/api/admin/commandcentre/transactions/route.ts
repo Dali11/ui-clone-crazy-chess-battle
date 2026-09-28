@@ -201,7 +201,12 @@ export async function GET(req: NextRequest) {
         userIds.add(b.white_player_id);
       }
 
-      // Resolve the stake currency via the white player's wallet country.
+      // Country here is metadata only (which market the white player is
+      // in) — it does NOT change the rake's currency. stake/pot/
+      // winner_payout on `battles` are always stored in MWK regardless of
+      // either player's country (see api/battles/challenge/create).
+      // Previously this converted the MWK rake as if it were the white
+      // player's LOCAL currency, inflating non-Malawi battle revenue.
       const whiteProfiles = battleUserIds.size
         ? await admin.from("profiles").select("id, country").in("id", [...battleUserIds])
         : { data: [] as any[] };
@@ -211,16 +216,15 @@ export async function GET(req: NextRequest) {
 
       for (const b of battleRows) {
         const country = whiteCountry.get(b.white_player_id) || null;
-        const currency = COUNTRY_CURRENCY[country || ""] || "MWK";
         rows.push({
           id: b.id,
           kind: "battle_fee",
           playerId: b.white_player_id,
           playerName: null,
           country,
-          amountUsd: fx.toUsd(battleRakeUnits(b), currency),
+          amountUsd: fx.usdFromMwk(battleRakeUnits(b)),
           localAmount: battleRakeUnits(b),
-          localCurrency: currency,
+          localCurrency: "MWK",
           status: "completed",
           time: b.completed_at,
           reference: null,

@@ -177,8 +177,13 @@ export async function GET(req: NextRequest) {
       if (rake <= 0) continue;
       const code = countryOf(b.white_player_id) || "ZZ";
       const m = marketOf(code);
-      const currency = COUNTRY_CURRENCY[code] || "MWK";
-      m.revenueUsd += fx.toUsd(rake, currency) ?? 0;
+      // Battle stake/pot/winner_payout are always stored in MWK — the
+      // platform's internal ledger unit — regardless of the player's
+      // country (see challenge/create/route.ts). Using the player's
+      // LOCAL currency here (e.g. ZMW for Zambia) instead of MWK was
+      // the bug: it divided an MWK amount by a ZMW rate, inflating
+      // non-Malawi revenue by ~70-100x. Always normalize via MWK.
+      m.revenueUsd += fx.usdFromMwk(rake) ?? 0;
       if (b.white_player_id) m.players.add(b.white_player_id);
     }
 

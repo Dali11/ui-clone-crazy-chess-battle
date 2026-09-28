@@ -149,7 +149,10 @@ export async function GET(req: NextRequest) {
           const { data: bp } = await admin.from("profiles").select("country").eq("id", b.white_player_id).single();
           const c = bp?.country || null;
           if (country && c !== country) continue;
-          out.push({ date: b.completed_at, stream: "battles", country: c, usd: fx.toUsd(rake, COUNTRY_CURRENCY[(c || "").toUpperCase()] || "MWK") ?? 0 });
+          // Battle stake/pot are always MWK-denominated (internal ledger
+          // unit) regardless of the player's country — see the markets
+          // and overview routes for the full fix note.
+          out.push({ date: b.completed_at, stream: "battles", country: c, usd: fx.usdFromMwk(rake) ?? 0 });
         }
         lines.push(["date", "stream", "country", "usd"].join(","));
         for (const r of out.sort((a, b) => Date.parse(b.date) - Date.parse(a.date))) {
