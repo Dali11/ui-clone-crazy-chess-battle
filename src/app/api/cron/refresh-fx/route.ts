@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       "DZD", "TND", "ETB", "XOF", "XAF", "CDF", "AOA", "MGA",
       "MUR", "SCR", "SZL", "LSL", "CAD", "EUR", "CHF", "NOK",
       "SEK", "DKK", "AUD", "NZD", "CNY", "INR", "JPY", "BRL",
-      "MXN", "ZMW",
+      "MXN",
     ];
 
     let updated = 0;
