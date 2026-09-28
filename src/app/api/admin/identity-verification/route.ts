@@ -22,9 +22,45 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const filter = searchParams.get("filter") || "pending";
 
+    // Review history for one player: every identity + KYC review action
+    // ever taken against them, newest first, with the admin's name.
+    if (searchParams.get("history")) {
+      const playerId = searchParams.get("playerId");
+      if (!playerId) return NextResponse.json({ error: "Missing playerId" }, { status: 400 });
+      const { data: logs } = await admin
+        .from("admin_logs")
+        .select("id, admin_id, action, details, created_at")
+        .in("action", ["identity_verification", "identity_rejection", "kyc_review"])
+        .eq("target_id", playerId)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      const adminIds = [...new Set((logs || []).map((l: any) => l.admin_id))];
+      const adminNames = new Map<string, string>();
+      if (adminIds.length > 0) {
+        const { data: admins } = await admin
+          .from("profiles")
+          .select("id, username, display_name")
+          .in("id", adminIds);
+        for (const a of admins || []) adminNames.set(a.id, a.display_name || a.username || "Admin");
+      }
+      const history = (logs || []).map((l: any) => ({
+        id: l.id,
+        action: l.action,
+        details: l.details,
+        time: l.created_at,
+        adminName: adminNames.get(l.admin_id) || "Admin",
+      }));
+      return NextResponse.json({ history });
+    }
+
+    const q = (searchParams.get("q") || "").trim();
+    // PostgREST .or() syntax uses commas — strip characters that would
+    // break out of the filter expression.
+    const safeQ = q.replace(/[,()]/g, "").trim();
+
     let query = admin
       .from("profiles")
-      .select("id, username, display_name, full_name, email, gender, identity_verified, identity_verified_at, gender_verified_at, phone_verified, phone, avatar_url, country, created_at")
+      .select("id, username, display_name, full_name, email, gender, identity_verified, identity_verified_at, gender_verified_at, phone_verified, phone, avatar_url, country, created_at", { count: "exact" })
       .order("created_at", { ascending: false });
 
     if (filter === "pending") {
@@ -33,10 +69,18 @@ export async function GET(req: NextRequest) {
       query = query.eq("identity_verified", true);
     }
 
-    const { data: players, error } = await query.limit(100);
+    if (safeQ) {
+      query = query.or(
+        `username.ilike.%${safeQ}%,display_name.ilike.%${safeQ}%,full_name.ilike.%${safeQ}%,email.ilike.%${safeQ}%,phone.ilike.%${safeQ}%`
+      );
+    }
+
+    // Cap the rendered list at 100 newest matches; `count` still reports
+    // the true total so the UI can say "showing 100 of N — refine search".
+    const { data: players, count, error } = await query.limit(100);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    return NextResponse.json({ players });
+    return NextResponse.json({ players, total: count ?? (players || []).length });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to fetch players" }, { status: 500 });
   }

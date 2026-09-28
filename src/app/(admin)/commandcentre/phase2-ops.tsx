@@ -1269,9 +1269,15 @@ export function VerificationView() {
 
   const [idFilter, setIdFilter] = useState<"pending" | "verified" | "all">("pending");
   const [players, setPlayers] = useState<VerificationPlayer[]>([]);
+  const [playersTotal, setPlayersTotal] = useState<number>(0);
   const [playersLoading, setPlayersLoading] = useState(true);
   const [playersError, setPlayersError] = useState<string | null>(null);
   const [playerBusy, setPlayerBusy] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [activeSearch, setActiveSearch] = useState("");
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
+  const [history, setHistory] = useState<{ id: string; action: string; details: any; time: string; adminName: string }[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   const fetchKyc = useCallback(async () => {
@@ -1289,24 +1295,48 @@ export function VerificationView() {
     }
   }, []);
 
-  const fetchPlayers = useCallback(async (filter: "pending" | "verified" | "all") => {
+  const fetchPlayers = useCallback(async (filter: "pending" | "verified" | "all", q?: string) => {
     setPlayersLoading(true);
     setPlayersError(null);
     try {
-      const res = await fetch(`/api/admin/identity-verification?filter=${filter}`, { cache: "no-store" });
+      const params = new URLSearchParams({ filter });
+      if (q) params.set("q", q);
+      const res = await fetch(`/api/admin/identity-verification?${params}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load players");
       const data = await res.json();
       setPlayers(data.players || []);
+      setPlayersTotal(data.total || 0);
     } catch (err: unknown) {
       setPlayersError(err instanceof Error ? err.message : "Failed to load players");
       setPlayers([]);
+      setPlayersTotal(0);
     } finally {
       setPlayersLoading(false);
     }
   }, []);
 
+  const fetchHistory = useCallback(async (playerId: string) => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/admin/identity-verification?playerId=${playerId}&history=1`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load history");
+      const data = await res.json();
+      setHistory(data.history || []);
+    } catch {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
   useEffect(() => { fetchKyc(); }, [fetchKyc]);
-  useEffect(() => { fetchPlayers(idFilter); }, [idFilter, fetchPlayers]);
+  useEffect(() => { fetchPlayers(idFilter, activeSearch); }, [idFilter, activeSearch, fetchPlayers]);
+
+  const HISTORY_ACTION_LABELS: Record<string, string> = {
+    identity_verification: "Identity verified",
+    identity_rejection: "Verification revoked",
+    kyc_review: "KYC document reviewed",
+  };
 
   const setKycAction = (id: string, action: KycAction) =>
     setKycActions((prev) => ({ ...prev, [id]: action }));
@@ -1366,7 +1396,7 @@ export function VerificationView() {
           </p>
         </div>
         <button
-          onClick={() => { fetchKyc(); fetchPlayers(idFilter); }}
+          onClick={() => { fetchKyc(); fetchPlayers(idFilter, activeSearch); }}
           className="rounded-lg border border-ccb-border bg-ccb-surface px-3 py-1.5 text-xs text-ccb-muted transition hover:border-violet-500 hover:text-white"
         >
           Refresh
@@ -1520,6 +1550,34 @@ export function VerificationView() {
 
       {/* Player identity / gender confirmation */}
       <div className="space-y-3">
+        <form
+          onSubmit={(e) => { e.preventDefault(); setActiveSearch(search.trim()); }}
+          className="flex flex-wrap items-center gap-2"
+        >
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search username, name, email or phone..."
+            className="min-w-[220px] flex-1 rounded-lg border border-ccb-border bg-ccb-surface px-3 py-1.5 text-xs text-white placeholder:text-ccb-muted focus:border-violet-500 focus:outline-none"
+          />
+          <button type="submit" className="rounded-lg border border-ccb-border bg-ccb-surface px-3 py-1.5 text-xs font-medium text-ccb-muted transition hover:border-violet-500 hover:text-white">
+            Search
+          </button>
+          {activeSearch && (
+            <button
+              type="button"
+              onClick={() => { setSearch(""); setActiveSearch(""); }}
+              className="text-xs text-ccb-muted underline transition hover:text-white"
+            >
+              Clear
+            </button>
+          )}
+          <span className="ml-auto text-[11px] text-ccb-muted">
+            {playersTotal > players.length
+              ? `Showing ${players.length} of ${playersTotal} — refine search to narrow`
+              : `${playersTotal} result${playersTotal === 1 ? "" : "s"}`}
+          </span>
+        </form>
         <div className="flex items-center gap-2">
           {(["pending", "verified", "all"] as const).map((f) => (
             <button
@@ -1608,7 +1666,52 @@ export function VerificationView() {
                       Revoke
                     </button>
                   )}
+                  <button
+                    onClick={() => {
+                      if (historyFor === p.id) { setHistoryFor(null); return; }
+                      setHistoryFor(p.id);
+                      fetchHistory(p.id);
+                    }}
+                    className="ml-auto rounded-lg px-2 py-1 text-[12px] font-medium text-ccb-muted transition hover:text-white"
+                  >
+                    {historyFor === p.id ? "Hide history" : "History"}
+                  </button>
                 </div>
+
+                {historyFor === p.id && (
+                  <div className="rounded-lg border border-ccb-border/60 bg-ccb-surface/60 p-2 text-[11px]">
+                    {historyLoading ? (
+                      <p className="text-ccb-muted">Loading review history...</p>
+                    ) : history.length === 0 ? (
+                      <p className="text-ccb-muted">No review actions recorded for this player yet.</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {history.map((h) => (
+                          <li key={h.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className={`font-semibold ${
+                              h.action === "identity_rejection" || (h.action === "kyc_review" && h.details?.decision === "reject")
+                                ? "text-red-400"
+                                : "text-emerald-400"
+                            }`}>
+                              {HISTORY_ACTION_LABELS[h.action] || h.action}
+                            </span>
+                            {h.action === "kyc_review" && h.details?.decision && (
+                              <span className="rounded bg-ccb-card px-1 py-0.5 text-[10px] uppercase tracking-wide text-ccb-muted">
+                                {h.details.decision}
+                              </span>
+                            )}
+                            {h.details?.reason && (
+                              <span className="italic text-ccb-muted">"{h.details.reason}"</span>
+                            )}
+                            <span className="ml-auto text-ccb-muted">
+                              {h.adminName} · {new Date(h.time).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -111,6 +111,22 @@ export async function POST(req: NextRequest) {
       if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
     }
 
+    // Audit trail — KYC reviews were previously invisible in admin_logs.
+    try {
+      await admin.from("admin_logs").insert({
+        admin_id: user.id,
+        action: "kyc_review",
+        target_type: "profile",
+        target_id: sub.user_id,
+        details: {
+          decision,
+          reason: reason || null,
+          submissionId,
+          docType: sub.doc_type || null,
+        },
+      });
+    } catch {}
+
     await admin.from("notifications").insert({
       user_id: sub.user_id,
       type: "kyc",
