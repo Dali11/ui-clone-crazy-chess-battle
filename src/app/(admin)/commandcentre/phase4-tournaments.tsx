@@ -16,7 +16,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   RefreshCw, Trophy, Swords, Users, Calendar, Trash2, Copy, Play,
-  Square, ChevronRight, X, Check, Ban, Pencil, Loader2, Crown, ShieldAlert,
+  Square, ChevronRight, X, Check, Ban, Pencil, Loader2, Crown, ShieldAlert, MoreHorizontal,
 } from "lucide-react";
 import { timeAgo } from "./sections";
 
@@ -82,6 +82,7 @@ interface TournamentRow {
 /* ═══════════════════════════ TournamentsView ═══════════════════════════ */
 
 export function TournamentsView() {
+  const [moreOpen, setMoreOpen] = useState<string | null>(null);
   const [tournaments, setTournaments] = useState<TournamentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -360,22 +361,27 @@ export function TournamentsView() {
                   {["upcoming", "active"].includes(t.status) && (
                     <button onClick={() => openEdit(t)} className={btnGhost}><Pencil className="h-3 w-3" /> Edit</button>
                   )}
-                  {["upcoming", "active"].includes(t.status) && (
-                    <button disabled={busy[`${t.id}:cancel`]} onClick={() => (confirming === `cancel:${t.id}` ? act(t, "cancel") : setConfirming(`cancel:${t.id}`))} className={btnDanger}>
-                      <Square className="h-3 w-3" /> {confirming === `cancel:${t.id}` ? "Confirm cancel?" : "Cancel"}
-                    </button>
-                  )}
-                  {t.status === "active" && (
-                    <button disabled={busy[`${t.id}:force_finish`]} onClick={() => (confirming === `force_finish:${t.id}` ? act(t, "force_finish") : setConfirming(`force_finish:${t.id}`))} className={btnDanger}>
-                      <Square className="h-3 w-3" /> {confirming === `force_finish:${t.id}` ? "Confirm finish?" : "Force finish"}
-                    </button>
-                  )}
-                  <button disabled={busy[`${t.id}:duplicate`]} onClick={() => act(t, "duplicate")} className={btnGhost}>
-                    <Copy className="h-3 w-3" /> Duplicate
+                  <button onClick={() => setMoreOpen(moreOpen === t.id ? null : t.id)} className={`${btnGhost} md:hidden`}>
+                    <MoreHorizontal className="h-3 w-3" /> {moreOpen === t.id ? "Less" : "More"}
                   </button>
-                  <button disabled={busy[`${t.id}:delete`]} onClick={() => (confirming === `delete:${t.id}` ? act(t, "delete") : setConfirming(`delete:${t.id}`))} className={btnDanger}>
-                    <Trash2 className="h-3 w-3" /> {confirming === `delete:${t.id}` ? "Confirm delete?" : "Delete"}
-                  </button>
+                  <div className={`${moreOpen === t.id ? "flex" : "hidden"} w-full flex-wrap items-center gap-1.5 md:flex`}>
+                    {["upcoming", "active"].includes(t.status) && (
+                      <button disabled={busy[`${t.id}:cancel`]} onClick={() => (confirming === `cancel:${t.id}` ? act(t, "cancel") : setConfirming(`cancel:${t.id}`))} className={btnDanger}>
+                        <Square className="h-3 w-3" /> {confirming === `cancel:${t.id}` ? "Confirm cancel?" : "Cancel"}
+                      </button>
+                    )}
+                    {t.status === "active" && (
+                      <button disabled={busy[`${t.id}:force_finish`]} onClick={() => (confirming === `force_finish:${t.id}` ? act(t, "force_finish") : setConfirming(`force_finish:${t.id}`))} className={btnDanger}>
+                        <Square className="h-3 w-3" /> {confirming === `force_finish:${t.id}` ? "Confirm finish?" : "Force finish"}
+                      </button>
+                    )}
+                    <button disabled={busy[`${t.id}:duplicate`]} onClick={() => act(t, "duplicate")} className={btnGhost}>
+                      <Copy className="h-3 w-3" /> Duplicate
+                    </button>
+                    <button disabled={busy[`${t.id}:delete`]} onClick={() => (confirming === `delete:${t.id}` ? act(t, "delete") : setConfirming(`delete:${t.id}`))} className={btnDanger}>
+                      <Trash2 className="h-3 w-3" /> {confirming === `delete:${t.id}` ? "Confirm delete?" : "Delete"}
+                    </button>
+                  </div>
                 </div>
               </div>
               {confirming && confirming.endsWith(`:${t.id}`) && (
@@ -685,19 +691,23 @@ export function GamesView() {
             <span>White</span><span>Black</span><span>Status</span><span>Created</span><span className="text-right">Actions</span>
           </div>
           {games.map((g) => (
-            <div key={g.id} className="grid grid-cols-1 items-center gap-2 border-b border-ccb-border/60 px-4 py-2.5 last:border-b-0 odd:bg-ccb-card/40 md:grid-cols-[1fr_1fr_auto_auto_auto] md:gap-3">
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="h-2.5 w-2.5 rounded-full border border-ccb-muted/60 bg-white" />
-                <span className="truncate text-white">{nameOf(g, "white")}</span>
-                <span className="text-ccb-muted">{g.white_rating ?? ""}</span>
-                {g.winner === "white" && <Crown className="h-3 w-3 text-amber-400" />}
+            <div key={g.id} className="border-b border-ccb-border/60 px-3 py-2.5 last:border-b-0 odd:bg-ccb-card/40 md:grid md:grid-cols-[1fr_1fr_auto_auto_auto] md:items-center md:gap-3 md:px-4 md:py-2">
+              <div className="flex min-w-0 items-center gap-1.5 md:contents">
+                <div className="flex min-w-0 items-center gap-1.5 text-xs">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full border border-ccb-muted/60 bg-white" />
+                  <span className="truncate text-white">{nameOf(g, "white")}</span>
+                  <span className="shrink-0 text-ccb-muted">{g.white_rating ?? ""}</span>
+                  {g.winner === "white" && <Crown className="h-3 w-3 shrink-0 text-amber-400" />}
+                </div>
+                <span className="shrink-0 text-[10px] italic text-ccb-muted md:hidden">vs</span>
+                <div className="flex min-w-0 items-center gap-1.5 text-xs">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full border border-ccb-muted bg-black" />
+                  <span className="truncate text-white">{nameOf(g, "black")}</span>
+                  <span className="shrink-0 text-ccb-muted">{g.black_rating ?? ""}</span>
+                  {g.winner === "black" && <Crown className="h-3 w-3 shrink-0 text-amber-400" />}
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="h-2.5 w-2.5 rounded-full border border-ccb-muted bg-black" />
-                <span className="truncate text-white">{nameOf(g, "black")}</span>
-                <span className="text-ccb-muted">{g.black_rating ?? ""}</span>
-                {g.winner === "black" && <Crown className="h-3 w-3 text-amber-400" />}
-              </div>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 md:mt-0 md:contents">
               <div className="flex items-center gap-1.5">
                 {statusBadge(g.status)}
                 {!g.tournament_id && g.tournament_id !== undefined && <span className="text-[9px] uppercase text-ccb-muted">Casual</span>}
@@ -730,6 +740,7 @@ export function GamesView() {
                   </button>
                 )}
                 <span className="hidden text-[11px] text-ccb-muted lg:inline">{g.move_count ?? 0} moves · {winnerLabel(g)}</span>
+              </div>
               </div>
             </div>
           ))}
@@ -1063,24 +1074,28 @@ export function BattlesView() {
             <span>White</span><span>Black</span><span>Stake</span><span>Status</span><span>Created</span><span className="text-right">Actions</span>
           </div>
           {battles.map((b) => (
-            <div key={b.id} className={`grid grid-cols-1 items-center gap-2 border-b border-ccb-border/60 px-4 py-2.5 last:border-b-0 odd:bg-ccb-card/40 md:grid-cols-[1fr_1fr_auto_auto_auto_auto] md:gap-3 ${b.stuck ? "ring-1 ring-amber-500/40" : ""}`}>
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="h-2.5 w-2.5 rounded-full border border-ccb-muted/60 bg-white" />
-                <span className="truncate text-white">{nameOf(b.white_player, b.white_player_id)}</span>
-                {b.winner_id === b.white_player_id && <Crown className="h-3 w-3 text-amber-400" />}
+            <div key={b.id} className={`border-b border-ccb-border/60 px-3 py-2.5 last:border-b-0 odd:bg-ccb-card/40 md:grid md:grid-cols-[1fr_1fr_auto_auto_auto_auto] md:items-center md:gap-3 md:px-4 md:py-2 ${b.stuck ? "ring-1 ring-amber-500/40" : ""}`}>
+              <div className="flex min-w-0 items-center gap-1.5 md:contents">
+                <div className="flex min-w-0 items-center gap-1.5 text-xs">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full border border-ccb-muted/60 bg-white" />
+                  <span className="truncate text-white">{nameOf(b.white_player, b.white_player_id)}</span>
+                  {b.winner_id === b.white_player_id && <Crown className="h-3 w-3 shrink-0 text-amber-400" />}
+                </div>
+                <span className="shrink-0 text-[10px] italic text-ccb-muted md:hidden">vs</span>
+                <div className="flex min-w-0 items-center gap-1.5 text-xs">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full border border-ccb-muted bg-black" />
+                  <span className="truncate text-white">{nameOf(b.black_player, b.black_player_id)}</span>
+                  {b.winner_id === b.black_player_id && <Crown className="h-3 w-3 shrink-0 text-amber-400" />}
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="h-2.5 w-2.5 rounded-full border border-ccb-muted bg-black" />
-                <span className="truncate text-white">{nameOf(b.black_player, b.black_player_id)}</span>
-                {b.winner_id === b.black_player_id && <Crown className="h-3 w-3 text-amber-400" />}
-              </div>
-              <span className="font-mono text-[11px] text-white">{fmtUsd(b.stakeUsd)}</span>
-              <div className="flex items-center gap-1.5">
-                {statusBadge(b.stuck ? "stuck" : b.status)}
-                {b.settled && <span className="text-[9px] uppercase text-ccb-muted">Settled</span>}
-              </div>
-              <span className="text-[11px] text-ccb-muted">{timeAgo(b.created_at)}</span>
-              <div className="flex items-center justify-end gap-1.5">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 md:mt-0 md:contents">
+                <span className="font-mono text-[11px] text-white">{fmtUsd(b.stakeUsd)}</span>
+                <div className="flex items-center gap-1.5">
+                  {statusBadge(b.stuck ? "stuck" : b.status)}
+                  {b.settled && <span className="text-[9px] uppercase text-ccb-muted">Settled</span>}
+                </div>
+                <span className="text-[11px] text-ccb-muted">{timeAgo(b.created_at)}</span>
+                <div className="flex items-center gap-1.5 md:justify-end md:ml-auto">
                 <button onClick={() => setViewing(b)} className="rounded-lg border border-ccb-border bg-ccb-surface px-2 py-1 text-[10px] font-medium text-ccb-muted hover:border-violet-500/50 hover:text-white">View</button>
                 {!b.settled && b.status !== "cancelled" && (
                   <button
@@ -1109,6 +1124,7 @@ export function BattlesView() {
                     {confirming === `retry:${b.id}` ? "Confirm?" : "Retry game"}
                   </button>
                 )}
+                </div>
               </div>
             </div>
           ))}
