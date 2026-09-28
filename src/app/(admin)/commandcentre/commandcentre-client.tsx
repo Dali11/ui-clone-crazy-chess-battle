@@ -98,7 +98,7 @@ const VIEW_META: Record<string, { title: string; sub: string; txType?: string }>
   audit: { title: "Financial Audit Log", sub: "Every financial admin action — immutable" },
   verification: { title: "Verification", sub: "KYC document review and player identity confirmation" },
   "rev-battles": { title: "Revenue · Battles", sub: "Rake from settled battles", txType: "battle_fee" },
-  "rev-tournaments": { title: "Revenue · Tournaments", sub: "Platform profit on tournaments", txType: "tournament" },
+  "rev-tournaments": { title: "Revenue · Tournaments", sub: "Creator profit share from tournaments", txType: "tournament" },
   "rev-memberships": { title: "Revenue · Memberships", sub: "Membership purchases", txType: "membership" },
   "rev-ads": { title: "Revenue · Ads", sub: "Self-serve ad campaign spend", txType: "ad" },
   "rev-withdrawal_fees": { title: "Revenue · Withdrawal Fees", sub: "Payout fees collected", txType: "withdrawal_fee" },

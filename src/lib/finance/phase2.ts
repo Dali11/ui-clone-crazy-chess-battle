@@ -16,7 +16,8 @@ import type { FeedStatus } from "./commandcentre";
 /** Phase 2 unified ledger types (spec §1). */
 export type LedgerType =
   | "deposit" | "withdrawal" | "battle_fee" | "battle_stake" | "battle_win"
-  | "tournament_payment" | "membership_payment" | "ad_payment"
+  | "tournament_entry" | "tournament_payout" | "tournament_creator_profit"
+  | "membership_payment" | "ad_payment"
   | "withdrawal_fee" | "refund" | "adjustment" | "sweep";
 
 export const LEDGER_TYPE_LABELS: Record<LedgerType, string> = {
@@ -25,7 +26,9 @@ export const LEDGER_TYPE_LABELS: Record<LedgerType, string> = {
   battle_fee: "Battle Fee",
   battle_stake: "Battle Stake",
   battle_win: "Battle Win",
-  tournament_payment: "Tournament Payment",
+  tournament_entry: "Tournament Entry Fee",
+  tournament_payout: "Tournament Prize",
+  tournament_creator_profit: "Tournament Creator Profit",
   membership_payment: "Membership Payment",
   ad_payment: "Ad Payment",
   withdrawal_fee: "Withdrawal Fee",
@@ -37,12 +40,18 @@ export const LEDGER_TYPE_LABELS: Record<LedgerType, string> = {
 /** deposits.method → ledger type. Anything unmapped lands in "adjustment" (generic). */
 // Money direction for colour-coding in the Command Centre:
 // money paid INTO the platform is green, money paid OUT is red,
-// internal wallet transfers (stakes, entries, ads, rake) stay neutral.
-const MONEY_IN_KINDS = new Set(["deposit", "membership", "membership_payment"]);
+// internal wallet transfers (stakes, ads, rake) stay neutral.
+// Tournament sub-kinds (feed): a prize or creator profit share CREDITS the
+// named player's wallet (green); an entry fee DEBITS it (amber) — the
+// direction of the money for the person on that row, so the feed tells
+// the whole story instead of one flat violet bucket.
+const MONEY_IN_KINDS = new Set(["deposit", "membership", "membership_payment", "tournament_payout", "tournament_creator_profit"]);
+const MONEY_DEBIT_KINDS = new Set(["tournament_entry"]);
 const MONEY_OUT_KINDS = new Set(["withdrawal", "withdrawal_fee", "sweep"]);
 
 export function moneyDirectionClass(kind: string): string {
   if (MONEY_IN_KINDS.has(kind)) return "text-emerald-400";
+  if (MONEY_DEBIT_KINDS.has(kind)) return "text-amber-400";
   if (MONEY_OUT_KINDS.has(kind)) return "text-red-400";
   return "text-white";
 }
@@ -60,9 +69,9 @@ export const METHOD_LEDGER_TYPE: Record<string, LedgerType> = {
   battle_payout: "battle_win",
   platform_cut: "battle_fee",
   // Tournament lifecycle
-  tournament_entry: "tournament_payment",
-  tournament_payout: "tournament_payment",
-  tournament_creator_profit: "tournament_payment",
+  tournament_entry: "tournament_entry",
+  tournament_payout: "tournament_payout",
+  tournament_creator_profit: "tournament_creator_profit",
   // Platform revenue streams
   membership_purchase: "membership_payment",
   ad_purchase: "ad_payment",

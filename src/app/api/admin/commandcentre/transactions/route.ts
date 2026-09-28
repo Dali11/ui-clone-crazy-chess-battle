@@ -33,7 +33,8 @@ export const dynamic = "force-dynamic";
  */
 
 type FeedKind =
-  | "deposit" | "withdrawal" | "battle_fee" | "tournament"
+  | "deposit" | "withdrawal" | "battle_fee"
+  | "tournament_entry" | "tournament_payout" | "tournament_creator_profit"
   | "membership" | "ad" | "withdrawal_fee";
 
 interface FeedRow {
@@ -51,17 +52,24 @@ interface FeedRow {
 }
 
 const TYPE_DEPOSIT_METHODS = [...MONEY_IN_METHODS];
+// Tournament money movements are three DISTINCT things that must never be
+// collapsed into one label: the fee a player pays to join (money leaving
+// their wallet), the prize a player wins (money credited to their wallet),
+// and the profit share paid to the tournament's creator (credited to the
+// creator's wallet — this is a payout to a player, not platform revenue).
 const TYPE_MAP: Record<FeedKind, string[]> = {
   deposit: TYPE_DEPOSIT_METHODS,
   withdrawal: [], // separate table
   battle_fee: [], // derived from battles
-  tournament: [REVENUE_METHODS.tournaments, "tournament_entry"].filter(
-    (m) => m !== REVENUE_METHODS.tournaments
-  ),
+  tournament_entry: ["tournament_entry"],
+  tournament_payout: ["tournament_payout"],
+  tournament_creator_profit: [REVENUE_METHODS.tournaments], // "tournament_creator_profit"
   membership: [REVENUE_METHODS.memberships],
   ad: [REVENUE_METHODS.ads],
   withdrawal_fee: [], // derived from withdrawals
 };
+/** "tournament" is a UI category covering all three tournament sub-kinds. */
+const TOURNAMENT_KINDS: FeedKind[] = ["tournament_entry", "tournament_payout", "tournament_creator_profit"];
 
 export async function GET(req: NextRequest) {
   try {
@@ -83,7 +91,9 @@ export async function GET(req: NextRequest) {
     const before = url.searchParams.get("before"); // cursor
     const kinds: FeedKind[] =
       typeParam === "all"
-        ? ["deposit", "withdrawal", "battle_fee", "tournament", "membership", "ad", "withdrawal_fee"]
+        ? ["deposit", "withdrawal", "battle_fee", ...TOURNAMENT_KINDS, "membership", "ad", "withdrawal_fee"]
+        : typeParam === "tournament"
+        ? TOURNAMENT_KINDS
         : [typeParam as FeedKind];
 
     const fx = await loadUsdConverter(admin, async () => getExchangeRate("MWK", "USD"));
@@ -109,7 +119,9 @@ export async function GET(req: NextRequest) {
         const kind: FeedKind =
           d.method === REVENUE_METHODS.memberships ? "membership"
           : d.method === REVENUE_METHODS.ads ? "ad"
-          : "tournament";
+          : d.method === "tournament_payout" ? "tournament_payout"
+          : d.method === REVENUE_METHODS.tournaments ? "tournament_creator_profit"
+          : "tournament_entry";
         const status = depositStatus(d.status);
         // Wallet-debit rows (ads, tournament entries) are stored negative —
         // a "payment" is displayed as the magnitude the player paid.

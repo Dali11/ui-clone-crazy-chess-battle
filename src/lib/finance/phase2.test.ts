@@ -274,7 +274,9 @@ describe("buildWalletHistory", () => {
     expect(ledgerTypeForMethod("mobile_money")).toBe("deposit");
     expect(ledgerTypeForMethod("battle_payout")).toBe("battle_win");
     expect(ledgerTypeForMethod("platform_cut")).toBe("battle_fee");
-    expect(ledgerTypeForMethod("tournament_entry")).toBe("tournament_payment");
+    expect(ledgerTypeForMethod("tournament_entry")).toBe("tournament_entry");
+    expect(ledgerTypeForMethod("tournament_payout")).toBe("tournament_payout");
+    expect(ledgerTypeForMethod("tournament_creator_profit")).toBe("tournament_creator_profit");
     expect(ledgerTypeForMethod("membership_purchase")).toBe("membership_payment");
     expect(ledgerTypeForMethod("ad_purchase")).toBe("ad_payment");
     expect(ledgerTypeForMethod("battle_refund")).toBe("refund");

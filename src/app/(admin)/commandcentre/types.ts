@@ -66,7 +66,8 @@ export interface OverviewResponse {
 }
 
 export type FeedKind =
-  | "deposit" | "withdrawal" | "battle_fee" | "tournament"
+  | "deposit" | "withdrawal" | "battle_fee"
+  | "tournament_entry" | "tournament_payout" | "tournament_creator_profit"
   | "membership" | "ad" | "withdrawal_fee";
 
 export interface FeedRow {

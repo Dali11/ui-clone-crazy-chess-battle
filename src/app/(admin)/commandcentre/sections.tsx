@@ -1,6 +1,6 @@
 "use client";
 import { moneyDirectionClass } from "@/lib/finance/phase2";
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Check, CircleDot, Megaphone, Percent, Star, Swords, Trophy, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Award, Check, CircleDot, Crown, Megaphone, Percent, Star, Swords, Trophy, type LucideIcon } from "lucide-react";
 
 /**
  * Command Centre building blocks: KPI cards, revenue tiles, the
@@ -58,7 +58,9 @@ const KIND_LABEL: Record<string, string> = {
   deposit: "Deposit",
   withdrawal: "Withdrawal",
   battle_fee: "Battle fee",
-  tournament: "Tournament payment",
+  tournament_entry: "Tournament entry fee",
+  tournament_payout: "Tournament prize",
+  tournament_creator_profit: "Creator profit share",
   membership: "Membership payment",
   ad: "Ad purchase",
   withdrawal_fee: "Withdrawal fee",
@@ -69,7 +71,9 @@ const KIND_ICON: Record<string, LucideIcon> = {
   deposit: ArrowDownLeft,
   withdrawal: ArrowUpRight,
   battle_fee: Swords,
-  tournament: Trophy,
+  tournament_entry: Trophy,
+  tournament_payout: Award,
+  tournament_creator_profit: Crown,
   membership: Star,
   ad: Megaphone,
   withdrawal_fee: Percent,
@@ -425,8 +429,11 @@ export function TransactionFeed({
         >
           <span
             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ccb-border bg-ccb-surface text-sm ${
-              r.kind === "deposit" || r.kind === "membership" ? "text-emerald-400"
+              r.kind === "deposit" || r.kind === "membership"
+              || r.kind === "tournament_payout" || r.kind === "tournament_creator_profit"
+                ? "text-emerald-400"
               : r.kind === "withdrawal" || r.kind === "withdrawal_fee" ? "text-red-400"
+              : r.kind === "tournament_entry" ? "text-amber-400"
               : "text-violet-400"
             }`}
           >
