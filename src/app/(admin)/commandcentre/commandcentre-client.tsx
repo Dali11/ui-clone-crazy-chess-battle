@@ -43,6 +43,7 @@ import { ReconciliationView, PlayersView } from "./phase2-recon";
 import { ControlsView } from "./phase3-controls";
 import { TournamentsView, GamesView, BattlesView } from "./phase4-tournaments";
 import { MarketsView, SettlementsView, ReportsView, AuditView, VerificationView } from "./phase2-ops";
+import { UsersView, IntegrityView, LogsView, LeaguesView, JobsView, SettingsView } from "./system-views";
 
 type View =
   | "dashboard"
@@ -62,7 +63,13 @@ type View =
   | "tournaments"
   | "games"
   | "battles"
-  | "controls";
+  | "controls"
+  | "users"
+  | "integrity"
+  | "logs"
+  | "leagues"
+  | "jobs"
+  | "settings";
 
 const RANGE_CHIPS: Array<[RangePresetUi, string]> = [
   ["today", "Today"],
@@ -96,6 +103,12 @@ const VIEW_META: Record<string, { title: string; sub: string; txType?: string }>
   "rev-ads": { title: "Revenue · Ads", sub: "Self-serve ad campaign spend", txType: "ad" },
   "rev-withdrawal_fees": { title: "Revenue · Withdrawal Fees", sub: "Payout fees collected", txType: "withdrawal_fee" },
   markets: { title: "Markets · Countries", sub: "Per-country performance — USD" },
+  users: { title: "Users", sub: "Player accounts — search, roles, bans, wallet adjustments" },
+  integrity: { title: "Integrity", sub: "Fraud & fairness flags with automated scans" },
+  logs: { title: "Activity Log", sub: "Every admin action, immutable" },
+  leagues: { title: "Leagues", sub: "Weekly league configuration, XP and payouts" },
+  jobs: { title: "System Jobs", sub: "Scheduled automation health — heartbeats from the cron runner" },
+  settings: { title: "Platform Settings", sub: "Every platform_config section + community rooms" },
 };
 
 /** Self-fetching Phase 2 section views (independent of the overview API). */
@@ -113,10 +126,10 @@ export default function CommandCentreClient() {
     "finance-transactions": "finance", ledger: "finance", deposits: "finance", withdrawals: "finance",
     "finance-overview": "revenue", "rev-battles": "revenue", "rev-tournaments": "revenue",
     "rev-memberships": "revenue", "rev-ads": "revenue", "rev-withdrawal_fees": "revenue",
-    players: "players", verification: "players",
+    players: "players", verification: "players", users: "players", integrity: "players",
     reconciliation: "operations", audit: "operations", settlements: "operations",
     reports: "operations", markets: "operations", controls: "operations",
-    tournaments: "operations", games: "operations",
+    tournaments: "operations", games: "operations", logs: "operations", leagues: "operations", jobs: "operations", settings: "operations",
   };
   useEffect(() => {
     const g = GROUP_OF[view];
@@ -338,8 +351,10 @@ export default function CommandCentreClient() {
       )}
       {navGroup("Players", "players",
         <>
+          {navItem("users", "Users")}
           {navItem("players", "Wallet & Management")}
           {navItem("verification", "Verification")}
+          {navItem("integrity", "Integrity")}
         </>
       )}
       {navGroup("Operations", "operations",
@@ -353,6 +368,10 @@ export default function CommandCentreClient() {
           {navItem("reports", "Reports")}
           {navItem("markets", "Country Finance")}
           {navItem("controls", "Financial Controls")}
+          {navItem("logs", "Activity Log")}
+          {navItem("leagues", "Leagues")}
+          {navItem("jobs", "System Jobs")}
+          {navItem("settings", "Platform Settings")}
         </>
       )}
       <div className="mt-auto space-y-1 border-t border-ccb-border pt-3">
@@ -475,6 +494,12 @@ export default function CommandCentreClient() {
             {view === "audit" && <AuditView />}
             {view === "verification" && <VerificationView />}
             {view === "controls" && <ControlsView />}
+            {view === "users" && <UsersView />}
+            {view === "integrity" && <IntegrityView />}
+            {view === "logs" && <LogsView />}
+            {view === "leagues" && <LeaguesView />}
+            {view === "jobs" && <JobsView />}
+            {view === "settings" && <SettingsView />}
             {view === "tournaments" && <TournamentsView />}
             {view === "battles" && <BattlesView />}
             {view === "games" && <GamesView />}
