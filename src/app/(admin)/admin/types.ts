@@ -123,7 +123,7 @@ export interface AdminLog {
   profiles: { username: string; display_name: string } | null;
 }
 
-export type Tab = "overview" | "ledger" | "users" | "withdrawals" | "tournaments" | "games" | "deposits" | "battles" | "integrity" | "logs" | "leagues" | "seasons" | "membership" | "verification" | "settings";
+export type Tab = "overview" | "ledger" | "users" | "withdrawals" | "tournaments" | "games" | "deposits" | "battles" | "integrity" | "logs" | "leagues" | "seasons" | "membership" | "verification" | "settings" | "jobs";
 
 /** Convert datetime-local (user's local TZ) to UTC ISO string for API */
 export function localToUTC(localValue: string): string {

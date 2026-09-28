@@ -9,9 +9,10 @@ import {
   ShieldCheck, UserRound, XCircle, ShieldAlert,
   Menu, LogOut, Crown, Play,
   Copy, Trash2, Edit3, Share2, Gift, Calendar,
-  Settings, FileText, SlidersHorizontal, Database, ChevronDown, FileCheck, RefreshCw,
+  Settings, FileText, SlidersHorizontal, Database, ChevronDown, FileCheck, RefreshCw, Activity,
 } from "lucide-react";
 import CommunityRoomsCard from "./components/community-rooms-card";
+import JobsPanel from "./components/jobs-panel";
 import LeaguesAdminPanel from "./components/leagues-admin-panel";
 import UserDetailModal from "./user-detail-modal";
 import { type Withdrawal, type Stats, type UserInfo, type Deposit, type Tournament, type GameInfo, type AdminLog, type Tab, localToUTC, utcToLocalInput } from "./types";
@@ -1045,6 +1046,7 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
     { id: "leagues", label: "Leagues", icon: Crown },
     { id: "verification", label: "Verification", icon: ShieldCheck },
     { id: "settings", label: "Settings", icon: Settings },
+    { id: "jobs", label: "Jobs", icon: Activity },
   ];
 
   return (
@@ -1141,7 +1143,7 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
             { label: "Financial", items: ["ledger", "deposits", "withdrawals", "battles"] },
             { label: "Compete", items: ["tournaments", "games", "leagues"] },
             { label: "Community", items: ["users", "verification"] },
-            { label: "System", items: ["logs", "settings"] },
+            { label: "System", items: ["logs", "settings", "jobs"] },
           ].map((group, gi) => {
             const groupTabs = group.items
               .map(id => tabs.find(t => t.id === id))
@@ -1898,6 +1900,13 @@ export default function AdminDashboard({ adminName, adminKyc }: { adminName: str
               <PlatformSettingsHub />
               {/* Community room moderation — lives with settings, not in the Users data tab */}
               <CommunityRoomsCard />
+            </div>
+          )}
+
+          {/* JOBS — scheduled system job health */}
+          {tab === "jobs" && (
+            <div className="space-y-4">
+              <JobsPanel />
             </div>
           )}
 
