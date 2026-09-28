@@ -2,6 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
+  // Legacy admin panel handoff — the Command Centre is the admin surface.
+  if (request.nextUrl.pathname === "/admin") {
+    return NextResponse.redirect(new URL("/commandcentre", request.url));
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
