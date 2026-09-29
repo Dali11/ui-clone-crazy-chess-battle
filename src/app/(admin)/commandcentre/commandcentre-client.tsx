@@ -112,7 +112,11 @@ const VIEW_META: Record<string, { title: string; sub: string; txType?: string }>
 };
 
 /** Self-fetching Phase 2 section views (independent of the overview API). */
-const PHASE2_VIEWS = new Set<View>(["ledger", "deposits", "withdrawals", "reconciliation", "players", "settlements", "reports", "audit", "markets", "verification", "controls", "tournaments", "games"]);
+const PHASE2_VIEWS = new Set<View>([
+  "ledger", "deposits", "withdrawals", "reconciliation", "players", "settlements",
+  "reports", "audit", "markets", "verification", "controls", "tournaments", "games",
+  "battles", "users", "integrity", "logs", "leagues", "jobs", "settings",
+]);
 
 
 export default function CommandCentreClient() {
