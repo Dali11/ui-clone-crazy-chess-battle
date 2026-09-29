@@ -222,10 +222,9 @@ export default function CommandCentreClient() {
     return () => clearInterval(id);
   }, [fetchOverview]);
 
-  // The dashboard's mini feed, the finance feed views and the revenue
-  // stream pages all render transaction rows — everywhere else the feed
-  // isn't visible so we skip fetching it.
-  const feedType = view === "dashboard" ? "all" : VIEW_META[view]?.txType;
+  // The finance feed views and the revenue stream pages render transaction
+  // rows — everywhere else the feed isn't visible so we skip fetching it.
+  const feedType = VIEW_META[view]?.txType;
   const effectiveType = view === "finance-transactions" ? txType : feedType;
 
   useEffect(() => {
@@ -524,11 +523,9 @@ export default function CommandCentreClient() {
               <>
                 <AttentionStrip items={data.attention} onReview={onReview} />
 
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <KpiCard label="Total Revenue" kpi={data.kpis.totalRevenue} highlight hint="Actual CrazyChess earnings — deposits excluded" />
-                  <KpiCard label="Transaction Volume" kpi={data.kpis.transactionVolume} hint="Deposits + completed withdrawals" />
                   <KpiCard label="Total Deposits" kpi={data.kpis.deposits} hint="Money in (not revenue)" />
-                  <KpiCard label="Total Withdrawals" kpi={data.kpis.withdrawals} hint="Completed payouts" />
                   <KpiCard label="Player Balances" kpi={data.kpis.playerBalances} hint="Live wallets, all currencies → USD" />
                   <KpiCard label="Pending Withdrawals" kpi={data.kpis.pendingWithdrawals} />
                 </div>
@@ -561,24 +558,6 @@ export default function CommandCentreClient() {
                   </div>
                 </section>
 
-                <div className="grid gap-5 xl:grid-cols-2">
-                  <section className="rounded-xl border border-ccb-border bg-ccb-card">
-                    <div className="flex items-center justify-between border-b border-ccb-border px-4 py-3">
-                      <h3 className="text-sm font-semibold text-white">Transaction Activity</h3>
-                      <button onClick={() => setView("finance-transactions")} className="text-xs font-semibold text-violet-400 hover:text-violet-300">
-                        View all →
-                      </button>
-                    </div>
-                    <TransactionFeed rows={txRows.slice(0, 8)} onOpen={() => setView("finance-transactions")} dense />
-                  </section>
-
-                  <MarketsTable
-                    markets={data.markets}
-                    compact
-                    onOpenMarket={setOpenMarket}
-                    onViewAll={() => setView("markets")}
-                  />
-                </div>
               </>
             )}
 
