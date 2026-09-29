@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Activity, Loader2, RefreshCw, CheckCircle2, XCircle, Clock, HelpCircle } from "lucide-react";
+import { Loader2, RefreshCw, CheckCircle2, XCircle, Clock, HelpCircle } from "lucide-react";
 
 interface JobStatus {
   path: string;
@@ -73,8 +73,6 @@ export default function JobsPanel() {
     <div className="card p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-ccb-primary" />
-          <h3 className="text-sm font-bold">System Jobs</h3>
           {(failing > 0 || stale > 0) && (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-ccb-danger/10 text-ccb-danger">
               {failing > 0 && `${failing} failing`}

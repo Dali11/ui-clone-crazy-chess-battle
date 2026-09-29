@@ -15,6 +15,7 @@ import {
   Ban, Bell, Loader2, RefreshCw, Search, ShieldAlert, TrendingUp, Users as UsersIcon,
   UserRound, Wallet, X, Check, Star, Swords, ScrollText,
 } from "lucide-react";
+import { countryFlag } from "@/lib/geo/flags";
 import IntegrityPanel from "../admin/components/integrity-panel";
 import LeaguesAdminPanel from "../admin/components/leagues-admin-panel";
 import JobsPanel from "../admin/components/jobs-panel";
@@ -25,6 +26,9 @@ import { ActionButton } from "../admin/components/shared";
 
 const formatMWK = (n: number | null | undefined) =>
   "MWK " + Math.round(Number(n || 0)).toLocaleString();
+
+const fmtUsd = (n: number | null | undefined) =>
+  "$" + (Math.round(Number(n || 0) * 100) / 100).toLocaleString();
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleString();
@@ -57,9 +61,11 @@ function ConfirmModal({
 interface UserRow {
   id: string; username: string; display_name: string; email: string;
   rating: number | null; games_played: number; wins: number; losses: number; draws: number;
-  wallet_balance: number; is_admin: boolean; is_banned: boolean;
+  wallet_balance: number; wallet_balance_usd?: number; is_admin: boolean; is_banned: boolean;
   phone?: string | null; country?: string | null; created_at: string;
 }
+
+interface CountryOption { country: string; count: number; }
 
 const STATUS_CHIPS = [
   { id: "all", label: "All" }, { id: "new", label: "New 30d" }, { id: "active", label: "Active" },
@@ -75,6 +81,8 @@ export function UsersView() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [sort, setSort] = useState("newest");
+  const [country, setCountry] = useState("");
+  const [countryOptions, setCountryOptions] = useState<CountryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -90,6 +98,7 @@ export function UsersView() {
     try {
       const params = new URLSearchParams({ status, sort, page: String(page), page_size: String(pageSize) });
       if (debouncedSearch) params.set("search", debouncedSearch);
+      if (country) params.set("country", country);
       const res = await fetch(`/api/admin/users?${params}`, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to load users");
@@ -101,9 +110,16 @@ export function UsersView() {
     } finally {
       setLoading(false);
     }
-  }, [status, sort, page, debouncedSearch]);
+  }, [status, sort, country, page, debouncedSearch]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  useEffect(() => {
+    fetch("/api/admin/users/countries", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json) => setCountryOptions(json.countries || []))
+      .catch(() => {});
+  }, []);
 
   const userAction = useCallback(async (userId: string, action: string, value?: any) => {
     setActionLoading(`${userId}_${action}`);
@@ -161,7 +177,7 @@ export function UsersView() {
             { label: "New (30d)", value: kpis.new_30d, sub: `${kpis.new_7d} in last 7 days`, icon: TrendingUp },
             { label: "Active Players", value: kpis.active_players, sub: "played ≥ 1 game", icon: Swords },
             { label: "Avg Rating", value: kpis.avg_rating, sub: `${kpis.admins} admin${kpis.admins === 1 ? "" : "s"}`, icon: Star },
-            { label: "Wallet Liability", value: formatMWK(kpis.wallet_liability), sub: `${kpis.negative_wallets} negative balance${kpis.negative_wallets === 1 ? "" : "s"}`, icon: Wallet },
+            { label: "Wallet Liability", value: fmtUsd(kpis.wallet_liability), sub: `${kpis.negative_wallets} negative balance${kpis.negative_wallets === 1 ? "" : "s"}`, icon: Wallet },
             { label: "Banned", value: kpis.banned, sub: "suspended accounts", icon: Ban },
           ].map((k) => (
             <div key={k.label} className="card p-3">
@@ -190,6 +206,14 @@ export function UsersView() {
           <option value="games">Most games</option>
           <option value="wallet">Wallet balance</option>
           <option value="username">Username A–Z</option>
+        </select>
+        <select value={country} onChange={(e) => { setCountry(e.target.value); setPage(0); }} className="px-3 py-2 rounded-lg bg-ccb-surface border border-ccb-border text-sm">
+          <option value="">All countries</option>
+          {countryOptions.map((c) => (
+            <option key={c.country} value={c.country}>
+              {countryFlag(c.country)} {c.country} ({c.count})
+            </option>
+          ))}
         </select>
       </div>
 
@@ -220,14 +244,14 @@ export function UsersView() {
                   </div>
                   <div>
                     <div className="text-sm font-medium flex items-center gap-2">
-                      {u.display_name || u.username}
+                      {u.display_name || u.username}{countryFlag(u.country) && ` ${countryFlag(u.country)}`}
                       {u.is_admin && <span className="text-xs px-1.5 py-0.5 rounded bg-ccb-primary/20 text-ccb-primary font-bold">ADMIN</span>}
                       {u.is_banned && <span className="text-xs px-1.5 py-0.5 rounded bg-ccb-danger/20 text-ccb-danger font-bold">BANNED</span>}
                     </div>
                     <div className="text-xs text-ccb-muted">{u.email} · {u.rating || "Unrated"} elo · {u.games_played || 0} games · W{u.wins || 0}/L{u.losses || 0}/D{u.draws || 0}</div>
                   </div>
                 </div>
-                <div className="text-right text-sm font-medium">{formatMWK(u.wallet_balance)}</div>
+                <div className="text-right text-sm font-medium">{fmtUsd(u.wallet_balance_usd)}</div>
               </div>
               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-ccb-border">
                 <ActionButton onClick={() => setDetailId(u.id)} loading={false} variant="primary">
@@ -364,8 +388,7 @@ export function LogsView() {
 
   return (
     <section className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold flex items-center gap-2"><ScrollText className="w-4 h-4 text-ccb-primary" /> Admin Activity Log</h3>
+      <div className="flex items-center justify-end">
         <button onClick={fetchLogs} className="text-xs text-ccb-muted hover:text-ccb-text flex items-center gap-1">
           <RefreshCw className="w-3 h-3" /> Refresh
         </button>

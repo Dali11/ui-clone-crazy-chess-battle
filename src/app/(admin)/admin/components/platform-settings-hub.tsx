@@ -4,7 +4,7 @@ import { useState, memo } from "react";
 import {
   LayoutDashboard, Users, ArrowDownUp, Trophy, Loader2, Gamepad2,
   Swords, Shield, Calendar, Crown,
-  Search, SlidersHorizontal, Database, ChevronDown, ScrollText,
+  Search, Database, ChevronDown, ScrollText,
   ShieldCheck, DollarSign, Megaphone, Zap, Radio, Globe, Wallet, Gift } from "lucide-react";
 import PlatformSettingsPanel from "../platform-settings-panel";
 import DirectAdsPanel from "./direct-ads-panel";
@@ -55,16 +55,6 @@ function PlatformSettingsHubBase() {
     <div className="space-y-4">
       {/* HEADER */}
       <div className="card p-4 sm:p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl bg-ccb-primary/10 flex items-center justify-center">
-            <SlidersHorizontal className="w-5 h-5 text-ccb-primary" />
-          </div>
-          <div>
-            <h2 className="font-bold text-lg">Platform Settings</h2>
-            <p className="text-xs text-ccb-muted">Configure all platform behavior in one place. Changes apply instantly across the entire site.</p>
-          </div>
-        </div>
-
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ccb-muted" />

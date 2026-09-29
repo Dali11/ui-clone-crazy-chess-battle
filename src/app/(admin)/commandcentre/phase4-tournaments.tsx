@@ -246,11 +246,7 @@ export function TournamentsView() {
   return (
     <div className="space-y-5 text-[13px]">
       {/* header */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Tournaments</h2>
-          <p className="text-xs text-ccb-muted">Full lifecycle control — platform-hosted and player-created events</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <button onClick={fetchList} className="rounded-lg border border-ccb-border bg-ccb-surface px-3 py-1.5 text-xs text-ccb-muted transition hover:border-violet-500 hover:text-white">
           <RefreshCw className="mr-1 inline h-3 w-3" /> Refresh
         </button>
@@ -314,29 +310,28 @@ export function TournamentsView() {
         <div className="space-y-3">
           {filtered.map((t) => (
             <div key={t.id} className="rounded-xl border border-ccb-border bg-ccb-card p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="truncate font-semibold text-white">{t.name}</span>
-                    {statusBadge(t.status)}
-                    {t.pool_source === "fixed" && (
-                      <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-400">Fixed</span>
-                    )}
-                    {t.is_player_created && (
-                      <span className="rounded border border-violet-500/30 bg-violet-600/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-300">Player{t.pool_source === "fixed" ? " · escrow" : ""}</span>
-                    )}
-                    <span className="text-[10px] uppercase text-ccb-muted">{t.type}</span>
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ccb-muted">
-                    <span className="inline items-center gap-1"><Users className="inline h-3 w-3" /> {t.participant_count}/{t.max_players ?? "∞"}{t.paid_count ? ` (${t.paid_count} paid)` : ""}</span>
-                    <span><Trophy className="inline h-3 w-3" /> {fmtMwk(t.prize_pool)}</span>
-                    <span>Entry {fmtMwk(t.entry_fee)}</span>
-                    {t.is_player_created && !!t.platform_fee_collected && <span className="text-emerald-400">Platform fee {fmtMwk(t.platform_fee_collected)}</span>}
-                    <span><Calendar className="inline h-3 w-3" /> {fmtDateTime(t.starts_at)}</span>
-                    {t.status === "active" && <span>Round {t.current_round}{t.rounds ? `/${t.rounds}` : ""}</span>}
-                  </div>
-                </div>
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-semibold text-white break-words">{t.name}</span>
+                  {statusBadge(t.status)}
+                  {t.pool_source === "fixed" && (
+                    <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-400">Fixed</span>
+                  )}
+                  {t.is_player_created && (
+                    <span className="rounded border border-violet-500/30 bg-violet-600/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-300">Player{t.pool_source === "fixed" ? " · escrow" : ""}</span>
+                  )}
+                  <span className="text-[10px] uppercase text-ccb-muted">{t.type}</span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ccb-muted">
+                  <span className="inline items-center gap-1"><Users className="inline h-3 w-3" /> {t.participant_count}/{t.max_players ?? "∞"}{t.paid_count ? ` (${t.paid_count} paid)` : ""}</span>
+                  <span><Trophy className="inline h-3 w-3" /> {fmtMwk(t.prize_pool)}</span>
+                  <span>Entry {fmtMwk(t.entry_fee)}</span>
+                  {t.is_player_created && !!t.platform_fee_collected && <span className="text-emerald-400">Platform fee {fmtMwk(t.platform_fee_collected)}</span>}
+                  <span><Calendar className="inline h-3 w-3" /> {fmtDateTime(t.starts_at)}</span>
+                  {t.status === "active" && <span>Round {t.current_round}{t.rounds ? `/${t.rounds}` : ""}</span>}
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-ccb-border pt-3">
                   <button onClick={() => openDetail(t.id)} className={btnGhost}><ChevronRight className="h-3 w-3" /> Detail</button>
                   {t.status === "pending_approval" && (
                     <>
@@ -382,7 +377,6 @@ export function TournamentsView() {
                       <Trash2 className="h-3 w-3" /> {confirming === `delete:${t.id}` ? "Confirm delete?" : "Delete"}
                     </button>
                   </div>
-                </div>
               </div>
               {confirming && confirming.endsWith(`:${t.id}`) && (
                 <p className="mt-2 flex items-center gap-1 text-[10px] text-amber-400">
@@ -636,11 +630,7 @@ export function GamesView() {
 
   return (
     <div className="space-y-5 text-[13px]">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Games</h2>
-          <p className="text-xs text-ccb-muted">Chess & draughts oversight — abort, result override, integrity checks</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <button onClick={fetchGames} className="rounded-lg border border-ccb-border bg-ccb-surface px-3 py-1.5 text-xs text-ccb-muted transition hover:border-violet-500 hover:text-white">
           <RefreshCw className="mr-1 inline h-3 w-3" /> Refresh
         </button>
@@ -996,11 +986,7 @@ export function BattlesView() {
 
   return (
     <div className="space-y-5 text-[13px]">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Battles</h2>
-          <p className="text-xs text-ccb-muted">Staked battles — set result, abort &amp; refund, view details, restart stuck matches</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <button onClick={fetchBattles} className="rounded-lg border border-ccb-border bg-ccb-surface px-3 py-1.5 text-xs text-ccb-muted transition hover:border-violet-500 hover:text-white">
           <RefreshCw className="mr-1 inline h-3 w-3" /> Refresh
         </button>

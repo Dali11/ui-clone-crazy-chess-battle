@@ -65,10 +65,6 @@ export default function IntegrityPanel({
       {/* Header + scan */}
       <div className="card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="h-5 w-5 text-ccb-accent" />
-            <h2 className="text-base font-bold">Player Integrity</h2>
-          </div>
           <p className="text-xs text-ccb-muted mt-1">
             Anti-cheat signals: shared payment phones (alt accounts) and robotic move rhythm (engine suspicion).
             Open flags hold league payouts and block withdrawals until you resolve them.

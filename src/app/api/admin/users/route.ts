@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { sendEmail } from "@/lib/email";
+import { loadUsdConverter, roundUsd } from "@/lib/finance/usd";
+import { getExchangeRate } from "@/lib/geo/fx";
+import { COUNTRY_CURRENCY } from "@/lib/geo/currency-map";
 
 // GET — list users (server-side search, filters, sort, pagination) + KPIs
 export async function GET(req: NextRequest) {
@@ -32,7 +35,13 @@ export async function GET(req: NextRequest) {
     // unbounded scan would freeze every KPI at exactly 1000 users.
     const rows = await fetchAll(() =>
       admin.from("profiles")
-        .select("created_at, is_banned, is_admin, games_played, wallet_balance, rating"));
+        .select("created_at, is_banned, is_admin, games_played, wallet_balance, rating, country"));
+    // Admin reporting currency is USD — every player's wallet is held in
+    // their own local currency (resolved from profile.country), so KPI
+    // and list figures must be converted, not summed raw across currencies.
+    const fx = await loadUsdConverter(admin, async () => getExchangeRate("MWK", "USD"));
+    const usdOf = (walletBalance: number, country: string | null | undefined) =>
+      fx.toUsd(Number(walletBalance || 0), COUNTRY_CURRENCY[(country || "").toUpperCase()] || "MWK") ?? 0;
     // CAT (UTC+2, no DST) calendar-day anchoring — "new in 7d/30d" counts the
     // last 7/30 calendar days including today (today starts at CAT midnight),
     // matching the Overview/Battles panel scope semantics.
@@ -50,7 +59,7 @@ export async function GET(req: NextRequest) {
       banned: rows.filter((r: any) => r.is_banned).length,
       admins: rows.filter((r: any) => r.is_admin).length,
       negative_wallets: rows.filter((r: any) => (r.wallet_balance || 0) < 0).length,
-      wallet_liability: rows.reduce((s: number, r: any) => s + (r.wallet_balance || 0), 0),
+      wallet_liability: roundUsd(rows.reduce((s: number, r: any) => s + usdOf(r.wallet_balance, r.country), 0)),
       avg_rating: rated.length ? Math.round(rated.reduce((s: number, r: any) => s + r.rating, 0) / rated.length) : 0,
     };
 
@@ -84,7 +93,12 @@ export async function GET(req: NextRequest) {
     const { data: users, count, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    return NextResponse.json({ users, total: count ?? 0, page, page_size: pageSize, kpis });
+    const usersWithUsd = (users || []).map((u: any) => ({
+      ...u,
+      wallet_balance_usd: roundUsd(usdOf(u.wallet_balance, u.country)),
+    }));
+
+    return NextResponse.json({ users: usersWithUsd, total: count ?? 0, page, page_size: pageSize, kpis });
   } catch (err: any) {
     return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
   }

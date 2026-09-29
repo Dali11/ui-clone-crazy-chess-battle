@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Crown, RefreshCw, Users, CalendarRange, Coins, TrendingUp, UserPlus } from "lucide-react";
+import { RefreshCw, Users, CalendarRange, Coins, TrendingUp, UserPlus } from "lucide-react";
 
 /**
  * Leagues admin panel — manage the tiered monthly XP championship from
@@ -148,8 +148,6 @@ export default function LeaguesAdminPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Crown className="w-5 h-5 text-ccb-primary" />
-          <h2 className="text-lg font-semibold text-ccb-text">League Management</h2>
           {toast && (
             <span className={`text-xs font-medium ${toast.ok ? "text-ccb-success" : "text-red-400"}`}>{toast.msg}</span>
           )}
