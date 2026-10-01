@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useCurrency } from "@/hooks/use-currency";
+import { Users, Swords, Trophy } from "lucide-react";
 
 interface Stats {
   activePlayers: number;
   gamesToday: number;
   liveTournaments: number;
-  totalPrizePool: number; // in MWK cents (base currency)
 }
 
 function formatNumber(n: number): string {
@@ -17,35 +16,14 @@ function formatNumber(n: number): string {
   return n.toLocaleString("en-US");
 }
 
-function formatMoneyCompact(amountMWK: number, formatFn: (n: number) => string): string {
-  const units = Math.floor(amountMWK);
-  if (units >= 1_000_000) return `${(units / 1_000_000).toFixed(1)}M`;
-  if (units >= 1_000) return `${(units / 1_000).toFixed(0)}K`;
-  return formatFn(amountMWK);
-}
-
 export default function HomeStats() {
   const [stats, setStats] = useState<Stats | null>(null);
-  const [userCountry, setUserCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const { formatMoney: fmtCurrency, convert: convertCurrency, currencySymbol: _curSym, rate: fxRate } = useCurrency(userCountry);
 
   useEffect(() => {
     async function fetchStats() {
       try {
         const supabase = createClient();
-        // Fetch user's country for currency initialization (prevents MWK flash)
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("country")
-              .eq("id", user.id)
-              .single();
-            if (profile?.country) setUserCountry(profile.country);
-          }
-        } catch {}
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayISO = today.toISOString();
@@ -53,26 +31,19 @@ export default function HomeStats() {
         const [playersRes, gamesRes, tournamentsRes] = await Promise.all([
           supabase.from("profiles").select("id", { count: "exact", head: true }),
           supabase.from("games").select("id", { count: "exact", head: true }).gte("created_at", todayISO),
-          supabase.from("tournaments").select("prize_pool, status").in("status", ["upcoming", "active"]),
+          supabase.from("tournaments").select("id, status").in("status", ["upcoming", "active"]),
         ]);
-
-        const totalPrizePool = (tournamentsRes.data || []).reduce(
-          (sum, t) => sum + (t.prize_pool || 0),
-          0
-        );
 
         setStats({
           activePlayers: playersRes.count || 0,
           gamesToday: gamesRes.count || 0,
           liveTournaments: tournamentsRes.data?.length || 0,
-          totalPrizePool,
         });
       } catch {
         setStats({
           activePlayers: 0,
           gamesToday: 0,
           liveTournaments: 0,
-          totalPrizePool: 0,
         });
       } finally {
         setLoading(false);
@@ -83,11 +54,11 @@ export default function HomeStats() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 text-center">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid grid-cols-3 gap-1 sm:gap-5 text-center">
+        {[...Array(3)].map((_, i) => (
           <div key={i}>
-            <div className="text-3xl font-bold text-ccb-muted animate-pulse">—</div>
-            <div className="text-sm text-ccb-muted mt-1">Loading...</div>
+            <div className="text-lg font-bold text-ccb-muted animate-pulse sm:text-3xl">—</div>
+            <div className="mt-1 text-[10px] text-ccb-muted sm:text-sm">Loading...</div>
           </div>
         ))}
       </div>
@@ -96,27 +67,21 @@ export default function HomeStats() {
 
   if (!stats) return null;
 
-  const convertedPrizePool = convertCurrency(stats.totalPrizePool);
-
   const items = [
-    { value: formatNumber(stats.activePlayers), label: "Players" },
-    { value: formatNumber(stats.gamesToday), label: "Games Today" },
-    { value: formatNumber(stats.liveTournaments), label: "Live Tournaments" },
-    {
-      value:
-        convertedPrizePool > 0
-          ? formatMoneyCompact(convertedPrizePool, fmtCurrency)
-          : fmtCurrency(0),
-      label: "Prize Pool",
-    },
+    { value: formatNumber(stats.activePlayers), label: "Players", icon: Users },
+    { value: formatNumber(stats.gamesToday), label: "Games Today", icon: Swords },
+    { value: formatNumber(stats.liveTournaments), label: "Tournaments", icon: Trophy },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 text-center">
+    <div className="grid grid-cols-3 gap-1 sm:gap-5">
       {items.map((item, i) => (
-        <div key={i}>
-          <div className="text-2xl sm:text-3xl font-bold text-ccb-primary">{item.value}</div>
-          <div className="text-xs sm:text-sm text-ccb-muted mt-1">{item.label}</div>
+        <div key={i} className="flex items-center justify-center gap-1.5 sm:gap-2.5">
+          <item.icon className={`h-4 w-4 shrink-0 sm:h-5 sm:w-5 ${i === 0 ? "text-cyan-300" : i === 1 ? "text-amber-300" : "text-yellow-300"}`} />
+          <div className="text-center sm:text-left">
+            <div className="text-lg font-black text-ccb-text sm:text-2xl">{item.value}</div>
+            <div className="mt-0.5 text-[9px] text-ccb-muted sm:text-xs">{item.label}</div>
+          </div>
         </div>
       ))}
     </div>

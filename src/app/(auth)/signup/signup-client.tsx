@@ -5,34 +5,31 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
-import { Check, Loader2, AlertCircle, ChevronRight, ChevronLeft } from "lucide-react";
+import { Check, Loader2, AlertCircle, ChevronRight, ChevronLeft, Eye, EyeOff, Globe2, LockKeyhole, Mail, Swords, UserRound } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 type ChessLevel = "beginner" | "intermediate" | "expert";
 type Step = 0 | 1 | 2 | 3;
 
-const LEVEL_CONFIG: Record<ChessLevel, { label: string; rating: number; blurb: string; icon: string; accent: string }> = {
+const LEVEL_CONFIG: Record<ChessLevel, { label: string; rating: number; blurb: string; icon: string }> = {
   beginner: {
     label: "Beginner",
     rating: 400,
     blurb: "New to chess or still learning the basics",
     icon: "♟",
-    accent: "border-ccb-bronze bg-ccb-bronze/10",
   },
   intermediate: {
     label: "Casual",
     rating: 1500,
     blurb: "Comfortable with tactics and openings",
     icon: "♞",
-    accent: "border-ccb-accent bg-ccb-accent/10",
   },
   expert: {
     label: "Expert",
     rating: 2500,
     blurb: "Experienced competitive player",
     icon: "♛",
-    accent: "border-purple-500 bg-purple-500/10",
   },
 };
 
@@ -64,6 +61,7 @@ export default function SignupPage() {
 
   // Step 3: Security
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Shared
   const [loading, setLoading] = useState(false);
@@ -308,91 +306,104 @@ export default function SignupPage() {
   const loginLink = loginParams.toString() ? `/login?${loginParams.toString()}` : "/login";
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-6">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={40} height={40} className="w-10 h-10 rounded-full" />
-            <span className="text-lg font-bold">Crazy Chess Battles</span>
-          </Link>
+    <main className="relative isolate min-h-screen overflow-hidden bg-[#050d15] text-slate-100">
+      <Image src="/chess-arena-hero-v2.png" alt="" fill priority sizes="100vw" className="-z-20 object-cover object-[78%_center] lg:object-[55%_center]" />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(2,8,14,.66),rgba(2,8,14,.78)_38%,rgba(2,8,14,.94)),linear-gradient(90deg,rgba(2,8,14,.25),rgba(2,8,14,.6))]" />
+
+      <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 sm:px-8 sm:py-6">
+        <Link href="/" className="flex items-center gap-2.5" aria-label="Crazy Chess Battles home">
+          <Image src="/logo-badge.png" alt="" width={42} height={42} className="h-9 w-9 sm:h-10 sm:w-10" />
+          <span className="leading-none"><span className="block text-sm font-black uppercase tracking-tight text-white sm:text-base">Crazy <b className="text-amber-300">Chess</b></span><span className="mt-1 block text-center text-[8px] font-bold uppercase tracking-[.38em] text-slate-300">Battles</span></span>
+        </Link>
+        <Link href="/" className="hidden rounded-md px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white sm:inline-flex sm:text-sm">Back to home</Link>
+      </header>
+
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-80px)] w-full max-w-7xl items-center justify-center px-4 pb-8 pt-2 sm:px-8 lg:px-10 lg:pb-14">
+        <section className="mx-auto w-full max-w-lg rounded-2xl border border-slate-500/60 bg-[#06111c]/90 p-4 shadow-[0_28px_90px_rgba(0,0,0,.55)] backdrop-blur-xl sm:p-6">
+        <div className="mb-5 flex flex-col items-center text-center sm:mb-6">
+          <span className="mb-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-300/10 text-emerald-300"><Swords className="h-4 w-4" /></span>
+          <div><h2 className="text-[1.65rem] font-black uppercase italic leading-none tracking-tight text-white sm:text-2xl">Join Crazy Chess Battles</h2><p className="mt-2 max-w-xs text-xs leading-relaxed text-slate-300">Create your account and start playing real players from around the world.</p></div>
         </div>
 
         {/* Progress bar */}
-        <div className="flex items-center gap-2 mb-6">
+        <div aria-label={`Registration step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`} className="mb-5 flex items-start gap-2 sm:mb-6 sm:gap-3">
           {STEPS.map((label, i) => (
-            <div key={label} className="flex-1">
-              <div
-                className={`h-1.5 rounded-full transition-colors ${
-                  i <= step ? "bg-ccb-primary" : "bg-ccb-border"
-                }`}
-              />
-              <p className={`text-[10px] mt-1 text-center transition-colors ${
-                i === step ? "text-ccb-primary font-semibold" : "text-ccb-muted"
-              }`}>
-                {label}
-              </p>
+            <div key={label} className="min-w-0 flex-1">
+              <div className={`h-1.5 rounded-full transition-colors ${i <= step ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.3)]" : "bg-slate-700"}`} />
+              <p className={`mt-1.5 hidden truncate text-center text-[9px] transition-colors sm:block sm:text-[10px] ${i === step ? "font-bold text-emerald-300" : "text-slate-500"}`}>{label}</p>
             </div>
           ))}
         </div>
 
         {refCode && step === 0 && (
-          <div className="rounded-lg bg-ccb-primary/10 border border-ccb-primary/30 px-4 py-3 mb-4 text-center">
-            <p className="text-sm font-semibold text-ccb-primary">
-                          </p>
+          <div className="mb-4 rounded-lg border border-emerald-300/25 bg-emerald-300/10 px-4 py-3 text-center">
+            <p className="text-xs font-semibold text-emerald-200">You were invited to join the battle. Create your account to get started.</p>
           </div>
         )}
 
         {error && (
-          <div className="rounded-lg bg-ccb-danger/10 border border-ccb-danger/30 text-ccb-danger px-4 py-3 text-sm mb-4">
+          <div role="alert" className="mb-4 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSignup} className="card space-y-5">
+        <form onSubmit={handleSignup} className="space-y-3.5 border-0 bg-transparent p-0 sm:space-y-5">
           {/* STEP 0: Profile */}
           {step === 0 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-bold">Let&apos;s get started</h2>
-              <p className="text-sm text-ccb-muted -mt-3">Tell us a bit about yourself.</p>
+              <h2 className="text-sm font-extrabold uppercase tracking-wide text-white">Let&apos;s get started</h2>
+              <p className="-mt-3 text-xs text-slate-400">Tell us a bit about yourself.</p>
 
               <div>
-                <label htmlFor="username" className="text-sm font-medium block mb-1.5">
+                <label htmlFor="username" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-300">
                   Username
                 </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="input"
-                  placeholder="Pick your username"
-                  required
-                  minLength={3}
-                  maxLength={20}
-                  autoFocus
-                />
+                <div className="relative">
+                  <UserRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="input !border-slate-600 !bg-slate-950/70 pl-10 !text-white placeholder:!text-slate-600 focus:!border-emerald-300"
+                    placeholder="Choose a username"
+                    required
+                    minLength={3}
+                    maxLength={20}
+                    autoComplete="username"
+                    autoFocus
+                  />
+                </div>
                 <p className="text-xs text-ccb-muted mt-1">This will also be your referral code.</p>
               </div>
 
               <div>
-                <label htmlFor="email" className="text-sm font-medium block mb-1.5">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input"
-                  placeholder="you@example.com"
-                  required
-                />
+                <label htmlFor="email" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-300">Email</label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input !border-slate-600 !bg-slate-950/70 pl-10 !text-white placeholder:!text-slate-600 focus:!border-emerald-300"
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    required
+                  />
+                </div>
               </div>
 
               <div>
-                <label htmlFor="country" className="text-sm font-medium block mb-1.5">Country <span className="text-ccb-muted font-normal">(auto-detected)</span></label>
+                <label htmlFor="country" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-300">Country <span className="font-normal normal-case tracking-normal text-slate-500">(auto-detected)</span></label>
                 <p className="text-xs text-ccb-muted mb-1.5">Locked to your location at signup — you can change it once later in Settings.</p>
+                <div className="relative">
+                <Globe2 className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <select
+                  id="country"
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
-                  className="input cursor-pointer"
+                  className="input cursor-pointer !border-slate-600 !bg-slate-950/70 pl-10 !text-white focus:!border-emerald-300"
                 >
                   <option value="MW">Malawi</option>
                   <option value="ZM">Zambia</option>
@@ -413,6 +424,7 @@ export default function SignupPage() {
                   <option value="SN">Senegal</option>
                   <option value="OTHER">Other</option>
                 </select>
+                </div>
                 <p className="text-xs text-ccb-muted mt-1">Used for competitive divisions and localized pricing.</p>
               </div>
             </div>
@@ -421,7 +433,7 @@ export default function SignupPage() {
           {/* STEP 1: Experience */}
           {step === 1 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-bold">What&apos;s your chess level?</h2>
+              <h2 className="text-sm font-extrabold uppercase tracking-wide text-white">What&apos;s your chess level?</h2>
               <p className="text-sm text-ccb-muted -mt-3">We&apos;ll use this to set your starting ELO.</p>
 
               <div className="grid grid-cols-3 gap-2 pt-2">
@@ -432,10 +444,10 @@ export default function SignupPage() {
                       key={level}
                       type="button"
                       onClick={() => setChessLevel(level)}
-                      className={`rounded-lg border-2 p-4 text-center transition-all ${
+                      className={`rounded-lg border p-3 text-center transition-all sm:p-4 ${
                         chessLevel === level
-                          ? config.accent
-                          : "border-ccb-border bg-ccb-surface hover:bg-ccb-card"
+                          ? "border-emerald-300 bg-emerald-300/10 text-emerald-100"
+                          : "border-slate-700 bg-slate-900/70 text-slate-200 hover:border-slate-500 hover:bg-slate-900"
                       }`}
                     >
                       <span className="text-3xl block mb-1.5">{config.icon}</span>
@@ -456,7 +468,7 @@ export default function SignupPage() {
           {/* STEP 2: Chess.com (optional) */}
           {step === 2 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-bold">Chess.com account?</h2>
+              <h2 className="text-sm font-extrabold uppercase tracking-wide text-white">Chess.com account?</h2>
               <p className="text-sm text-ccb-muted -mt-3">
                 Optional — link it for an accurate starting rating instead of the level estimate.
               </p>
@@ -466,7 +478,7 @@ export default function SignupPage() {
                   <button
                     type="button"
                     onClick={() => setHasChesscom(true)}
-                    className="rounded-lg border border-ccb-border bg-ccb-surface hover:bg-ccb-card p-4 text-center transition-all"
+                    className="rounded-lg border border-slate-700 bg-slate-900/70 p-4 text-center transition-all hover:border-emerald-300/50 hover:bg-slate-900"
                   >
                     <Check className="w-5 h-5 mx-auto mb-1.5 text-green-500" />
                     <span className="text-sm font-semibold">Yes, I have one</span>
@@ -474,7 +486,7 @@ export default function SignupPage() {
                   <button
                     type="button"
                     onClick={() => setHasChesscom(false)}
-                    className="rounded-lg border border-ccb-border bg-ccb-surface hover:bg-ccb-card p-4 text-center transition-all"
+                    className="rounded-lg border border-slate-700 bg-slate-900/70 p-4 text-center transition-all hover:border-slate-500 hover:bg-slate-900"
                   >
                     <span className="text-sm font-semibold block mt-1.5">No, skip this</span>
                     <span className="text-[10px] text-ccb-muted">Use my level rating</span>
@@ -488,10 +500,11 @@ export default function SignupPage() {
                     <label className="text-sm font-medium block mb-1.5">Chess.com Username</label>
                     <div className="relative">
                       <input
+                        id="chesscom-username"
                         type="text"
                         value={chesscomUsername}
                         onChange={(e) => setChesscomUsername(e.target.value)}
-                        className="input w-full pr-10"
+                        className="input w-full !border-slate-600 !bg-slate-950/70 pr-10 !text-white placeholder:!text-slate-600 focus:!border-emerald-300"
                         placeholder="Your Chess.com username"
                         autoFocus
                       />
@@ -508,7 +521,7 @@ export default function SignupPage() {
 
                   {/* Detected profile */}
                   {chesscomVerified && (
-                    <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3 flex items-center gap-3">
+                  <div className="rounded-lg border border-emerald-300/25 bg-emerald-300/10 p-3 flex items-center gap-3">
                       {chesscomVerified.avatar ? (
                         <img src={chesscomVerified.avatar} alt="" className="w-10 h-10 rounded-full" />
                       ) : (
@@ -518,7 +531,7 @@ export default function SignupPage() {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">
-                          <span className="text-green-500 font-semibold">Found</span> · {chesscomVerified.username}
+                          <span className="font-semibold text-emerald-300">Found</span> · {chesscomVerified.username}
                         </p>
                         <div className="flex gap-3 text-xs text-ccb-muted mt-0.5">
                           {chesscomVerified.ratings.rapid && <span>Rapid: {chesscomVerified.ratings.rapid}</span>}
@@ -527,7 +540,7 @@ export default function SignupPage() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-lg font-bold text-ccb-primary">{chesscomVerified.rating}</div>
+                      <div className="text-lg font-bold text-emerald-300">{chesscomVerified.rating}</div>
                         <div className="text-[10px] text-ccb-muted">Starting ELO</div>
                       </div>
                     </div>
@@ -547,7 +560,7 @@ export default function SignupPage() {
                       setChesscomVerified(null);
                       setChesscomUsername("");
                     }}
-                    className="text-xs text-ccb-muted hover:text-ccb-primary"
+                    className="text-xs text-slate-400 hover:text-emerald-300"
                   >
                     Skip — I&apos;ll use my level rating ({chessLevel ? LEVEL_CONFIG[chessLevel].rating : "—"} ELO)
                   </button>
@@ -555,10 +568,10 @@ export default function SignupPage() {
               )}
 
               {hasChesscom === false && (
-                <div className="rounded-lg border border-ccb-border bg-ccb-surface p-4 text-center">
+                  <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-4 text-center">
                   <p className="text-sm">
                     No problem! You&apos;ll start at{" "}
-                    <span className="font-bold text-ccb-primary">
+                    <span className="font-bold text-emerald-300">
                       {chessLevel ? LEVEL_CONFIG[chessLevel].rating : "—"} ELO
                     </span>{" "}
                     based on your level.
@@ -566,7 +579,7 @@ export default function SignupPage() {
                   <button
                     type="button"
                     onClick={() => setHasChesscom(null)}
-                    className="text-xs text-ccb-muted hover:text-ccb-primary mt-2"
+                    className="mt-2 text-xs text-slate-400 hover:text-emerald-300"
                   >
                     Actually, I do have a Chess.com account
                   </button>
@@ -578,26 +591,34 @@ export default function SignupPage() {
           {/* STEP 3: Security */}
           {step === 3 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-bold">Secure your account</h2>
+              <h2 className="text-sm font-extrabold uppercase tracking-wide text-white">Secure your account</h2>
               <p className="text-sm text-ccb-muted -mt-3">Pick a password — at least 8 characters.</p>
 
               <div>
-                <label htmlFor="password" className="text-sm font-medium block mb-1.5">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input"
-                  placeholder="••••••••"
-                  required
-                  minLength={8}
-                  autoFocus
-                />
+                <label htmlFor="password" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-300">Password</label>
+                <div className="relative">
+                  <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input !border-slate-600 !bg-slate-950/70 pl-10 pr-11 !text-white placeholder:!text-slate-600 focus:!border-emerald-300"
+                    placeholder="At least 8 characters"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    autoFocus
+                  />
+                  <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-white/5 hover:text-white" aria-label={showPassword ? "Hide password" : "Show password"}>
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
 
               {/* Summary */}
-              <div className="rounded-lg border border-ccb-border bg-ccb-surface p-3 space-y-1.5">
-                <p className="text-xs font-semibold text-ccb-muted mb-1">Account Summary</p>
+              <div className="space-y-1.5 rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+                <p className="mb-1 text-xs font-semibold text-slate-400">Account Summary</p>
                 <p className="text-sm flex justify-between">
                   <span className="text-ccb-muted">Username</span>
                   <span className="font-medium">{username}</span>
@@ -612,7 +633,7 @@ export default function SignupPage() {
                 </p>
                 <p className="text-sm flex justify-between">
                   <span className="text-ccb-muted">Starting ELO</span>
-                  <span className="font-bold text-ccb-primary">
+                  <span className="font-bold text-emerald-300">
                     {chesscomVerified?.rating || (chessLevel ? LEVEL_CONFIG[chessLevel].rating : "—")}
                   </span>
                 </p>
@@ -631,7 +652,7 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={handleBack}
-                className="flex items-center gap-1 rounded-lg border border-ccb-border bg-ccb-surface hover:bg-ccb-card px-4 py-2.5 text-sm font-medium transition-colors"
+                className="flex items-center gap-1 rounded-lg border border-slate-600 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:border-slate-400 hover:bg-slate-800"
               >
                 <ChevronLeft className="w-4 h-4" /> Back
               </button>
@@ -642,7 +663,7 @@ export default function SignupPage() {
                 type="button"
                 onClick={handleNext}
                 disabled={!canProceed()}
-                className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                className="flex min-h-11 flex-1 items-center justify-center gap-1 rounded-lg bg-gradient-to-r from-emerald-400 to-emerald-500 px-4 text-sm font-black text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Continue <ChevronRight className="w-4 h-4" />
               </button>
@@ -650,7 +671,7 @@ export default function SignupPage() {
               <button
                 type="submit"
                 disabled={loading || !canProceed()}
-                className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="min-h-11 flex-1 rounded-lg bg-gradient-to-r from-emerald-400 to-emerald-500 px-4 text-sm font-black text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? "Creating account..." : "Create account"}
               </button>
@@ -658,17 +679,11 @@ export default function SignupPage() {
           </div>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-ccb-muted mb-3">Already have an account?</p>
-          <Link
-            href={loginLink}
-            className="btn-secondary w-full inline-flex items-center justify-center gap-2 px-6 py-3 text-base font-medium"
-          >
-            Log in
-          </Link>
-        </div>
+        {step === 3 && <p className="mt-3 text-center text-[10px] leading-relaxed text-slate-500">By creating an account, you agree to our <Link href="/terms" className="text-emerald-300 hover:underline">Terms of Service</Link> and <Link href="/privacy" className="text-emerald-300 hover:underline">Privacy Policy</Link>.</p>}
+
+        <p className="mt-5 text-center text-xs text-slate-400">Already have an account? <Link href={loginLink} className="font-bold text-emerald-300 hover:text-emerald-200">Log in</Link></p>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
-

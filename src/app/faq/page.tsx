@@ -1,6 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import { ChevronDown, ArrowRight } from "lucide-react";
+import PublicHomeNav from "@/components/layout/public-home-nav";
+import PublicSiteFooter from "@/components/layout/public-site-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -123,20 +124,7 @@ const FAQ_SECTIONS = [
 export default function FAQPage() {
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Nav */}
-      <nav className="border-b border-ccb-border bg-ccb-surface sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
-          <Link href="/" className="flex items-center gap-2 min-w-0">
-            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
-            <span className="font-bold text-sm sm:text-lg truncate">Crazy Chess Battles</span>
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <Link href="/league" className="btn-ghost text-sm hidden sm:inline-flex">Tournaments</Link>
-            <Link href="/league" className="btn-ghost text-sm">Leagues</Link>
-            <Link href="/signup" className="btn-primary text-sm px-3 sm:px-4">Sign up</Link>
-          </div>
-        </div>
-      </nav>
+      <PublicHomeNav signupUrl="/signup" />
 
       {/* Hero */}
       <section className="px-4 py-10 sm:py-16 text-center">
@@ -151,7 +139,7 @@ export default function FAQPage() {
         <div className="max-w-2xl mx-auto space-y-10">
           {FAQ_SECTIONS.map((section, si) => (
             <div key={si}>
-              <h2 className="text-base sm:text-lg font-bold mb-4 text-ccb-primary">{section.title}</h2>
+              <h2 className="text-base sm:text-lg font-bold mb-4 text-emerald-300">{section.title}</h2>
               <div className="space-y-3">
                 {section.questions.map((faq, qi) => (
                   <details key={qi} className="card group">
@@ -169,36 +157,19 @@ export default function FAQPage() {
       </section>
 
       {/* CTA */}
-      <section className="border-t border-ccb-border py-12 px-4 bg-ccb-primary/5">
+      <section className="border-t border-ccb-border py-12 px-4 bg-emerald-400/5">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-xl font-bold mb-3">Still have questions?</h2>
           <p className="text-sm text-ccb-muted mb-6">
             Join the platform and explore — it&apos;s free to start playing.
           </p>
-          <Link href="/signup" className="btn-primary text-base px-8 py-3 inline-flex items-center gap-2">
+          <Link href="/signup" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-400 to-emerald-500 px-8 py-3 text-base font-black text-slate-950 shadow-[0_0_18px_rgba(16,230,143,.22)] transition hover:brightness-110 items-center gap-2">
             Get Started <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-ccb-border py-6 px-4">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row-reverse items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="w-6 h-6 rounded-full shrink-0" />
-            <span className="text-xs sm:text-sm text-ccb-muted">© 2026 Crazy Chess Battles</span>
-          </div>
-          <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-ccb-muted flex-wrap justify-center">
-            <Link href="/" className="hover:text-ccb-text transition-colors">Home</Link>
-            <Link href="/how-it-works" className="hover:text-ccb-text transition-colors">How it Works</Link>
-            <Link href="/league" className="hover:text-ccb-text transition-colors">Leagues</Link>
-            <Link href="/league" className="hover:text-ccb-text transition-colors">Tournaments</Link>
-            <Link href="/about" className="hover:text-ccb-text transition-colors">About</Link>
-            <Link href="/terms" className="hover:text-ccb-text transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-ccb-text transition-colors">Privacy</Link>
-          </div>
-        </div>
-      </footer>
+      <PublicSiteFooter />
     </div>
   );
 }

@@ -1,5 +1,5 @@
-import Link from "next/link";
-import Image from "next/image";
+import PublicHomeNav from "@/components/layout/public-home-nav";
+import PublicSiteFooter from "@/components/layout/public-site-footer";
 
 import { pageMetadata } from "@/lib/seo/metadata";
 
@@ -11,12 +11,9 @@ export const metadata = pageMetadata({
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-ccb-dark text-ccb-text">
-      <div className="max-w-2xl mx-auto px-4 py-12">
-        <div className="flex items-center gap-3 mb-8">
-          <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-8 h-8 rounded-full" />
-          <Link href="/" className="text-ccb-muted hover:text-ccb-primary text-sm">← Back to CCB</Link>
-        </div>
+    <div className="min-h-screen bg-[#07111b] text-ccb-text">
+      <PublicHomeNav signupUrl="/signup" />
+      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
         
         <h1 className="text-3xl font-bold mb-2">Terms of Service</h1>
         <p className="text-sm text-ccb-muted mb-8">Last updated: August 25, 2026</p>
@@ -110,6 +107,7 @@ export default function TermsPage() {
           </section>
         </div>
       </div>
+      <PublicSiteFooter />
     </div>
   );
 }

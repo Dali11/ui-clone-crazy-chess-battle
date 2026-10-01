@@ -1,10 +1,10 @@
 import Link from "next/link";
-import Image from "next/image";
 import {
   Users, Smartphone, Swords, Trophy, Wallet, ArrowRight, Check,
   Gamepad2, Clock, Crown, ChevronRight, Zap, Disc3,
 } from "lucide-react";
-import HomeStats from "../home-stats";
+import PublicHomeNav from "@/components/layout/public-home-nav";
+import PublicSiteFooter from "@/components/layout/public-site-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -19,26 +19,13 @@ export const metadata = pageMetadata({
 export default function HowItWorksPage() {
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Nav */}
-      <nav className="border-b border-ccb-border bg-ccb-surface sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
-          <Link href="/" className="flex items-center gap-2 min-w-0">
-            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
-            <span className="font-bold text-sm sm:text-lg truncate">Crazy Chess Battles</span>
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <Link href="/league" className="btn-ghost text-sm hidden sm:inline-flex">Tournaments</Link>
-            <Link href="/league" className="btn-ghost text-sm">Leagues</Link>
-            <Link href="/signup" className="btn-primary text-sm px-3 sm:px-4">Sign up</Link>
-          </div>
-        </div>
-      </nav>
+      <PublicHomeNav signupUrl="/signup" />
 
       {/* Hero */}
       <section className="px-4 py-12 sm:py-20 text-center">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-4">
-            How <span className="text-ccb-primary">Crazy Chess Battles</span> works
+            How <span className="text-emerald-300">Crazy Chess Battles</span> works
           </h1>
           <p className="text-sm sm:text-lg text-ccb-muted">
             From zero to your first tournament in minutes. Here&apos;s everything you need to know.
@@ -50,8 +37,8 @@ export default function HowItWorksPage() {
       <section className="border-t border-ccb-border px-4 py-12 sm:py-16">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-start gap-4 sm:gap-6">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-ccb-primary/10 flex items-center justify-center shrink-0">
-              <Users className="w-6 h-6 sm:w-7 sm:h-7 text-ccb-primary" />
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-400/10 flex items-center justify-center shrink-0">
+              <Users className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-300" />
             </div>
             <div className="space-y-4">
               <div>
@@ -139,7 +126,7 @@ export default function HowItWorksPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="card">
-                  <Zap className="w-5 h-5 text-ccb-primary mb-2" />
+                  <Zap className="w-5 h-5 text-emerald-300 mb-2" />
                   <h3 className="font-semibold text-sm mb-1">Quick Match</h3>
                   <p className="text-xs text-ccb-muted">Get matched with a player at your skill level. Bullet, blitz, or rapid.</p>
                 </div>
@@ -159,7 +146,7 @@ export default function HowItWorksPage() {
                   <p className="text-xs text-ccb-muted">International draughts (10×10). Play vs computer or challenge a friend online.</p>
                 </div>
                 <div className="card">
-                  <Gamepad2 className="w-5 h-5 text-ccb-primary mb-2" />
+                  <Gamepad2 className="w-5 h-5 text-emerald-300 mb-2" />
                   <h3 className="font-semibold text-sm mb-1">Play vs Computer</h3>
                   <p className="text-xs text-ccb-muted">Practice chess or draughts against the AI. No rating impact — just sharpen your skills.</p>
                 </div>
@@ -202,8 +189,8 @@ export default function HowItWorksPage() {
       <section className="border-t border-ccb-border px-4 py-12 sm:py-16 bg-ccb-surface/30">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-start gap-4 sm:gap-6">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-ccb-primary/10 flex items-center justify-center shrink-0">
-              <Crown className="w-6 h-6 sm:w-7 sm:h-7 text-ccb-primary" />
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-400/10 flex items-center justify-center shrink-0">
+              <Crown className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-300" />
             </div>
             <div className="space-y-4">
               <div>
@@ -221,7 +208,7 @@ export default function HowItWorksPage() {
                   "Hosting larger events: Chess.com verified, 7+ day account, 20+ games played",
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm text-ccb-muted">
-                    <ChevronRight className="w-4 h-4 text-ccb-primary shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-emerald-300 shrink-0" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -232,34 +219,17 @@ export default function HowItWorksPage() {
       </section>
 
       {/* CTA */}
-      <section className="border-t border-ccb-border py-12 sm:py-20 px-4 bg-ccb-primary/5">
+      <section className="border-t border-ccb-border py-12 sm:py-20 px-4 bg-emerald-400/5">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-xl sm:text-3xl font-bold mb-4">Ready to make your first move?</h2>
           <p className="text-sm text-ccb-muted mb-6">Join Malawi&apos;s competitive chess community.</p>
-          <Link href="/signup" className="btn-primary text-base px-8 py-3 inline-flex items-center gap-2">
+          <Link href="/signup" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-400 to-emerald-500 px-8 py-3 text-base font-black text-slate-950 shadow-[0_0_18px_rgba(16,230,143,.22)] transition hover:brightness-110">
             Create Free Account <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-ccb-border py-6 sm:py-8 px-4">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row-reverse items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-2">
-            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={24} height={24} className="w-6 h-6 rounded-full shrink-0" />
-            <span className="text-xs sm:text-sm text-ccb-muted">© 2026 Crazy Chess Battles</span>
-          </div>
-          <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-ccb-muted flex-wrap justify-center">
-            <Link href="/" className="hover:text-ccb-text transition-colors">Home</Link>
-            <Link href="/league" className="hover:text-ccb-text transition-colors">Leagues</Link>
-            <Link href="/league" className="hover:text-ccb-text transition-colors">Tournaments</Link>
-            <Link href="/faq" className="hover:text-ccb-text transition-colors">FAQ</Link>
-            <Link href="/about" className="hover:text-ccb-text transition-colors">About</Link>
-            <Link href="/terms" className="hover:text-ccb-text transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-ccb-text transition-colors">Privacy</Link>
-          </div>
-        </div>
-      </footer>
+      <PublicSiteFooter />
     </div>
   );
 }

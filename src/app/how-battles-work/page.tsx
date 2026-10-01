@@ -1,9 +1,10 @@
 import Link from "next/link";
-import Image from "next/image";
 import {
   Wallet, Swords, Clock, Trophy, Zap, Timer, EyeOff,
   Scale, TrendingUp, ArrowRight,
 } from "lucide-react";
+import PublicHomeNav from "@/components/layout/public-home-nav";
+import PublicSiteFooter from "@/components/layout/public-site-footer";
 
 import { pageMetadata } from "@/lib/seo/metadata";
 
@@ -64,25 +65,13 @@ const SECTIONS = [
 export default function HowBattlesWorkPage() {
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Nav */}
-      <nav className="border-b border-ccb-border bg-ccb-surface sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
-          <Link href="/" className="flex items-center gap-2 min-w-0">
-            <Image src="/logo-badge.png" alt="Crazy Chess Battles" width={32} height={32} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
-            <span className="font-bold text-sm sm:text-lg truncate">Crazy Chess Battles</span>
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <Link href="/battles" className="btn-ghost text-sm hidden sm:inline-flex">Battles</Link>
-            <Link href="/signup" className="btn-primary text-sm px-3 sm:px-4">Sign up</Link>
-          </div>
-        </div>
-      </nav>
+      <PublicHomeNav signupUrl="/signup" />
 
       {/* Hero */}
       <section className="px-4 py-12 sm:py-16 text-center">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-4">
-            How <span className="text-ccb-primary">Battles</span> work
+            How <span className="text-emerald-300">Battles</span> work
           </h1>
           <p className="text-sm sm:text-lg text-ccb-muted">
             Everything about head-to-head battles on Crazy Chess Battles — from finding an opponent to claiming the win. Play hard.
@@ -95,8 +84,8 @@ export default function HowBattlesWorkPage() {
         <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
           {SECTIONS.map((s, i) => (
             <div key={s.title} className="p-5 sm:p-6 rounded-2xl border border-ccb-border bg-ccb-surface/50 flex items-start gap-4 sm:gap-5">
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-ccb-primary/10 flex items-center justify-center shrink-0">
-                <s.icon className="w-5 h-5 sm:w-6 sm:h-6 text-ccb-primary" />
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-emerald-400/10 flex items-center justify-center shrink-0">
+                <s.icon className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-300" />
               </div>
               <div className="min-w-0">
                 <div className="text-ccb-muted text-xs font-mono mb-1">{String(i + 1).padStart(2, "0")}</div>
@@ -117,12 +106,13 @@ export default function HowBattlesWorkPage() {
           </p>
           <Link
             href="/battles"
-            className="btn-primary inline-flex items-center gap-2 text-base px-6 py-3.5"
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-400 to-emerald-500 px-6 py-3.5 text-base font-black text-slate-950 shadow-[0_0_18px_rgba(16,230,143,.22)] transition hover:brightness-110"
           >
             <Swords className="w-5 h-5" /> Find a Battle <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
+      <PublicSiteFooter />
     </div>
   );
 }
