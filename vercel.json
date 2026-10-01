@@ -5,48 +5,6 @@
     "NEXT_PUBLIC_SUPABASE_URL": "https://jykrncwtrmegmzimqekf.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5a3JuY3d0cm1lZ216aW1xZWtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5NDU5MDgsImV4cCI6MjEwMDUyMTkwOH0.GqVNE0xi-SBcHqNCDX-hTPSM_wJ89BCbLZutcHWj93k"
   },
-  "crons": [
-    {
-      "path": "/api/tournaments/cron",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/battles/heal-stuck",
-      "schedule": "*/2 * * * *"
-    },
-    {
-      "path": "/api/game/timeout",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/battles/challenge/cleanup-expired",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/tournaments/reminder-check",
-      "schedule": "30 13 * * *"
-    },
-    {
-      "path": "/api/tournaments/daily-create",
-      "schedule": "0 0 * * 1"
-    },
-    {
-      "path": "/api/cron/refresh-fx",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/league/xp/settle",
-      "schedule": "5 22 * * *"
-    },
-    {
-      "path": "/api/cron/revenue-sweep",
-      "schedule": "15 22 * * 0"
-    },
-    {
-      "path": "/api/cron/reconcile-payouts",
-      "schedule": "*/15 * * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/sw.js",
